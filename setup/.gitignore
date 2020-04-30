@@ -1,0 +1,14 @@
+/channels
+/conda
+/lcls2
+/relmanage
+
+/finufft
+/cupy
+/gasnet
+/legion
+/install
+/mpi4py-*
+
+/env.sh
+/temp_env_create.yaml
