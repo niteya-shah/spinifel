@@ -98,6 +98,7 @@ fi
 
 rm -rf finufft
 git clone git@github.com:AntoineDujardin/finufft.git
+./rebuild_finufft.sh
 
 echo
 echo "Done. Please run 'source env.sh' to use this build."
