@@ -19,7 +19,7 @@ export CRAYPE_LINK_TYPE=dynamic # allow dynamic linking
 unset PYTHONSTARTUP
 
 # Make sure Cray-FFTW get loaded first to avoid Conda's MKL
-export LD_PRELOAD=/opt/cray/pe/fftw/3.3.8.2/haswell/lib/libfftw3.so
+export LD_PRELOAD="$FFTW_DIR/libfftw3.so"
 
 export USE_CUDA=${USE_CUDA:-0}
 export USE_GASNET=${USE_GASNET:-1}
