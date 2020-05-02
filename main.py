@@ -11,6 +11,8 @@ def print_region(data):
 
 @task
 def main():
+    print("In main", flush=True)
+
     det_shape = (4, 512, 512)
     N_images = 1000
 
