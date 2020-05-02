@@ -92,7 +92,7 @@ fi
 if [[ $LG_RT_DIR == $PWD/legion/runtime ]]; then
     rm -rf legion
     rm -rf install
-    git clone https://gitlab.com/StanfordLegion/legion.git
+    git clone -b control_replication https://gitlab.com/StanfordLegion/legion.git
     ./reconfigure_legion.sh
     ./rebuild_legion.sh
 fi
