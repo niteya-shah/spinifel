@@ -60,7 +60,7 @@ rm -rf conda
 source env.sh
 
 # Install Conda environment.
-wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-$(uname -p).sh -O conda-installer.sh
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-$(uname -p).sh -O conda-installer.sh
 bash ./conda-installer.sh -b -p $CONDA_ROOT
 rm conda-installer.sh
 source $CONDA_ROOT/etc/profile.d/conda.sh
