@@ -9,7 +9,7 @@ from pygion import acquire, attach_hdf5, task, Fspace, Ispace, Region, R
 def print_region(data):
     print(data.images)
 
-@task
+@task(replicable=True)
 def main():
     print("In main", flush=True)
 
