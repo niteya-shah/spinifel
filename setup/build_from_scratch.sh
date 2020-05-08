@@ -47,7 +47,6 @@ export PYTHONPATH="\$LEGION_INSTALL_DIR/lib/python\$PYVER/site-packages:\$PYTHON
 
 export CONDA_ROOT="$PWD/conda"
 export CONDA_ENV_DIR="\$CONDA_ROOT/envs/myenv"
-export LD_LIBRARY_PATH="\$CONDA_ENV_DIR/lib:\$LD_LIBRARY_PATH"
 
 if [[ -d \$CONDA_ROOT ]]; then
   source "\$CONDA_ROOT/etc/profile.d/conda.sh"
@@ -95,6 +94,7 @@ if [[ $LG_RT_DIR == $PWD/legion/runtime ]]; then
     git clone -b control_replication https://gitlab.com/StanfordLegion/legion.git
     ./reconfigure_legion.sh
     ./rebuild_legion.sh
+    cp "$CONDA_ENV_DIR"/lib/libhdf5* "$LEGION_INSTALL_DIR"/lib/
 fi
 
 rm -rf finufft
