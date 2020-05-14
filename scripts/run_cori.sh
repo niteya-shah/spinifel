@@ -24,4 +24,4 @@ nodes=$SLURM_JOB_NUM_NODES
 
 sockets=2
 cores=10
-srun -n 1 legion_python main.py -ll:py 1
+srun -n 1 legion_python legion_main.py -ll:py 1
