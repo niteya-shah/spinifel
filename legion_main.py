@@ -14,7 +14,7 @@ def print_region(data):
 
 @task(replicable=True)
 def main():
-    print("In main", flush=True)
+    print("In Legion main", flush=True)
 
     data = Region((parms.N_images,) + parms.det_shape,
                   {'images': pygion.float64})

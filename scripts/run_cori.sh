@@ -6,6 +6,14 @@
 #SBATCH --mail-type=ALL
 #SBATCH --account=m2859
 
+while getopts l option
+do
+case "${option}"
+in
+l) USING_LEGION="1";;
+esac
+done
+
 root_dir="$PWD"
 
 source "$root_dir"/setup/env.sh
@@ -22,6 +30,10 @@ echo "OMP_NUM_THREADS: $OMP_NUM_THREADS"
 
 nodes=$SLURM_JOB_NUM_NODES
 
-sockets=2
-cores=10
-srun -n 1 legion_python legion_main.py -ll:py 1
+if [[ $USING_LEGION -eq 1 ]]; then
+    sockets=2
+    cores=10
+    srun -n 1 legion_python legion_main.py -ll:py 1
+else
+    python sequential_main.py
+fi
