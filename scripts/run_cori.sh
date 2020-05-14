@@ -33,7 +33,7 @@ nodes=$SLURM_JOB_NUM_NODES
 if [[ $USING_LEGION -eq 1 ]]; then
     sockets=2
     cores=10
-    srun -n 1 legion_python legion_main.py -ll:py 1
+    srun -n 1 legion_python legion_main.py -ll:py 1 -ll:csize 16384
 else
     python sequential_main.py
 fi

@@ -1,8 +1,8 @@
 import h5py
-import numpy
+import numpy as np
 import os
 import pygion
-from pygion import acquire, attach_hdf5, task, Region, R
+from pygion import acquire, attach_hdf5, task, Partition, Region, R
 
 from spinifel import parms
 
@@ -16,12 +16,17 @@ def print_region(data):
 def main():
     print("In Legion main", flush=True)
 
-    data = Region((parms.N_images,) + parms.det_shape,
-                  {'images': pygion.float64})
+    N_images = 1
 
-    with attach_hdf5(data, str(parms.data_path), {'images': 'slices'},
+    det_shape = parms.det_shape
+    data_type = getattr(pygion, parms.data_type_str)
+
+    data = Region((N_images,) + det_shape, {'images': data_type})
+
+    with attach_hdf5(data, str(parms.data_path),
+                     {'images': parms.data_field_name},
                      pygion.file_read_only):
-        pass
+        print_region(data)
 
 
 if __name__ == '__main__':
