@@ -4,7 +4,7 @@ import os
 import pygion
 from pygion import acquire, attach_hdf5, task, Region, R
 
-import parms
+from spinifel import parms
 
 
 @task(privileges=[R])
