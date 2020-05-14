@@ -2,13 +2,15 @@ import h5py
 import numpy
 import os
 import pygion
-from pygion import acquire, attach_hdf5, task, Fspace, Ispace, Region, R
+from pygion import acquire, attach_hdf5, task, Region, R
 
 import parms
+
 
 @task(privileges=[R])
 def print_region(data):
     print(data.images)
+
 
 @task(replicable=True)
 def main():
@@ -20,6 +22,7 @@ def main():
     with attach_hdf5(data, str(parms.data_path), {'images': 'slices'},
                      pygion.file_read_only):
         pass
+
 
 if __name__ == '__main__':
     main()
