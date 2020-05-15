@@ -22,7 +22,7 @@ export PYTHONPATH="$PYTHONPATH:$root_dir"
 
 export DATA_DIR=$SCRATCH/spinifel_data
 
-export OUT_DIR=$SCRATCH/spinifel_output_job_$SLURM_JOB_ID
+export OUT_DIR=$SCRATCH/spinifel_output
 mkdir -p $OUT_DIR
 
 export OMP_NUM_THREADS=1
