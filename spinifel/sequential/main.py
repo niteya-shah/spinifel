@@ -1,5 +1,7 @@
 from spinifel import parms
-from spinifel.sequential import get_data, solve_ac
+
+from .prep import get_data
+from .autocorrelation import solve_ac
 
 
 def main():
