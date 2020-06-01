@@ -76,6 +76,7 @@ PACKAGE_LIST=(
 
     cffi  # Legion
     pybind11  # FINUFFT
+    numba  # pysingfel
 )
 
 conda create -y -p "$CONDA_ENV_DIR" "${PACKAGE_LIST[@]}" -c defaults -c anaconda
@@ -100,6 +101,10 @@ fi
 rm -rf finufft
 git clone git@github.com:AntoineDujardin/finufft.git
 ./rebuild_finufft.sh
+
+rm -rf pysingfel
+git clone git@github.com:AntoineDujardin/pysingfel.git
+./rebuild_pysingfel.sh
 
 echo
 echo "Done. Please run 'source env.sh' to use this build."

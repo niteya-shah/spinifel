@@ -4,6 +4,7 @@
 /relmanage
 
 /finufft
+/pysingfel
 /cupy
 /gasnet
 /legion
