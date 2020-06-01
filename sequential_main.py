@@ -28,7 +28,7 @@ def show_image(pixel_index_map, image, filename):
 def main():
     print("In sequential main", flush=True)
 
-    N_images = 1
+    N_images = 1000
     det_shape = parms.det_shape
 
     with h5py.File(parms.data_path, 'r') as h5f:
@@ -38,7 +38,10 @@ def main():
     pixel_position_reciprocal = np.moveaxis(pixel_position_reciprocal, -1, 0)
     pixel_index_map = np.moveaxis(pixel_index_map, -1, 0)
 
-    show_image(pixel_index_map, slices_[0], "test.png")
+    show_image(pixel_index_map, slices_[0], "image_0.png")
+
+    mean_image = slices_.mean(axis=0)
+    show_image(pixel_index_map, mean_image, "mean_image.png")
 
 
 if __name__ == '__main__':
