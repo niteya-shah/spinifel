@@ -80,13 +80,9 @@ def clipping_index(arr, n):
     return arr
 
 
-def main():
-    print("In sequential main", flush=True)
-
-    # Setup
-
-    N_images = 1000
-    det_shape = parms.det_shape
+def get_data(N_images):
+    N_clipping = 1
+    N_binning = 4
 
     with h5py.File(parms.data_path, 'r') as h5f:
         pixel_position_reciprocal = h5f['pixel_position_reciprocal'][:]
@@ -108,8 +104,6 @@ def main():
     plt.cla()
     plt.clf()
 
-    N_clipping = 1
-    N_binning = 4
     binning_sum = lambda arr: bin2nx2n_sum(
         clipping(arr, N_clipping), N_binning)
     binning_mean = lambda arr: bin2nx2n_mean(
@@ -133,6 +127,23 @@ def main():
     plt.savefig(parms.out_dir / "saxs_binned.png")
     plt.cla()
     plt.clf()
+
+    return (pixel_position_reciprocal,
+            pixel_distance_reciprocal,
+            pixel_index_map,
+            slices_)
+
+
+def main():
+    print("In sequential main", flush=True)
+
+    N_images = 1000
+    det_shape = parms.det_shape
+
+    (pixel_position_reciprocal,
+     pixel_distance_reciprocal,
+     pixel_index_map,
+     slices_) = get_data(N_images)
 
     # Solve AC
 
