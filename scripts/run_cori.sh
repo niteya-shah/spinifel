@@ -24,6 +24,7 @@ export DATA_DIR=$SCRATCH/spinifel_data
 
 export OUT_DIR=$SCRATCH/spinifel_output
 mkdir -p $OUT_DIR
+rm -rf $OUT_DIR/*
 
 export OMP_NUM_THREADS=1
 echo "OMP_NUM_THREADS: $OMP_NUM_THREADS"
