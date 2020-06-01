@@ -134,19 +134,10 @@ def get_data(N_images):
             slices_)
 
 
-def main():
-    print("In sequential main", flush=True)
-
-    N_images = 1000
-    det_shape = parms.det_shape
-
-    (pixel_position_reciprocal,
-     pixel_distance_reciprocal,
-     pixel_index_map,
-     slices_) = get_data(N_images)
-
-    # Solve AC
-
+def solve_ac(N_images,
+             pixel_position_reciprocal,
+             pixel_distance_reciprocal,
+             slices_):
     orientations = ps.get_random_quat(N_images)
     rotmat = np.array([ps.quaternion2rot3d(quat) for quat in orientations])
     H, K, L = np.einsum("ijk,klmn->jilmn", rotmat, pixel_position_reciprocal)
@@ -164,6 +155,24 @@ def main():
     plt.savefig(parms.out_dir / "star_0.png")
     plt.cla()
     plt.clf()
+
+
+
+def main():
+    print("In sequential main", flush=True)
+
+    N_images = 1000
+    det_shape = parms.det_shape
+
+    (pixel_position_reciprocal,
+     pixel_distance_reciprocal,
+     pixel_index_map,
+     slices_) = get_data(N_images)
+
+    solve_ac(N_images,
+             pixel_position_reciprocal,
+             pixel_distance_reciprocal,
+             slices_)
 
 
 if __name__ == '__main__':
