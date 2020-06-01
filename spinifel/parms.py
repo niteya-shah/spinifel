@@ -1,5 +1,10 @@
+import matplotlib
+import numpy
 import os
 from pathlib import Path
+
+matplotlib.use("Agg")
+numpy.seterr(divide='ignore', invalid='ignore')
 
 
 det_shape = (4, 512, 512)
