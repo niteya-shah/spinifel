@@ -6,15 +6,15 @@ from matplotlib.colors import LogNorm
 from spinifel import parms
 
 
-def get_saxs(pixel_position_reciprocal, slices):
-    qs = np.sqrt((pixel_position_reciprocal**2).sum(axis=0)).flatten()
-    qs /= qs.max()
+def get_saxs(pixel_distance_reciprocal, mean_image):
+    qs = pixel_distance_reciprocal.flatten()
     N = 100
-    idx = (qs*N).astype(np.int)
-    saxs_acc = np.bincount(idx, slices[:].sum(axis=0).flatten(), N)
+    q_max = qs.max()
+    idx = (N*qs/q_max).astype(np.int)
+    saxs_acc = np.bincount(idx, mean_image.flatten(), N)
     saxs_wgt = np.bincount(idx, None, N)
     saxs = saxs_acc / saxs_wgt
-    return saxs
+    return np.linspace(0, q_max, N+1), saxs
 
 
 def show_image(pixel_index_map, image, filename):
@@ -42,6 +42,13 @@ def main():
 
     mean_image = slices_.mean(axis=0)
     show_image(pixel_index_map, mean_image, "mean_image.png")
+
+    pixel_distance_reciprocal = np.sqrt(
+        (pixel_position_reciprocal**2).sum(axis=0))
+    saxs_qs, saxs = get_saxs(pixel_distance_reciprocal, mean_image)
+    plt.figure()
+    plt.semilogy(saxs_qs, saxs)
+    plt.savefig(parms.out_dir / "saxs.png")
 
 
 if __name__ == '__main__':
