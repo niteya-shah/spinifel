@@ -16,6 +16,7 @@ def main():
      slices_) = get_data(N_images)
 
     solve_ac(N_images,
+             det_shape,
              pixel_position_reciprocal,
              pixel_distance_reciprocal,
              slices_)
