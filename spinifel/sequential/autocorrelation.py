@@ -1,12 +1,20 @@
 import finufftpy as nfft
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.colors import LogNorm
+from matplotlib.colors import LogNorm, SymLogNorm
 from scipy.sparse.linalg import LinearOperator, cg
 
 import pysingfel as ps
 
 from spinifel import parms, utils
+
+
+def show_ac(ac, Mquat, number):
+    ac_midz = ac[..., 2*Mquat]
+    plt.imshow(ac_midz, norm=SymLogNorm(1e-3))
+    plt.savefig(parms.out_dir / "autocorrelation_{}.png".format(number))
+    plt.cla()
+    plt.clf()
 
 
 def forward(uvect, H, K, L, support, M, N,
@@ -108,7 +116,6 @@ def solve_ac(pixel_position_reciprocal,
 
     def callback(xk):
         callback.counter += 1
-        print('+', end='')
     callback.counter = 0
 
     x0 = ac_estimate.flatten()
@@ -118,5 +125,11 @@ def solve_ac(pixel_position_reciprocal,
     W = al * A.H * D * A + rl * I
     d = al * A.H * D * b + rl * x0
     ret, info = cg(W, d, x0=x0, maxiter=maxiter, callback=callback)
-    print('')
-    return ret.reshape((M,)*3), callback.counter
+    ac = ret.reshape((M,)*3)
+    assert np.all(np.isreal(ac))  # if use_reciprocal_symmetry
+    ac = ac.real
+    it_number = callback.counter
+
+    show_ac(ac, Mquat, 0)
+
+    return ac, it_number
