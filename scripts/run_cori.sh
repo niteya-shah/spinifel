@@ -6,7 +6,7 @@
 #SBATCH --mail-type=ALL
 #SBATCH --account=m2859
 
-while getopts lmpsn: option
+while getopts lmpsn:t: option
 do
 case "${option}"
 in
@@ -15,6 +15,7 @@ m) USING_MPI="1";;
 p) PROFILING="1";;
 s) SMALL_PROBLEM="1";;
 n) NTASKS=$OPTARG;;
+t) OMP_NUM_THREADS=$OPTARG;;
 esac
 done
 
@@ -42,6 +43,7 @@ if [[ -z $NTASKS ]]; then
 fi
 echo "NTASKS: $NTASKS"
 
+export OMP_NUM_THREADS
 echo "OMP_NUM_THREADS: $OMP_NUM_THREADS"
 
 export SMALL_PROBLEM
