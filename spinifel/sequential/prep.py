@@ -7,9 +7,6 @@ from spinifel import parms, prep
 
 
 def get_data(N_images):
-    N_clipping = 1
-    N_binning = 4
-
     with h5py.File(parms.data_path, 'r') as h5f:
         pixel_position_reciprocal = h5f['pixel_position_reciprocal'][:]
         pixel_index_map = h5f['pixel_index_map'][:]
@@ -31,11 +28,11 @@ def get_data(N_images):
     plt.clf()
 
     binning_sum = lambda arr: prep.bin2nx2n_sum(
-        prep.clipping(arr, N_clipping), N_binning)
+        prep.clipping(arr, parms.N_clipping), parms.N_binning)
     binning_mean = lambda arr: prep.bin2nx2n_mean(
-        prep.clipping(arr, N_clipping), N_binning)
+        prep.clipping(arr, parms.N_clipping), parms.N_binning)
     binning_index = lambda arr: prep.bin2nx2n_index(
-        prep.clipping_index(arr, N_clipping), N_binning)
+        prep.clipping_index(arr, parms.N_clipping), parms.N_binning)
 
     pixel_position_reciprocal = binning_mean(pixel_position_reciprocal)
     pixel_index_map = binning_index(pixel_index_map)
