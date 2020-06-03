@@ -35,15 +35,14 @@ export OUT_DIR=$SCRATCH/spinifel_output
 mkdir -p $OUT_DIR
 rm -rf $OUT_DIR/*
 
-export OMP_NUM_THREADS=1
-echo "OMP_NUM_THREADS: $OMP_NUM_THREADS"
-
 nodes=$SLURM_JOB_NUM_NODES
 
 if [[ -z $NTASKS ]]; then
 	NTASKS="1"
 fi
 echo "NTASKS: $NTASKS"
+
+echo "OMP_NUM_THREADS: $OMP_NUM_THREADS"
 
 export SMALL_PROBLEM
 
