@@ -6,13 +6,14 @@
 #SBATCH --mail-type=ALL
 #SBATCH --account=m2859
 
-while getopts lmpn: option
+while getopts lmpsn: option
 do
 case "${option}"
 in
 l) USING_LEGION="1";;
 m) USING_MPI="1";;
 p) PROFILING="1";;
+s) SMALL_PROBLEM="1";;
 n) NTASKS=$OPTARG;;
 esac
 done
@@ -43,6 +44,8 @@ if [[ -z $NTASKS ]]; then
 	NTASKS="1"
 fi
 echo "NTASKS: $NTASKS"
+
+export SMALL_PROBLEM
 
 if [[ $USING_LEGION -eq 1 ]]; then
     sockets=2
