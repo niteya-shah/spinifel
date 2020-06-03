@@ -19,6 +19,6 @@ data_path = data_dir / "2CEX-10k-2.h5"
 out_dir = Path(os.environ.get("OUT_DIR", ""))
 
 if os.environ.get("SMALL_PROBLEM") == "1":
-    N_images = 10
+    N_images_per_rank = 10
 else:
-    N_images = 1000
+    N_images_per_rank = 1000

@@ -7,7 +7,7 @@ from .autocorrelation import solve_ac
 def main():
     print("In sequential main", flush=True)
 
-    N_images = parms.N_images
+    N_images = parms.N_images_per_rank
     det_shape = parms.det_shape
 
     timer = utils.Timer()
