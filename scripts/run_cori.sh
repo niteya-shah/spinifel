@@ -6,11 +6,13 @@
 #SBATCH --mail-type=ALL
 #SBATCH --account=m2859
 
-while getopts l option
+while getopts lpn: option
 do
 case "${option}"
 in
 l) USING_LEGION="1";;
+p) PROFILING="1";;
+n) NTASKS=$OPTARG;;
 esac
 done
 
@@ -31,10 +33,18 @@ echo "OMP_NUM_THREADS: $OMP_NUM_THREADS"
 
 nodes=$SLURM_JOB_NUM_NODES
 
+if [[ -z $NTASKS ]]; then
+	NTASKS="1"
+fi
+echo "NTASKS: $NTASKS"
+
 if [[ $USING_LEGION -eq 1 ]]; then
     sockets=2
     cores=10
-    srun -n 1 legion_python legion_main.py -ll:py 1 -ll:csize 16384
+    srun -n $NTASKS legion_python legion_main.py -ll:py 1 -ll:csize 16384
 else
-    python sequential_main.py
+    if [[ $PROFILING -eq 1 ]]; then
+        PYFLAGS="-m cProfile -o $OUT_DIR/main.prof "$PYFLAGS
+    fi
+    python $PYFLAGS sequential_main.py
 fi
