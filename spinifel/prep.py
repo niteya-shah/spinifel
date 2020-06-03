@@ -76,3 +76,11 @@ def clipping_index(arr, n):
     for i in range(2):
         arr[i] -= arr[i].min()
     return arr
+
+
+binning_sum = lambda arr: bin2nx2n_sum(
+    clipping(arr, parms.N_clipping), parms.N_binning)
+binning_mean = lambda arr: bin2nx2n_mean(
+    clipping(arr, parms.N_clipping), parms.N_binning)
+binning_index = lambda arr: bin2nx2n_index(
+    clipping_index(arr, parms.N_clipping), parms.N_binning)

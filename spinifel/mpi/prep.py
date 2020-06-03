@@ -47,17 +47,10 @@ def get_data(N_images_per_rank):
         plt.cla()
         plt.clf()
 
-    binning_sum = lambda arr: prep.bin2nx2n_sum(
-        prep.clipping(arr, parms.N_clipping), parms.N_binning)
-    binning_mean = lambda arr: prep.bin2nx2n_mean(
-        prep.clipping(arr, parms.N_clipping), parms.N_binning)
-    binning_index = lambda arr: prep.bin2nx2n_index(
-        prep.clipping_index(arr, parms.N_clipping), parms.N_binning)
-
     if rank == 0:
-        pixel_position_reciprocal = binning_mean(pixel_position_reciprocal)
-        pixel_index_map = binning_index(pixel_index_map)
-    slices_ = binning_sum(slices_)
+        pixel_position_reciprocal = prep.binning_mean(pixel_position_reciprocal)
+        pixel_index_map = prep.binning_index(pixel_index_map)
+    slices_ = prep.binning_sum(slices_)
 
     if rank == 0:
         prep.show_image(pixel_index_map, slices_[0], "image_binned_0.png")
