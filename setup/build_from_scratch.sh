@@ -77,9 +77,15 @@ PACKAGE_LIST=(
     cffi  # Legion
     pybind11  # FINUFFT
     numba  # pysingfel
+    scikit-learn  # pysingfel
 )
 
 conda create -y -p "$CONDA_ENV_DIR" "${PACKAGE_LIST[@]}" -c defaults -c anaconda
+conda activate "$CONDA_ENV_DIR"
+
+if [[ $(hostname) = "cori"* ]]; then
+    CC=gcc MPICC=cc pip install -v --no-binary mpi4py mpi4py
+fi
 
 if [[ $USE_GASNET -eq 1 && $GASNET_ROOT == $PWD/gasnet/release ]]; then
     rm -rf gasnet
@@ -105,6 +111,8 @@ git clone git@github.com:AntoineDujardin/finufft.git
 rm -rf pysingfel
 git clone git@github.com:AntoineDujardin/pysingfel.git
 ./rebuild_pysingfel.sh
+
+pip check
 
 echo
 echo "Done. Please run 'source env.sh' to use this build."

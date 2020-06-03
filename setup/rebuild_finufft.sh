@@ -8,6 +8,6 @@ source "$root_dir"/env.sh
 pushd "$root_dir"/finufft
 
 make -j8 lib
-pip install .
+pip install --no-deps .
 
 popd

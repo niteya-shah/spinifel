@@ -6,15 +6,21 @@
 #SBATCH --mail-type=ALL
 #SBATCH --account=m2859
 
-while getopts lpn: option
+while getopts lmpn: option
 do
 case "${option}"
 in
 l) USING_LEGION="1";;
+m) USING_MPI="1";;
 p) PROFILING="1";;
 n) NTASKS=$OPTARG;;
 esac
 done
+
+if [[ $USING_LEGION -eq 1 && $USING_MPI -eq 1 ]]; then
+	echo "Legion and MPI options are mutually exclusive. Please pick one."
+	exit 1
+fi
 
 root_dir="$PWD"
 
@@ -42,6 +48,8 @@ if [[ $USING_LEGION -eq 1 ]]; then
     sockets=2
     cores=10
     srun -n $NTASKS legion_python legion_main.py -ll:py 1 -ll:csize 16384
+elif [[ $USING_MPI -eq 1 ]]; then
+    srun -n $NTASKS python mpi_main.py
 else
     if [[ $PROFILING -eq 1 ]]; then
         PYFLAGS="-m cProfile -o $OUT_DIR/main.prof "$PYFLAGS

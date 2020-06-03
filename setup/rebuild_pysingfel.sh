@@ -7,6 +7,6 @@ source "$root_dir"/env.sh
 
 pushd "$root_dir"/pysingfel
 
-pip install -e .
+pip install --no-deps -e .
 
 popd
