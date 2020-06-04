@@ -15,6 +15,14 @@ def load_pixel_position(pixel_position):
             h5f['pixel_position_reciprocal'][:], -1, 0)
 
 
+def get_pixel_position():
+    pixel_position_type = getattr(pygion, parms.pixel_position_type_str)
+    pixel_position = Region(parms.pixel_position_shape,
+                            {'reciprocal': pixel_position_type})
+    load_pixel_position(pixel_position)
+    return pixel_position
+
+
 @task(privileges=[WD])
 def load_pixel_index(pixel_index):
     pixel_index_map = pixel_index.map
@@ -23,16 +31,15 @@ def load_pixel_index(pixel_index):
             h5f['pixel_index_map'][:], -1, 0)
 
 
-def get_data():
-    pixel_position_type = getattr(pygion, parms.pixel_position_type_str)
+def get_pixel_index():
     pixel_index_type = getattr(pygion, parms.pixel_index_type_str)
-
-    pixel_position = Region(parms.pixel_position_shape,
-                            {'reciprocal': pixel_position_type})
     pixel_index = Region(parms.pixel_index_shape,
                          {'map': pixel_index_type})
-
-    load_pixel_position(pixel_position)
     load_pixel_index(pixel_index)
+    return pixel_index
 
+
+def get_data():
+    pixel_position = get_pixel_position()
+    pixel_index = get_pixel_index()
     return (pixel_position, pixel_index)

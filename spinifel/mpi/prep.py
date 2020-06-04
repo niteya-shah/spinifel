@@ -7,6 +7,9 @@ from mpi4py import MPI
 from spinifel import parms, prep
 
 
+
+
+
 def get_data(N_images_per_rank):
     comm = MPI.COMM_WORLD
     rank = comm.rank
