@@ -37,6 +37,15 @@ def get_slices(comm, N_images_per_rank):
     return slices_
 
 
+def reduce_mean_image(comm, slices_):
+    mean_image = slices_.mean(axis=0)
+    reduced_image = np.zeros_like(mean_image)
+    comm.Reduce(mean_image, reduced_image, op=MPI.SUM, root=0)
+    mean_image = reduced_image / comm.size
+    # Send None rather than intermediary result
+    return mean_image if comm.rank == 0 else None
+
+
 def get_data(N_images_per_rank):
     comm = MPI.COMM_WORLD
     rank = comm.rank
@@ -50,15 +59,12 @@ def get_data(N_images_per_rank):
     if rank == 0:
         prep.show_image(pixel_index_map, slices_[0], "image_0.png")
 
-    mean_image = slices_.mean(axis=0)
-    reduced_image = np.zeros_like(mean_image)
-    comm.Reduce(mean_image, reduced_image, op=MPI.SUM, root=0)
+    mean_image = reduce_mean_image(comm, slices_)
     if rank == 0:
-        mean_image_tot = reduced_image / size
-        prep.show_image(pixel_index_map, mean_image_tot, "mean_image.png")
+        prep.show_image(pixel_index_map, mean_image, "mean_image.png")
         pixel_distance_reciprocal = np.sqrt(
             (pixel_position_reciprocal**2).sum(axis=0))
-        saxs_qs, saxs = prep.get_saxs(pixel_distance_reciprocal, mean_image_tot)
+        saxs_qs, saxs = prep.get_saxs(pixel_distance_reciprocal, mean_image)
         plt.semilogy(saxs_qs, saxs)
         plt.savefig(parms.out_dir / "saxs.png")
         plt.cla()
@@ -72,17 +78,14 @@ def get_data(N_images_per_rank):
     if rank == 0:
         prep.show_image(pixel_index_map, slices_[0], "image_binned_0.png")
 
-    mean_image = slices_.mean(axis=0)
-    reduced_image = np.zeros_like(mean_image)
-    comm.Reduce(mean_image, reduced_image, op=MPI.SUM, root=0)
+    mean_image = reduce_mean_image(comm, slices_)
     if rank == 0:
-        mean_image_tot = reduced_image / size
-        prep.show_image(pixel_index_map, mean_image_tot, "mean_image_binned.png")
+        prep.show_image(pixel_index_map, mean_image, "mean_image_binned.png")
 
     pixel_distance_reciprocal = np.sqrt(
         (pixel_position_reciprocal**2).sum(axis=0))
     if rank == 0:
-        saxs_qs, saxs = prep.get_saxs(pixel_distance_reciprocal, mean_image_tot)
+        saxs_qs, saxs = prep.get_saxs(pixel_distance_reciprocal, mean_image)
         plt.semilogy(saxs_qs, saxs)
         plt.savefig(parms.out_dir / "saxs_binned.png")
         plt.cla()
