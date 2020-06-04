@@ -33,8 +33,7 @@ def get_slices(comm, N_images_per_rank):
                        dtype=data_type)
     i_start = comm.rank * N_images_per_rank
     i_end = i_start + N_images_per_rank
-    with h5py.File(parms.data_path, 'r') as h5f:
-        slices_[:] = h5f['intensities'][i_start:i_end]
+    prep.load_slices(slices_, i_start, i_end)
     return slices_
 
 

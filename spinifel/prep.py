@@ -96,3 +96,8 @@ def load_pixel_index_map(pixel_index_map):
     with h5py.File(parms.data_path, 'r') as h5f:
         pixel_index_map[:] = np.moveaxis(
             h5f['pixel_index_map'][:], -1, 0)
+
+
+def load_slices(slices, i_start, i_end):
+    with h5py.File(parms.data_path, 'r') as h5f:
+        slices[:] = h5f['intensities'][i_start:i_end]
