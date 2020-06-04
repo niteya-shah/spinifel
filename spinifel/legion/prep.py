@@ -2,7 +2,7 @@ import h5py
 import numpy as np
 import os
 import pygion
-from pygion import task, Tunable, Partition, Region, WD
+from pygion import task, Tunable, Partition, Region, WD, RO, Reduce
 
 from spinifel import parms, prep
 
@@ -57,8 +57,22 @@ def get_slices():
     return slices, slices_p
 
 
+@task(privileges=[RO, Reduce('+')])
+def reduce_mean_image(slices, mean_image):
+    mean_image.data[:] = slices.data.mean(axis=0)
+
+
+def compute_mean_image(slices_p):
+    mean_image = Region(parms.det_shape, {'data': pygion.float32})
+    pygion.fill(mean_image, 'data', 0.)
+    for slices in slices_p:
+        reduce_mean_image(slices, mean_image)
+    return mean_image
+
+
 def get_data():
     pixel_position = get_pixel_position()
     pixel_index = get_pixel_index()
     slices, slices_p = get_slices()
+    mean_image = compute_mean_image(slices_p)
     return (pixel_position, pixel_index, slices, slices_p)
