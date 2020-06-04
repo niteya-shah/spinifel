@@ -22,12 +22,19 @@ def get_pixel_index_map():
     return pixel_index_map
 
 
+def get_slices(N_images):
+    data_type = getattr(np, parms.data_type_str)
+    slices_ = np.zeros((N_images,) + parms.det_shape,
+                       dtype=data_type)
+    prep.load_slices(slices_, 0, N_images)
+    return slices_
+
+
 def get_data(N_images):
     pixel_position_reciprocal = get_pixel_position_reciprocal()
     pixel_index_map = get_pixel_index_map()
 
-    with h5py.File(parms.data_path, 'r') as h5f:
-        slices_ = h5f['intensities'][:N_images]
+    slices_ = get_slices(N_images)
 
     prep.show_image(pixel_index_map, slices_[0], "image_0.png")
 
