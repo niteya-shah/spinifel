@@ -70,9 +70,16 @@ def compute_mean_image(slices_p):
     return mean_image
 
 
+@task(privileges=[RO, RO])
+def show_image(pixel_index, images, image_index, name):
+    prep.show_image(pixel_index.map, images.data[image_index], name)
+
+
 def get_data():
     pixel_position = get_pixel_position()
     pixel_index = get_pixel_index()
     slices, slices_p = get_slices()
     mean_image = compute_mean_image(slices_p)
+    show_image(pixel_index, slices_p[0], 0, "image_0.png")
+    show_image(pixel_index, mean_image, ..., "mean_image.png")
     return (pixel_position, pixel_index, slices, slices_p)
