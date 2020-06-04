@@ -20,7 +20,9 @@ def main():
     print("In Legion main", flush=True)
 
     (pixel_position,
-     pixel_index) = get_data()
+     pixel_index,
+     slices, slices_p) = get_data()
 
     print_region(pixel_position)
     print_region(pixel_index)
+    print_region(slices_p[0])
