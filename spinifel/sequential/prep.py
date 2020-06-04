@@ -6,13 +6,28 @@ from matplotlib.colors import LogNorm
 from spinifel import parms, prep
 
 
+def get_pixel_position_reciprocal():
+    pixel_position_type = getattr(np, parms.pixel_position_type_str)
+    pixel_position_reciprocal = np.zeros(parms.pixel_position_shape,
+                                         dtype=pixel_position_type)
+    prep.load_pixel_position_reciprocal(pixel_position_reciprocal)
+    return pixel_position_reciprocal
+
+
+def get_pixel_index_map():
+    pixel_index_type = getattr(np, parms.pixel_index_type_str)
+    pixel_index_map = np.zeros(parms.pixel_index_shape,
+                               dtype=pixel_index_type)
+    prep.load_pixel_index_map(pixel_index_map)
+    return pixel_index_map
+
+
 def get_data(N_images):
+    pixel_position_reciprocal = get_pixel_position_reciprocal()
+    pixel_index_map = get_pixel_index_map()
+
     with h5py.File(parms.data_path, 'r') as h5f:
-        pixel_position_reciprocal = h5f['pixel_position_reciprocal'][:]
-        pixel_index_map = h5f['pixel_index_map'][:]
         slices_ = h5f['intensities'][:N_images]
-    pixel_position_reciprocal = np.moveaxis(pixel_position_reciprocal, -1, 0)
-    pixel_index_map = np.moveaxis(pixel_index_map, -1, 0)
 
     prep.show_image(pixel_index_map, slices_[0], "image_0.png")
 
