@@ -4,15 +4,12 @@ import os
 import pygion
 from pygion import acquire, attach_hdf5, task, Partition, Region, R, WD
 
-from spinifel import parms
+from spinifel import parms, prep
 
 
 @task(privileges=[WD])
 def load_pixel_position(pixel_position):
-    pixel_position_reciprocal = pixel_position.reciprocal
-    with h5py.File(parms.data_path, 'r') as h5f:
-        pixel_position_reciprocal[:] = np.moveaxis(
-            h5f['pixel_position_reciprocal'][:], -1, 0)
+    prep.load_pixel_position_reciprocal(pixel_position.reciprocal)
 
 
 def get_pixel_position():
@@ -25,10 +22,7 @@ def get_pixel_position():
 
 @task(privileges=[WD])
 def load_pixel_index(pixel_index):
-    pixel_index_map = pixel_index.map
-    with h5py.File(parms.data_path, 'r') as h5f:
-        pixel_index_map[:] = np.moveaxis(
-            h5f['pixel_index_map'][:], -1, 0)
+        prep.load_pixel_index_map(pixel_index.map)
 
 
 def get_pixel_index():

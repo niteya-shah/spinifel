@@ -84,3 +84,15 @@ binning_mean = lambda arr: bin2nx2n_mean(
     clipping(arr, parms.N_clipping), parms.N_binning)
 binning_index = lambda arr: bin2nx2n_index(
     clipping_index(arr, parms.N_clipping), parms.N_binning)
+
+
+def load_pixel_position_reciprocal(pixel_position_reciprocal):
+    with h5py.File(parms.data_path, 'r') as h5f:
+        pixel_position_reciprocal[:] = np.moveaxis(
+            h5f['pixel_position_reciprocal'][:], -1, 0)
+
+
+def load_pixel_index_map(pixel_index_map):
+    with h5py.File(parms.data_path, 'r') as h5f:
+        pixel_index_map[:] = np.moveaxis(
+            h5f['pixel_index_map'][:], -1, 0)
