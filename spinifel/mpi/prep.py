@@ -37,7 +37,7 @@ def get_slices(comm, N_images_per_rank):
     return slices_
 
 
-def reduce_mean_image(comm, slices_):
+def compute_mean_image(comm, slices_):
     mean_image = slices_.mean(axis=0)
     reduced_image = np.zeros_like(mean_image)
     comm.Reduce(mean_image, reduced_image, op=MPI.SUM, root=0)
@@ -55,7 +55,7 @@ def get_data(N_images_per_rank):
     pixel_index_map = get_pixel_index_map(comm)
 
     slices_ = get_slices(comm, N_images_per_rank)
-    mean_image = reduce_mean_image(comm, slices_)
+    mean_image = compute_mean_image(comm, slices_)
 
     if rank == 0:
         prep.show_image(pixel_index_map, slices_[0], "image_0.png")
@@ -72,7 +72,7 @@ def get_data(N_images_per_rank):
         pixel_position_reciprocal = prep.binning_mean(pixel_position_reciprocal)
         pixel_index_map = prep.binning_index(pixel_index_map)
     slices_ = prep.binning_sum(slices_)
-    mean_image = reduce_mean_image(comm, slices_)
+    mean_image = compute_mean_image(comm, slices_)
 
     if rank == 0:
         prep.show_image(pixel_index_map, slices_[0], "image_binned_0.png")
