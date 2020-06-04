@@ -27,6 +27,17 @@ def get_pixel_index_map(comm):
     return pixel_index_map
 
 
+def get_slices(comm, N_images_per_rank):
+    data_type = getattr(np, parms.data_type_str)
+    slices_ = np.zeros((N_images_per_rank,) + parms.det_shape,
+                       dtype=data_type)
+    i_start = comm.rank * N_images_per_rank
+    i_end = i_start + N_images_per_rank
+    with h5py.File(parms.data_path, 'r') as h5f:
+        slices_[:] = h5f['intensities'][i_start:i_end]
+    return slices_
+
+
 def get_data(N_images_per_rank):
     comm = MPI.COMM_WORLD
     rank = comm.rank
@@ -35,12 +46,7 @@ def get_data(N_images_per_rank):
     pixel_position_reciprocal = get_pixel_position_reciprocal(comm)
     pixel_index_map = get_pixel_index_map(comm)
 
-    data_type = getattr(np, parms.data_type_str)
-    slices_ = np.zeros((N_images_per_rank,) + parms.det_shape, dtype=data_type)
-    i_start = rank * N_images_per_rank
-    i_end = i_start + N_images_per_rank
-    with h5py.File(parms.data_path, 'r') as h5f:
-        slices_[:] = h5f['intensities'][i_start:i_end]
+    slices_ = get_slices(comm, N_images_per_rank)
 
     if rank == 0:
         prep.show_image(pixel_index_map, slices_[0], "image_0.png")
