@@ -55,12 +55,10 @@ def get_data(N_images_per_rank):
     pixel_index_map = get_pixel_index_map(comm)
 
     slices_ = get_slices(comm, N_images_per_rank)
+    mean_image = reduce_mean_image(comm, slices_)
 
     if rank == 0:
         prep.show_image(pixel_index_map, slices_[0], "image_0.png")
-
-    mean_image = reduce_mean_image(comm, slices_)
-    if rank == 0:
         prep.show_image(pixel_index_map, mean_image, "mean_image.png")
         pixel_distance_reciprocal = np.sqrt(
             (pixel_position_reciprocal**2).sum(axis=0))
@@ -74,12 +72,10 @@ def get_data(N_images_per_rank):
         pixel_position_reciprocal = prep.binning_mean(pixel_position_reciprocal)
         pixel_index_map = prep.binning_index(pixel_index_map)
     slices_ = prep.binning_sum(slices_)
+    mean_image = reduce_mean_image(comm, slices_)
 
     if rank == 0:
         prep.show_image(pixel_index_map, slices_[0], "image_binned_0.png")
-
-    mean_image = reduce_mean_image(comm, slices_)
-    if rank == 0:
         prep.show_image(pixel_index_map, mean_image, "mean_image_binned.png")
 
     pixel_distance_reciprocal = np.sqrt(
