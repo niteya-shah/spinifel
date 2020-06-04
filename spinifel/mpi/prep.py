@@ -7,7 +7,36 @@ from mpi4py import MPI
 from spinifel import parms, prep
 
 
+def load_pixel_position_reciprocal(pixel_position_reciprocal):
+    with h5py.File(parms.data_path, 'r') as h5f:
+        pixel_position_reciprocal[:] = np.moveaxis(
+            h5f['pixel_position_reciprocal'][:], -1, 0)
 
+
+def get_pixel_position_reciprocal(comm):
+    pixel_position_type = getattr(np, parms.pixel_position_type_str)
+    pixel_position_reciprocal = np.zeros(parms.pixel_position_shape,
+                                         dtype=pixel_position_type)
+    if comm.rank == 0:
+        load_pixel_position_reciprocal(pixel_position_reciprocal)
+    comm.Bcast(pixel_position_reciprocal, root=0)
+    return pixel_position_reciprocal
+
+
+def load_pixel_index_map(pixel_index_map):
+    with h5py.File(parms.data_path, 'r') as h5f:
+        pixel_index_map[:] = np.moveaxis(
+            h5f['pixel_index_map'][:], -1, 0)
+
+
+def get_pixel_index_map(comm):
+    pixel_index_type = getattr(np, parms.pixel_index_type_str)
+    pixel_index_map = np.zeros(parms.pixel_index_shape,
+                               dtype=pixel_index_type)
+    if comm.rank == 0:
+        load_pixel_index_map(pixel_index_map)
+    comm.Bcast(pixel_index_map, root=0)
+    return pixel_index_map
 
 
 def get_data(N_images_per_rank):
@@ -15,21 +44,8 @@ def get_data(N_images_per_rank):
     rank = comm.rank
     size = comm.size
 
-    pixel_position_type = getattr(np, parms.pixel_position_type_str)
-    pixel_index_type = getattr(np, parms.pixel_index_type_str)
-
-    pixel_position_reciprocal = np.zeros(parms.pixel_position_shape,
-                                         dtype=pixel_position_type)
-    pixel_index_map = np.zeros(parms.pixel_index_shape,
-                               dtype=pixel_index_type)
-    if rank == 0:
-        with h5py.File(parms.data_path, 'r') as h5f:
-            pixel_position_reciprocal[:] = np.moveaxis(
-                h5f['pixel_position_reciprocal'][:], -1, 0)
-            pixel_index_map[:] = np.moveaxis(
-                h5f['pixel_index_map'][:], -1, 0)
-    comm.Bcast(pixel_position_reciprocal, root=0)
-    comm.Bcast(pixel_index_map, root=0)
+    pixel_position_reciprocal = get_pixel_position_reciprocal(comm)
+    pixel_index_map = get_pixel_index_map(comm)
 
     data_type = getattr(np, parms.data_type_str)
     slices_ = np.zeros((N_images_per_rank,) + parms.det_shape, dtype=data_type)
