@@ -12,8 +12,13 @@ def get_data(N_images_per_rank):
     rank = comm.rank
     size = comm.size
 
-    pixel_position_reciprocal = np.zeros((3,) + parms.det_shape, dtype=np.float)
-    pixel_index_map = np.zeros((2,) + parms.det_shape, dtype=np.int)
+    pixel_position_type = getattr(np, parms.pixel_position_type_str)
+    pixel_index_type = getattr(np, parms.pixel_index_type_str)
+
+    pixel_position_reciprocal = np.zeros(parms.pixel_position_shape,
+                                         dtype=pixel_position_type)
+    pixel_index_map = np.zeros(parms.pixel_index_shape,
+                               dtype=pixel_index_type)
     if rank == 0:
         with h5py.File(parms.data_path, 'r') as h5f:
             pixel_position_reciprocal[:] = np.moveaxis(

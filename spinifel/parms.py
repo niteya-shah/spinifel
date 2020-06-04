@@ -10,6 +10,10 @@ det_shape = (4, 512, 512)
 N_images_max = 10000
 data_field_name = "intensities"
 data_type_str = "float32"
+pixel_position_shape = (3,) + det_shape
+pixel_position_type_str = "float32"
+pixel_index_shape = (2,) + det_shape
+pixel_index_type_str = "int32"
 N_clipping = 1
 N_binning = 4
 

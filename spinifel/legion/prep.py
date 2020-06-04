@@ -24,8 +24,13 @@ def load_pixel_index(pixel_index):
 
 
 def get_data():
-    pixel_position = Region((3,) + parms.det_shape, {'reciprocal': pygion.float32})
-    pixel_index = Region((2,) + parms.det_shape, {'map': pygion.int32})
+    pixel_position_type = getattr(pygion, parms.pixel_position_type_str)
+    pixel_index_type = getattr(pygion, parms.pixel_index_type_str)
+
+    pixel_position = Region(parms.pixel_position_shape,
+                            {'reciprocal': pixel_position_type})
+    pixel_index = Region(parms.pixel_index_shape,
+                         {'map': pixel_index_type})
 
     load_pixel_position(pixel_position)
     load_pixel_index(pixel_index)
