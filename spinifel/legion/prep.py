@@ -165,4 +165,4 @@ def get_data():
     show_image(pixel_index, mean_image, ..., "mean_image_binned.png")
     pixel_distance = compute_pixel_distance(pixel_position)
     export_saxs(pixel_distance, mean_image, "saxs_binned.png")
-    return (pixel_position, pixel_index, slices, slices_p)
+    return (pixel_position, pixel_distance, pixel_index, slices, slices_p)

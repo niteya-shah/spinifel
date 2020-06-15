@@ -20,6 +20,7 @@ def main():
     print("In Legion main", flush=True)
 
     (pixel_position,
+     pixel_distance,
      pixel_index,
      slices, slices_p) = get_data()
 
