@@ -40,8 +40,8 @@ def get_data(N_images):
     prep.show_image(pixel_index_map, slices_[0], "image_0.png")
     prep.show_image(pixel_index_map, mean_image, "mean_image.png")
 
-    pixel_distance_reciprocal = np.sqrt(
-        (pixel_position_reciprocal**2).sum(axis=0))
+    pixel_distance_reciprocal = prep.compute_pixel_distance(
+        pixel_position_reciprocal)
     saxs_qs, saxs = prep.get_saxs(pixel_distance_reciprocal, mean_image)
     plt.semilogy(saxs_qs, saxs)
     plt.savefig(parms.out_dir / "saxs.png")
@@ -56,8 +56,8 @@ def get_data(N_images):
     prep.show_image(pixel_index_map, slices_[0], "image_binned_0.png")
     prep.show_image(pixel_index_map, mean_image, "mean_image_binned.png")
 
-    pixel_distance_reciprocal = np.sqrt(
-        (pixel_position_reciprocal**2).sum(axis=0))
+    pixel_distance_reciprocal = prep.compute_pixel_distance(
+        pixel_position_reciprocal)
     saxs_qs, saxs = prep.get_saxs(pixel_distance_reciprocal, mean_image)
     plt.semilogy(saxs_qs, saxs)
     plt.savefig(parms.out_dir / "saxs_binned.png")

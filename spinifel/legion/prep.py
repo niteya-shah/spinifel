@@ -72,8 +72,8 @@ def compute_mean_image(slices_p):
 
 @task(privileges=[RO, WD])
 def calculate_pixel_distance(pixel_position, pixel_distance):
-    pixel_distance.reciprocal[:] = np.sqrt(
-        (pixel_position.reciprocal[:]**2).sum(axis=0))
+    pixel_distance.reciprocal[:] = prep.compute_pixel_distance(
+            pixel_position.reciprocal)
 
 
 def compute_pixel_distance(pixel_position):
