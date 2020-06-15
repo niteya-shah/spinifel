@@ -17,6 +17,14 @@ def get_saxs(pixel_distance_reciprocal, mean_image):
     return np.linspace(0, q_max, N+1), saxs
 
 
+def export_saxs(pixel_distance_reciprocal, mean_image, filename):
+    saxs_qs, saxs = get_saxs(pixel_distance_reciprocal, mean_image)
+    plt.semilogy(saxs_qs, saxs)
+    plt.savefig(parms.out_dir / filename)
+    plt.cla()
+    plt.clf()
+
+
 def show_image(pixel_index_map, image, filename):
     buffer = np.zeros((pixel_index_map[0].max()+1, pixel_index_map[1].max()+1),
                       dtype=image.dtype)

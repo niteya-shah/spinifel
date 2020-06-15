@@ -62,11 +62,7 @@ def get_data(N_images_per_rank):
         prep.show_image(pixel_index_map, mean_image, "mean_image.png")
         pixel_distance_reciprocal = prep.compute_pixel_distance(
             pixel_position_reciprocal)
-        saxs_qs, saxs = prep.get_saxs(pixel_distance_reciprocal, mean_image)
-        plt.semilogy(saxs_qs, saxs)
-        plt.savefig(parms.out_dir / "saxs.png")
-        plt.cla()
-        plt.clf()
+        prep.export_saxs(pixel_distance_reciprocal, mean_image, "saxs.png")
 
     if rank == 0:
         pixel_position_reciprocal = prep.binning_mean(pixel_position_reciprocal)
@@ -81,11 +77,8 @@ def get_data(N_images_per_rank):
     pixel_distance_reciprocal = prep.compute_pixel_distance(
             pixel_position_reciprocal)
     if rank == 0:
-        saxs_qs, saxs = prep.get_saxs(pixel_distance_reciprocal, mean_image)
-        plt.semilogy(saxs_qs, saxs)
-        plt.savefig(parms.out_dir / "saxs_binned.png")
-        plt.cla()
-        plt.clf()
+        prep.export_saxs(pixel_distance_reciprocal, mean_image,
+                         "saxs_binned.png")
 
     return (pixel_position_reciprocal,
             pixel_distance_reciprocal,
