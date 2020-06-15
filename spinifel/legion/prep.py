@@ -6,6 +6,8 @@ from pygion import task, Tunable, Partition, Region, WD, RO, Reduce
 
 from spinifel import parms, prep
 
+from . import utils as lgutils
+
 
 @task(privileges=[WD])
 def load_pixel_position(pixel_position):
@@ -62,8 +64,9 @@ def reduce_mean_image(slices, mean_image):
     mean_image.data[:] = slices.data.mean(axis=0)
 
 
-def compute_mean_image(slices_p):
-    mean_image = Region(parms.det_shape, {'data': pygion.float32})
+def compute_mean_image(slices, slices_p):
+    mean_image = Region(lgutils.get_region_shape(slices)[1:],
+                        {'data': pygion.float32})
     pygion.fill(mean_image, 'data', 0.)
     for slices in slices_p:
         reduce_mean_image(slices, mean_image)
@@ -78,10 +81,60 @@ def calculate_pixel_distance(pixel_position, pixel_distance):
 
 def compute_pixel_distance(pixel_position):
     pixel_position_type = getattr(pygion, parms.pixel_position_type_str)
-    pixel_distance = Region(parms.det_shape,
+    pixel_distance = Region(lgutils.get_region_shape(pixel_position)[1:],
                             {'reciprocal': pixel_position_type})
     calculate_pixel_distance(pixel_position, pixel_distance)
     return pixel_distance
+
+
+@task(privileges=[RO, WD])
+def apply_pixel_position_binning(old_pixel_position, new_pixel_position):
+    new_pixel_position.reciprocal[:] = prep.binning_mean(
+        old_pixel_position.reciprocal)
+
+
+def bin_pixel_position(old_pixel_position):
+    pixel_position_type = getattr(pygion, parms.pixel_position_type_str)
+    new_pixel_position = Region(parms.reduced_pixel_position_shape,
+                                {'reciprocal': pixel_position_type})
+    apply_pixel_position_binning(old_pixel_position, new_pixel_position)
+    return new_pixel_position
+
+
+@task(privileges=[RO, WD])
+def apply_pixel_index_binning(old_pixel_index, new_pixel_index):
+    new_pixel_index.map[:] = prep.binning_index(
+        old_pixel_index.map)
+
+
+def bin_pixel_index(old_pixel_index):
+    pixel_index_type = getattr(pygion, parms.pixel_index_type_str)
+    new_pixel_index = Region(parms.reduced_pixel_index_shape,
+                             {'map': pixel_index_type})
+    apply_pixel_index_binning(old_pixel_index, new_pixel_index)
+    return new_pixel_index
+
+
+@task(privileges=[RO, WD])
+def apply_slices_binning(old_slices, new_slices):
+    new_slices.data[:] = prep.binning_sum(old_slices.data)
+
+
+def bin_slices(old_slices, old_slices_p):
+    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
+    N_images_per_rank = parms.N_images_per_rank
+    N_images = N_procs * N_images_per_rank
+    data_type = getattr(pygion, parms.data_type_str)
+    data_shape_total = (N_images,) + parms.reduced_det_shape
+    data_shape_local = (N_images_per_rank,) + parms.reduced_det_shape
+    new_slices = Region(data_shape_total, {'data': data_type})
+    new_slices_p = Partition.restrict(
+        new_slices, [N_procs],
+        N_images_per_rank * np.eye(len(data_shape_total), 1),
+        data_shape_local)
+    for i in range(N_procs):
+        apply_slices_binning(old_slices_p[i], new_slices_p[i])
+    return new_slices, new_slices_p
 
 
 @task(privileges=[RO, RO])
@@ -98,9 +151,17 @@ def get_data():
     pixel_position = get_pixel_position()
     pixel_index = get_pixel_index()
     slices, slices_p = get_slices()
-    mean_image = compute_mean_image(slices_p)
+    mean_image = compute_mean_image(slices, slices_p)
     show_image(pixel_index, slices_p[0], 0, "image_0.png")
     show_image(pixel_index, mean_image, ..., "mean_image.png")
     pixel_distance = compute_pixel_distance(pixel_position)
     export_saxs(pixel_distance, mean_image, "saxs.png")
+    pixel_position = bin_pixel_position(pixel_position)
+    pixel_index = bin_pixel_index(pixel_index)
+    slices, slices_p = bin_slices(slices, slices_p)
+    mean_image = compute_mean_image(slices, slices_p)
+    show_image(pixel_index, slices_p[0], 0, "image_binned_0.png")
+    show_image(pixel_index, mean_image, ..., "mean_image_binned.png")
+    pixel_distance = compute_pixel_distance(pixel_position)
+    export_saxs(pixel_distance, mean_image, "saxs_binned.png")
     return (pixel_position, pixel_index, slices, slices_p)

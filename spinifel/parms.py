@@ -26,3 +26,9 @@ if os.environ.get("SMALL_PROBLEM") == "1":
     N_images_per_rank = 10
 else:
     N_images_per_rank = 1000
+
+N_binning_tot = N_clipping + N_binning
+reduced_det_shape = det_shape[:-2] + (
+    det_shape[-2] // 2**N_binning_tot, det_shape[-1] // 2**N_binning_tot)
+reduced_pixel_position_shape = (3,) + reduced_det_shape
+reduced_pixel_index_shape = (2,) + reduced_det_shape
