@@ -61,7 +61,8 @@ def get_slices():
 
 @task(privileges=[RO, Reduce('+')])
 def reduce_mean_image(slices, mean_image):
-    mean_image.data[:] = slices.data.mean(axis=0)
+    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
+    mean_image.data[:] += slices.data.mean(axis=0) / N_procs
 
 
 def compute_mean_image(slices, slices_p):
