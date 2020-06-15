@@ -89,6 +89,11 @@ def show_image(pixel_index, images, image_index, name):
     prep.show_image(pixel_index.map, images.data[image_index], name)
 
 
+@task(privileges=[RO, RO])
+def export_saxs(pixel_distance, mean_image, name):
+    prep.export_saxs(pixel_distance.reciprocal, mean_image.data, name)
+
+
 def get_data():
     pixel_position = get_pixel_position()
     pixel_index = get_pixel_index()
@@ -97,4 +102,5 @@ def get_data():
     show_image(pixel_index, slices_p[0], 0, "image_0.png")
     show_image(pixel_index, mean_image, ..., "mean_image.png")
     pixel_distance = compute_pixel_distance(pixel_position)
+    export_saxs(pixel_distance, mean_image, "saxs.png")
     return (pixel_position, pixel_index, slices, slices_p)
