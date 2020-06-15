@@ -70,6 +70,20 @@ def compute_mean_image(slices_p):
     return mean_image
 
 
+@task(privileges=[RO, WD])
+def calculate_pixel_distance(pixel_position, pixel_distance):
+    pixel_distance.reciprocal[:] = np.sqrt(
+        (pixel_position.reciprocal[:]**2).sum(axis=0))
+
+
+def compute_pixel_distance(pixel_position):
+    pixel_position_type = getattr(pygion, parms.pixel_position_type_str)
+    pixel_distance = Region(parms.det_shape,
+                            {'reciprocal': pixel_position_type})
+    calculate_pixel_distance(pixel_position, pixel_distance)
+    return pixel_distance
+
+
 @task(privileges=[RO, RO])
 def show_image(pixel_index, images, image_index, name):
     prep.show_image(pixel_index.map, images.data[image_index], name)
@@ -82,4 +96,5 @@ def get_data():
     mean_image = compute_mean_image(slices_p)
     show_image(pixel_index, slices_p[0], 0, "image_0.png")
     show_image(pixel_index, mean_image, ..., "mean_image.png")
+    pixel_distance = compute_pixel_distance(pixel_position)
     return (pixel_position, pixel_index, slices, slices_p)
