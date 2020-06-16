@@ -134,6 +134,7 @@ def solve_ac(pixel_position_reciprocal,
     ac = ac.real
     it_number = callback.counter
 
+    print(f"Recovered AC in {it_number} iterations.", flush=True)
     show_ac(ac, Mquat, 0)
 
     return ac, it_number
