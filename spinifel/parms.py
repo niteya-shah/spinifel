@@ -17,6 +17,8 @@ pixel_index_type_str = "int32"
 N_clipping = 1
 N_binning = 4
 
+Mquat = 10  # 1/4 of uniform grid size
+
 data_dir = Path(os.environ.get("DATA_DIR", ""))
 data_path = data_dir / "2CEX-10k-2.h5"
 

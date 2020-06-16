@@ -52,7 +52,7 @@ def solve_ac(pixel_position_reciprocal,
              slices_):
     comm = MPI.COMM_WORLD
 
-    Mquat = 10
+    Mquat = parms.Mquat
     M = 4 * Mquat + 1
     Mtot = M**3
     N_images = slices_.shape[0]

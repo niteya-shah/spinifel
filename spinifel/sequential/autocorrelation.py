@@ -42,7 +42,7 @@ def adjoint(nuvect, H_, K_, L_, support, M,
 def solve_ac(pixel_position_reciprocal,
              pixel_distance_reciprocal,
              slices_):
-    Mquat = 10
+    Mquat = parms.Mquat
     M = 4 * Mquat + 1
     Mtot = M**3
     N_images = slices_.shape[0]
