@@ -18,6 +18,8 @@ def show_image(pixel_index_map, image, filename):
 
 def show_volume(ac, Mquat, filename):
     ac_midz = ac[..., 2*Mquat]
+    if ac.dtype == np.bool_:
+        ac_midz = ac_midz.astype(np.float)
     plt.imshow(ac_midz, norm=SymLogNorm(1e-3))
     plt.colorbar()
     plt.savefig(parms.out_dir / filename)
