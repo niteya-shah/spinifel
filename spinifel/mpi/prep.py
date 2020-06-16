@@ -4,7 +4,7 @@ import numpy as np
 from matplotlib.colors import LogNorm
 from mpi4py import MPI
 
-from spinifel import parms, prep
+from spinifel import parms, prep, image
 
 
 def get_pixel_position_reciprocal(comm):
@@ -60,8 +60,8 @@ def get_data(N_images_per_rank):
     if rank == 0:
         pixel_distance_reciprocal = prep.compute_pixel_distance(
             pixel_position_reciprocal)
-        prep.show_image(pixel_index_map, slices_[0], "image_0.png")
-        prep.show_image(pixel_index_map, mean_image, "mean_image.png")
+        image.show_image(pixel_index_map, slices_[0], "image_0.png")
+        image.show_image(pixel_index_map, mean_image, "mean_image.png")
         prep.export_saxs(pixel_distance_reciprocal, mean_image, "saxs.png")
 
     pixel_position_reciprocal = prep.binning_mean(pixel_position_reciprocal)
@@ -73,8 +73,8 @@ def get_data(N_images_per_rank):
     mean_image = compute_mean_image(comm, slices_)
 
     if rank == 0:
-        prep.show_image(pixel_index_map, slices_[0], "image_binned_0.png")
-        prep.show_image(pixel_index_map, mean_image, "mean_image_binned.png")
+        image.show_image(pixel_index_map, slices_[0], "image_binned_0.png")
+        image.show_image(pixel_index_map, mean_image, "mean_image_binned.png")
         prep.export_saxs(pixel_distance_reciprocal, mean_image,
                          "saxs_binned.png")
 

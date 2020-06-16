@@ -25,17 +25,6 @@ def export_saxs(pixel_distance_reciprocal, mean_image, filename):
     plt.clf()
 
 
-def show_image(pixel_index_map, image, filename):
-    buffer = np.zeros((pixel_index_map[0].max()+1, pixel_index_map[1].max()+1),
-                      dtype=image.dtype)
-    buffer[pixel_index_map[0], pixel_index_map[1]] = image
-    plt.imshow(buffer, norm=LogNorm())
-    plt.colorbar()
-    plt.savefig(parms.out_dir / filename)
-    plt.cla()
-    plt.clf()
-
-
 def bin2x2_sum(arr):
     return (arr[..., ::2, ::2] + arr[..., 1::2, ::2] + arr[..., ::2, 1::2]
             + arr[..., 1::2, 1::2])

@@ -4,7 +4,7 @@ import os
 import pygion
 from pygion import task, Tunable, Partition, Region, WD, RO, Reduce
 
-from spinifel import parms, prep
+from spinifel import parms, prep, image
 
 from . import utils as lgutils
 
@@ -140,7 +140,7 @@ def bin_slices(old_slices, old_slices_p):
 
 @task(privileges=[RO, RO])
 def show_image(pixel_index, images, image_index, name):
-    prep.show_image(pixel_index.map, images.data[image_index], name)
+    image.show_image(pixel_index.map, images.data[image_index], name)
 
 
 @task(privileges=[RO, RO])

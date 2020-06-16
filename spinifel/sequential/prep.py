@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import LogNorm
 
-from spinifel import parms, prep
+from spinifel import parms, prep, image
 
 
 def get_pixel_position_reciprocal():
@@ -37,8 +37,8 @@ def get_data(N_images):
     slices_ = get_slices(N_images)
     mean_image = slices_.mean(axis=0)
 
-    prep.show_image(pixel_index_map, slices_[0], "image_0.png")
-    prep.show_image(pixel_index_map, mean_image, "mean_image.png")
+    image.show_image(pixel_index_map, slices_[0], "image_0.png")
+    image.show_image(pixel_index_map, mean_image, "mean_image.png")
 
     pixel_distance_reciprocal = prep.compute_pixel_distance(
         pixel_position_reciprocal)
@@ -49,8 +49,8 @@ def get_data(N_images):
     slices_ = prep.binning_sum(slices_)
     mean_image = slices_.mean(axis=0)
 
-    prep.show_image(pixel_index_map, slices_[0], "image_binned_0.png")
-    prep.show_image(pixel_index_map, mean_image, "mean_image_binned.png")
+    image.show_image(pixel_index_map, slices_[0], "image_binned_0.png")
+    image.show_image(pixel_index_map, mean_image, "mean_image_binned.png")
 
     pixel_distance_reciprocal = prep.compute_pixel_distance(
         pixel_position_reciprocal)
