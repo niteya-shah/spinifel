@@ -3,20 +3,12 @@ from mpi4py import MPI
 import finufftpy as nfft
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.colors import LogNorm, SymLogNorm
+from matplotlib.colors import LogNorm
 from scipy.sparse.linalg import LinearOperator, cg
 
 import pysingfel as ps
 
-from spinifel import parms, utils
-
-
-def show_ac(ac, Mquat, number):
-    ac_midz = ac[..., 2*Mquat]
-    plt.imshow(ac_midz, norm=SymLogNorm(1e-3))
-    plt.savefig(parms.out_dir / "autocorrelation_{}.png".format(number))
-    plt.cla()
-    plt.clf()
+from spinifel import parms, utils, image
 
 
 def forward(comm, uvect, H_, K_, L_, support, M, N,
@@ -146,6 +138,6 @@ def solve_ac(pixel_position_reciprocal,
 
     print(f"Rank {comm.rank} got AC in {it_number} iterations.", flush=True)
     if comm.rank == 0:
-        show_ac(ac, Mquat, 0)
+        image.show_ac(ac, Mquat, 0)
 
     return ac, it_number
