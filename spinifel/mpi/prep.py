@@ -58,25 +58,23 @@ def get_data(N_images_per_rank):
     mean_image = compute_mean_image(comm, slices_)
 
     if rank == 0:
-        prep.show_image(pixel_index_map, slices_[0], "image_0.png")
-        prep.show_image(pixel_index_map, mean_image, "mean_image.png")
         pixel_distance_reciprocal = prep.compute_pixel_distance(
             pixel_position_reciprocal)
+        prep.show_image(pixel_index_map, slices_[0], "image_0.png")
+        prep.show_image(pixel_index_map, mean_image, "mean_image.png")
         prep.export_saxs(pixel_distance_reciprocal, mean_image, "saxs.png")
 
-    if rank == 0:
-        pixel_position_reciprocal = prep.binning_mean(pixel_position_reciprocal)
-        pixel_index_map = prep.binning_index(pixel_index_map)
+    pixel_position_reciprocal = prep.binning_mean(pixel_position_reciprocal)
+    pixel_index_map = prep.binning_index(pixel_index_map)
+    pixel_distance_reciprocal = prep.compute_pixel_distance(
+            pixel_position_reciprocal)
+
     slices_ = prep.binning_sum(slices_)
     mean_image = compute_mean_image(comm, slices_)
 
     if rank == 0:
         prep.show_image(pixel_index_map, slices_[0], "image_binned_0.png")
         prep.show_image(pixel_index_map, mean_image, "mean_image_binned.png")
-
-    pixel_distance_reciprocal = prep.compute_pixel_distance(
-            pixel_position_reciprocal)
-    if rank == 0:
         prep.export_saxs(pixel_distance_reciprocal, mean_image,
                          "saxs_binned.png")
 
