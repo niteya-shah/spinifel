@@ -81,7 +81,7 @@ def solve_ac(pixel_position_reciprocal,
 
     alambda = 1
     rlambda = 1e-9
-    maxiter = 1000
+    maxiter = 100
 
     idx = np.abs(L) < reciprocal_extent * .01
     plt.scatter(H[idx], K[idx], c=slices_[idx], s=1, norm=LogNorm())
