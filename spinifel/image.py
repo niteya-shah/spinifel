@@ -16,14 +16,10 @@ def show_image(pixel_index_map, image, filename):
     plt.clf()
 
 
-def show_ac(ac, Mquat, number, qual=None):
-    fn_list = ["autocorrelation"]
-    if qual is not None:
-        fn_list.append(qual)
-    fn_list.append("{}.png".format(number))
-    filename = "_".join(fn_list)
+def show_volume(ac, Mquat, filename):
     ac_midz = ac[..., 2*Mquat]
     plt.imshow(ac_midz, norm=SymLogNorm(1e-3))
+    plt.colorbar()
     plt.savefig(parms.out_dir / filename)
     plt.cla()
     plt.clf()

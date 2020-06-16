@@ -138,6 +138,6 @@ def solve_ac(pixel_position_reciprocal,
 
     print(f"Rank {comm.rank} got AC in {it_number} iterations.", flush=True)
     if comm.rank == 0:
-        image.show_ac(ac, Mquat, 0)
+        image.show_volume(ac, Mquat, "autocorrelation_0.png")
 
     return ac, it_number

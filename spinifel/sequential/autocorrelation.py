@@ -127,6 +127,6 @@ def solve_ac(pixel_position_reciprocal,
     it_number = callback.counter
 
     print(f"Recovered AC in {it_number} iterations.", flush=True)
-    image.show_ac(ac, Mquat, 0)
+    image.show_volume(ac, Mquat, "autocorrelation_0.png")
 
     return ac, it_number
