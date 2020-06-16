@@ -17,7 +17,7 @@ def show_ac(ac, Mquat, number):
     plt.clf()
 
 
-def forward(uvect, H, K, L, support, M, N,
+def forward(uvect, H_, K_, L_, support, M, N,
             recip_extent, use_recip_sym):
     """Apply the forward, NUFFT2- problem."""
     if use_recip_sym:
@@ -25,21 +25,21 @@ def forward(uvect, H, K, L, support, M, N,
     ugrid = uvect.reshape((M,)*3) * support
     nuvect = np.zeros(N, dtype=np.complex)
     assert not nfft.nufft3d2(
-        H/recip_extent*np.pi,
-        K/recip_extent*np.pi,
-        L/recip_extent*np.pi,
+        H_,
+        K_,
+        L_,
         nuvect, -1, 1e-12, ugrid)
     return nuvect / M**3
 
 
-def adjoint(nuvect, H, K, L, support, M,
+def adjoint(nuvect, H_, K_, L_, support, M,
             recip_extent, use_recip_sym):
     """Apply the adjoint, NUFFT1+ problem."""
     ugrid = np.zeros((M,)*3, dtype=np.complex, order='F')
     assert not nfft.nufft3d1(
-        H/recip_extent*np.pi,
-        K/recip_extent*np.pi,
-        L/recip_extent*np.pi,
+        H_,
+        K_,
+        L_,
         nuvect, +1, 1e-12, M, M, M, ugrid)
     uvect = (ugrid * support).flatten()
     if use_recip_sym:
@@ -69,6 +69,10 @@ def solve_ac(pixel_position_reciprocal,
     Kf = K.flatten()
     Lf = L.flatten()
 
+    H_ = H/reciprocal_extent*np.pi
+    K_ = K/reciprocal_extent*np.pi
+    L_ = L/reciprocal_extent*np.pi
+
     ac_support = np.ones((M,)*3)
     ac_estimate = np.zeros((M,)*3)
     weights = np.ones(N)
@@ -89,14 +93,14 @@ def solve_ac(pixel_position_reciprocal,
         dtype=np.complex128,
         shape=(N, Mtot),
         matvec=lambda x: forward(
-            x, H, K, L, ac_support, M, N,
+            x, H_, K_, L_, ac_support, M, N,
             reciprocal_extent, use_reciprocal_symmetry))
 
     A_adj = LinearOperator(
         dtype=np.complex128,
         shape=(Mtot, N),
         matvec=lambda x: adjoint(
-            x, H, K, L, ac_support, M,
+            x, H_, K_, L_, ac_support, M,
             reciprocal_extent, use_reciprocal_symmetry))
 
     I = LinearOperator(
