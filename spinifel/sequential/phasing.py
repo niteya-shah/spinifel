@@ -28,6 +28,42 @@ def create_support_(ac_, M, Mquat):
     return np.logical_and(square_support_, thresh_support_)
 
 
+def ER_loop(n_loops, rho_, amplitudes_, amp_mask_, support_, rho_max):
+    for k in range(n_loops):
+        ER(rho_, amplitudes_, amp_mask_, support_, rho_max)
+
+
+def HIO_loop(n_loops, beta, rho_, amplitudes_, amp_mask_, support_, rho_max):
+    for k in range(n_loops):
+        HIO(beta, rho_, amplitudes_, amp_mask_, support_, rho_max)
+
+
+def ER(rho_, amplitudes_, amp_mask_, support_, rho_max):
+    rho_mod_, support_star_ = step_phase(rho_, amplitudes_, amp_mask_, support_)
+    rho_[:] = np.where(support_star_, rho_mod_, 0)
+    i_overmax = rho_mod_ > rho_max
+    rho_[i_overmax] = rho_max
+
+
+def HIO(beta, rho_, amplitudes_, amp_mask_, support_, rho_max):
+    rho_mod_, support_star_ = step_phase(rho_, amplitudes_, amp_mask_, support_)
+    rho_[:] = np.where(support_star_, rho_mod_, rho_-beta*rho_mod_)
+    i_overmax = rho_mod_ > rho_max
+    rho_[i_overmax] += 2*beta*rho_mod_[i_overmax] - rho_max
+
+
+def step_phase(rho_, amplitudes_, amp_mask_, support_):
+    rho_hat_ = np.fft.fftn(rho_)
+    phases_ = np.angle(rho_hat_)
+    rho_hat_mod_ = np.where(
+        amp_mask_,
+        amplitudes_ * np.exp(1j*phases_),
+        rho_hat_)
+    rho_mod_ = np.fft.ifftn(rho_hat_mod_).real
+    support_star_ = np.logical_and(support_, rho_mod_>0)
+    return rho_mod_, support_star_
+
+
 def phase(ac):
     Mquat = parms.Mquat
     M = 4*Mquat + 1
@@ -47,11 +83,21 @@ def phase(ac):
     amplitudes_ = np.sqrt(intensities_)
     image.show_volume(np.fft.fftshift(amplitudes_), Mquat, "amplitudes_0.png")
 
-    masked_amp_ = amplitudes_.copy()
-    masked_amp_[0, 0, 0] = np.nan
+    amp_mask_ = np.ones((M, M, M), dtype=np.bool_)
+    amp_mask_[0, 0, 0] = 0  # Mask out central peak
+    image.show_volume(np.fft.fftshift(amp_mask_), Mquat, "amp_mask_0.png")
 
     support_ = create_support_(ac_filt_, M, Mquat)
     image.show_volume(np.fft.fftshift(support_), Mquat, "support_0.png")
 
     rho_ = support_ * np.random.rand(*support_.shape)
     image.show_volume(np.fft.fftshift(rho_), Mquat, "rho_0.png")
+
+    rho_max = np.infty
+
+    for i in range(20):
+        ER_loop(100, rho_, amplitudes_, amp_mask_, support_, rho_max)
+        HIO_loop(50, 0.3, rho_, amplitudes_, amp_mask_, support_, rho_max)
+        ER_loop(100, rho_, amplitudes_, amp_mask_, support_, rho_max)
+
+    image.show_volume(np.fft.fftshift(rho_), Mquat, "rho_phased_0.png")
