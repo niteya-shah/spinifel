@@ -3,6 +3,7 @@ from mpi4py import MPI
 from spinifel import parms, utils
 
 from .prep import get_data
+from .autocorrelation import solve_ac
 
 
 def main():
@@ -25,4 +26,10 @@ def main():
 
     if rank == 0:
         print(f"Loaded in {timer.lap():.2f}s.")
+
+    ac, it_count = solve_ac(
+        pixel_position_reciprocal, pixel_distance_reciprocal, slices_)
+
+    if rank == 0:
+        print(f"AC recovered in {timer.lap():.2f}s.")
         print(f"Total: {timer.total():.2f}s.")
