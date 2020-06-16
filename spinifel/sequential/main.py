@@ -2,6 +2,7 @@ from spinifel import parms, utils
 
 from .prep import get_data
 from .autocorrelation import solve_ac
+from .phasing import phase
 
 
 def main():
@@ -23,5 +24,7 @@ def main():
         pixel_position_reciprocal, pixel_distance_reciprocal, slices_)
 
     print(f"AC recovered in {timer.lap():.2f}s.")
+
+    phase(ac)
 
     print(f"Total: {timer.total():.2f}s.")
