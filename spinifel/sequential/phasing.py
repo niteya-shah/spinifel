@@ -70,6 +70,14 @@ def step_phase(rho_, amplitudes_, amp_mask_, support_):
     return rho_mod_, support_star_
 
 
+def shrink_wrap(cutoff, sigma, rho_, support_):
+    rho_abs_ = np.absolute(rho_)
+    # By using 'wrap', we don't need to fftshift it back and forth
+    rho_gauss_ = gaussian_filter(
+        rho_abs_, mode='wrap', sigma=sigma, truncate=2)
+    support_[:] = rho_gauss_ > rho_abs_.max() * cutoff
+
+
 def phase(ac):
     Mquat = parms.Mquat
     M = 4*Mquat + 1
@@ -102,5 +110,7 @@ def phase(ac):
         ER_loop(100, rho_, amplitudes_, amp_mask_, support_, rho_max)
         HIO_loop(50, 0.3, rho_, amplitudes_, amp_mask_, support_, rho_max)
         ER_loop(100, rho_, amplitudes_, amp_mask_, support_, rho_max)
+        shrink_wrap(5e-2, 1, rho_, support_)
+    ER_loop(100, rho_, amplitudes_, amp_mask_, support_, rho_max)
 
     image.show_volume(np.fft.fftshift(rho_), Mquat, "rho_phased_0.png")
