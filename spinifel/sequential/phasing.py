@@ -106,12 +106,15 @@ def phase(ac):
 
     rho_max = np.infty
 
-    for i in range(20):
-        ER_loop(100, rho_, amplitudes_, amp_mask_, support_, rho_max)
-        HIO_loop(50, 0.3, rho_, amplitudes_, amp_mask_, support_, rho_max)
-        ER_loop(100, rho_, amplitudes_, amp_mask_, support_, rho_max)
+    nER = parms.nER
+    nHIO = parms.nHIO
+
+    for i in range(parms.N_phase_loops):
+        ER_loop(nER, rho_, amplitudes_, amp_mask_, support_, rho_max)
+        HIO_loop(nHIO, 0.3, rho_, amplitudes_, amp_mask_, support_, rho_max)
+        ER_loop(nER, rho_, amplitudes_, amp_mask_, support_, rho_max)
         shrink_wrap(5e-2, 1, rho_, support_)
-    ER_loop(100, rho_, amplitudes_, amp_mask_, support_, rho_max)
+    ER_loop(nER, rho_, amplitudes_, amp_mask_, support_, rho_max)
 
     image.show_volume(np.fft.fftshift(rho_), Mquat, "rho_phased_0.png")
 

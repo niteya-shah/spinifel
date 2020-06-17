@@ -26,8 +26,14 @@ out_dir = Path(os.environ.get("OUT_DIR", ""))
 
 if os.environ.get("SMALL_PROBLEM") == "1":
     N_images_per_rank = 10
+    nER = 10
+    nHIO = 5
+    N_phase_loops = 5
 else:
     N_images_per_rank = 1000
+    nER = 100
+    nHIO = 50
+    N_phase_loops = 20
 
 N_binning_tot = N_clipping + N_binning
 reduced_det_shape = det_shape[:-2] + (
