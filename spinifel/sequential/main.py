@@ -25,6 +25,6 @@ def main():
 
     print(f"AC recovered in {timer.lap():.2f}s.")
 
-    phase(ac)
+    ac_phased = phase(ac)
 
     print(f"Total: {timer.total():.2f}s.")

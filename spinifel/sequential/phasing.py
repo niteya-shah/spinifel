@@ -119,4 +119,7 @@ def phase(ac):
     image.show_volume(np.fft.fftshift(intensities_phased_), Mquat, "intensities_phased_0.png")
 
     ac_phased_ = np.abs(np.fft.ifftn(intensities_phased_))
-    image.show_volume(np.fft.fftshift(ac_phased_), Mquat, "autocorrelation_phased_0.png")
+    ac_phased = np.fft.fftshift(ac_phased_)
+    image.show_volume(ac_phased, Mquat, "autocorrelation_phased_0.png")
+
+    return ac_phased
