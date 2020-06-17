@@ -17,16 +17,13 @@ def main():
      pixel_distance_reciprocal,
      pixel_index_map,
      slices_) = get_data(N_images)
-
     print(f"Loaded in {timer.lap():.2f}s.")
 
     ac, it_count = solve_ac(
         pixel_position_reciprocal, pixel_distance_reciprocal, slices_)
-
     print(f"AC recovered in {timer.lap():.2f}s.")
 
     ac_phased = phase(ac)
-
     print(f"Problem phased in {timer.lap():.2f}s.")
 
     print(f"Total: {timer.total():.2f}s.")
