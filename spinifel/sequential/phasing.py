@@ -21,15 +21,15 @@ from spinifel import parms, image
 # Please mind the difference when comparing results.
 
 
-def create_support_(ac_, M, Mquat):
+def create_support_(ac_, M, Mquat, generation):
     sl = slice(Mquat, -Mquat)
     square_support = np.zeros((M, M, M), dtype=np.bool_)
     square_support[sl, sl, sl] = 1
     square_support_ = np.fft.ifftshift(square_support)
-    image.show_volume(square_support, Mquat, "square_support_0.png")
+    image.show_volume(square_support, Mquat, f"square_support_{generation}.png")
 
     thresh_support_ = ac_ > 1e-2 * ac_.max()
-    image.show_volume(np.fft.fftshift(thresh_support_), Mquat, "thresh_support_0.png")
+    image.show_volume(np.fft.fftshift(thresh_support_), Mquat, f"thresh_support_{generation}.png")
 
     return np.logical_and(square_support_, thresh_support_)
 
@@ -78,31 +78,33 @@ def shrink_wrap(cutoff, sigma, rho_, support_):
     support_[:] = rho_gauss_ > rho_abs_.max() * cutoff
 
 
-def phase(ac):
+def phase(generation, ac, support_=None, rho_=None):
     Mquat = parms.Mquat
     M = 4*Mquat + 1
     Mtot = M**3
 
     ac_filt = gaussian_filter(np.maximum(ac.real, 0), mode='constant',
                               sigma=1, truncate=2)
-    image.show_volume(ac_filt, Mquat, "autocorrelation_filtered_0.png")
+    image.show_volume(ac_filt, Mquat, f"autocorrelation_filtered_{generation}.png")
     ac_filt_ = np.fft.ifftshift(ac_filt)
 
     intensities_ = np.abs(np.fft.fftn(ac_filt_))
-    image.show_volume(np.fft.fftshift(intensities_), Mquat, "intensities_0.png")
+    image.show_volume(np.fft.fftshift(intensities_), Mquat, f"intensities_{generation}.png")
 
     amplitudes_ = np.sqrt(intensities_)
-    image.show_volume(np.fft.fftshift(amplitudes_), Mquat, "amplitudes_0.png")
+    image.show_volume(np.fft.fftshift(amplitudes_), Mquat, f"amplitudes_{generation}.png")
 
     amp_mask_ = np.ones((M, M, M), dtype=np.bool_)
     amp_mask_[0, 0, 0] = 0  # Mask out central peak
-    image.show_volume(np.fft.fftshift(amp_mask_), Mquat, "amp_mask_0.png")
+    image.show_volume(np.fft.fftshift(amp_mask_), Mquat, f"amp_mask_{generation}.png")
 
-    support_ = create_support_(ac_filt_, M, Mquat)
-    image.show_volume(np.fft.fftshift(support_), Mquat, "support_0.png")
+    if support_ is None:
+        support_ = create_support_(ac_filt_, M, Mquat, generation)
+    image.show_volume(np.fft.fftshift(support_), Mquat, f"support_{generation}.png")
 
-    rho_ = support_ * np.random.rand(*support_.shape)
-    image.show_volume(np.fft.fftshift(rho_), Mquat, "rho_0.png")
+    if rho_ is None:
+        rho_ = support_ * np.random.rand(*support_.shape)
+    image.show_volume(np.fft.fftshift(rho_), Mquat, f"rho_{generation}.png")
 
     rho_max = np.infty
 
@@ -116,13 +118,13 @@ def phase(ac):
         shrink_wrap(5e-2, 1, rho_, support_)
     ER_loop(nER, rho_, amplitudes_, amp_mask_, support_, rho_max)
 
-    image.show_volume(np.fft.fftshift(rho_), Mquat, "rho_phased_0.png")
+    image.show_volume(np.fft.fftshift(rho_), Mquat, f"rho_phased_{generation}.png")
 
     intensities_phased_ = np.abs(np.fft.fftn(rho_))**2
-    image.show_volume(np.fft.fftshift(intensities_phased_), Mquat, "intensities_phased_0.png")
+    image.show_volume(np.fft.fftshift(intensities_phased_), Mquat, f"intensities_phased_{generation}.png")
 
     ac_phased_ = np.abs(np.fft.ifftn(intensities_phased_))
     ac_phased = np.fft.fftshift(ac_phased_)
-    image.show_volume(ac_phased, Mquat, "autocorrelation_phased_0.png")
+    image.show_volume(ac_phased, Mquat, f"autocorrelation_phased_{generation}.png")
 
-    return ac_phased
+    return ac_phased, support_, rho_

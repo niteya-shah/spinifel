@@ -24,7 +24,7 @@ def main():
         0, pixel_position_reciprocal, pixel_distance_reciprocal, slices_)
     print(f"AC recovered in {timer.lap():.2f}s.")
 
-    ac_phased = phase(ac)
+    ac_phased, support_, rho_ = phase(0, ac)
     print(f"Problem phased in {timer.lap():.2f}s.")
 
     orientations = match(
@@ -36,5 +36,8 @@ def main():
         1, pixel_position_reciprocal, pixel_distance_reciprocal, slices_,
         orientations, ac_phased)
     print(f"AC recovered in {timer.lap():.2f}s.")
+
+    ac_phased, support_, rho_ = phase(1, ac, support_, rho_)
+    print(f"Problem phased in {timer.lap():.2f}s.")
 
     print(f"Total: {timer.total():.2f}s.")
