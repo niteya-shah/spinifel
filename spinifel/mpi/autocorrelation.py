@@ -67,13 +67,9 @@ def solve_ac(pixel_position_reciprocal,
     # shape -> [N_images] x det_shape
 
     data = slices_.flatten()
-    Hf = H.flatten()
-    Kf = K.flatten()
-    Lf = L.flatten()
-
-    H_ = H/reciprocal_extent*np.pi
-    K_ = K/reciprocal_extent*np.pi
-    L_ = L/reciprocal_extent*np.pi
+    H_ = H.flatten() / reciprocal_extent * np.pi
+    K_ = K.flatten() / reciprocal_extent * np.pi
+    L_ = L.flatten() / reciprocal_extent * np.pi
 
     ac_support = np.ones((M,)*3)
     ac_estimate = np.zeros((M,)*3)
