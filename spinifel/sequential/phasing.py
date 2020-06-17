@@ -114,3 +114,9 @@ def phase(ac):
     ER_loop(100, rho_, amplitudes_, amp_mask_, support_, rho_max)
 
     image.show_volume(np.fft.fftshift(rho_), Mquat, "rho_phased_0.png")
+
+    intensities_phased_ = np.abs(np.fft.fftn(rho_))**2
+    image.show_volume(np.fft.fftshift(intensities_phased_), Mquat, "intensities_phased_0.png")
+
+    ac_phased_ = np.abs(np.fft.ifftn(intensities_phased_))
+    image.show_volume(np.fft.fftshift(ac_phased_), Mquat, "autocorrelation_phased_0.png")
