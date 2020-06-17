@@ -39,9 +39,12 @@ def adjoint(nuvect, H_, K_, L_, support, M,
     return uvect
 
 
-def solve_ac(pixel_position_reciprocal,
+def solve_ac(generation,
+             pixel_position_reciprocal,
              pixel_distance_reciprocal,
-             slices_):
+             slices_,
+             orientations=None,
+             ac_estimate=None):
     Mquat = parms.Mquat
     M = 4 * Mquat + 1
     Mtot = M**3
@@ -51,7 +54,8 @@ def solve_ac(pixel_position_reciprocal,
     reciprocal_extent = pixel_distance_reciprocal.max()
     use_reciprocal_symmetry = True
 
-    orientations = ps.get_random_quat(N_images)
+    if orientations is None:
+        orientations = ps.get_random_quat(N_images)
     rotmat = np.array([ps.quaternion2rot3d(quat) for quat in orientations])
     H, K, L = np.einsum("ijk,klmn->jilmn", rotmat, pixel_position_reciprocal)
     # shape -> [N_images] x det_shape
@@ -61,8 +65,12 @@ def solve_ac(pixel_position_reciprocal,
     K_ = K.flatten() / reciprocal_extent * np.pi
     L_ = L.flatten() / reciprocal_extent * np.pi
 
-    ac_support = np.ones((M,)*3)
-    ac_estimate = np.zeros((M,)*3)
+    if ac_estimate is None:
+        ac_support = np.ones((M,)*3)
+        ac_estimate = np.zeros((M,)*3)
+    else:
+        ac_support = (ac_estimate > 1e-12).astype(np.float)
+        ac_estimate *= ac_support
     weights = np.ones(N)
 
     alambda = 1
@@ -73,7 +81,7 @@ def solve_ac(pixel_position_reciprocal,
     plt.scatter(H[idx], K[idx], c=slices_[idx], s=1, norm=LogNorm())
     plt.axis('equal')
     plt.colorbar()
-    plt.savefig(parms.out_dir / "star_0.png")
+    plt.savefig(parms.out_dir / f"star_{generation}.png")
     plt.cla()
     plt.clf()
 
@@ -123,6 +131,6 @@ def solve_ac(pixel_position_reciprocal,
     it_number = callback.counter
 
     print(f"Recovered AC in {it_number} iterations.", flush=True)
-    image.show_volume(ac, Mquat, "autocorrelation_0.png")
+    image.show_volume(ac, Mquat, f"autocorrelation_{generation}.png")
 
     return ac, it_number

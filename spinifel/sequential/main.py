@@ -21,7 +21,7 @@ def main():
     print(f"Loaded in {timer.lap():.2f}s.")
 
     ac, it_count = solve_ac(
-        pixel_position_reciprocal, pixel_distance_reciprocal, slices_)
+        0, pixel_position_reciprocal, pixel_distance_reciprocal, slices_)
     print(f"AC recovered in {timer.lap():.2f}s.")
 
     ac_phased = phase(ac)
@@ -31,5 +31,10 @@ def main():
         ac_phased, slices_,
         pixel_position_reciprocal, pixel_distance_reciprocal)
     print(f"Orientations matched in {timer.lap():.2f}s.")
+
+    ac, it_count = solve_ac(
+        1, pixel_position_reciprocal, pixel_distance_reciprocal, slices_,
+        orientations, ac_phased)
+    print(f"AC recovered in {timer.lap():.2f}s.")
 
     print(f"Total: {timer.total():.2f}s.")
