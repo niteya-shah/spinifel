@@ -8,11 +8,17 @@ from spinifel import parms, image
 #   In this module, trailing underscores are used to refer to numpy
 # arrays that have been ifftshifted.
 # For unshifted arrays, the FFT/IFFT are defined as:
+#   f -> np.fft.fftshift(np.fft.fftn(np.fft.ifftshift(f)))
+#   f -> np.fft.fftshift(np.fft.ifftn(np.fft.ifftshift(f)))
+# For shifted arrays, the FFT/IFFT are thus as:
+#   f_ -> np.fft.fftn(f_)
+#   f_ -> np.fft.ifftn(f_)
+# To be compatible with the conventions used in the AC solver,
+# we would also have to scale by Mtot:
 #   f -> np.fft.fftshift(np.fft.fftn(np.fft.ifftshift(f))) / Mtot
 #   f -> np.fft.fftshift(np.fft.ifftn(np.fft.ifftshift(f))) * Mtot
-# For shifted arrays, the FFT/IFFT are thus as:
-#   f_ -> np.fft.fftn(f_) / Mtot
-#   f_ -> np.fft.ifftn(f_) * Mtot
+# but this won't be done here at each iteration.
+# Please mind the difference when comparing results.
 
 
 def create_support_(ac_, M, Mquat):
@@ -74,10 +80,7 @@ def phase(ac):
     image.show_volume(ac_filt, Mquat, "autocorrelation_filtered_0.png")
     ac_filt_ = np.fft.ifftshift(ac_filt)
 
-    fft = lambda f_: np.fft.fftn(f_) / Mtot
-    ifft = lambda f_: np.fft.ifftn(f_) * Mtot
-
-    intensities_ = np.abs(fft(ac_filt_))
+    intensities_ = np.abs(np.fft.fftn(ac_filt_))
     image.show_volume(np.fft.fftshift(intensities_), Mquat, "intensities_0.png")
 
     amplitudes_ = np.sqrt(intensities_)
