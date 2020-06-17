@@ -27,6 +27,9 @@ def main():
     ac_phased = phase(ac)
     print(f"Problem phased in {timer.lap():.2f}s.")
 
-    match(ac_phased, slices_, pixel_position_reciprocal, pixel_distance_reciprocal)
+    orientations = match(
+        ac_phased, slices_,
+        pixel_position_reciprocal, pixel_distance_reciprocal)
+    print(f"Orientations matched in {timer.lap():.2f}s.")
 
     print(f"Total: {timer.total():.2f}s.")

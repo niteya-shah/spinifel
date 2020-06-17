@@ -34,3 +34,5 @@ def match(ac, slices_, pixel_position_reciprocal, pixel_distance_reciprocal):
 
     ed = euclidean_distances(model_slices, slices_)
     ed_argmin = np.argmin(ed, axis=0)
+
+    return ref_orientations[ed_argmin]
