@@ -4,6 +4,7 @@ from spinifel import parms, utils
 
 from .prep import get_data
 from .autocorrelation import solve_ac
+from .phasing import phase
 
 
 def main():
@@ -32,4 +33,11 @@ def main():
 
     if rank == 0:
         print(f"AC recovered in {timer.lap():.2f}s.")
+
+    ac_phased, support_, rho_ = phase(0, ac)
+
+    if rank == 0:
+        print(f"Problem phased in {timer.lap():.2f}s.")
+
+    if rank == 0:
         print(f"Total: {timer.total():.2f}s.")
