@@ -5,6 +5,7 @@ from spinifel import parms, utils
 from .prep import get_data
 from .autocorrelation import solve_ac
 from .phasing import phase
+from .orientation_matching import match
 
 
 def main():
@@ -38,6 +39,13 @@ def main():
 
     if rank == 0:
         print(f"Problem phased in {timer.lap():.2f}s.")
+
+    orientations = match(
+        ac_phased, slices_,
+        pixel_position_reciprocal, pixel_distance_reciprocal)
+
+    if rank == 0:
+        print(f"Orientations matched in {timer.lap():.2f}s.")
 
     if rank == 0:
         print(f"Total: {timer.total():.2f}s.")
