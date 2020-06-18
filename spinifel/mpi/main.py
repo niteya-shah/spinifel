@@ -41,4 +41,7 @@ def main():
         slices_, orientations, ac_phased)
     logger.log(f"AC recovered in {timer.lap():.2f}s.")
 
+    ac_phased, support_, rho_ = phase(1, ac, support_, rho_)
+    logger.log(f"Problem phased in {timer.lap():.2f}s.")
+
     logger.log(f"Total: {timer.total():.2f}s.")
