@@ -21,6 +21,27 @@ from spinifel import parms, image
 # Please mind the difference when comparing results.
 
 
+def center_of_mass(rho_, hkl_, M):
+    rho_ = np.abs(rho_)
+    num = (rho_ * hkl_).sum(axis=(1, 2, 3))
+    den = rho_.sum()
+    return np.round(num/den * M/2)
+
+
+def recenter(rho_, support_, M):
+    ls = np.linspace(-1, 1, M+1)
+    ls = (ls[:-1] + ls[1:])/2
+
+    hkl_list = np.meshgrid(ls, ls, ls, indexing='ij')
+    hkl_ = np.stack([np.fft.ifftshift(coord) for coord in hkl_list])
+    vect = center_of_mass(rho_, hkl_, M)
+
+    for i in range(3):
+        shift = int(vect[i])
+        rho_[:] = np.roll(rho_, -shift, i)
+        support_[:] = np.roll(support_, -shift, i)
+
+
 def create_support_(ac_, M, Mquat, generation):
     sl = slice(Mquat, -Mquat)
     square_support = np.zeros((M, M, M), dtype=np.bool_)
@@ -117,6 +138,8 @@ def phase(generation, ac, support_=None, rho_=None):
         ER_loop(nER, rho_, amplitudes_, amp_mask_, support_, rho_max)
         shrink_wrap(5e-2, 1, rho_, support_)
     ER_loop(nER, rho_, amplitudes_, amp_mask_, support_, rho_max)
+
+    recenter(rho_, support_, M)
 
     image.show_volume(np.fft.fftshift(rho_), Mquat, f"rho_phased_{generation}.png")
 
