@@ -10,42 +10,30 @@ from .orientation_matching import match
 
 def main():
     comm = MPI.COMM_WORLD
-    rank = comm.rank
-    size = comm.size
 
-    if rank == 0:
-        print("In MPI main", flush=True)
+    logger = utils.Logger(comm.rank==0)
+    logger.log("In MPI main")
 
     N_images_per_rank = parms.N_images_per_rank
 
-    if rank == 0:
-        timer = utils.Timer()
+    timer = utils.Timer()
 
     (pixel_position_reciprocal,
      pixel_distance_reciprocal,
      pixel_index_map,
      slices_) = get_data(N_images_per_rank)
-
-    if rank == 0:
-        print(f"Loaded in {timer.lap():.2f}s.")
+    logger.log(f"Loaded in {timer.lap():.2f}s.")
 
     ac, it_count = solve_ac(
         pixel_position_reciprocal, pixel_distance_reciprocal, slices_)
-
-    if rank == 0:
-        print(f"AC recovered in {timer.lap():.2f}s.")
+    logger.log(f"AC recovered in {timer.lap():.2f}s.")
 
     ac_phased, support_, rho_ = phase(0, ac)
-
-    if rank == 0:
-        print(f"Problem phased in {timer.lap():.2f}s.")
+    logger.log(f"Problem phased in {timer.lap():.2f}s.")
 
     orientations = match(
         ac_phased, slices_,
         pixel_position_reciprocal, pixel_distance_reciprocal)
+    logger.log(f"Orientations matched in {timer.lap():.2f}s.")
 
-    if rank == 0:
-        print(f"Orientations matched in {timer.lap():.2f}s.")
-
-    if rank == 0:
-        print(f"Total: {timer.total():.2f}s.")
+    logger.log(f"Total: {timer.total():.2f}s.")
