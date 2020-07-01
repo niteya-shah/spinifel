@@ -20,8 +20,10 @@ data_path = data_dir / "2CEX-10k-2.h5"
 
 out_dir = Path(os.environ.get("OUT_DIR", ""))
 
+data_multiplier = int(os.environ.get("DATA_MULTIPLIER", 1))
+
 if os.environ.get("SMALL_PROBLEM") == "1":
-    N_images_per_rank = 10
+    N_images_per_rank = 10 * data_multiplier
     nER = 10
     nHIO = 5
     N_phase_loops = 5
@@ -29,7 +31,7 @@ if os.environ.get("SMALL_PROBLEM") == "1":
     N_binning = 4
     Mquat = 10  # 1/4 of uniform grid size
 else:
-    N_images_per_rank = 1000
+    N_images_per_rank = 1000 * data_multiplier
     nER = 50
     nHIO = 25
     N_phase_loops = 10

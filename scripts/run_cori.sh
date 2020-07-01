@@ -58,5 +58,6 @@ else
     if [[ $PROFILING -eq 1 ]]; then
         PYFLAGS="-m cProfile -o $OUT_DIR/main.prof "$PYFLAGS
     fi
+    export DATA_MULTIPLIER=$NTASKS  # use same amount of data as distributed app
     python $PYFLAGS sequential_main.py
 fi
