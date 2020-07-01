@@ -29,7 +29,7 @@ def match(ac, slices_, pixel_position_reciprocal, pixel_distance_reciprocal):
     model_slices = model_slices.reshape((N_orientations, N_pixels))
     slices_ = slices_.reshape((N_slices, N_pixels))
     data_model_scaling_ratio = slices_.std() / model_slices.std()
-    print(f"Data/Model std ratio: {data_model_scaling_ratio}.")
+    print(f"Data/Model std ratio: {data_model_scaling_ratio}.", flush=True)
     model_slices *= data_model_scaling_ratio
 
     ed = euclidean_distances(model_slices, slices_)
