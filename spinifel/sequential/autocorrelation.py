@@ -2,6 +2,7 @@ import finufftpy as nfft
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import LogNorm
+from scipy.ndimage import gaussian_filter
 from scipy.sparse.linalg import LinearOperator, cg
 
 import pysingfel as ps
@@ -69,7 +70,8 @@ def solve_ac(generation,
         ac_support = np.ones((M,)*3)
         ac_estimate = np.zeros((M,)*3)
     else:
-        ac_support = (ac_estimate > 1e-12).astype(np.float)
+        ac_smoothed = gaussian_filter(ac_estimate, 0.5)
+        ac_support = (ac_smoothed > 1e-12).astype(np.float)
         ac_estimate *= ac_support
     weights = np.ones(N)
 
