@@ -21,9 +21,9 @@ def match(ac, slices_, pixel_position_reciprocal, pixel_distance_reciprocal):
     H, K, L = np.einsum("ijk,klmn->jilmn", ref_rotmat, pixel_position_reciprocal)
     real_extent = 2
     reciprocal_extent = pixel_distance_reciprocal.max()
-    H_ = H.flatten() / reciprocal_extent * np.pi
-    K_ = K.flatten() / reciprocal_extent * np.pi
-    L_ = L.flatten() / reciprocal_extent * np.pi
+    H_ = H.flatten() / reciprocal_extent * np.pi / parms.oversampling
+    K_ = K.flatten() / reciprocal_extent * np.pi / parms.oversampling
+    L_ = L.flatten() / reciprocal_extent * np.pi / parms.oversampling
     model_slices = forward(ac, H_, K_, L_, 1, M, N, reciprocal_extent, True).real
     # Imaginary part ~ numerical error
     model_slices = model_slices.reshape((N_orientations, N_pixels))

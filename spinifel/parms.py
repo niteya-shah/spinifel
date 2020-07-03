@@ -14,6 +14,7 @@ pixel_position_shape = (3,) + det_shape
 pixel_position_type_str = "float32"
 pixel_index_shape = (2,) + det_shape
 pixel_index_type_str = "int32"
+oversampling = 1
 
 data_dir = Path(os.environ.get("DATA_DIR", ""))
 data_path = data_dir / "2CEX-10k-2.h5"
@@ -29,7 +30,7 @@ if os.environ.get("SMALL_PROBLEM") == "1":
     N_phase_loops = 5
     N_clipping = 1
     N_binning = 4
-    Mquat = 10  # 1/4 of uniform grid size
+    Mquat = int(oversampling * 10)  # 1/4 of uniform grid size
 else:
     N_images_per_rank = 1000 * data_multiplier
     nER = 50
@@ -37,7 +38,7 @@ else:
     N_phase_loops = 10
     N_clipping = 0
     N_binning = 3
-    Mquat = 20  # 1/4 of uniform grid size
+    Mquat = int(oversampling * 20)  # 1/4 of uniform grid size
 
 N_binning_tot = N_clipping + N_binning
 reduced_det_shape = det_shape[:-2] + (

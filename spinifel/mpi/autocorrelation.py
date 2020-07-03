@@ -48,6 +48,19 @@ def adjoint(comm, nuvect, H_, K_, L_, support, M,
     return uvect
 
 
+def fourier_reg(uvect, support, F_antisupport, M, use_recip_sym):
+    ugrid = uvect.reshape((M,)*3) * support
+    if use_recip_sym:
+        assert np.all(np.isreal(ugrid))
+    F_ugrid = np.fft.fftn(np.fft.ifftshift(ugrid))
+    F_reg = F_ugrid * np.fft.ifftshift(F_antisupport)
+    reg = np.fft.fftshift(np.fft.ifftn(F_reg))
+    uvect = (reg * support).flatten()
+    if use_recip_sym:
+        uvect = uvect.real
+    return uvect
+
+
 def solve_ac(generation,
              pixel_position_reciprocal,
              pixel_distance_reciprocal,
@@ -72,9 +85,18 @@ def solve_ac(generation,
     # shape -> [N_images] x det_shape
 
     data = slices_.flatten()
-    H_ = H.flatten() / reciprocal_extent * np.pi
-    K_ = K.flatten() / reciprocal_extent * np.pi
-    L_ = L.flatten() / reciprocal_extent * np.pi
+    H_ = H.flatten() / reciprocal_extent * np.pi / parms.oversampling
+    K_ = K.flatten() / reciprocal_extent * np.pi / parms.oversampling
+    L_ = L.flatten() / reciprocal_extent * np.pi / parms.oversampling
+
+    lu = np.linspace(-np.pi, np.pi, M)
+    Hu_, Ku_, Lu_ = np.meshgrid(lu, lu, lu, indexing='ij')
+    Qu_ = np.sqrt(Hu_**2 + Ku_**2 + Lu_**2)
+    F_antisupport = Qu_ > np.pi / parms.oversampling
+    assert np.all(F_antisupport == F_antisupport[::-1, :, :])
+    assert np.all(F_antisupport == F_antisupport[:, ::-1, :])
+    assert np.all(F_antisupport == F_antisupport[:, :, ::-1])
+    assert np.all(F_antisupport == F_antisupport[::-1, ::-1, ::-1])
 
     if ac_estimate is None:
         ac_support = np.ones((M,)*3)
@@ -87,6 +109,7 @@ def solve_ac(generation,
 
     alambda = 1
     rlambda = 1e-9
+    flambda = 1e3
     maxiter = 100
 
     if comm.rank == 0:
@@ -123,6 +146,12 @@ def solve_ac(generation,
         matvec=lambda x: weights*x,
         rmatvec=lambda x: weights*x)
 
+    F_reg = LinearOperator(
+        dtype=np.complex128,
+        shape=(Mtot, Mtot),
+        matvec=lambda x: fourier_reg(
+            x, ac_support, F_antisupport, M, use_reciprocal_symmetry))
+
     A._adjoint = lambda: A_adj
     A_adj._adjoint = lambda: A
     I._adjoint = lambda: I
@@ -135,7 +164,7 @@ def solve_ac(generation,
     b = data
     al = alambda
     rl = rlambda
-    W = al * A.H * D * A + rl * I
+    W = al * A.H * D * A + rl * I + flambda * F_reg
     d = al * A.H * D * b + rl * x0
     ret, info = cg(W, d, x0=x0, maxiter=maxiter, callback=callback)
     ac = ret.reshape((M,)*3)
