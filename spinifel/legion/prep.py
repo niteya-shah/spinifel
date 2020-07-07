@@ -145,6 +145,9 @@ def show_image(pixel_index, images, image_index, name):
 
 @task(privileges=[RO, RO])
 def export_saxs(pixel_distance, mean_image, name):
+    np.seterr(invalid='ignore')
+    # Avoid warning in SAXS 0/0 division.
+    # Legion seems to reset the global seterr from parms.py.
     prep.export_saxs(pixel_distance.reciprocal, mean_image.data, name)
 
 
