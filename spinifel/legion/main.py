@@ -6,6 +6,7 @@ from pygion import acquire, attach_hdf5, task, Partition, Region, R, WD
 from spinifel import parms
 
 from .prep import get_data
+from .autocorrelation import solve_ac
 
 
 @task(privileges=[R])
@@ -24,6 +25,4 @@ def main():
      pixel_index,
      slices, slices_p) = get_data()
 
-    print_region(pixel_position)
-    print_region(pixel_index)
-    print_region(slices_p[0])
+    solve_ac()
