@@ -69,12 +69,10 @@ def solve_ac(generation,
              ac_estimate=None):
     comm = MPI.COMM_WORLD
 
-    Mquat = parms.Mquat
-    M = 4 * Mquat + 1
+    M = parms.M
     Mtot = M**3
     N_images = slices_.shape[0]
     N = utils.prod(slices_.shape)
-    real_extent = 2
     reciprocal_extent = pixel_distance_reciprocal.max()
     use_reciprocal_symmetry = True
 
@@ -174,6 +172,6 @@ def solve_ac(generation,
 
     print(f"Rank {comm.rank} got AC in {it_number} iterations.", flush=True)
     if comm.rank == 0:
-        image.show_volume(ac, Mquat, f"autocorrelation_{generation}.png")
+        image.show_volume(ac, parms.Mquat, f"autocorrelation_{generation}.png")
 
-    return ac, it_number
+    return ac

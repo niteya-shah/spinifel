@@ -24,7 +24,7 @@ def main():
      slices_) = get_data(N_images_per_rank)
     logger.log(f"Loaded in {timer.lap():.2f}s.")
 
-    ac, it_count = solve_ac(
+    ac = solve_ac(
         0, pixel_position_reciprocal, pixel_distance_reciprocal, slices_)
     logger.log(f"AC recovered in {timer.lap():.2f}s.")
 
@@ -37,7 +37,7 @@ def main():
             pixel_position_reciprocal, pixel_distance_reciprocal)
         logger.log(f"Orientations matched in {timer.lap():.2f}s.")
 
-        ac, it_count = solve_ac(
+        ac = solve_ac(
             generation, pixel_position_reciprocal, pixel_distance_reciprocal,
             slices_, orientations, ac_phased)
         logger.log(f"AC recovered in {timer.lap():.2f}s.")
