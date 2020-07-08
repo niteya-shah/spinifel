@@ -3,9 +3,7 @@ from sklearn.metrics.pairwise import euclidean_distances
 
 import pysingfel as ps
 
-from spinifel import parms, utils
-from spinifel.sequential.autocorrelation import forward
-# Want sequential version even with MPI
+from spinifel import parms, utils, autocorrelation
 
 
 def match(ac, slices_, pixel_position_reciprocal, pixel_distance_reciprocal):
@@ -24,7 +22,8 @@ def match(ac, slices_, pixel_position_reciprocal, pixel_distance_reciprocal):
     H_ = H.flatten() / reciprocal_extent * np.pi / parms.oversampling
     K_ = K.flatten() / reciprocal_extent * np.pi / parms.oversampling
     L_ = L.flatten() / reciprocal_extent * np.pi / parms.oversampling
-    model_slices = forward(ac, H_, K_, L_, 1, M, N, reciprocal_extent, True).real
+    model_slices = autocorrelation.forward(
+        ac, H_, K_, L_, 1, M, N, reciprocal_extent, True).real
     # Imaginary part ~ numerical error
     model_slices = model_slices.reshape((N_orientations, N_pixels))
     slices_ = slices_.reshape((N_slices, N_pixels))

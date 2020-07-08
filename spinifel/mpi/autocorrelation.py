@@ -12,40 +12,27 @@ import pysingfel as ps
 from spinifel import parms, utils, image, autocorrelation
 
 
-def forward(comm, uvect, H_, K_, L_, support, M, N,
-            recip_extent, use_recip_sym):
-    """Apply the forward, NUFFT2- problem."""
-    if use_recip_sym:
-        assert np.all(np.isreal(uvect))
-    ugrid = uvect.reshape((M,)*3) * support
-    comm.Bcast(ugrid, root=0)
-    nuvect = np.zeros(N, dtype=np.complex)
-    assert not nfft.nufft3d2(
-        H_,
-        K_,
-        L_,
-        nuvect, -1, 1e-12, ugrid)
-    return nuvect / M**3
+def reduce_bcast(comm, vect):
+    vect = np.ascontiguousarray(vect)
+    reduced_vect = np.zeros_like(vect)
+    comm.Reduce(vect, reduced_vect, op=MPI.SUM, root=0)
+    vect = reduced_vect
+    comm.Bcast(vect, root=0)
+    return vect
 
 
-def adjoint(comm, nuvect, H_, K_, L_, support, M,
-            recip_extent, use_recip_sym):
-    """Apply the adjoint, NUFFT1+ problem."""
-    ugrid = np.zeros((M,)*3, dtype=np.complex, order='F')
-    assert not nfft.nufft3d1(
-        H_,
-        K_,
-        L_,
-        nuvect, +1, 1e-12, M, M, M, ugrid)
-    uvect = (ugrid * support).flatten()
-    if use_recip_sym:
-        uvect = uvect.real
-    uvect = np.ascontiguousarray(uvect)
-    reduced_uvect = np.zeros_like(uvect)
-    comm.Reduce(uvect, reduced_uvect, op=MPI.SUM, root=0)
-    uvect = reduced_uvect
+def core_problem(comm, uvect, H_, K_, L_, ac_support, weights, M, N,
+                 reciprocal_extent, use_reciprocal_symmetry):
     comm.Bcast(uvect, root=0)
-    return uvect
+    nuvect = autocorrelation.forward(
+        uvect, H_, K_, L_, ac_support, M, N,
+        reciprocal_extent, use_reciprocal_symmetry)
+    nuvect *= weights
+    uvect_ADA = autocorrelation.adjoint(
+        nuvect, H_, K_, L_, ac_support, M,
+        reciprocal_extent, use_reciprocal_symmetry)
+    uvect_ADA = reduce_bcast(comm, uvect_ADA)
+    return uvect_ADA
 
 
 def fourier_reg(uvect, support, F_antisupport, M, use_recip_sym):
@@ -96,20 +83,11 @@ def setup_linops(comm, H, K, L, data,
 
     def W_matvec(uvect):
         """Define W part of the W @ x = d problem."""
-        # A_adj*Da*A
-        nuvect = forward(
-            comm, uvect, H_, K_, L_, ac_support, M, N,
+        uvect_ADA = core_problem(  # A_adj*Da*A
+            comm, uvect, H_, K_, L_, ac_support, weights, M, N,
             reciprocal_extent, use_reciprocal_symmetry)
-        nuvect *= weights
-        uvect_ADA = adjoint(
-            comm, nuvect, H_, K_, L_, ac_support, M,
-            reciprocal_extent, use_reciprocal_symmetry)
-
-        # F_adj*Df*F
-        uvect_FDF = fourier_reg(
+        uvect_FDF = fourier_reg(  # A_adj*Da*A
             uvect, ac_support, F_antisupport, M, use_reciprocal_symmetry)
-
-        # Sum
         uvect = alambda*uvect_ADA + rlambda*uvect + flambda*uvect_FDF
         return uvect
 
@@ -119,10 +97,10 @@ def setup_linops(comm, H, K, L, data,
         matvec=W_matvec)
 
     nuvect_Db = data * weights
-    uvect_ADb = adjoint(
-        comm, nuvect_Db, H_, K_, L_, ac_support, M,
+    uvect_ADb = autocorrelation.adjoint(
+        nuvect_Db, H_, K_, L_, ac_support, M,
         reciprocal_extent, use_reciprocal_symmetry)
-    # Sum
+    uvect_ADb = reduce_bcast(comm, uvect_ADb)
     d = alambda*uvect_ADb + rlambda*x0
 
     return W, d
