@@ -53,26 +53,12 @@ def fourier_reg(uvect, support, F_antisupport, M, use_recip_sym):
     return uvect
 
 
-def solve_ac(generation,
-             pixel_position_reciprocal,
-             pixel_distance_reciprocal,
-             slices_,
-             orientations=None,
-             ac_estimate=None):
-    M = parms.M
-    Mtot = M**3
-    N_images = slices_.shape[0]
-    N = utils.prod(slices_.shape)
-    reciprocal_extent = pixel_distance_reciprocal.max()
-    use_reciprocal_symmetry = True
-
-    if orientations is None:
-        orientations = ps.get_random_quat(N_images)
-    rotmat = np.array([ps.quaternion2rot3d(quat) for quat in orientations])
-    H, K, L = np.einsum("ijk,klmn->jilmn", rotmat, pixel_position_reciprocal)
-    # shape -> [N_images] x det_shape
-
-    data = slices_.flatten()
+def setup_linops(H, K, L, data,
+                 ac_support, weights, x0,
+                 M, Mtot, N, reciprocal_extent,
+                 alambda, rlambda, flambda,
+                 use_reciprocal_symmetry):
+    """Define W and d parts of the W @ x = d problem."""
     H_ = H.flatten() / reciprocal_extent * np.pi / parms.oversampling
     K_ = K.flatten() / reciprocal_extent * np.pi / parms.oversampling
     L_ = L.flatten() / reciprocal_extent * np.pi / parms.oversampling
@@ -85,28 +71,6 @@ def solve_ac(generation,
     assert np.all(F_antisupport == F_antisupport[:, ::-1, :])
     assert np.all(F_antisupport == F_antisupport[:, :, ::-1])
     assert np.all(F_antisupport == F_antisupport[::-1, ::-1, ::-1])
-
-    if ac_estimate is None:
-        ac_support = np.ones((M,)*3)
-        ac_estimate = np.zeros((M,)*3)
-    else:
-        ac_smoothed = gaussian_filter(ac_estimate, 0.5)
-        ac_support = (ac_smoothed > 1e-12).astype(np.float)
-        ac_estimate *= ac_support
-    weights = np.ones(N)
-
-    alambda = 1
-    rlambda = 1e-9
-    flambda = 1e3
-    maxiter = 100
-
-    idx = np.abs(L) < reciprocal_extent * .01
-    plt.scatter(H[idx], K[idx], c=slices_[idx], s=1, norm=LogNorm())
-    plt.axis('equal')
-    plt.colorbar()
-    plt.savefig(parms.out_dir / f"star_{generation}.png")
-    plt.cla()
-    plt.clf()
 
     A = LinearOperator(
         dtype=np.complex128,
@@ -143,16 +107,68 @@ def solve_ac(generation,
     A_adj._adjoint = lambda: A
     I._adjoint = lambda: I
 
-    def callback(xk):
-        callback.counter += 1
-    callback.counter = 0
-
-    x0 = ac_estimate.flatten()
     b = data
     al = alambda
     rl = rlambda
     W = al * A.H * D * A + rl * I + flambda * F_reg
     d = al * A.H * D * b + rl * x0
+
+    return W, d
+
+
+def solve_ac(generation,
+             pixel_position_reciprocal,
+             pixel_distance_reciprocal,
+             slices_,
+             orientations=None,
+             ac_estimate=None):
+    M = parms.M
+    Mtot = M**3
+    N_images = slices_.shape[0]
+    N = utils.prod(slices_.shape)
+    reciprocal_extent = pixel_distance_reciprocal.max()
+    use_reciprocal_symmetry = True
+
+    if orientations is None:
+        orientations = ps.get_random_quat(N_images)
+    rotmat = np.array([ps.quaternion2rot3d(quat) for quat in orientations])
+    H, K, L = np.einsum("ijk,klmn->jilmn", rotmat, pixel_position_reciprocal)
+    # shape -> [N_images] x det_shape
+
+    data = slices_.flatten()
+
+    if ac_estimate is None:
+        ac_support = np.ones((M,)*3)
+        ac_estimate = np.zeros((M,)*3)
+    else:
+        ac_smoothed = gaussian_filter(ac_estimate, 0.5)
+        ac_support = (ac_smoothed > 1e-12).astype(np.float)
+        ac_estimate *= ac_support
+    weights = np.ones(N)
+
+    alambda = 1
+    rlambda = 1e-9
+    flambda = 1e3
+    maxiter = 100
+
+    idx = np.abs(L) < reciprocal_extent * .01
+    plt.scatter(H[idx], K[idx], c=slices_[idx], s=1, norm=LogNorm())
+    plt.axis('equal')
+    plt.colorbar()
+    plt.savefig(parms.out_dir / f"star_{generation}.png")
+    plt.cla()
+    plt.clf()
+
+    def callback(xk):
+        callback.counter += 1
+    callback.counter = 0
+
+    x0 = ac_estimate.flatten()
+    W, d = setup_linops(H, K, L, data,
+                        ac_support, weights, x0,
+                        M, Mtot, N, reciprocal_extent,
+                        alambda, rlambda, flambda,
+                        use_reciprocal_symmetry)
     ret, info = cg(W, d, x0=x0, maxiter=maxiter, callback=callback)
     ac = ret.reshape((M,)*3)
     assert np.all(np.isreal(ac))  # if use_reciprocal_symmetry
