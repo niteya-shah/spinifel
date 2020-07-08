@@ -1,5 +1,12 @@
 import numpy as np
-from pygion import Region, Partition, Tunable
+from pygion import task, Region, Partition, Tunable, R
+
+
+@task(privileges=[R])
+def print_region(region):
+    for field in region.keys():
+        value = getattr(region, field).flatten()[0]
+        print(f"{field}: {value}")
 
 
 def get_region_shape(region):

@@ -35,3 +35,4 @@ def solve_ac(generation,
              ac_estimate=None):
     if orientations is None:
         orientations, orientations_p = get_random_orientations()
+    lgutils.print_region(orientations_p[0])

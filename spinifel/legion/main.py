@@ -9,13 +9,6 @@ from .prep import get_data
 from .autocorrelation import solve_ac
 
 
-@task(privileges=[R])
-def print_region(region):
-    for field in region.keys():
-        value = getattr(region, field).flatten()[0]
-        print(f"{field}: {value}")
-
-
 @task(replicable=True)
 def main():
     print("In Legion main", flush=True)
