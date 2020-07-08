@@ -58,7 +58,21 @@ def setup_linops(H, K, L, data,
                  M, Mtot, N, reciprocal_extent,
                  alambda, rlambda, flambda,
                  use_reciprocal_symmetry):
-    """Define W and d parts of the W @ x = d problem."""
+    """Define W and d parts of the W @ x = d problem.
+
+    W = al*A_adj*Da*A + rl*I  + fl*F_adj*Df*F
+    d = al*A_adj*Da*b + rl*x0 + 0
+
+    Where:
+        A represents the NUFFT operator
+        A_adj its adjoint
+        I the identity
+        F the FFT operator
+        F_adj its atjoint
+        Da, Df weights
+        b the data
+        x0 the initial guess (ac_estimate)
+    """
     H_ = H.flatten() / reciprocal_extent * np.pi / parms.oversampling
     K_ = K.flatten() / reciprocal_extent * np.pi / parms.oversampling
     L_ = L.flatten() / reciprocal_extent * np.pi / parms.oversampling
@@ -72,46 +86,36 @@ def setup_linops(H, K, L, data,
     assert np.all(F_antisupport == F_antisupport[:, :, ::-1])
     assert np.all(F_antisupport == F_antisupport[::-1, ::-1, ::-1])
 
-    A = LinearOperator(
-        dtype=np.complex128,
-        shape=(N, Mtot),
-        matvec=lambda x: forward(
-            x, H_, K_, L_, ac_support, M, N,
-            reciprocal_extent, use_reciprocal_symmetry))
+    def W_matvec(uvect):
+        """Define W part of the W @ x = d problem."""
+        # A_adj*Da*A
+        nuvect = forward(
+            uvect, H_, K_, L_, ac_support, M, N,
+            reciprocal_extent, use_reciprocal_symmetry)
+        nuvect *= weights
+        uvect_ADA = adjoint(
+            nuvect, H_, K_, L_, ac_support, M,
+            reciprocal_extent, use_reciprocal_symmetry)
 
-    A_adj = LinearOperator(
-        dtype=np.complex128,
-        shape=(Mtot, N),
-        matvec=lambda x: adjoint(
-            x, H_, K_, L_, ac_support, M,
-            reciprocal_extent, use_reciprocal_symmetry))
+        # F_adj*Df*F
+        uvect_FDF = fourier_reg(
+            uvect, ac_support, F_antisupport, M, use_reciprocal_symmetry)
 
-    I = LinearOperator(
-        dtype=np.complex128,
-        shape=(Mtot, Mtot),
-        matvec=lambda x: x)
+        # Sum
+        uvect = alambda*uvect_ADA + rlambda*uvect + flambda*uvect_FDF
+        return uvect
 
-    D = LinearOperator(
-        dtype=np.complex128,
-        shape=(N, N),
-        matvec=lambda x: weights*x,
-        rmatvec=lambda x: weights*x)
-
-    F_reg = LinearOperator(
+    W = LinearOperator(
         dtype=np.complex128,
         shape=(Mtot, Mtot),
-        matvec=lambda x: fourier_reg(
-            x, ac_support, F_antisupport, M, use_reciprocal_symmetry))
+        matvec=lambda x: W_matvec(x))
 
-    A._adjoint = lambda: A_adj
-    A_adj._adjoint = lambda: A
-    I._adjoint = lambda: I
-
-    b = data
-    al = alambda
-    rl = rlambda
-    W = al * A.H * D * A + rl * I + flambda * F_reg
-    d = al * A.H * D * b + rl * x0
+    nuvect_Db = data * weights
+    uvect_ADb = adjoint(
+        nuvect_Db, H_, K_, L_, ac_support, M,
+        reciprocal_extent, use_reciprocal_symmetry)
+    # Sum
+    d = alambda*uvect_ADb + rlambda*x0
 
     return W, d
 
