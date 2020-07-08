@@ -116,19 +116,13 @@ def apply_slices_binning(old_slices, new_slices):
 
 
 def bin_slices(old_slices, old_slices_p):
-    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
     N_images_per_rank = parms.N_images_per_rank
-    N_images = N_procs * N_images_per_rank
-    data_type = getattr(pygion, parms.data_type_str)
-    data_shape_total = (N_images,) + parms.reduced_det_shape
-    data_shape_local = (N_images_per_rank,) + parms.reduced_det_shape
-    new_slices = Region(data_shape_total, {'data': data_type})
-    new_slices_p = Partition.restrict(
-        new_slices, [N_procs],
-        N_images_per_rank * np.eye(len(data_shape_total), 1),
-        data_shape_local)
-    for i in range(N_procs):
-        apply_slices_binning(old_slices_p[i], new_slices_p[i])
+    fields_dict = {"data": getattr(pygion, parms.data_type_str)}
+    sec_shape = parms.reduced_det_shape
+    new_slices, new_slices_p = lgutils.create_distributed_region(
+        N_images_per_rank, fields_dict, sec_shape)
+    for old_slices_subr, new_slices_subr in zip(old_slices_p, new_slices_p):
+        apply_slices_binning(old_slices_subr, new_slices_subr)
     return new_slices, new_slices_p
 
 
