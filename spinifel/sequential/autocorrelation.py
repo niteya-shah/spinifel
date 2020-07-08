@@ -108,7 +108,7 @@ def setup_linops(H, K, L, data,
     W = LinearOperator(
         dtype=np.complex128,
         shape=(Mtot, Mtot),
-        matvec=lambda x: W_matvec(x))
+        matvec=W_matvec)
 
     nuvect_Db = data * weights
     uvect_ADb = adjoint(
