@@ -25,4 +25,4 @@ def main():
      pixel_index,
      slices, slices_p) = get_data()
 
-    solve_ac()
+    solve_ac(0, pixel_position, pixel_distance, slices, slices_p)

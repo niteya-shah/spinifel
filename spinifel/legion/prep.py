@@ -43,19 +43,13 @@ def load_slices(slices, rank, N_images_per_rank):
 
 
 def get_slices():
-    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
     N_images_per_rank = parms.N_images_per_rank
-    N_images = N_procs * N_images_per_rank
-    data_type = getattr(pygion, parms.data_type_str)
-    data_shape_total = (N_images,) + parms.det_shape
-    data_shape_local = (N_images_per_rank,) + parms.det_shape
-    slices = Region(data_shape_total, {'data': data_type})
-    slices_p = Partition.restrict(
-        slices, [N_procs],
-        N_images_per_rank * np.eye(len(data_shape_total), 1),
-        data_shape_local)
-    for i in range(N_procs):
-        load_slices(slices_p[i], i, N_images_per_rank)
+    fields_dict = {"data": getattr(pygion, parms.data_type_str)}
+    sec_shape = parms.det_shape
+    slices, slices_p = lgutils.create_distributed_region(
+        N_images_per_rank, fields_dict, sec_shape)
+    for i, slices_subr in enumerate(slices_p):
+        load_slices(slices_subr, i, N_images_per_rank)
     return slices, slices_p
 
 
