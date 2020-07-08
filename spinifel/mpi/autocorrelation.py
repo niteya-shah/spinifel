@@ -128,7 +128,6 @@ def setup_linops(comm, H, K, L, data,
     return W, d
 
 
-
 def solve_ac(generation,
              pixel_position_reciprocal,
              pixel_distance_reciprocal,
