@@ -9,7 +9,7 @@ from scipy.sparse.linalg import LinearOperator, cg
 
 import pysingfel as ps
 
-from spinifel import parms, utils, image
+from spinifel import parms, utils, image, autocorrelation
 
 
 def forward(comm, uvect, H_, K_, L_, support, M, N,
@@ -145,9 +145,8 @@ def solve_ac(generation,
 
     if orientations is None:
         orientations = ps.get_random_quat(N_images)
-    rotmat = np.array([ps.quaternion2rot3d(quat) for quat in orientations])
-    H, K, L = np.einsum("ijk,klmn->jilmn", rotmat, pixel_position_reciprocal)
-    # shape -> [N_images] x det_shape
+    H, K, L = autocorrelation.gen_nonuniform_positions(
+        orientations, pixel_position_reciprocal)
 
     data = slices_.flatten()
 

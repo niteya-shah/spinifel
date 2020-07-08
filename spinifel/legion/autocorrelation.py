@@ -1,11 +1,11 @@
 import numpy as np
 import pygion
-from pygion import task, WD
+from pygion import task, RO, WD
 from scipy.sparse.linalg import LinearOperator, cg
 
 import pysingfel as ps
 
-from spinifel import parms
+from spinifel import parms, autocorrelation
 from . import utils as lgutils
 
 
@@ -25,6 +25,29 @@ def get_random_orientations():
     return orientations, orientations_p
 
 
+@task(privileges=[RO, WD, RO])
+def gen_nonuniform_positions(orientations, nonuniform, pixel_position):
+    H, K, L = autocorrelation.gen_nonuniform_positions(
+        orientations.quaternions, pixel_position.reciprocal)
+    nonuniform.H[:] = H
+    nonuniform.K[:] = K
+    nonuniform.L[:] = L
+
+
+def get_nonuniform_positions(orientations, orientations_p, pixel_position):
+    N_images_per_rank = parms.N_images_per_rank
+    fields_dict = {"H": pygion.float64, "K": pygion.float64,
+                   "L": pygion.float64}
+    sec_shape = parms.reduced_det_shape
+    nonuniform, nonuniform_p = lgutils.create_distributed_region(
+        N_images_per_rank, fields_dict, sec_shape)
+    for orientations_subr, nonuniform_subr in zip(
+            orientations_p, nonuniform_p):
+        gen_nonuniform_positions(
+            orientations_subr, nonuniform_subr, pixel_position)
+    return nonuniform, nonuniform_p
+
+
 def solve_ac(generation,
              pixel_position,
              pixel_distance,
@@ -35,4 +58,6 @@ def solve_ac(generation,
              ac_estimate=None):
     if orientations is None:
         orientations, orientations_p = get_random_orientations()
-    lgutils.print_region(orientations_p[0])
+    nonuniform, nonuniform_p = get_nonuniform_positions(
+        orientations, orientations_p, pixel_position)
+    lgutils.print_region(nonuniform_p[0])
