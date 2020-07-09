@@ -97,18 +97,29 @@ def core_problem(uregion, nonuniform_v, nonuniform_v_p, ac, weights, M, N,
     return uregion.ADA
 
 
-@task
-def righ_hand_ADb_task():
+@task(privileges=[RO, Reduce('+', 'ADb'), RO, RO])
+def right_hand_ADb_task(slices, uregion, nonuniform_v, ac, weights, M,
+                        reciprocal_extent, use_reciprocal_symmetry):
     data = slices.data.flatten()
     nuvect_Db = data * weights
-    uvect_ADb = autocorrelation.adjoint(
-        nuvect_Db, H_, K_, L_, ac_support, M,
+    uregion.ADb[:] += autocorrelation.adjoint(
+        nuvect_Db,
+        nonuniform_v.H,
+        nonuniform_v.K,
+        nonuniform_v.L,
+        ac.support, M,
         reciprocal_extent, use_reciprocal_symmetry)
 
 
-def right_hand():
-    for slices_subr in slices_p:
-        right_hand_task()
+def right_hand(slices, slices_p, uregion, nonuniform_v, nonuniform_v_p,
+               ac, weights, M,
+               reciprocal_extent, use_reciprocal_symmetry):
+    pygion.fill(uregion, "ADb", 0.)
+    for slices_subr, nonuniform_v_subr in zip(slices_p, nonuniform_v_p):
+        right_hand_ADb_task(slices_subr, uregion, nonuniform_v_subr,
+                            ac, weights, M,
+                            reciprocal_extent, use_reciprocal_symmetry)
+    return uregion.ADb
 
 
 def setup_linops(slices, slices_p, nonuniform, nonuniform_p,
@@ -157,7 +168,9 @@ def setup_linops(slices, slices_p, nonuniform, nonuniform_p,
         shape=(Mtot, Mtot),
         matvec=W_matvec)
 
-    d = right_hand()
+    d = right_hand(slices, slices_p, uregion, nonuniform_v, nonuniform_v_p,
+                   ac, weights, M,
+                   reciprocal_extent, use_reciprocal_symmetry)
 
     return W, d
 
