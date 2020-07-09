@@ -174,6 +174,8 @@ def setup_linops(slices, slices_p, nonuniform, nonuniform_p,
                    ac, weights, M,
                    reciprocal_extent, use_reciprocal_symmetry)
 
+    print("WARNING: Legion implementation of AC solver is incomplete.")
+
     return W, d
 
 
