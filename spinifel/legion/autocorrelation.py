@@ -5,7 +5,7 @@ from scipy.sparse.linalg import LinearOperator, cg
 
 import pysingfel as ps
 
-from spinifel import parms, autocorrelation, utils
+from spinifel import parms, autocorrelation, utils, image
 from . import utils as lgutils
 
 
@@ -155,7 +155,9 @@ def setup_linops(slices, slices_p, nonuniform, nonuniform_p,
 
     def W_matvec(uvect):
         """Define W part of the W @ x = d problem."""
-        uregion.input[:] = uvect
+        assert use_reciprocal_symmetry, "Complex AC are not supported."
+        assert np.all(np.isreal(uvect))
+        uregion.input[:] = uvect.real
 
         uvect_ADA = core_problem(  # A_adj*Da*A
             uregion, nonuniform_v, nonuniform_v_p, ac, weights, M, N,
@@ -202,11 +204,23 @@ def solve_ac(generation,
         raise NotImplemented()
     weights = 1
 
+    maxiter = 100
+
+    def callback(xk):
+        callback.counter += 1
+    callback.counter = 0
+
     x0 = ac_estimate.flatten()
     W, d = setup_linops(
         slices, slices_p, nonuniform, nonuniform_p,
         ac_support, weights, M, Mtot, N,
         reciprocal_extent, use_reciprocal_symmetry)
 
-    print(x0.flatten()[0])
-    print((W*x0).flatten()[0])
+    ret, info = cg(W, d, x0=x0, maxiter=maxiter, callback=callback)
+    ac = ret.reshape((M,)*3)
+    assert np.all(np.isreal(ac))  # if use_reciprocal_symmetry
+    ac = ac.real
+    it_number = callback.counter
+
+    print(f"Recovered AC in {it_number} iterations.", flush=True)
+    image.show_volume(ac, parms.Mquat, f"autocorrelation_{generation}.png")
