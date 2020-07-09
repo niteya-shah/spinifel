@@ -9,18 +9,6 @@ import pysingfel as ps
 from spinifel import parms, utils, image, autocorrelation
 
 
-def core_problem(uvect, H_, K_, L_, ac_support, weights, M, N,
-                 reciprocal_extent, use_reciprocal_symmetry):
-    nuvect = autocorrelation.forward(
-        uvect, H_, K_, L_, ac_support, M, N,
-        reciprocal_extent, use_reciprocal_symmetry)
-    nuvect *= weights
-    uvect_ADA = autocorrelation.adjoint(
-        nuvect, H_, K_, L_, ac_support, M,
-        reciprocal_extent, use_reciprocal_symmetry)
-    return uvect_ADA
-
-
 def fourier_reg(uvect, support, F_antisupport, M, use_recip_sym):
     ugrid = uvect.reshape((M,)*3) * support
     if use_recip_sym:
@@ -69,7 +57,7 @@ def setup_linops(H, K, L, data,
 
     def W_matvec(uvect):
         """Define W part of the W @ x = d problem."""
-        uvect_ADA = core_problem(  # A_adj*Da*A
+        uvect_ADA = autocorrelation.core_problem(  # A_adj*Da*A
             uvect, H_, K_, L_, ac_support, weights, M, N,
             reciprocal_extent, use_reciprocal_symmetry)
         uvect_FDF = fourier_reg(  # A_adj*Da*A

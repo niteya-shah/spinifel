@@ -1,11 +1,11 @@
 import numpy as np
 import pygion
-from pygion import task, RO, WD
+from pygion import task, Region, RO, WD, Reduce, Tunable
 from scipy.sparse.linalg import LinearOperator, cg
 
 import pysingfel as ps
 
-from spinifel import parms, autocorrelation
+from spinifel import parms, autocorrelation, utils
 from . import utils as lgutils
 
 
@@ -23,6 +23,32 @@ def get_random_orientations():
     for orientations_subr in orientations_p:
         gen_random_orientations(orientations_subr, N_images_per_rank)
     return orientations, orientations_p
+
+
+@task(privileges=[RO, WD])
+def gen_nonuniform_positions_v(nonuniform, nonuniform_v, reciprocal_extent):
+    nonuniform_v.H[:] = (nonuniform.H.flatten()
+        / reciprocal_extent * np.pi / parms.oversampling)
+    nonuniform_v.K[:] = (nonuniform.K.flatten()
+        / reciprocal_extent * np.pi / parms.oversampling)
+    nonuniform_v.L[:] = (nonuniform.L.flatten()
+        / reciprocal_extent * np.pi / parms.oversampling)
+
+
+def get_nonuniform_positions_v(nonuniform, nonuniform_p, reciprocal_extent):
+    """Flatten and calibrate nonuniform positions."""
+    N_vals_per_rank = (
+        parms.N_images_per_rank * utils.prod(parms.reduced_det_shape))
+    fields_dict = {"H": pygion.float64, "K": pygion.float64,
+                   "L": pygion.float64}
+    sec_shape = ()
+    nonuniform_v, nonuniform_v_p = lgutils.create_distributed_region(
+        N_vals_per_rank, fields_dict, sec_shape)
+    for nonuniform_subr, nonuniform_v_subr in zip(
+            nonuniform_p, nonuniform_v_p):
+        gen_nonuniform_positions_v(nonuniform_subr, nonuniform_v_subr,
+                                   reciprocal_extent)
+    return nonuniform_v, nonuniform_v_p
 
 
 @task(privileges=[RO, WD, RO])
@@ -48,6 +74,94 @@ def get_nonuniform_positions(orientations, orientations_p, pixel_position):
     return nonuniform, nonuniform_p
 
 
+@task(privileges=[
+    RO("input") + Reduce("+", "ADA"),
+    RO, RO])
+def core_problem_task(uregion, nonuniform_v, ac, weights, M, N,
+                      reciprocal_extent, use_reciprocal_symmetry):
+    uregion.ADA[:] += autocorrelation.core_problem(
+        uregion.input,
+        nonuniform_v.H,
+        nonuniform_v.K,
+        nonuniform_v.L,
+        ac.support, weights, M, N,
+        reciprocal_extent, use_reciprocal_symmetry)
+
+
+def core_problem(uregion, nonuniform_v, nonuniform_v_p, ac, weights, M, N,
+                 reciprocal_extent, use_reciprocal_symmetry):
+    pygion.fill(uregion, "ADA", 0.)
+    for nonuniform_v_subr in nonuniform_v_p:
+        core_problem_task(uregion, nonuniform_v_subr, ac, weights, M, N,
+                          reciprocal_extent, use_reciprocal_symmetry)
+    return uregion.ADA
+
+
+@task
+def righ_hand_ADb_task():
+    data = slices.data.flatten()
+    nuvect_Db = data * weights
+    uvect_ADb = autocorrelation.adjoint(
+        nuvect_Db, H_, K_, L_, ac_support, M,
+        reciprocal_extent, use_reciprocal_symmetry)
+
+
+def right_hand():
+    for slices_subr in slices_p:
+        right_hand_task()
+
+
+def setup_linops(slices, slices_p, nonuniform, nonuniform_p,
+                 ac_support, weights, M, Mtot, N,
+                 reciprocal_extent, use_reciprocal_symmetry):
+    """Define W and d parts of the W @ x = d problem.
+
+    W = al*A_adj*Da*A + rl*I  + fl*F_adj*Df*F
+    d = al*A_adj*Da*b + rl*x0 + 0
+
+    Where:
+        A represents the NUFFT operator
+        A_adj its adjoint
+        I the identity
+        F the FFT operator
+        F_adj its atjoint
+        Da, Df weights
+        b the data
+        x0 the initial guess (ac_estimate)
+    """
+    nonuniform_v, nonuniform_v_p = get_nonuniform_positions_v(
+        nonuniform, nonuniform_p, reciprocal_extent)
+    uregion = Region((Mtot,), {
+        "input": pygion.float64, "ADA": pygion.float64,
+        "ADb": pygion.float64})
+    ac = Region((M,)*3, {"support": pygion.float32})
+    # Avoid uninitialized warning.
+    pygion.fill(uregion, "input", 0.)
+    pygion.fill(uregion, "ADA", 0.)
+    pygion.fill(uregion, "ADb", 0.)
+    pygion.fill(ac, "support", 0.)
+    ac.support[:] = ac_support
+
+    def W_matvec(uvect):
+        """Define W part of the W @ x = d problem."""
+        uregion.input[:] = uvect
+
+        uvect_ADA = core_problem(  # A_adj*Da*A
+            uregion, nonuniform_v, nonuniform_v_p, ac, weights, M, N,
+            reciprocal_extent, use_reciprocal_symmetry)
+        uvect = uvect_ADA
+        return uvect
+
+    W = LinearOperator(
+        dtype=np.complex128,
+        shape=(Mtot, Mtot),
+        matvec=W_matvec)
+
+    d = right_hand()
+
+    return W, d
+
+
 def solve_ac(generation,
              pixel_position,
              pixel_distance,
@@ -56,8 +170,30 @@ def solve_ac(generation,
              orientations=None,
              orientations_p=None,
              ac_estimate=None):
+    M = parms.M
+    Mtot = M**3
+    N_images_per_rank = parms.N_images_per_rank
+    N = N_images_per_rank * utils.prod(parms.reduced_det_shape)
+    reciprocal_extent = pixel_distance.reciprocal.max()
+    use_reciprocal_symmetry = True
+
     if orientations is None:
         orientations, orientations_p = get_random_orientations()
     nonuniform, nonuniform_p = get_nonuniform_positions(
         orientations, orientations_p, pixel_position)
-    lgutils.print_region(nonuniform_p[0])
+
+    if ac_estimate is None:
+        ac_support = np.ones((M,)*3)
+        ac_estimate = np.zeros((M,)*3)
+    else:
+        raise NotImplemented()
+    weights = 1
+
+    x0 = ac_estimate.flatten()
+    W, d = setup_linops(
+        slices, slices_p, nonuniform, nonuniform_p,
+        ac_support, weights, M, Mtot, N,
+        reciprocal_extent, use_reciprocal_symmetry)
+
+    print(x0.flatten()[0])
+    print((W*x0).flatten()[0])

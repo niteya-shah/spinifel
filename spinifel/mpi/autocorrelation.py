@@ -24,12 +24,8 @@ def reduce_bcast(comm, vect):
 def core_problem(comm, uvect, H_, K_, L_, ac_support, weights, M, N,
                  reciprocal_extent, use_reciprocal_symmetry):
     comm.Bcast(uvect, root=0)
-    nuvect = autocorrelation.forward(
-        uvect, H_, K_, L_, ac_support, M, N,
-        reciprocal_extent, use_reciprocal_symmetry)
-    nuvect *= weights
-    uvect_ADA = autocorrelation.adjoint(
-        nuvect, H_, K_, L_, ac_support, M,
+    uvect_ADA = autocorrelation.core_problem(
+        uvect, H_, K_, L_, ac_support, weights, M, N,
         reciprocal_extent, use_reciprocal_symmetry)
     uvect_ADA = reduce_bcast(comm, uvect_ADA)
     return uvect_ADA
