@@ -27,11 +27,11 @@ def show_volume(ac, Mquat, filename):
     vmax = ac.max()
 
     fig, axes = plt.subplots(figsize=(8.0, 2.5), nrows=1, ncols=3)
-    axes[0].imshow(ac_midx, norm=SymLogNorm(1e-3), vmin=vmin, vmax=vmax)
-    axes[1].imshow(ac_midy, norm=SymLogNorm(1e-3), vmin=vmin, vmax=vmax)
-    axes[2].imshow(ac_midz, norm=SymLogNorm(1e-3), vmin=vmin, vmax=vmax)
+    axes[0].imshow(ac_midx, norm=SymLogNorm(1e-3, base=10), vmin=vmin, vmax=vmax)
+    axes[1].imshow(ac_midy, norm=SymLogNorm(1e-3, base=10), vmin=vmin, vmax=vmax)
+    axes[2].imshow(ac_midz, norm=SymLogNorm(1e-3, base=10), vmin=vmin, vmax=vmax)
 
-    fig.colorbar(cm.ScalarMappable(norm=SymLogNorm(1e-3, vmin=vmin, vmax=vmax)),
+    fig.colorbar(cm.ScalarMappable(norm=SymLogNorm(1e-3, base=10, vmin=vmin, vmax=vmax)),
                  ax=axes.ravel().tolist(), fraction=0.04, pad=0.04)
 
     plt.savefig(parms.out_dir / filename)
