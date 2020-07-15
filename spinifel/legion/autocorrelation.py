@@ -108,7 +108,8 @@ def right_hand_ADb_task(slices, uregion, nonuniform_v, ac, weights, M,
         nonuniform_v.K,
         nonuniform_v.L,
         ac.support, M,
-        reciprocal_extent, use_reciprocal_symmetry)
+        reciprocal_extent, use_reciprocal_symmetry
+    ).flatten()
 
 
 def right_hand(slices, slices_p, uregion, nonuniform_v, nonuniform_v_p,

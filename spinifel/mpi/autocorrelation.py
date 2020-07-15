@@ -95,7 +95,8 @@ def setup_linops(comm, H, K, L, data,
     nuvect_Db = data * weights
     uvect_ADb = autocorrelation.adjoint(
         nuvect_Db, H_, K_, L_, ac_support, M,
-        reciprocal_extent, use_reciprocal_symmetry)
+        reciprocal_extent, use_reciprocal_symmetry
+    ).flatten()
     uvect_ADb = reduce_bcast(comm, uvect_ADb)
     d = alambda*uvect_ADb + rlambda*x0
 
