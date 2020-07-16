@@ -30,6 +30,7 @@ if os.environ.get("SMALL_PROBLEM") == "1":
     N_phase_loops = 5
     N_clipping = 1
     N_binning = 4
+    N_orientations = 1000
     Mquat = int(oversampling * 10)  # 1/4 of uniform grid size
 else:
     N_images_per_rank = 1000 * data_multiplier
@@ -38,6 +39,7 @@ else:
     N_phase_loops = 10
     N_clipping = 0
     N_binning = 3
+    N_orientations = 2000
     Mquat = int(oversampling * 20)  # 1/4 of uniform grid size
 
 M = 4 * Mquat + 1

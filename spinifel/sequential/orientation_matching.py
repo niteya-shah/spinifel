@@ -9,7 +9,7 @@ from spinifel import parms, utils, autocorrelation
 def match(ac, slices_, pixel_position_reciprocal, pixel_distance_reciprocal):
     Mquat = parms.Mquat
     M = 4 * Mquat + 1
-    N_orientations = 1000
+    N_orientations = parms.N_orientations
     N_pixels = utils.prod(parms.reduced_det_shape)
     N_slices = slices_.shape[0]
     assert slices_.shape == (N_slices,) + parms.reduced_det_shape
