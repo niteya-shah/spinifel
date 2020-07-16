@@ -55,12 +55,23 @@ def setup_linops(H, K, L, data,
     assert np.all(F_antisupport == F_antisupport[:, :, ::-1])
     assert np.all(F_antisupport == F_antisupport[::-1, ::-1, ::-1])
 
+    # Using upsampled convolution technique instead of ADA
+    M_ups = parms.M_ups
+    ugrid_conv = autocorrelation.adjoint(
+        np.ones_like(data), H_, K_, L_, 1, M_ups,
+        reciprocal_extent, use_reciprocal_symmetry)
+    F_ugrid_conv_ = np.fft.fftn(np.fft.ifftshift(ugrid_conv)) / Mtot
+
     def W_matvec(uvect):
         """Define W part of the W @ x = d problem."""
-        uvect_ADA = autocorrelation.core_problem(  # A_adj*Da*A
-            uvect, H_, K_, L_, ac_support, weights, M, N,
-            reciprocal_extent, use_reciprocal_symmetry)
-        uvect_FDF = fourier_reg(  # A_adj*Da*A
+        uvect_ADA = autocorrelation.core_problem_convolution(
+            uvect, M, F_ugrid_conv_, M_ups, ac_support, use_reciprocal_symmetry)
+        if False:  # Debug/test
+            uvect_ADA_old = autocorrelation.core_problem(
+                 uvect, H_, K_, L_, ac_support, weights, M, N,
+                 reciprocal_extent, use_reciprocal_symmetry)
+            assert np.allclose(uvect_ADA, uvect_ADA_old)
+        uvect_FDF = fourier_reg(
             uvect, ac_support, F_antisupport, M, use_reciprocal_symmetry)
         uvect = alambda*uvect_ADA + rlambda*uvect + flambda*uvect_FDF
         return uvect
@@ -134,7 +145,8 @@ def solve_ac(generation,
                         use_reciprocal_symmetry)
     ret, info = cg(W, d, x0=x0, maxiter=maxiter, callback=callback)
     ac = ret.reshape((M,)*3)
-    assert np.all(np.isreal(ac))  # if use_reciprocal_symmetry
+    if use_reciprocal_symmetry:
+        assert np.all(np.isreal(ac))
     ac = ac.real
     it_number = callback.counter
 

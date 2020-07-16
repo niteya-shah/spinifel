@@ -41,6 +41,7 @@ else:
     Mquat = int(oversampling * 20)  # 1/4 of uniform grid size
 
 M = 4 * Mquat + 1
+M_ups = 2*M  # Upsampled grid for AC convolution technique
 N_binning_tot = N_clipping + N_binning
 reduced_det_shape = det_shape[:-2] + (
     det_shape[-2] // 2**N_binning_tot, det_shape[-1] // 2**N_binning_tot)

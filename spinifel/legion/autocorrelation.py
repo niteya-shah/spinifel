@@ -221,7 +221,8 @@ def solve_ac(generation,
 
     ret, info = cg(W, d, x0=x0, maxiter=maxiter, callback=callback)
     ac = ret.reshape((M,)*3)
-    assert np.all(np.isreal(ac))  # if use_reciprocal_symmetry
+    if use_reciprocal_symmetry:
+        assert np.all(np.isreal(ac))
     ac = ac.real
     it_number = callback.counter
 
