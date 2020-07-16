@@ -4,6 +4,7 @@ import finufftpy as nfft
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import LogNorm
+from scipy.linalg import norm
 from scipy.ndimage import gaussian_filter
 from scipy.sparse.linalg import LinearOperator, cg
 
@@ -147,8 +148,8 @@ def solve_ac(generation,
     weights = np.ones(N)
 
     alambda = 1
-    rlambda = 1e-9
-    flambda = 1e3
+    rlambda = 1e-8 * pow(100, comm.rank)
+    flambda = 0  # 1e5 * pow(10, comm.rank - comm.size//2)
     maxiter = 100
 
     if comm.rank == 0:
@@ -171,6 +172,24 @@ def solve_ac(generation,
                         alambda, rlambda, flambda,
                         use_reciprocal_symmetry)
     ret, info = cg(W, d, x0=x0, maxiter=maxiter, callback=callback)
+
+    v1 = norm(ret)
+    v2 = norm(W*ret-d)
+
+    summary = comm.gather((rlambda, v1, v2), root=0)
+    if comm.rank == 0:
+        lambdas, v1s, v2s = zip(*summary)
+        fig, axes = plt.subplots(figsize=(6.0, 6.0), nrows=2, ncols=1)
+        axes[0].semilogx(lambdas, v1s)
+        axes[0].set_xlabel("$\\lambda_r$")
+        axes[0].set_ylabel("$\\|x\\|$")
+        axes[1].semilogx(lambdas, v2s)
+        axes[1].set_xlabel("$\\lambda_r$")
+        axes[1].set_ylabel("$\\|W x - d\\|$")
+        plt.savefig(parms.out_dir / f"summary_{generation}.png")
+        plt.close('all')
+
+
     ac = ret.reshape((M,)*3)
     if use_reciprocal_symmetry:
         assert np.all(np.isreal(ac))
@@ -178,7 +197,6 @@ def solve_ac(generation,
     it_number = callback.counter
 
     print(f"Rank {comm.rank} got AC in {it_number} iterations.", flush=True)
-    if comm.rank == 0:
-        image.show_volume(ac, parms.Mquat, f"autocorrelation_{generation}.png")
+    image.show_volume(ac, parms.Mquat, f"autocorrelation_{generation}_{comm.rank}.png")
 
     return ac
