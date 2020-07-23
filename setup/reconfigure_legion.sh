@@ -17,6 +17,7 @@ cmake -DCMAKE_PREFIX_PATH="$CONDA_ENV_DIR" \
     -DLegion_USE_Python=ON \
     -DPYTHON_EXECUTABLE="$(which python)" \
     -DLegion_USE_CUDA=$([ $USE_CUDA -eq 1 ] && echo ON || echo OFF) \
+    -DLegion_USE_OpenMP=$([ $USE_OPENMP -eq 1 ] && echo ON || echo OFF) \
     -DLegion_USE_GASNet=$([ $USE_GASNET -eq 1 ] && echo ON || echo OFF) \
     -DGASNet_ROOT_DIR="$GASNET_ROOT" \
     -DGASNet_CONDUITS=$CONDUIT \
