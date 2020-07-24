@@ -99,7 +99,7 @@ fi
 if [[ $LG_RT_DIR == $PWD/legion/runtime ]]; then
     rm -rf legion
     rm -rf install
-    git clone -b pyomp https://gitlab.com/StanfordLegion/legion.git
+    git clone -b control_replication https://gitlab.com/StanfordLegion/legion.git
     ./reconfigure_legion.sh
     ./rebuild_legion.sh
     cp "$CONDA_ENV_DIR"/lib/libhdf5* "$LEGION_INSTALL_DIR"/lib/
