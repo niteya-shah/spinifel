@@ -37,21 +37,22 @@ mkdir -p $OUT_DIR
 rm -rf $OUT_DIR/*
 
 nodes=$SLURM_JOB_NUM_NODES
+total_cores=$(( $(echo $SLURM_JOB_CPUS_PER_NODE | cut -d'(' -f 1) / 2 ))
 
 if [[ -z $NTASKS ]]; then
 	NTASKS="1"
 fi
 echo "NTASKS: $NTASKS"
 
-export OMP_NUM_THREADS
-echo "OMP_NUM_THREADS: $OMP_NUM_THREADS"
+if [[ -n $OMP_NUM_THREADS ]]; then
+    export OMP_NUM_THREADS
+    echo "OMP_NUM_THREADS: $OMP_NUM_THREADS"
+fi
 
 export SMALL_PROBLEM
 
 if [[ $USING_LEGION -eq 1 ]]; then
-    sockets=2
-    cores=10
-    srun -n $NTASKS legion_python legion_main.py -ll:py 1 -ll:csize 16384
+    srun -n $NTASKS -N $nodes --cpus-per-task=$(( total_cores * 2 / (NTASKS / nodes) )) legion_python legion_main.py -ll:csize 16384 -ll:py 1 -ll:pyomp $(( total_cores - 2 ))
 elif [[ $USING_MPI -eq 1 ]]; then
     srun -n $NTASKS python mpi_main.py
 else

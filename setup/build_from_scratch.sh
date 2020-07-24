@@ -22,6 +22,7 @@ unset PYTHONSTARTUP
 export LD_PRELOAD="\$FFTW_DIR/libfftw3.so"
 
 export USE_CUDA=${USE_CUDA:-0}
+export USE_OPENMP=${USE_OPENMP:-1}
 export USE_GASNET=${USE_GASNET:-1}
 export CONDUIT=${CONDUIT:-aries}
 EOF
@@ -120,7 +121,7 @@ fi
 if [[ $LG_RT_DIR == $PWD/legion/runtime ]]; then
     rm -rf legion
     rm -rf install
-    git clone -b control_replication https://gitlab.com/StanfordLegion/legion.git
+    git clone -b pyomp https://gitlab.com/StanfordLegion/legion.git
     ./reconfigure_legion.sh
     ./rebuild_legion.sh
     cp "$CONDA_ENV_DIR"/lib/libhdf5* "$LEGION_INSTALL_DIR"/lib/
