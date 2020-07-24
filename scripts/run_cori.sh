@@ -56,6 +56,7 @@ if [[ $USING_LEGION -eq 1 ]]; then
 elif [[ $USING_MPI -eq 1 ]]; then
     srun -n $NTASKS python mpi_main.py
 else
+    export PS_PARALLEL=none
     if [[ $PROFILING -eq 1 ]]; then
         PYFLAGS="-m cProfile -o $OUT_DIR/main.prof "$PYFLAGS
     fi

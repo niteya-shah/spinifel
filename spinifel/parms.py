@@ -18,6 +18,12 @@ oversampling = 1
 
 data_dir = Path(os.environ.get("DATA_DIR", ""))
 data_path = data_dir / "2CEX-10k-2.h5"
+if os.environ.get("USE_PSANA") == "1":
+    use_psana = True
+    exp = 'xpptut15'
+    runnum = 14
+else:
+    use_psana = False
 
 out_dir = Path(os.environ.get("OUT_DIR", ""))
 

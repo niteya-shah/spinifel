@@ -22,19 +22,29 @@ def get_pixel_index_map():
     return pixel_index_map
 
 
-def get_slices(N_images):
+def get_slices(N_images, ds):
     data_type = getattr(np, parms.data_type_str)
     slices_ = np.zeros((N_images,) + parms.det_shape,
                        dtype=data_type)
-    prep.load_slices(slices_, 0, N_images)
+    if ds is None:
+        prep.load_slices(slices_, 0, N_images)
+    else:
+        i = 0
+        for run in ds.runs():
+            for nevt, evt in enumerate(run.events()):
+                raw = evt._dgrams[0].pnccdBack[0].raw
+                slices_[i] = raw.image
+                i += 1
+                if i >= N_images:
+                    return slices_
     return slices_
 
 
-def get_data(N_images):
+def get_data(N_images, ds):
     pixel_position_reciprocal = get_pixel_position_reciprocal()
     pixel_index_map = get_pixel_index_map()
 
-    slices_ = get_slices(N_images)
+    slices_ = get_slices(N_images, ds)
     mean_image = slices_.mean(axis=0)
 
     image.show_image(pixel_index_map, slices_[0], "image_0.png")
