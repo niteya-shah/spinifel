@@ -15,3 +15,9 @@ To use that environment, use
 ```
 source setup/env.sh
 ```
+
+## Data
+Spinifel needs input data.
+By default, it expects the data to be located in the `$SCRATCH/spinifel_data` directory.
+As of writing, the reference file is `2CEX-10k-2.h5` and is available in the `$CFS/m2859/dujardin/spi` directory.
+Create the `spinifel_data` directory in your scratch system and copy the data file.
