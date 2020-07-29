@@ -152,7 +152,7 @@ def solve_ac(generation,
     flambda = 0  # 1e5 * pow(10, comm.rank - comm.size//2)
     maxiter = 100
 
-    if comm.rank == 0:
+    if comm.rank == (2 if parms.use_psana else 0):
         idx = np.abs(L) < reciprocal_extent * .01
         plt.scatter(H[idx], K[idx], c=slices_[idx], s=1, norm=LogNorm())
         plt.axis('equal')
