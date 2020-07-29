@@ -84,6 +84,9 @@ def get_data(N_images_per_rank, ds):
     print(f"Rank {comm.rank}: {N_images_local} values, start: {witness}", flush=True)
     mean_image = compute_mean_image(comm, slices_)
 
+    if rank == (2 if parms.use_psana else 0):
+        image.show_image(pixel_index_map, slices_[0], "image_0.png")
+
     if rank == 0:
         pixel_distance_reciprocal = prep.compute_pixel_distance(
             pixel_position_reciprocal)
@@ -97,6 +100,9 @@ def get_data(N_images_per_rank, ds):
 
     slices_ = prep.binning_sum(slices_)
     mean_image = compute_mean_image(comm, slices_)
+
+    if rank == (2 if parms.use_psana else 0):
+        image.show_image(pixel_index_map, slices_[0], "image_binned_0.png")
 
     if rank == 0:
         image.show_image(pixel_index_map, mean_image, "mean_image_binned.png")
