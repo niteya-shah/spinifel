@@ -41,19 +41,12 @@ def get_slices(comm, N_images_per_rank, ds):
         for run in ds.runs():
             for evt in run.events():
                 raw = evt._dgrams[0].pnccdBack[0].raw
-                slices_[i] = raw.image
+                try:
+                    slices_[i] = raw.image
+                except IndexError:
+                    raise RuntimeError(
+                        f"Rank {comm.rank} received too many events.")
                 i += 1
-                if i >= N_images_per_rank:
-                    # Each big data node needs to receive a StopIteration
-                    # from the Event Builder before the Event Builder
-                    # can stop. However, we can't be guaranteed they'd
-                    # ask the last chunk at the same time.
-                    # So, we have a barrier until all are full and then
-                    # ask for the StopIteration. If we don't get a
-                    # StopIteration, `slices_[i]` will crash a few lines
-                    # above.
-                    bd_comm = comm.Create_group(comm.group.Excl([0, 1]))
-                    bd_comm.Barrier()
         return slices_[:i]
 
 

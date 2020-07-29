@@ -25,8 +25,13 @@ def main():
     if parms.use_psana:
         from psana import DataSource
         logger.log("Using psana")
+        def destination(timestamp):
+            # Return big data node destination, numbered from 1, round-robin
+            destination.last = destination.last % N_big_data_nodes + 1
+            return destination.last
+        destination.last = 0
         ds = DataSource(exp=parms.exp, run=parms.runnum, dir=parms.data_dir,
-                        batch_size=batch_size, max_events=max_events)
+                        destination=destination, max_events=max_events)
 
     (pixel_position_reciprocal,
      pixel_distance_reciprocal,
