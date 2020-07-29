@@ -64,7 +64,10 @@ def core_problem_convolution(uvect, M, F_ugrid_conv_, M_ups, ac_support,
 
 
 def gen_nonuniform_positions(orientations, pixel_position_reciprocal):
-    rotmat = np.array([ps.quaternion2rot3d(quat) for quat in orientations])
+    if orientations.shape[0] > 0:
+        rotmat = np.array([ps.quaternion2rot3d(quat) for quat in orientations])
+    else:
+        rotmat = np.zeros((0, 3, 3))
     H, K, L = np.einsum("ijk,klmn->jilmn", rotmat, pixel_position_reciprocal)
     # shape -> [N_images] x det_shape
     return H, K, L

@@ -11,17 +11,32 @@ from .orientation_matching import match
 def main():
     comm = MPI.COMM_WORLD
 
-    logger = utils.Logger(comm.rank==0)
+    logger = utils.Logger(comm.rank==(2 if parms.use_psana else 0))
     logger.log("In MPI main")
 
     N_images_per_rank = parms.N_images_per_rank
+    N_big_data_nodes = comm.size - 2
+    batch_size = min(N_images_per_rank, 100)
+    max_events = min(parms.N_images_max, N_big_data_nodes*N_images_per_rank)
 
     timer = utils.Timer()
+
+    ds = None
+    if parms.use_psana:
+        from psana import DataSource
+        logger.log("Using psana")
+        def destination(timestamp):
+            # Return big data node destination, numbered from 1, round-robin
+            destination.last = destination.last % N_big_data_nodes + 1
+            return destination.last
+        destination.last = 0
+        ds = DataSource(exp=parms.exp, run=parms.runnum, dir=parms.data_dir,
+                        destination=destination, max_events=max_events)
 
     (pixel_position_reciprocal,
      pixel_distance_reciprocal,
      pixel_index_map,
-     slices_) = get_data(N_images_per_rank)
+     slices_) = get_data(N_images_per_rank, ds)
     logger.log(f"Loaded in {timer.lap():.2f}s.")
 
     ac = solve_ac(

@@ -14,6 +14,10 @@ def match(ac, slices_, pixel_position_reciprocal, pixel_distance_reciprocal):
     N_slices = slices_.shape[0]
     assert slices_.shape == (N_slices,) + parms.reduced_det_shape
     N = N_pixels * N_orientations
+
+    if not N_slices:
+        return np.zeros((0, 4))
+
     ref_orientations = ps.get_uniform_quat(N_orientations, True)
     ref_rotmat = np.array([ps.quaternion2rot3d(quat) for quat in ref_orientations])
     H, K, L = np.einsum("ijk,klmn->jilmn", ref_rotmat, pixel_position_reciprocal)

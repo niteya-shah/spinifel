@@ -6,7 +6,7 @@
 #SBATCH --mail-type=ALL
 #SBATCH --account=m2859
 
-while getopts lmpsn:t: option
+while getopts lmpsan:t: option
 do
 case "${option}"
 in
@@ -14,6 +14,7 @@ l) USING_LEGION="1";;
 m) USING_MPI="1";;
 p) PROFILING="1";;
 s) SMALL_PROBLEM="1";;
+a) USE_PSANA="1";;
 n) NTASKS=$OPTARG;;
 t) OMP_NUM_THREADS=$OPTARG;;
 esac
@@ -49,13 +50,21 @@ if [[ -n $OMP_NUM_THREADS ]]; then
     echo "OMP_NUM_THREADS: $OMP_NUM_THREADS"
 fi
 
-export SMALL_PROBLEM
+if [[ -n $SMALL_PROBLEM ]]; then
+    export SMALL_PROBLEM
+fi
+
+if [[ -n $USE_PSANA ]]; then
+    export USE_PSANA
+fi
 
 if [[ $USING_LEGION -eq 1 ]]; then
     srun -n $NTASKS -N $nodes --cpus-per-task=$(( total_cores * 2 / (NTASKS / nodes) )) legion_python legion_main.py -ll:csize 16384 -ll:py 1 -ll:pyomp $(( total_cores - 2 ))
 elif [[ $USING_MPI -eq 1 ]]; then
+    export PS_PARALLEL=mpi
     srun -n $NTASKS python mpi_main.py
 else
+    export PS_PARALLEL=none
     if [[ $PROFILING -eq 1 ]]; then
         PYFLAGS="-m cProfile -o $OUT_DIR/main.prof "$PYFLAGS
     fi

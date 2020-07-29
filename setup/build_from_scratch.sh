@@ -49,6 +49,11 @@ export PYTHONPATH="\$LEGION_INSTALL_DIR/lib/python\$PYVER/site-packages:\$PYTHON
 export CONDA_ROOT="$PWD/conda"
 export CONDA_ENV_DIR="\$CONDA_ROOT/envs/myenv"
 
+export LCLS2_DIR="$PWD/lcls2"
+
+export PATH="\$LCLS2_DIR/install/bin:\$PATH"
+export PYTHONPATH="\$LCLS2_DIR/install/lib/python\$PYVER/site-packages:\$PYTHONPATH"
+
 if [[ -d \$CONDA_ROOT ]]; then
   source "\$CONDA_ROOT/etc/profile.d/conda.sh"
   conda activate "\$CONDA_ENV_DIR"
@@ -79,10 +84,27 @@ PACKAGE_LIST=(
     pybind11  # FINUFFT
     numba  # pysingfel
     scikit-learn  # pysingfel
+    tqdm  # convenience
+
+    # lcls2
+    setuptools=46.4.0  # temp need specific version
+    cmake
+    cython
+    mongodb
+    pymongo
+    curl
+    rapidjson
+    ipython
+    requests
+    mypy
+    prometheus_client
 )
 
 conda create -y -p "$CONDA_ENV_DIR" "${PACKAGE_LIST[@]}" -c defaults -c anaconda
 conda activate "$CONDA_ENV_DIR"
+# Extra lcls2 deps
+conda install -y amityping -c lcls-ii
+conda install -y bitstruct krtc -c conda-forge
 
 if [[ $(hostname) = "cori"* ]]; then
     CC=gcc MPICC=cc pip install -v --no-binary mpi4py mpi4py
@@ -104,6 +126,10 @@ if [[ $LG_RT_DIR == $PWD/legion/runtime ]]; then
     ./rebuild_legion.sh
     cp "$CONDA_ENV_DIR"/lib/libhdf5* "$LEGION_INSTALL_DIR"/lib/
 fi
+
+rm -rf lcls2
+git clone https://github.com/slac-lcls/lcls2.git $LCLS2_DIR
+./psana_clean_build.sh
 
 rm -rf finufft
 git clone git@github.com:AntoineDujardin/finufft.git

@@ -15,10 +15,17 @@ def main():
 
     timer = utils.Timer()
 
+    ds = None
+    if parms.use_psana:
+        from psana import DataSource
+        logger.log("Using psana")
+        ds = DataSource(exp=parms.exp, run=parms.runnum, dir=parms.data_dir,
+                        batch_size=50, max_events=parms.N_images_max)
+
     (pixel_position_reciprocal,
      pixel_distance_reciprocal,
      pixel_index_map,
-     slices_) = get_data(N_images)
+     slices_) = get_data(N_images, ds)
     logger.log(f"Loaded in {timer.lap():.2f}s.")
 
     ac = solve_ac(
