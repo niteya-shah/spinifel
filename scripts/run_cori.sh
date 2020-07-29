@@ -54,6 +54,7 @@ export SMALL_PROBLEM
 if [[ $USING_LEGION -eq 1 ]]; then
     srun -n $NTASKS -N $nodes --cpus-per-task=$(( total_cores * 2 / (NTASKS / nodes) )) legion_python legion_main.py -ll:csize 16384 -ll:py 1 -ll:pyomp $(( total_cores - 2 ))
 elif [[ $USING_MPI -eq 1 ]]; then
+    export PS_PARALLEL=mpi
     srun -n $NTASKS python mpi_main.py
 else
     export PS_PARALLEL=none

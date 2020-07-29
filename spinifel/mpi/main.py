@@ -15,13 +15,23 @@ def main():
     logger.log("In MPI main")
 
     N_images_per_rank = parms.N_images_per_rank
+    N_big_data_nodes = comm.size - 2
+    batch_size = min(N_images_per_rank, 100)
+    max_events = min(parms.N_images_max, N_big_data_nodes*N_images_per_rank)
 
     timer = utils.Timer()
+
+    ds = None
+    if parms.use_psana:
+        from psana import DataSource
+        logger.log("Using psana")
+        ds = DataSource(exp=parms.exp, run=parms.runnum, dir=parms.data_dir,
+                        batch_size=batch_size, max_events=max_events)
 
     (pixel_position_reciprocal,
      pixel_distance_reciprocal,
      pixel_index_map,
-     slices_) = get_data(N_images_per_rank)
+     slices_) = get_data(N_images_per_rank, ds)
     logger.log(f"Loaded in {timer.lap():.2f}s.")
 
     ac = solve_ac(

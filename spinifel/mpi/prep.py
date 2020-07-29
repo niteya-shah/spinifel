@@ -27,26 +27,50 @@ def get_pixel_index_map(comm):
     return pixel_index_map
 
 
-def get_slices(comm, N_images_per_rank):
+def get_slices(comm, N_images_per_rank, ds):
     data_type = getattr(np, parms.data_type_str)
     slices_ = np.zeros((N_images_per_rank,) + parms.det_shape,
                        dtype=data_type)
-    i_start = comm.rank * N_images_per_rank
-    i_end = i_start + N_images_per_rank
-    prep.load_slices(slices_, i_start, i_end)
-    return slices_
+    if ds is None:
+        i_start = comm.rank * N_images_per_rank
+        i_end = i_start + N_images_per_rank
+        prep.load_slices(slices_, i_start, i_end)
+        return slices_
+    else:
+        i = 0
+        for run in ds.runs():
+            for evt in run.events():
+                raw = evt._dgrams[0].pnccdBack[0].raw
+                slices_[i] = raw.image
+                i += 1
+                if i >= N_images_per_rank:
+                    # Each big data node needs to receive a StopIteration
+                    # from the Event Builder before the Event Builder
+                    # can stop. However, we can't be guaranteed they'd
+                    # ask the last chunk at the same time.
+                    # So, we have a barrier until all are full and then
+                    # ask for the StopIteration. If we don't get a
+                    # StopIteration, `slices_[i]` will crash a few lines
+                    # above.
+                    bd_comm = comm.Create_group(comm.group.Excl([0, 1]))
+                    bd_comm.Barrier()
+        return slices_[:i]
 
 
 def compute_mean_image(comm, slices_):
-    mean_image = slices_.mean(axis=0)
-    reduced_image = np.zeros_like(mean_image)
-    comm.Reduce(mean_image, reduced_image, op=MPI.SUM, root=0)
-    mean_image = reduced_image / comm.size
-    # Send None rather than intermediary result
-    return mean_image if comm.rank == 0 else None
+    images_sum = slices_.sum(axis=0)
+    N_images = slices_.shape[0]
+    images_sum_total = np.zeros_like(images_sum)
+    comm.Reduce(images_sum, images_sum_total, op=MPI.SUM, root=0)
+    N_images = comm.reduce(N_images, op=MPI.SUM, root=0)
+    if comm.rank == 0:
+        return images_sum_total / N_images
+    else:
+        # Send None rather than intermediary result
+        return None
 
 
-def get_data(N_images_per_rank):
+def get_data(N_images_per_rank, ds):
     comm = MPI.COMM_WORLD
     rank = comm.rank
     size = comm.size
@@ -54,13 +78,15 @@ def get_data(N_images_per_rank):
     pixel_position_reciprocal = get_pixel_position_reciprocal(comm)
     pixel_index_map = get_pixel_index_map(comm)
 
-    slices_ = get_slices(comm, N_images_per_rank)
+    slices_ = get_slices(comm, N_images_per_rank, ds)
+    N_images_local = slices_.shape[0]
+    witness = slices_.flatten()[0] if N_images_local else None
+    print(f"Rank {comm.rank}: {N_images_local} values, start: {witness}", flush=True)
     mean_image = compute_mean_image(comm, slices_)
 
     if rank == 0:
         pixel_distance_reciprocal = prep.compute_pixel_distance(
             pixel_position_reciprocal)
-        image.show_image(pixel_index_map, slices_[0], "image_0.png")
         image.show_image(pixel_index_map, mean_image, "mean_image.png")
         prep.export_saxs(pixel_distance_reciprocal, mean_image, "saxs.png")
 
@@ -73,7 +99,6 @@ def get_data(N_images_per_rank):
     mean_image = compute_mean_image(comm, slices_)
 
     if rank == 0:
-        image.show_image(pixel_index_map, slices_[0], "image_binned_0.png")
         image.show_image(pixel_index_map, mean_image, "mean_image_binned.png")
         prep.export_saxs(pixel_distance_reciprocal, mean_image,
                          "saxs_binned.png")
