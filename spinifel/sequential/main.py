@@ -19,9 +19,8 @@ def main():
     if parms.use_psana:
         from psana import DataSource
         logger.log("Using psana")
-        ds = DataSource(files=str(parms.data_dir/"data-r0014-s00.xtc2"))
-                        # exp=parms.exp, run=parms.runnum, dir=parms.data_dir,
-                        # batch_size=50, max_events=N_images)
+        ds = DataSource(exp=parms.exp, run=parms.runnum, dir=parms.data_dir,
+                        batch_size=50, max_events=parms.N_images_max)
 
     (pixel_position_reciprocal,
      pixel_distance_reciprocal,
