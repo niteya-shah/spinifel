@@ -11,7 +11,7 @@ from .orientation_matching import match
 def main():
     comm = MPI.COMM_WORLD
 
-    logger = utils.Logger(comm.rank==0)
+    logger = utils.Logger(comm.rank==(2 if parms.use_psana else 0))
     logger.log("In MPI main")
 
     N_images_per_rank = parms.N_images_per_rank
