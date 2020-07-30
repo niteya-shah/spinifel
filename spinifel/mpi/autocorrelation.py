@@ -176,27 +176,47 @@ def solve_ac(generation,
     v1 = norm(ret)
     v2 = norm(W*ret-d)
 
-    summary = comm.gather((rlambda, v1, v2), root=0)
+    summary = comm.gather((comm.rank, rlambda, v1, v2), root=0)
     if comm.rank == 0:
-        lambdas, v1s, v2s = zip(*summary)
+        ranks, lambdas, v1s, v2s = [np.array(el) for el in zip(*summary)]
+
+        if generation == 0:
+            # Expect non-convergence => weird results.
+            # Heuristic: retain rank with highest lambda and high v1.
+            idx = v1s >= np.mean(v1s)
+            imax = np.argmax(lambdas[idx])
+            iref = np.arange(len(ranks), dtype=np.int)[idx][imax]
+        else:
+            # Take corner of L-curve: min (v1+v2)
+            iref = np.argmin(v1s+v2s)
+        ref_rank = ranks[iref]
+
         fig, axes = plt.subplots(figsize=(6.0, 6.0), nrows=2, ncols=1)
         axes[0].semilogx(lambdas, v1s)
+        axes[0].semilogx(lambdas[iref], v1s[iref], "rD")
         axes[0].set_xlabel("$\\lambda_r$")
         axes[0].set_ylabel("$\\|x\\|$")
         axes[1].semilogx(lambdas, v2s)
+        axes[1].semilogx(lambdas[iref], v2s[iref], "rD")
         axes[1].set_xlabel("$\\lambda_r$")
         axes[1].set_ylabel("$\\|W x - d\\|$")
         plt.savefig(parms.out_dir / f"summary_{generation}.png")
         plt.close('all')
-
+    else:
+        ref_rank = -1
+    ref_rank = comm.bcast(ref_rank, root=0)
 
     ac = ret.reshape((M,)*3)
     if use_reciprocal_symmetry:
         assert np.all(np.isreal(ac))
-    ac = ac.real
+    ac = np.ascontiguousarray(ac.real)
     it_number = callback.counter
 
     print(f"Rank {comm.rank} got AC in {it_number} iterations.", flush=True)
     image.show_volume(ac, parms.Mquat, f"autocorrelation_{generation}_{comm.rank}.png")
+
+    comm.Bcast(ac, root=ref_rank)
+    if comm.rank == 0:
+        print(f"Keeping result from rank {ref_rank}.")
 
     return ac
