@@ -74,29 +74,6 @@ def get_nonuniform_positions(orientations, orientations_p, pixel_position):
     return nonuniform, nonuniform_p
 
 
-@task(privileges=[
-    RO("input") + Reduce("+", "ADA"),
-    RO, RO])
-def core_problem_task(uregion, nonuniform_v, ac, weights, M, N,
-                      reciprocal_extent, use_reciprocal_symmetry):
-    uregion.ADA[:] += autocorrelation.core_problem(
-        uregion.input,
-        nonuniform_v.H,
-        nonuniform_v.K,
-        nonuniform_v.L,
-        ac.support, weights, M, N,
-        reciprocal_extent, use_reciprocal_symmetry)
-
-
-def core_problem(uregion, nonuniform_v, nonuniform_v_p, ac, weights, M, N,
-                 reciprocal_extent, use_reciprocal_symmetry):
-    pygion.fill(uregion, "ADA", 0.)
-    for nonuniform_v_subr in nonuniform_v_p:
-        core_problem_task(uregion, nonuniform_v_subr, ac, weights, M, N,
-                          reciprocal_extent, use_reciprocal_symmetry)
-    return uregion.ADA
-
-
 @task(privileges=[RO, Reduce('+', 'ADb'), RO, RO])
 def right_hand_ADb_task(slices, uregion, nonuniform_v, ac, weights, M,
                         reciprocal_extent, use_reciprocal_symmetry):
@@ -122,6 +99,30 @@ def right_hand(slices, slices_p, uregion, nonuniform_v, nonuniform_v_p,
                             reciprocal_extent, use_reciprocal_symmetry)
 
 
+@task(privileges=[Reduce('+', 'F_conv_'), RO, RO])
+def prep_Fconv_task(uregion_ups, nonuniform_v, ac, weights, M_ups, Mtot, N,
+                    reciprocal_extent, use_reciprocal_symmetry):
+    conv_ups = autocorrelation.adjoint(
+        np.ones(N),
+        nonuniform_v.H,
+        nonuniform_v.K,
+        nonuniform_v.L,
+        1, M_ups,
+        reciprocal_extent, use_reciprocal_symmetry
+    )
+    uregion_ups.F_conv_[:] += np.fft.fftn(np.fft.ifftshift(conv_ups)) / Mtot
+
+
+def prep_Fconv(uregion_ups, nonuniform_v, nonuniform_v_p,
+               ac, weights, M_ups, Mtot, N,
+               reciprocal_extent, use_reciprocal_symmetry):
+    pygion.fill(uregion_ups, "F_conv_", 0.)
+    for nonuniform_v_subr in nonuniform_v_p:
+        prep_Fconv_task(uregion_ups, nonuniform_v_subr,
+                        ac, weights, M_ups, Mtot, N,
+                        reciprocal_extent, use_reciprocal_symmetry)
+
+
 def solve_ac(generation,
              pixel_position,
              pixel_distance,
@@ -131,6 +132,7 @@ def solve_ac(generation,
              orientations_p=None,
              ac_estimate=None):
     M = parms.M
+    M_ups = parms.M_ups  # For upsampled convolution technique
     Mtot = M**3
     N_images_per_rank = parms.N_images_per_rank
     N = N_images_per_rank * utils.prod(parms.reduced_det_shape)
@@ -164,6 +166,7 @@ def solve_ac(generation,
     uregion = Region((Mtot,), {
         "input": pygion.float64, "ADA": pygion.float64,
         "ADb": pygion.float64})
+    uregion_ups = Region((M_ups,)*3, {"F_conv_": pygion.complex128})
     ac = Region((M,)*3, {"support": pygion.float32})
     # Avoid uninitialized warning.
     pygion.fill(uregion, "input", 0.)
@@ -172,15 +175,17 @@ def solve_ac(generation,
     pygion.fill(ac, "support", 0.)
     ac.support[:] = ac_support
 
+    prep_Fconv(uregion_ups, nonuniform_v, nonuniform_v_p,
+               ac, weights, M_ups, Mtot, N,
+               reciprocal_extent, use_reciprocal_symmetry)
+
     def W_matvec(uvect):
         """Define W part of the W @ x = d problem."""
         assert use_reciprocal_symmetry, "Complex AC are not supported."
         assert np.all(np.isreal(uvect))
-        uregion.input[:] = uvect.real
 
-        uvect_ADA = core_problem(  # A_adj*Da*A
-            uregion, nonuniform_v, nonuniform_v_p, ac, weights, M, N,
-            reciprocal_extent, use_reciprocal_symmetry)
+        uvect_ADA = autocorrelation.core_problem_convolution(
+            uvect, M, uregion_ups.F_conv_, M_ups, ac_support, use_reciprocal_symmetry)
         uvect = uvect_ADA
         return uvect
 
