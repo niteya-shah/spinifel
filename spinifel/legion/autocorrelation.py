@@ -123,24 +123,43 @@ def right_hand(slices, slices_p, uregion, nonuniform_v, nonuniform_v_p,
     return uregion.ADb
 
 
-def setup_linops(slices, slices_p, nonuniform, nonuniform_p,
-                 ac_support, weights, M, Mtot, N,
-                 reciprocal_extent, use_reciprocal_symmetry):
-    """Define W and d parts of the W @ x = d problem.
+def solve_ac(generation,
+             pixel_position,
+             pixel_distance,
+             slices,
+             slices_p,
+             orientations=None,
+             orientations_p=None,
+             ac_estimate=None):
+    M = parms.M
+    Mtot = M**3
+    N_images_per_rank = parms.N_images_per_rank
+    N = N_images_per_rank * utils.prod(parms.reduced_det_shape)
+    reciprocal_extent = pixel_distance.reciprocal.max()
+    use_reciprocal_symmetry = True
 
-    W = al*A_adj*Da*A + rl*I  + fl*F_adj*Df*F
-    d = al*A_adj*Da*b + rl*x0 + 0
+    if orientations is None:
+        orientations, orientations_p = get_random_orientations()
+    nonuniform, nonuniform_p = get_nonuniform_positions(
+        orientations, orientations_p, pixel_position)
 
-    Where:
-        A represents the NUFFT operator
-        A_adj its adjoint
-        I the identity
-        F the FFT operator
-        F_adj its atjoint
-        Da, Df weights
-        b the data
-        x0 the initial guess (ac_estimate)
-    """
+    if ac_estimate is None:
+        ac_support = np.ones((M,)*3)
+        ac_estimate = np.zeros((M,)*3)
+    else:
+        raise NotImplemented()
+    weights = 1
+
+    maxiter = 100
+
+    def callback(xk):
+        callback.counter += 1
+    callback.counter = 0
+
+    x0 = ac_estimate.flatten()
+
+    # BEGIN Setup Linear Operator
+
     nonuniform_v, nonuniform_v_p = get_nonuniform_positions_v(
         nonuniform, nonuniform_p, reciprocal_extent)
     uregion = Region((Mtot,), {
@@ -177,47 +196,7 @@ def setup_linops(slices, slices_p, nonuniform, nonuniform_p,
 
     print("WARNING: Legion implementation of AC solver is incomplete.")
 
-    return W, d
-
-
-def solve_ac(generation,
-             pixel_position,
-             pixel_distance,
-             slices,
-             slices_p,
-             orientations=None,
-             orientations_p=None,
-             ac_estimate=None):
-    M = parms.M
-    Mtot = M**3
-    N_images_per_rank = parms.N_images_per_rank
-    N = N_images_per_rank * utils.prod(parms.reduced_det_shape)
-    reciprocal_extent = pixel_distance.reciprocal.max()
-    use_reciprocal_symmetry = True
-
-    if orientations is None:
-        orientations, orientations_p = get_random_orientations()
-    nonuniform, nonuniform_p = get_nonuniform_positions(
-        orientations, orientations_p, pixel_position)
-
-    if ac_estimate is None:
-        ac_support = np.ones((M,)*3)
-        ac_estimate = np.zeros((M,)*3)
-    else:
-        raise NotImplemented()
-    weights = 1
-
-    maxiter = 100
-
-    def callback(xk):
-        callback.counter += 1
-    callback.counter = 0
-
-    x0 = ac_estimate.flatten()
-    W, d = setup_linops(
-        slices, slices_p, nonuniform, nonuniform_p,
-        ac_support, weights, M, Mtot, N,
-        reciprocal_extent, use_reciprocal_symmetry)
+    # END Setup Linear Operator
 
     ret, info = cg(W, d, x0=x0, maxiter=maxiter, callback=callback)
     ac = ret.reshape((M,)*3)
