@@ -126,7 +126,7 @@ def prep_Fconv(uregion_ups, nonuniform_v, nonuniform_v_p,
 @task(privileges=[RO, RO, RO])
 def solve(uregion, uregion_ups, ac,
           weights, M, M_ups, Mtot, N,
-          generation,
+          generation, alambda, rlambda,
           reciprocal_extent, use_reciprocal_symmetry):
     """Solve the W @ x = d problem.
 
@@ -150,7 +150,7 @@ def solve(uregion, uregion_ups, ac,
 
         uvect_ADA = autocorrelation.core_problem_convolution(
             uvect, M, uregion_ups.F_conv_, M_ups, ac.support, use_reciprocal_symmetry)
-        uvect = uvect_ADA
+        uvect = alambda*uvect_ADA + rlambda*uvect
         return uvect
 
     W = LinearOperator(
@@ -159,7 +159,8 @@ def solve(uregion, uregion_ups, ac,
         matvec=W_matvec)
 
     x0 = ac.estimate.flatten()
-    d = uregion.ADb.flatten()
+    ADb = uregion.ADb.flatten()
+    d = alambda*ADb + rlambda*x0
 
     maxiter = 100
 
@@ -227,7 +228,10 @@ def solve_ac(generation,
 
     # END Setup Linear Operator
 
+    alambda = 1
+    rlambda = 1e-5
+
     solve(uregion, uregion_ups, ac,
           weights, M, M_ups, Mtot, N,
-          generation,
+          generation, alambda, rlambda,
           reciprocal_extent, use_reciprocal_symmetry)
