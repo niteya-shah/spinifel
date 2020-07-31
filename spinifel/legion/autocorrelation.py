@@ -229,10 +229,12 @@ def solve_ac(generation,
 
     # END Setup Linear Operator
 
+    N_ranks = 5
     alambda = 1
-    rlambda = 1e-5
+    rlambdas = 1e-7 * 100**np.arange(N_ranks)
 
-    solve(uregion, uregion_ups, ac,
-          weights, M, M_ups, Mtot, N,
-          generation, 0, alambda, rlambda,
-          reciprocal_extent, use_reciprocal_symmetry)
+    for i in range(N_ranks):
+        solve(uregion, uregion_ups, ac,
+              weights, M, M_ups, Mtot, N,
+              generation, i, alambda, rlambdas[i],
+              reciprocal_extent, use_reciprocal_symmetry)
