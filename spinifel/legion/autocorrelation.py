@@ -1,6 +1,7 @@
 import numpy as np
 import pygion
 from pygion import task, Region, RO, WD, Reduce, Tunable
+from scipy.linalg import norm
 from scipy.sparse.linalg import LinearOperator, cg
 
 import pysingfel as ps
@@ -179,6 +180,16 @@ def solve(uregion, uregion_ups, ac,
     image.show_volume(ac_res, parms.Mquat,
                       f"autocorrelation_{generation}_{rank}.png")
 
+    v1 = norm(ret)
+    v2 = norm(W*ret-d)
+    return rank, rlambda, v1, v2
+
+
+@task
+def select_ac(*summary):
+    for el in summary:
+        print(el.get())
+
 
 def solve_ac(generation,
              pixel_position,
@@ -232,9 +243,13 @@ def solve_ac(generation,
     N_ranks = 5
     alambda = 1
     rlambdas = 1e-7 * 100**np.arange(N_ranks)
+    summary = []
 
     for i in range(N_ranks):
-        solve(uregion, uregion_ups, ac,
-              weights, M, M_ups, Mtot, N,
-              generation, i, alambda, rlambdas[i],
-              reciprocal_extent, use_reciprocal_symmetry)
+        summary.append(solve(
+            uregion, uregion_ups, ac,
+            weights, M, M_ups, Mtot, N,
+            generation, i, alambda, rlambdas[i],
+            reciprocal_extent, use_reciprocal_symmetry))
+
+    select_ac(*summary)
