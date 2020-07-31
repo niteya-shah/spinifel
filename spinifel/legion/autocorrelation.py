@@ -126,7 +126,7 @@ def prep_Fconv(uregion_ups, nonuniform_v, nonuniform_v_p,
 @task(privileges=[RO, RO, RO])
 def solve(uregion, uregion_ups, ac,
           weights, M, M_ups, Mtot, N,
-          generation, alambda, rlambda,
+          generation, rank, alambda, rlambda,
           reciprocal_extent, use_reciprocal_symmetry):
     """Solve the W @ x = d problem.
 
@@ -176,7 +176,8 @@ def solve(uregion, uregion_ups, ac,
     it_number = callback.counter
 
     print(f"Recovered AC in {it_number} iterations.", flush=True)
-    image.show_volume(ac_res, parms.Mquat, f"autocorrelation_{generation}.png")
+    image.show_volume(ac_res, parms.Mquat,
+                      f"autocorrelation_{generation}_{rank}.png")
 
 
 def solve_ac(generation,
@@ -233,5 +234,5 @@ def solve_ac(generation,
 
     solve(uregion, uregion_ups, ac,
           weights, M, M_ups, Mtot, N,
-          generation, alambda, rlambda,
+          generation, 0, alambda, rlambda,
           reciprocal_extent, use_reciprocal_symmetry)
