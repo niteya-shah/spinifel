@@ -173,6 +173,16 @@ def solve_ac(generation,
                ac, weights, M_ups, Mtot, N,
                reciprocal_extent, use_reciprocal_symmetry)
 
+    right_hand(slices, slices_p, uregion, nonuniform_v, nonuniform_v_p,
+               ac, weights, M,
+               reciprocal_extent, use_reciprocal_symmetry)
+
+    print("WARNING: Legion implementation of AC solver is incomplete.")
+
+    # END Setup Linear Operator
+
+    # BEGIN Solve
+
     def W_matvec(uvect):
         """Define W part of the W @ x = d problem."""
         assert use_reciprocal_symmetry, "Complex AC are not supported."
@@ -188,14 +198,6 @@ def solve_ac(generation,
         shape=(Mtot, Mtot),
         matvec=W_matvec)
 
-    right_hand(slices, slices_p, uregion, nonuniform_v, nonuniform_v_p,
-               ac, weights, M,
-               reciprocal_extent, use_reciprocal_symmetry)
-
-    print("WARNING: Legion implementation of AC solver is incomplete.")
-
-    # END Setup Linear Operator
-
     d = np.asarray(uregion.ADb).flatten()
 
     ret, info = cg(W, d, x0=x0, maxiter=maxiter, callback=callback)
@@ -207,3 +209,5 @@ def solve_ac(generation,
 
     print(f"Recovered AC in {it_number} iterations.", flush=True)
     image.show_volume(ac, parms.Mquat, f"autocorrelation_{generation}.png")
+
+    # END Solve
