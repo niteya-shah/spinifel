@@ -123,6 +123,61 @@ def prep_Fconv(uregion_ups, nonuniform_v, nonuniform_v_p,
                         reciprocal_extent, use_reciprocal_symmetry)
 
 
+@task(privileges=[RO, RO, RO])
+def solve(uregion, uregion_ups, ac,
+          weights, M, M_ups, Mtot, N,
+          generation,
+          reciprocal_extent, use_reciprocal_symmetry):
+    """Solve the W @ x = d problem.
+
+    W = al*A_adj*Da*A + rl*I  + fl*F_adj*Df*F
+    d = al*A_adj*Da*b + rl*x0 + 0
+
+    Where:
+        A represents the NUFFT operator
+        A_adj its adjoint
+        I the identity
+        F the FFT operator
+        F_adj its atjoint
+        Da, Df weights
+        b the data
+        x0 the initial guess (ac_estimate)
+    """
+    def W_matvec(uvect):
+        """Define W part of the W @ x = d problem."""
+        assert use_reciprocal_symmetry, "Complex AC are not supported."
+        assert np.all(np.isreal(uvect))
+
+        uvect_ADA = autocorrelation.core_problem_convolution(
+            uvect, M, uregion_ups.F_conv_, M_ups, ac.support, use_reciprocal_symmetry)
+        uvect = uvect_ADA
+        return uvect
+
+    W = LinearOperator(
+        dtype=np.complex128,
+        shape=(Mtot, Mtot),
+        matvec=W_matvec)
+
+    x0 = ac.estimate.flatten()
+    d = uregion.ADb.flatten()
+
+    maxiter = 100
+
+    def callback(xk):
+        callback.counter += 1
+    callback.counter = 0
+
+    ret, info = cg(W, d, x0=x0, maxiter=maxiter, callback=callback)
+    ac_res = ret.reshape((M,)*3)
+    if use_reciprocal_symmetry:
+        assert np.all(np.isreal(ac_res))
+    ac_res = ac_res.real
+    it_number = callback.counter
+
+    print(f"Recovered AC in {it_number} iterations.", flush=True)
+    image.show_volume(ac_res, parms.Mquat, f"autocorrelation_{generation}.png")
+
+
 def solve_ac(generation,
              pixel_position,
              pixel_distance,
@@ -153,12 +208,6 @@ def solve_ac(generation,
         raise NotImplemented()
     weights = 1
 
-    maxiter = 100
-
-    def callback(xk):
-        callback.counter += 1
-    callback.counter = 0
-
     # BEGIN Setup Linear Operator
 
     nonuniform_v, nonuniform_v_p = get_nonuniform_positions_v(
@@ -178,34 +227,7 @@ def solve_ac(generation,
 
     # END Setup Linear Operator
 
-    # BEGIN Solve
-
-    def W_matvec(uvect):
-        """Define W part of the W @ x = d problem."""
-        assert use_reciprocal_symmetry, "Complex AC are not supported."
-        assert np.all(np.isreal(uvect))
-
-        uvect_ADA = autocorrelation.core_problem_convolution(
-            uvect, M, uregion_ups.F_conv_, M_ups, ac.support, use_reciprocal_symmetry)
-        uvect = uvect_ADA
-        return uvect
-
-    W = LinearOperator(
-        dtype=np.complex128,
-        shape=(Mtot, Mtot),
-        matvec=W_matvec)
-
-    x0 = ac.estimate.flatten()
-    d = uregion.ADb.flatten()
-
-    ret, info = cg(W, d, x0=x0, maxiter=maxiter, callback=callback)
-    ac = ret.reshape((M,)*3)
-    if use_reciprocal_symmetry:
-        assert np.all(np.isreal(ac))
-    ac = ac.real
-    it_number = callback.counter
-
-    print(f"Recovered AC in {it_number} iterations.", flush=True)
-    image.show_volume(ac, parms.Mquat, f"autocorrelation_{generation}.png")
-
-    # END Solve
+    solve(uregion, uregion_ups, ac,
+          weights, M, M_ups, Mtot, N,
+          generation,
+          reciprocal_extent, use_reciprocal_symmetry)
