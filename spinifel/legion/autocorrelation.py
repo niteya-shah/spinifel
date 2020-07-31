@@ -163,15 +163,9 @@ def solve_ac(generation,
 
     nonuniform_v, nonuniform_v_p = get_nonuniform_positions_v(
         nonuniform, nonuniform_p, reciprocal_extent)
-    uregion = Region((Mtot,), {
-        "input": pygion.float64, "ADA": pygion.float64,
-        "ADb": pygion.float64})
+    uregion = Region((Mtot,), {"ADb": pygion.float64})
     uregion_ups = Region((M_ups,)*3, {"F_conv_": pygion.complex128})
     ac = Region((M,)*3, {"support": pygion.float32})
-    # Avoid uninitialized warning.
-    pygion.fill(uregion, "input", 0.)
-    pygion.fill(uregion, "ADA", 0.)
-    pygion.fill(uregion, "ADb", 0.)
     pygion.fill(ac, "support", 0.)
     ac.support[:] = ac_support
 
