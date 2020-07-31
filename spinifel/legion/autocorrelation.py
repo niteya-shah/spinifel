@@ -145,8 +145,10 @@ def solve_ac(generation,
         orientations, orientations_p, pixel_position)
 
     if ac_estimate is None:
-        ac_support = np.ones((M,)*3)
-        ac_estimate = np.zeros((M,)*3)
+        ac = Region((M,)*3,
+                    {"support": pygion.float32, "estimate": pygion.float32})
+        pygion.fill(ac, "support", 1.)
+        pygion.fill(ac, "estimate", 0.)
     else:
         raise NotImplemented()
     weights = 1
@@ -157,17 +159,12 @@ def solve_ac(generation,
         callback.counter += 1
     callback.counter = 0
 
-    x0 = ac_estimate.flatten()
-
     # BEGIN Setup Linear Operator
 
     nonuniform_v, nonuniform_v_p = get_nonuniform_positions_v(
         nonuniform, nonuniform_p, reciprocal_extent)
     uregion = Region((M,)*3, {"ADb": pygion.float64})
     uregion_ups = Region((M_ups,)*3, {"F_conv_": pygion.complex128})
-    ac = Region((M,)*3, {"support": pygion.float32})
-    pygion.fill(ac, "support", 0.)
-    ac.support[:] = ac_support
 
     prep_Fconv(uregion_ups, nonuniform_v, nonuniform_v_p,
                ac, weights, M_ups, Mtot, N,
@@ -189,7 +186,7 @@ def solve_ac(generation,
         assert np.all(np.isreal(uvect))
 
         uvect_ADA = autocorrelation.core_problem_convolution(
-            uvect, M, uregion_ups.F_conv_, M_ups, ac_support, use_reciprocal_symmetry)
+            uvect, M, uregion_ups.F_conv_, M_ups, ac.support, use_reciprocal_symmetry)
         uvect = uvect_ADA
         return uvect
 
@@ -198,6 +195,7 @@ def solve_ac(generation,
         shape=(Mtot, Mtot),
         matvec=W_matvec)
 
+    x0 = np.asarray(ac.estimate).flatten()
     d = np.asarray(uregion.ADb).flatten()
 
     ret, info = cg(W, d, x0=x0, maxiter=maxiter, callback=callback)
