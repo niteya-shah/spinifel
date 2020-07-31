@@ -86,7 +86,7 @@ def right_hand_ADb_task(slices, uregion, nonuniform_v, ac, weights, M,
         nonuniform_v.L,
         ac.support, M,
         reciprocal_extent, use_reciprocal_symmetry
-    ).flatten()
+    )
 
 
 def right_hand(slices, slices_p, uregion, nonuniform_v, nonuniform_v_p,
@@ -163,7 +163,7 @@ def solve_ac(generation,
 
     nonuniform_v, nonuniform_v_p = get_nonuniform_positions_v(
         nonuniform, nonuniform_p, reciprocal_extent)
-    uregion = Region((Mtot,), {"ADb": pygion.float64})
+    uregion = Region((M,)*3, {"ADb": pygion.float64})
     uregion_ups = Region((M_ups,)*3, {"F_conv_": pygion.complex128})
     ac = Region((M,)*3, {"support": pygion.float32})
     pygion.fill(ac, "support", 0.)
@@ -196,7 +196,7 @@ def solve_ac(generation,
 
     # END Setup Linear Operator
 
-    d = uregion.ADb
+    d = np.asarray(uregion.ADb).flatten()
 
     ret, info = cg(W, d, x0=x0, maxiter=maxiter, callback=callback)
     ac = ret.reshape((M,)*3)
