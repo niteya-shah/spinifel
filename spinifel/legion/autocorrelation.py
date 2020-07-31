@@ -120,7 +120,6 @@ def right_hand(slices, slices_p, uregion, nonuniform_v, nonuniform_v_p,
         right_hand_ADb_task(slices_subr, uregion, nonuniform_v_subr,
                             ac, weights, M,
                             reciprocal_extent, use_reciprocal_symmetry)
-    return uregion.ADb
 
 
 def solve_ac(generation,
@@ -190,13 +189,15 @@ def solve_ac(generation,
         shape=(Mtot, Mtot),
         matvec=W_matvec)
 
-    d = right_hand(slices, slices_p, uregion, nonuniform_v, nonuniform_v_p,
-                   ac, weights, M,
-                   reciprocal_extent, use_reciprocal_symmetry)
+    right_hand(slices, slices_p, uregion, nonuniform_v, nonuniform_v_p,
+               ac, weights, M,
+               reciprocal_extent, use_reciprocal_symmetry)
 
     print("WARNING: Legion implementation of AC solver is incomplete.")
 
     # END Setup Linear Operator
+
+    d = uregion.ADb
 
     ret, info = cg(W, d, x0=x0, maxiter=maxiter, callback=callback)
     ac = ret.reshape((M,)*3)
