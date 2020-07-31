@@ -195,8 +195,8 @@ def solve_ac(generation,
         shape=(Mtot, Mtot),
         matvec=W_matvec)
 
-    x0 = np.asarray(ac.estimate).flatten()
-    d = np.asarray(uregion.ADb).flatten()
+    x0 = ac.estimate.flatten()
+    d = uregion.ADb.flatten()
 
     ret, info = cg(W, d, x0=x0, maxiter=maxiter, callback=callback)
     ac = ret.reshape((M,)*3)
