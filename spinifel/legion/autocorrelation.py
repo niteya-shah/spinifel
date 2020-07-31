@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 import numpy as np
 import pygion
 from pygion import task, Region, RO, WD, Reduce, Tunable
@@ -124,8 +125,8 @@ def prep_Fconv(uregion_ups, nonuniform_v, nonuniform_v_p,
                         reciprocal_extent, use_reciprocal_symmetry)
 
 
-@task(privileges=[RO, RO, RO])
-def solve(uregion, uregion_ups, ac,
+@task(privileges=[RO, RO, RO, WD])
+def solve(uregion, uregion_ups, ac, result,
           weights, M, M_ups, Mtot, N,
           generation, rank, alambda, rlambda,
           reciprocal_extent, use_reciprocal_symmetry):
@@ -173,11 +174,11 @@ def solve(uregion, uregion_ups, ac,
     ac_res = ret.reshape((M,)*3)
     if use_reciprocal_symmetry:
         assert np.all(np.isreal(ac_res))
-    ac_res = ac_res.real
+    result.ac[:] = ac_res.real
     it_number = callback.counter
 
     print(f"Recovered AC in {it_number} iterations.", flush=True)
-    image.show_volume(ac_res, parms.Mquat,
+    image.show_volume(result.ac[:], parms.Mquat,
                       f"autocorrelation_{generation}_{rank}.png")
 
     v1 = norm(ret)
@@ -186,9 +187,36 @@ def solve(uregion, uregion_ups, ac,
 
 
 @task
-def select_ac(*summary):
-    for el in summary:
-        print(el.get())
+def select_ac(generation, *summary):
+    summary = [el.get() for el in summary]
+    ranks, lambdas, v1s, v2s = [np.array(el) for el in zip(*summary)]
+
+    if generation == 0:
+        # Expect non-convergence => weird results.
+        # Heuristic: retain rank with highest lambda and high v1.
+        idx = v1s >= np.mean(v1s)
+        imax = np.argmax(lambdas[idx])
+        iref = np.arange(len(ranks), dtype=np.int)[idx][imax]
+    else:
+        # Take corner of L-curve: min (v1+v2)
+        iref = np.argmin(v1s+v2s)
+    ref_rank = ranks[iref]
+
+    fig, axes = plt.subplots(figsize=(6.0, 6.0), nrows=2, ncols=1)
+    axes[0].semilogx(lambdas, v1s)
+    axes[0].semilogx(lambdas[iref], v1s[iref], "rD")
+    axes[0].set_xlabel("$\\lambda_r$")
+    axes[0].set_ylabel("$\\|x\\|$")
+    axes[1].semilogx(lambdas, v2s)
+    axes[1].semilogx(lambdas[iref], v2s[iref], "rD")
+    axes[1].set_xlabel("$\\lambda_r$")
+    axes[1].set_ylabel("$\\|W x - d\\|$")
+    plt.savefig(parms.out_dir / f"summary_{generation}.png")
+    plt.close('all')
+
+    print(f"Keeping result from rank {ref_rank}.", flush=True)
+
+    return iref
 
 
 def solve_ac(generation,
@@ -241,15 +269,21 @@ def solve_ac(generation,
     # END Setup Linear Operator
 
     N_ranks = 5
+    results = [Region((M,)*3, {"ac": pygion.float64}) for i in range(N_ranks)]
+
     alambda = 1
     rlambdas = 1e-7 * 100**np.arange(N_ranks)
     summary = []
 
     for i in range(N_ranks):
         summary.append(solve(
-            uregion, uregion_ups, ac,
+            uregion, uregion_ups, ac, results[i],
             weights, M, M_ups, Mtot, N,
             generation, i, alambda, rlambdas[i],
             reciprocal_extent, use_reciprocal_symmetry))
 
-    select_ac(*summary)
+    iref = select_ac(generation, *summary)
+    # At this point, I just want to chose one of the results as reference.
+    # I tried to have `results` as a partition and copy into a region,
+    # but I couldn't get it to work.
+    return results[iref.get()]
