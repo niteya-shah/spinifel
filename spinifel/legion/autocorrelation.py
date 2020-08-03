@@ -125,12 +125,27 @@ def prep_Fconv(uregion_ups, nonuniform_v, nonuniform_v_p,
                         reciprocal_extent, use_reciprocal_symmetry)
 
 
+@task(privileges=[WD("F_antisupport")])
+def prep_Fantisupport(uregion, M):
+    lu = np.linspace(-np.pi, np.pi, M)
+    Hu_, Ku_, Lu_ = np.meshgrid(lu, lu, lu, indexing='ij')
+    Qu_ = np.sqrt(Hu_**2 + Ku_**2 + Lu_**2)
+    uregion.F_antisupport[:] = Qu_ > np.pi / parms.oversampling
+
+    Fantisup = uregion.F_antisupport
+    assert np.all(Fantisup[:] == Fantisup[::-1, :, :])
+    assert np.all(Fantisup[:] == Fantisup[:, ::-1, :])
+    assert np.all(Fantisup[:] == Fantisup[:, :, ::-1])
+    assert np.all(Fantisup[:] == Fantisup[::-1, ::-1, ::-1])
+
+
 def prepare_solve(slices, slices_p, nonuniform, nonuniform_p,
                   ac, weights, M, Mtot, M_ups, N,
                   reciprocal_extent, use_reciprocal_symmetry):
     nonuniform_v, nonuniform_v_p = get_nonuniform_positions_v(
         nonuniform, nonuniform_p, reciprocal_extent)
-    uregion = Region((M,)*3, {"ADb": pygion.float64})
+    uregion = Region((M,)*3,
+                     {"ADb": pygion.float64, "F_antisupport": pygion.float32})
     uregion_ups = Region((M_ups,)*3, {"F_conv_": pygion.complex128})
     prep_Fconv(uregion_ups, nonuniform_v, nonuniform_v_p,
                ac, weights, M_ups, Mtot, N,
@@ -138,13 +153,14 @@ def prepare_solve(slices, slices_p, nonuniform, nonuniform_p,
     right_hand(slices, slices_p, uregion, nonuniform_v, nonuniform_v_p,
                ac, weights, M,
                reciprocal_extent, use_reciprocal_symmetry)
+    prep_Fantisupport(uregion, M)
     return uregion, uregion_ups
 
 
 @task(privileges=[RO, RO, RO, WD])
 def solve(uregion, uregion_ups, ac, result,
           weights, M, M_ups, Mtot, N,
-          generation, rank, alambda, rlambda,
+          generation, rank, alambda, rlambda, flambda,
           reciprocal_extent, use_reciprocal_symmetry):
     """Solve the W @ x = d problem.
 
@@ -168,7 +184,9 @@ def solve(uregion, uregion_ups, ac, result,
 
         uvect_ADA = autocorrelation.core_problem_convolution(
             uvect, M, uregion_ups.F_conv_, M_ups, ac.support, use_reciprocal_symmetry)
-        uvect = alambda*uvect_ADA + rlambda*uvect
+        uvect_FDF = autocorrelation.fourier_reg(
+            uvect, ac.support, uregion.F_antisupport, M, use_reciprocal_symmetry)
+        uvect = alambda*uvect_ADA + rlambda*uvect + flambda*uvect_FDF
         return uvect
 
     W = LinearOperator(
@@ -275,13 +293,14 @@ def solve_ac(generation,
 
     alambda = 1
     rlambdas = 1e-7 * 100**np.arange(N_ranks)
+    flambda = 0
     summary = []
 
     for i in range(N_ranks):
         summary.append(solve(
             uregion, uregion_ups, ac, results[i],
             weights, M, M_ups, Mtot, N,
-            generation, i, alambda, rlambdas[i],
+            generation, i, alambda, rlambdas[i], flambda,
             reciprocal_extent, use_reciprocal_symmetry))
     print("WARNING: Legion implementation of AC solver is incomplete.")
 
