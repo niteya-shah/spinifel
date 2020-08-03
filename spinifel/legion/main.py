@@ -8,6 +8,7 @@ from spinifel import parms
 from .prep import get_data
 from .autocorrelation import solve_ac
 from .phasing import phase
+from .orientation_matching import match
 
 
 @task(replicable=True)
@@ -22,3 +23,7 @@ def main():
     solved = solve_ac(0, pixel_position, pixel_distance, slices, slices_p)
 
     phased = phase(0, solved)
+
+    for generation in range(1, 2):
+        orientations, orientations_p = match(
+            phased, slices, slices_p, pixel_position, pixel_distance)
