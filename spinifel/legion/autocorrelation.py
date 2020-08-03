@@ -125,6 +125,22 @@ def prep_Fconv(uregion_ups, nonuniform_v, nonuniform_v_p,
                         reciprocal_extent, use_reciprocal_symmetry)
 
 
+def prepare_solve(slices, slices_p, nonuniform, nonuniform_p,
+                  ac, weights, M, Mtot, M_ups, N,
+                  reciprocal_extent, use_reciprocal_symmetry):
+    nonuniform_v, nonuniform_v_p = get_nonuniform_positions_v(
+        nonuniform, nonuniform_p, reciprocal_extent)
+    uregion = Region((M,)*3, {"ADb": pygion.float64})
+    uregion_ups = Region((M_ups,)*3, {"F_conv_": pygion.complex128})
+    prep_Fconv(uregion_ups, nonuniform_v, nonuniform_v_p,
+               ac, weights, M_ups, Mtot, N,
+               reciprocal_extent, use_reciprocal_symmetry)
+    right_hand(slices, slices_p, uregion, nonuniform_v, nonuniform_v_p,
+               ac, weights, M,
+               reciprocal_extent, use_reciprocal_symmetry)
+    return uregion, uregion_ups
+
+
 @task(privileges=[RO, RO, RO, WD])
 def solve(uregion, uregion_ups, ac, result,
           weights, M, M_ups, Mtot, N,
@@ -249,24 +265,10 @@ def solve_ac(generation,
         raise NotImplemented()
     weights = 1
 
-    # BEGIN Setup Linear Operator
-
-    nonuniform_v, nonuniform_v_p = get_nonuniform_positions_v(
-        nonuniform, nonuniform_p, reciprocal_extent)
-    uregion = Region((M,)*3, {"ADb": pygion.float64})
-    uregion_ups = Region((M_ups,)*3, {"F_conv_": pygion.complex128})
-
-    prep_Fconv(uregion_ups, nonuniform_v, nonuniform_v_p,
-               ac, weights, M_ups, Mtot, N,
-               reciprocal_extent, use_reciprocal_symmetry)
-
-    right_hand(slices, slices_p, uregion, nonuniform_v, nonuniform_v_p,
-               ac, weights, M,
-               reciprocal_extent, use_reciprocal_symmetry)
-
-    print("WARNING: Legion implementation of AC solver is incomplete.")
-
-    # END Setup Linear Operator
+    uregion, uregion_ups = prepare_solve(
+        slices, slices_p, nonuniform, nonuniform_p,
+        ac, weights, M, Mtot, M_ups, N,
+        reciprocal_extent, use_reciprocal_symmetry)
 
     N_ranks = 5
     results = [Region((M,)*3, {"ac": pygion.float64}) for i in range(N_ranks)]
@@ -281,6 +283,7 @@ def solve_ac(generation,
             weights, M, M_ups, Mtot, N,
             generation, i, alambda, rlambdas[i],
             reciprocal_extent, use_reciprocal_symmetry))
+    print("WARNING: Legion implementation of AC solver is incomplete.")
 
     iref = select_ac(generation, *summary)
     # At this point, I just want to chose one of the results as reference.
