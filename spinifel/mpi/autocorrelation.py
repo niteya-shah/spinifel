@@ -32,19 +32,6 @@ def core_problem(comm, uvect, H_, K_, L_, ac_support, weights, M, N,
     return uvect_ADA
 
 
-def fourier_reg(uvect, support, F_antisupport, M, use_recip_sym):
-    ugrid = uvect.reshape((M,)*3) * support
-    if use_recip_sym:
-        assert np.all(np.isreal(ugrid))
-    F_ugrid = np.fft.fftn(np.fft.ifftshift(ugrid))
-    F_reg = F_ugrid * np.fft.ifftshift(F_antisupport)
-    reg = np.fft.fftshift(np.fft.ifftn(F_reg))
-    uvect = (reg * support).flatten()
-    if use_recip_sym:
-        uvect = uvect.real
-    return uvect
-
-
 def setup_linops(comm, H, K, L, data,
                  ac_support, weights, x0,
                  M, Mtot, N, reciprocal_extent,
@@ -95,7 +82,7 @@ def setup_linops(comm, H, K, L, data,
                  comm, uvect, H_, K_, L_, ac_support, weights, M, N,
                  reciprocal_extent, use_reciprocal_symmetry)
             assert np.allclose(uvect_ADA, uvect_ADA_old)
-        uvect_FDF = fourier_reg(
+        uvect_FDF = autocorrelation.fourier_reg(
             uvect, ac_support, F_antisupport, M, use_reciprocal_symmetry)
         uvect = alambda*uvect_ADA + rlambda*uvect + flambda*uvect_FDF
         return uvect

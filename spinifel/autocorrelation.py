@@ -63,6 +63,19 @@ def core_problem_convolution(uvect, M, F_ugrid_conv_, M_ups, ac_support,
     return ugrid_conv_out.flatten()
 
 
+def fourier_reg(uvect, support, F_antisupport, M, use_recip_sym):
+    ugrid = uvect.reshape((M,)*3) * support
+    if use_recip_sym:
+        assert np.all(np.isreal(ugrid))
+    F_ugrid = np.fft.fftn(np.fft.ifftshift(ugrid))
+    F_reg = F_ugrid * np.fft.ifftshift(F_antisupport)
+    reg = np.fft.fftshift(np.fft.ifftn(F_reg))
+    uvect = (reg * support).flatten()
+    if use_recip_sym:
+        uvect = uvect.real
+    return uvect
+
+
 def gen_nonuniform_positions(orientations, pixel_position_reciprocal):
     if orientations.shape[0] > 0:
         rotmat = np.array([ps.quaternion2rot3d(quat) for quat in orientations])
