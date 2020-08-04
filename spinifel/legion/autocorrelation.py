@@ -3,6 +3,7 @@ import numpy as np
 import pygion
 from pygion import task, Region, RO, WD, Reduce, Tunable
 from scipy.linalg import norm
+from scipy.ndimage import gaussian_filter
 from scipy.sparse.linalg import LinearOperator, cg
 
 import pysingfel as ps
@@ -157,6 +158,13 @@ def prepare_solve(slices, slices_p, nonuniform, nonuniform_p,
     return uregion, uregion_ups
 
 
+@task(privileges=[RO("ac"), WD("support", "estimate")])
+def phased_to_constrains(phased, ac):
+    ac_smoothed = gaussian_filter(phased.ac, 0.5)
+    ac.support[:] = (ac_smoothed > 1e-12).astype(np.float)
+    ac.estimate[:] = phased.ac * ac.support
+
+
 @task(privileges=[RO, RO, RO, WD])
 def solve(uregion, uregion_ups, ac, result,
           weights, M, M_ups, Mtot, N,
@@ -260,7 +268,7 @@ def solve_ac(generation,
              slices_p,
              orientations=None,
              orientations_p=None,
-             ac_estimate=None):
+             phased=None):
     M = parms.M
     M_ups = parms.M_ups  # For upsampled convolution technique
     Mtot = M**3
@@ -274,13 +282,13 @@ def solve_ac(generation,
     nonuniform, nonuniform_p = get_nonuniform_positions(
         orientations, orientations_p, pixel_position)
 
-    if ac_estimate is None:
-        ac = Region((M,)*3,
-                    {"support": pygion.float32, "estimate": pygion.float32})
+    ac = Region((M,)*3,
+                {"support": pygion.float32, "estimate": pygion.float32})
+    if phased is None:
         pygion.fill(ac, "support", 1.)
         pygion.fill(ac, "estimate", 0.)
     else:
-        raise NotImplemented()
+        phased_to_constrains(phased, ac)
     weights = 1
 
     uregion, uregion_ups = prepare_solve(

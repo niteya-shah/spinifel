@@ -27,3 +27,7 @@ def main():
     for generation in range(1, 2):
         orientations, orientations_p = match(
             phased, slices, slices_p, pixel_position, pixel_distance)
+
+        solved = solve_ac(
+            generation, pixel_position, pixel_distance, slices, slices_p,
+            orientations, orientations_p, phased)
