@@ -20,13 +20,9 @@ def phase_task(solved, phased, generation):
 
 
 def phase(generation, solved, phased=None):
-    Mquat = parms.Mquat
-    M = 4*Mquat + 1
-    Mtot = M**3
-
     if generation == 0:
         assert phased is None
-        phased = Region((M,)*3, {
+        phased = Region((parms.M,)*3, {
             "ac": pygion.float32, "support_": pygion.float32,
             "rho_": pygion.float32})
         phase_gen0_task(solved, phased)
