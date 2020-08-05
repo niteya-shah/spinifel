@@ -24,7 +24,7 @@ def main():
 
     phased = phase(0, solved)
 
-    for generation in range(1, 2):
+    for generation in range(1, 10):
         orientations, orientations_p = match(
             phased, slices, slices_p, pixel_position, pixel_distance)
 
