@@ -310,7 +310,6 @@ def solve_ac(generation,
             weights, M, M_ups, Mtot, N,
             generation, i, alambda, rlambdas[i], flambda,
             reciprocal_extent, use_reciprocal_symmetry))
-    print("WARNING: Legion implementation of AC solver is incomplete.")
 
     iref = select_ac(generation, *summary)
     # At this point, I just want to chose one of the results as reference.
