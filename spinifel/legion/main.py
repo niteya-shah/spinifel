@@ -31,3 +31,5 @@ def main():
         solved = solve_ac(
             generation, pixel_position, pixel_distance, slices, slices_p,
             orientations, orientations_p, phased)
+
+        phased = phase(generation, solved, phased)
