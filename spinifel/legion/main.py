@@ -1,7 +1,7 @@
 import numpy as np
 import os
 import pygion
-from pygion import acquire, attach_hdf5, task, Partition, Region, R, WD
+from pygion import acquire, attach_hdf5, task, Partition, Region, R, Tunable, WD
 
 from spinifel import parms
 
@@ -15,10 +15,24 @@ from .orientation_matching import match
 def main():
     print("In Legion main", flush=True)
 
+    total_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
+
+    N_images_per_rank = parms.N_images_per_rank
+    batch_size = min(N_images_per_rank, 100)
+    max_events = min(parms.N_images_max, total_procs*N_images_per_rank)
+
+    if parms.use_psana:
+        # For now, we use one smd chunk per node just to keep things simple.
+        os.environ['PS_SMD_N_EVENTS'] = str(N_images_per_rank)
+
+        from psana import DataSource
+        ds = DataSource(exp=parms.exp, run=parms.runnum, dir=parms.data_dir,
+                        batch_size=batch_size, max_events=max_events)
+
     (pixel_position,
      pixel_distance,
      pixel_index,
-     slices, slices_p) = get_data()
+     slices, slices_p) = get_data(ds)
 
     solved = solve_ac(0, pixel_position, pixel_distance, slices, slices_p)
 

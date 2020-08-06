@@ -8,6 +8,11 @@ from spinifel import parms, prep, image
 
 from . import utils as lgutils
 
+psana = None
+if parms.use_psana:
+    import psana
+    from psana.psexp.legion_node import smd_chunks, smd_batches, batch_events
+
 
 @task(privileges=[WD])
 def load_pixel_position(pixel_position):
@@ -36,20 +41,41 @@ def get_pixel_index():
 
 
 @task(privileges=[WD])
-def load_slices(slices, rank, N_images_per_rank):
+def load_slices_psana(slices, rank, N_images_per_rank, smd_chunk, run):
+    i = 0
+    for smd_batch in smd_batches(smd_chunk, run):
+        for evt in batch_events(smd_batch, run):
+            raw = evt._dgrams[0].pnccdBack[0].raw
+            try:
+                slices.data[i] = raw.image
+            except IndexError:
+                raise RuntimeError(
+                    f"Rank {rank} received too many events.")
+            i += 1
+
+@task(privileges=[WD])
+def load_slices_hdf5(slices, rank, N_images_per_rank):
     i_start = rank * N_images_per_rank
     i_end = i_start + N_images_per_rank
     prep.load_slices(slices.data, i_start, i_end)
 
 
-def get_slices():
+def get_slices(ds):
     N_images_per_rank = parms.N_images_per_rank
     fields_dict = {"data": getattr(pygion, parms.data_type_str)}
     sec_shape = parms.det_shape
     slices, slices_p = lgutils.create_distributed_region(
         N_images_per_rank, fields_dict, sec_shape)
-    for i, slices_subr in enumerate(slices_p):
-        load_slices(slices_subr, i, N_images_per_rank)
+    if ds is not None:
+        chunk_i = 0
+        for run in ds.runs():
+            for smd_chunk in smd_chunks(run):
+                i = chunk_i % n_nodes
+                load_slices_psana(slices_p[i], i, N_images_per_rank, smd_chunk, run, point=i)
+                chunk_i += 1
+    else:
+        for i, slices_subr in enumerate(slices_p):
+            load_slices_hdf5(slices_subr, i, N_images_per_rank, point=i)
     return slices, slices_p
 
 
@@ -139,10 +165,10 @@ def export_saxs(pixel_distance, mean_image, name):
     prep.export_saxs(pixel_distance.reciprocal, mean_image.data, name)
 
 
-def get_data():
+def get_data(ds):
     pixel_position = get_pixel_position()
     pixel_index = get_pixel_index()
-    slices, slices_p = get_slices()
+    slices, slices_p = get_slices(ds)
     mean_image = compute_mean_image(slices, slices_p)
     show_image(pixel_index, slices_p[0], 0, "image_0.png")
     show_image(pixel_index, mean_image, ..., "mean_image.png")
