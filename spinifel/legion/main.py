@@ -21,6 +21,7 @@ def main():
     batch_size = min(N_images_per_rank, 100)
     max_events = min(parms.N_images_max, total_procs*N_images_per_rank)
 
+    ds = None
     if parms.use_psana:
         # For now, we use one smd chunk per node just to keep things simple.
         os.environ['PS_SMD_N_EVENTS'] = str(N_images_per_rank)
