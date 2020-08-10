@@ -67,12 +67,16 @@ def get_slices(ds):
     slices, slices_p = lgutils.create_distributed_region(
         N_images_per_rank, fields_dict, sec_shape)
     if ds is not None:
+        n_nodes = Tunable.select(Tunable.NODE_COUNT).get()
         chunk_i = 0
-        for run in ds.runs():
+        runs = list(ds.runs())
+        pygion.execution_fence(block=True)
+        for run in runs:
             for smd_chunk in smd_chunks(run):
                 i = chunk_i % n_nodes
                 load_slices_psana(slices_p[i], i, N_images_per_rank, smd_chunk, run, point=i)
                 chunk_i += 1
+        pygion.execution_fence(block=True)
     else:
         for i, slices_subr in enumerate(slices_p):
             load_slices_hdf5(slices_subr, i, N_images_per_rank, point=i)
