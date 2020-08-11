@@ -9,6 +9,7 @@ from .prep import get_data
 from .autocorrelation import solve_ac
 from .phasing import phase
 from .orientation_matching import match
+from . import mapper
 
 
 @task(replicable=True)
