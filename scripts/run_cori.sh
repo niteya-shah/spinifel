@@ -6,7 +6,7 @@
 #SBATCH --mail-type=ALL
 #SBATCH --account=m2859
 
-while getopts lmpsan:t: option
+while getopts lmpsan:t:d: option
 do
 case "${option}"
 in
@@ -17,6 +17,7 @@ s) SMALL_PROBLEM="1";;
 a) USE_PSANA="1";;
 n) NTASKS=$OPTARG;;
 t) OMP_NUM_THREADS=$OPTARG;;
+d) DATA_MULTIPLIER=$OPTARG;;
 esac
 done
 
@@ -58,6 +59,11 @@ if [[ -n $USE_PSANA ]]; then
     export USE_PSANA
 fi
 
+if [[ -z $DATA_MULTIPLIER ]]; then
+    DATA_MULTIPLIER="1"
+fi
+export DATA_MULTIPLIER
+
 if [[ $USING_LEGION -eq 1 ]]; then
     export PS_PARALLEL=legion
     srun -n $NTASKS -N $nodes --cpus-per-task=$(( total_cores * 2 / (NTASKS / nodes) )) legion_python legion_main.py -ll:csize 65536 -ll:py 1 -ll:pyomp $(( total_cores - 2 ))
@@ -69,6 +75,6 @@ else
     if [[ $PROFILING -eq 1 ]]; then
         PYFLAGS="-m cProfile -o $OUT_DIR/main.prof "$PYFLAGS
     fi
-    export DATA_MULTIPLIER=$NTASKS  # use same amount of data as distributed app
+    DATA_MULTIPLIER=$(echo $(( DATA_MULTIPLIER * NTASKS )) )  # use same amount of data as distributed app
     python $PYFLAGS sequential_main.py
 fi
