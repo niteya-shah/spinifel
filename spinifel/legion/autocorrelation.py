@@ -24,8 +24,8 @@ def get_random_orientations():
     sec_shape = (4,)
     orientations, orientations_p = lgutils.create_distributed_region(
         N_images_per_rank, fields_dict, sec_shape)
-    for orientations_subr in orientations_p:
-        gen_random_orientations(orientations_subr, N_images_per_rank)
+    for i, orientations_subr in enumerate(orientations_p):
+        gen_random_orientations(orientations_subr, N_images_per_rank, point=i)
     return orientations, orientations_p
 
 
@@ -48,10 +48,12 @@ def get_nonuniform_positions_v(nonuniform, nonuniform_p, reciprocal_extent):
     sec_shape = ()
     nonuniform_v, nonuniform_v_p = lgutils.create_distributed_region(
         N_vals_per_rank, fields_dict, sec_shape)
-    for nonuniform_subr, nonuniform_v_subr in zip(
-            nonuniform_p, nonuniform_v_p):
+    for i, (nonuniform_subr, nonuniform_v_subr) in enumerate(zip(
+            nonuniform_p, nonuniform_v_p)):
         gen_nonuniform_positions_v(nonuniform_subr, nonuniform_v_subr,
-                                   reciprocal_extent)
+                                   reciprocal_extent, point=i)
+        # Ideally, the location (point) should be deduced from the
+        # location of the slices.
     return nonuniform_v, nonuniform_v_p
 
 
@@ -71,10 +73,12 @@ def get_nonuniform_positions(orientations, orientations_p, pixel_position):
     sec_shape = parms.reduced_det_shape
     nonuniform, nonuniform_p = lgutils.create_distributed_region(
         N_images_per_rank, fields_dict, sec_shape)
-    for orientations_subr, nonuniform_subr in zip(
-            orientations_p, nonuniform_p):
+    for i, (orientations_subr, nonuniform_subr) in enumerate(zip(
+            orientations_p, nonuniform_p)):
         gen_nonuniform_positions(
-            orientations_subr, nonuniform_subr, pixel_position)
+            orientations_subr, nonuniform_subr, pixel_position, point=i)
+        # Ideally, the location (point) should be deduced from the
+        # location of the slices.
     return nonuniform, nonuniform_p
 
 
@@ -98,10 +102,14 @@ def right_hand(slices, slices_p, uregion, nonuniform_v, nonuniform_v_p,
                ac, weights, M,
                reciprocal_extent, use_reciprocal_symmetry):
     pygion.fill(uregion, "ADb", 0.)
-    for slices_subr, nonuniform_v_subr in zip(slices_p, nonuniform_v_p):
+    for i, (slices_subr, nonuniform_v_subr) in enumerate(zip(
+            slices_p, nonuniform_v_p)):
         right_hand_ADb_task(slices_subr, uregion, nonuniform_v_subr,
                             ac, weights, M,
-                            reciprocal_extent, use_reciprocal_symmetry)
+                            reciprocal_extent, use_reciprocal_symmetry,
+                            point=i)
+        # Ideally, the location (point) should be deduced from the
+        # location of the slices.
 
 
 @task(privileges=[Reduce('+', 'F_conv_'), RO, RO])
@@ -123,10 +131,13 @@ def prep_Fconv(uregion_ups, nonuniform_v, nonuniform_v_p,
                ac, weights, M_ups, Mtot, N,
                reciprocal_extent, use_reciprocal_symmetry):
     pygion.fill(uregion_ups, "F_conv_", 0.)
-    for nonuniform_v_subr in nonuniform_v_p:
+    for i, nonuniform_v_subr in enumerate(nonuniform_v_p):
         prep_Fconv_task(uregion_ups, nonuniform_v_subr,
                         ac, weights, M_ups, Mtot, N,
-                        reciprocal_extent, use_reciprocal_symmetry)
+                        reciprocal_extent, use_reciprocal_symmetry,
+                        point=i)
+        # Ideally, the location (point) should be deduced from the
+        # location of the slices.
 
 
 @task(privileges=[WD("F_antisupport")])
@@ -312,7 +323,9 @@ def solve_ac(generation,
             uregion, uregion_ups, ac, results[i],
             weights, M, M_ups, Mtot, N,
             generation, i, alambda, rlambdas[i], flambda,
-            reciprocal_extent, use_reciprocal_symmetry))
+            reciprocal_extent, use_reciprocal_symmetry, point=i%N_procs))
+        # Ideally, the mapper should distribute these tasks. However,
+        # here, without the point, everything runs on the same node.
 
     iref = select_ac(generation, *summary)
     # At this point, I just want to chose one of the results as reference.
