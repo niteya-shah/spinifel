@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pygion
+import socket
 from pygion import task, Region, RO, WD, Reduce, Tunable
 from scipy.linalg import norm
 from scipy.ndimage import gaussian_filter
@@ -90,6 +91,7 @@ def right_hand_ADb_task(slices, uregion, nonuniform_v, ac, weights, M,
         ac.support, M,
         reciprocal_extent, use_reciprocal_symmetry
     )
+    print(f"{socket.gethostname()} computed ADb.", flush=True)
 
 
 def right_hand(slices, slices_p, uregion, nonuniform_v, nonuniform_v_p,
@@ -114,6 +116,7 @@ def prep_Fconv_task(uregion_ups, nonuniform_v, ac, weights, M_ups, Mtot, N,
         reciprocal_extent, use_reciprocal_symmetry
     )
     uregion_ups.F_conv_[:] += np.fft.fftn(np.fft.ifftshift(conv_ups)) / Mtot
+    print(f"{socket.gethostname()} computed Fconv.", flush=True)
 
 
 def prep_Fconv(uregion_ups, nonuniform_v, nonuniform_v_p,
@@ -219,7 +222,7 @@ def solve(uregion, uregion_ups, ac, result,
     result.ac[:] = ac_res.real
     it_number = callback.counter
 
-    print(f"Recovered AC in {it_number} iterations.", flush=True)
+    print(f"{socket.gethostname()} - gen {generation} - rank {rank} recovered AC in {it_number} iterations.", flush=True)
     image.show_volume(result.ac[:], parms.Mquat,
                       f"autocorrelation_{generation}_{rank}.png")
 

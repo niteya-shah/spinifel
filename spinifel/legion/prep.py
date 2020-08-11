@@ -2,6 +2,7 @@ import h5py
 import numpy as np
 import os
 import pygion
+import socket
 from pygion import task, Tunable, Partition, Region, WD, RO, Reduce
 
 from spinifel import parms, prep, image
@@ -52,12 +53,15 @@ def load_slices_psana(slices, rank, N_images_per_rank, smd_chunk, run):
                 raise RuntimeError(
                     f"Rank {rank} received too many events.")
             i += 1
+    print(f"{socket.gethostname()} loaded slices.", flush=True)
+
 
 @task(privileges=[WD])
 def load_slices_hdf5(slices, rank, N_images_per_rank):
     i_start = rank * N_images_per_rank
     i_end = i_start + N_images_per_rank
     prep.load_slices(slices.data, i_start, i_end)
+    print(f"{socket.gethostname()} loaded slices.", flush=True)
 
 
 def get_slices(ds):
