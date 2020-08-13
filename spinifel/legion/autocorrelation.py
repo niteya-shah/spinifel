@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pygion
 import socket
-from pygion import task, Region, RO, WD, Reduce, Tunable
+from pygion import task, Region, RO, WD, Reduce, Tunable, IndexLaunch
 from scipy.linalg import norm
 from scipy.ndimage import gaussian_filter
 from scipy.sparse.linalg import LinearOperator, cg
@@ -24,8 +24,9 @@ def get_random_orientations():
     sec_shape = (4,)
     orientations, orientations_p = lgutils.create_distributed_region(
         N_images_per_rank, fields_dict, sec_shape)
-    for i, orientations_subr in enumerate(orientations_p):
-        gen_random_orientations(orientations_subr, N_images_per_rank, point=i)
+    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
+    for i in IndexLaunch([N_procs]):
+        gen_random_orientations(orientations_p[i], N_images_per_rank)
     return orientations, orientations_p
 
 
@@ -48,12 +49,10 @@ def get_nonuniform_positions_v(nonuniform, nonuniform_p, reciprocal_extent):
     sec_shape = ()
     nonuniform_v, nonuniform_v_p = lgutils.create_distributed_region(
         N_vals_per_rank, fields_dict, sec_shape)
-    for i, (nonuniform_subr, nonuniform_v_subr) in enumerate(zip(
-            nonuniform_p, nonuniform_v_p)):
-        gen_nonuniform_positions_v(nonuniform_subr, nonuniform_v_subr,
-                                   reciprocal_extent, point=i)
-        # Ideally, the location (point) should be deduced from the
-        # location of the slices.
+    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
+    for i in IndexLaunch([N_procs]):
+        gen_nonuniform_positions_v(nonuniform_p[i], nonuniform_v_p[i],
+                                   reciprocal_extent)
     return nonuniform_v, nonuniform_v_p
 
 
@@ -73,12 +72,10 @@ def get_nonuniform_positions(orientations, orientations_p, pixel_position):
     sec_shape = parms.reduced_det_shape
     nonuniform, nonuniform_p = lgutils.create_distributed_region(
         N_images_per_rank, fields_dict, sec_shape)
-    for i, (orientations_subr, nonuniform_subr) in enumerate(zip(
-            orientations_p, nonuniform_p)):
+    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
+    for i in IndexLaunch([N_procs]):
         gen_nonuniform_positions(
-            orientations_subr, nonuniform_subr, pixel_position, point=i)
-        # Ideally, the location (point) should be deduced from the
-        # location of the slices.
+            orientations_p[i], nonuniform_p[i], pixel_position)
     return nonuniform, nonuniform_p
 
 
@@ -102,14 +99,11 @@ def right_hand(slices, slices_p, uregion, nonuniform_v, nonuniform_v_p,
                ac, weights, M,
                reciprocal_extent, use_reciprocal_symmetry):
     pygion.fill(uregion, "ADb", 0.)
-    for i, (slices_subr, nonuniform_v_subr) in enumerate(zip(
-            slices_p, nonuniform_v_p)):
-        right_hand_ADb_task(slices_subr, uregion, nonuniform_v_subr,
+    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
+    for i in IndexLaunch([N_procs]):
+        right_hand_ADb_task(slices_p[i], uregion, nonuniform_v_p[i],
                             ac, weights, M,
-                            reciprocal_extent, use_reciprocal_symmetry,
-                            point=i)
-        # Ideally, the location (point) should be deduced from the
-        # location of the slices.
+                            reciprocal_extent, use_reciprocal_symmetry)
 
 
 @task(privileges=[Reduce('+', 'F_conv_'), RO, RO])
@@ -131,13 +125,11 @@ def prep_Fconv(uregion_ups, nonuniform_v, nonuniform_v_p,
                ac, weights, M_ups, Mtot, N,
                reciprocal_extent, use_reciprocal_symmetry):
     pygion.fill(uregion_ups, "F_conv_", 0.)
-    for i, nonuniform_v_subr in enumerate(nonuniform_v_p):
-        prep_Fconv_task(uregion_ups, nonuniform_v_subr,
+    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
+    for i in IndexLaunch([N_procs]):
+        prep_Fconv_task(uregion_ups, nonuniform_v_p[i],
                         ac, weights, M_ups, Mtot, N,
-                        reciprocal_extent, use_reciprocal_symmetry,
-                        point=i)
-        # Ideally, the location (point) should be deduced from the
-        # location of the slices.
+                        reciprocal_extent, use_reciprocal_symmetry)
 
 
 @task(privileges=[WD("F_antisupport")])
@@ -288,6 +280,9 @@ def solve_ac(generation,
     Mtot = M**3
     N_images_per_rank = parms.N_images_per_rank
     N = N_images_per_rank * utils.prod(parms.reduced_det_shape)
+    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
+    N_images_tot = N_images_per_rank * N_procs
+    Ntot = N * N_procs
     reciprocal_extent = pixel_distance.reciprocal.max()
     use_reciprocal_symmetry = True
 

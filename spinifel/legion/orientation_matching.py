@@ -1,6 +1,6 @@
 import pygion
 import socket
-from pygion import task, RO, WD
+from pygion import task, RO, WD, IndexLaunch, Tunable
 
 from spinifel import parms
 from spinifel.sequential.orientation_matching import match as sequential_match
@@ -24,12 +24,12 @@ def match(phased, slices, slices_p, pixel_position, pixel_distance):
     orientations, orientations_p = lgutils.create_distributed_region(
         parms.N_images_per_rank, {"quaternions": pygion.float32}, (4,))
 
-    for i, (orientations_subr, slices_subr) in enumerate(zip(
-            orientations_p, slices_p)):
+    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
+    for i in IndexLaunch([N_procs]):
         # Ideally, the location (point) should be deduced from the
         # location of the slices.
         match_task(
-            phased, slices_subr, orientations_subr,
-            pixel_position, pixel_distance, point=i)
+            phased, slices_p[i], orientations_p[i],
+            pixel_position, pixel_distance)
 
     return orientations, orientations_p

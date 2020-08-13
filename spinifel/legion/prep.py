@@ -3,7 +3,7 @@ import numpy as np
 import os
 import pygion
 import socket
-from pygion import task, Tunable, Partition, Region, WD, RO, Reduce
+from pygion import task, Tunable, Partition, Region, WD, RO, Reduce, IndexLaunch
 
 from spinifel import parms, prep, image
 
