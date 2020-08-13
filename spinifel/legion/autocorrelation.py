@@ -298,21 +298,21 @@ def solve_ac(generation,
         reciprocal_extent, use_reciprocal_symmetry)
 
     N_ranks = 5
-    results = [Region((M,)*3, {"ac": pygion.float64}) for i in range(N_ranks)]
+    results = Region((N_ranks * M, M, M), {"ac": pygion.float64})
+    results_p = Partition.restrict(results, (N_ranks,), [[M], [0], [0]], [M, M, M])
 
     alambda = 1
     rlambdas = 1e-7 * 100**np.arange(N_ranks)
     flambda = 0
-    summary = []
 
     summary = Region((N_ranks,),
                 {"rank": pygion.int32, "rlambda": pygion.float32, "v1": pygion.float32, "v2": pygion.float32})
     summary_p = Partition.equal(summary, (N_ranks,))
 
 
-    for i in range(N_ranks):
+    for i in IndexLaunch((N_ranks,)):
         solve(
-            uregion, uregion_ups, ac, results[i], summary_p[i],
+            uregion, uregion_ups, ac, results_p[i], summary_p[i],
             weights, M, M_ups, Mtot, N,
             generation, i, alambda, rlambdas[i], flambda,
             reciprocal_extent, use_reciprocal_symmetry)
@@ -321,4 +321,4 @@ def solve_ac(generation,
     # At this point, I just want to chose one of the results as reference.
     # I tried to have `results` as a partition and copy into a region,
     # but I couldn't get it to work.
-    return results[iref.get()]
+    return results_p[iref.get()]
