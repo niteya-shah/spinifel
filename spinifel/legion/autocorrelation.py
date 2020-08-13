@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pygion
 import socket
-from pygion import task, Region, RO, WD, Reduce, Tunable, IndexLaunch
+from pygion import task, IndexLaunch, Partition, Region, RO, WD, Reduce, Tunable
 from scipy.linalg import norm
 from scipy.ndimage import gaussian_filter
 from scipy.sparse.linalg import LinearOperator, cg
@@ -177,8 +177,8 @@ def phased_to_constrains(phased, ac):
     ac.estimate[:] = phased.ac * ac.support
 
 
-@task(privileges=[RO, RO, RO, WD])
-def solve(uregion, uregion_ups, ac, result,
+@task(privileges=[RO, RO, RO, WD, WD])
+def solve(uregion, uregion_ups, ac, result, summary,
           weights, M, M_ups, Mtot, N,
           generation, rank, alambda, rlambda, flambda,
           reciprocal_extent, use_reciprocal_symmetry):
@@ -239,32 +239,33 @@ def solve(uregion, uregion_ups, ac, result,
 
     v1 = norm(ret)
     v2 = norm(W*ret-d)
-    return rank, rlambda, v1, v2
+
+    summary.rank[0] = rank
+    summary.rlambda[0] = rlambda
+    summary.v1[0] = v1
+    summary.v2[0] = v2
 
 
-@task
-def select_ac(generation, *summary):
-    summary = [el.get() for el in summary]
-    ranks, lambdas, v1s, v2s = [np.array(el) for el in zip(*summary)]
-
+@task(privileges=[None, RO])
+def select_ac(generation, summary):
     if generation == 0:
         # Expect non-convergence => weird results.
         # Heuristic: retain rank with highest lambda and high v1.
-        idx = v1s >= np.mean(v1s)
-        imax = np.argmax(lambdas[idx])
-        iref = np.arange(len(ranks), dtype=np.int)[idx][imax]
+        idx = summary.v1 >= np.mean(summary.v1)
+        imax = np.argmax(summary.rlambda[idx])
+        iref = np.arange(len(summary.rank), dtype=np.int)[idx][imax]
     else:
         # Take corner of L-curve: min (v1+v2)
-        iref = np.argmin(v1s+v2s)
-    ref_rank = ranks[iref]
+        iref = np.argmin(summary.v1+summary.v2)
+    ref_rank = summary.rank[iref]
 
     fig, axes = plt.subplots(figsize=(6.0, 6.0), nrows=2, ncols=1)
-    axes[0].semilogx(lambdas, v1s)
-    axes[0].semilogx(lambdas[iref], v1s[iref], "rD")
+    axes[0].semilogx(summary.rlambda, summary.v1)
+    axes[0].semilogx(summary.rlambda[iref], summary.v1[iref], "rD")
     axes[0].set_xlabel("$\\lambda_r$")
     axes[0].set_ylabel("$\\|x\\|$")
-    axes[1].semilogx(lambdas, v2s)
-    axes[1].semilogx(lambdas[iref], v2s[iref], "rD")
+    axes[1].semilogx(summary.rlambda, summary.v2)
+    axes[1].semilogx(summary.rlambda[iref], summary.v2[iref], "rD")
     axes[1].set_xlabel("$\\lambda_r$")
     axes[1].set_ylabel("$\\|W x - d\\|$")
     plt.savefig(parms.out_dir / f"summary_{generation}.png")
@@ -314,24 +315,27 @@ def solve_ac(generation,
         reciprocal_extent, use_reciprocal_symmetry)
 
     N_ranks = 5
-    results = [Region((M,)*3, {"ac": pygion.float64}) for i in range(N_ranks)]
+    results = Region((N_ranks * M, M, M), {"ac": pygion.float64})
+    results_p = Partition.restrict(results, (N_ranks,), [[M], [0], [0]], [M, M, M])
 
     alambda = 1
     rlambdas = 1e-7 * 100**np.arange(N_ranks)
     flambda = 0
-    summary = []
 
-    for i in range(N_ranks):
-        summary.append(solve(
-            uregion, uregion_ups, ac, results[i],
+    summary = Region((N_ranks,),
+                {"rank": pygion.int32, "rlambda": pygion.float32, "v1": pygion.float32, "v2": pygion.float32})
+    summary_p = Partition.equal(summary, (N_ranks,))
+
+
+    for i in IndexLaunch((N_ranks,)):
+        solve(
+            uregion, uregion_ups, ac, results_p[i], summary_p[i],
             weights, M, M_ups, Mtot, N,
             generation, i, alambda, rlambdas[i], flambda,
-            reciprocal_extent, use_reciprocal_symmetry, point=i%N_procs))
-        # Ideally, the mapper should distribute these tasks. However,
-        # here, without the point, everything runs on the same node.
+            reciprocal_extent, use_reciprocal_symmetry)
 
-    iref = select_ac(generation, *summary)
+    iref = select_ac(generation, summary)
     # At this point, I just want to chose one of the results as reference.
     # I tried to have `results` as a partition and copy into a region,
     # but I couldn't get it to work.
-    return results[iref.get()]
+    return results_p[iref.get()]
