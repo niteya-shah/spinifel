@@ -82,6 +82,8 @@ def get_nonuniform_positions(orientations, orientations_p, pixel_position):
 @task(privileges=[RO, Reduce('+', 'ADb'), RO, RO])
 def right_hand_ADb_task(slices, uregion, nonuniform_v, ac, weights, M,
                         reciprocal_extent, use_reciprocal_symmetry):
+    if parms.verbosity > 0:
+        print(f"{socket.gethostname()} started ADb.", flush=True)
     data = slices.data.flatten()
     nuvect_Db = data * weights
     uregion.ADb[:] += autocorrelation.adjoint(
@@ -92,7 +94,8 @@ def right_hand_ADb_task(slices, uregion, nonuniform_v, ac, weights, M,
         ac.support, M,
         reciprocal_extent, use_reciprocal_symmetry
     )
-    print(f"{socket.gethostname()} computed ADb.", flush=True)
+    if parms.verbosity > 0:
+        print(f"{socket.gethostname()} computed ADb.", flush=True)
 
 
 def right_hand(slices, slices_p, uregion, nonuniform_v, nonuniform_v_p,
@@ -109,6 +112,8 @@ def right_hand(slices, slices_p, uregion, nonuniform_v, nonuniform_v_p,
 @task(privileges=[Reduce('+', 'F_conv_'), RO, RO])
 def prep_Fconv_task(uregion_ups, nonuniform_v, ac, weights, M_ups, Mtot, N,
                     reciprocal_extent, use_reciprocal_symmetry):
+    if parms.verbosity > 0:
+        print(f"{socket.gethostname()} started Fconv.", flush=True)
     conv_ups = autocorrelation.adjoint(
         np.ones(N),
         nonuniform_v.H,
@@ -118,7 +123,8 @@ def prep_Fconv_task(uregion_ups, nonuniform_v, ac, weights, M_ups, Mtot, N,
         reciprocal_extent, use_reciprocal_symmetry
     )
     uregion_ups.F_conv_[:] += np.fft.fftn(np.fft.ifftshift(conv_ups)) / Mtot
-    print(f"{socket.gethostname()} computed Fconv.", flush=True)
+    if parms.verbosity > 0:
+        print(f"{socket.gethostname()} computed Fconv.", flush=True)
 
 
 def prep_Fconv(uregion_ups, nonuniform_v, nonuniform_v_p,
@@ -225,7 +231,9 @@ def solve(uregion, uregion_ups, ac, result,
     result.ac[:] = ac_res.real
     it_number = callback.counter
 
-    print(f"{socket.gethostname()} - gen {generation} - rank {rank} recovered AC in {it_number} iterations.", flush=True)
+    if parms.verbosity > 0:
+        print(f"{socket.gethostname()} - ", end='')
+    print(f"Rank {rank} recovered AC in {it_number} iterations.", flush=True)
     image.show_volume(result.ac[:], parms.Mquat,
                       f"autocorrelation_{generation}_{rank}.png")
 

@@ -9,14 +9,22 @@ from spinifel.sequential.phasing import phase as sequential_phase
 
 @task(privileges=[RO("ac"), WD("ac", "support_", "rho_")])
 def phase_gen0_task(solved, phased):
+    if parms.verbosity > 0:
+        print("Starting phasing", flush=True)
     phased.ac[:] , phased.support_[:], phased.rho_[:] = sequential_phase(
             0, solved.ac, None, None)
+    if parms.verbosity > 0:
+        print("Finishing phasing", flush=True)
 
 
 @task(privileges=[RO("ac"), WD("ac") + RW("support_", "rho_")])
 def phase_task(solved, phased, generation):
+    if parms.verbosity > 0:
+        print("Starting phasing", flush=True)
     phased.ac[:] , phased.support_[:], phased.rho_[:] = sequential_phase(
             generation, solved.ac, phased.support_, phased.rho_)
+    if parms.verbosity > 0:
+        print("Finishing phasing", flush=True)
 
 
 def phase(generation, solved, phased=None):

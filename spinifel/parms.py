@@ -28,6 +28,7 @@ else:
 out_dir = Path(os.environ.get("OUT_DIR", ""))
 
 data_multiplier = int(os.environ.get("DATA_MULTIPLIER", 1))
+verbosity = int(os.environ.get("VERBOSITY", 0))
 
 if os.environ.get("SMALL_PROBLEM") == "1":
     N_images_per_rank = 10 * data_multiplier

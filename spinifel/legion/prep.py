@@ -53,15 +53,19 @@ def load_slices_psana(slices, rank, N_images_per_rank, smd_chunk, run):
                 raise RuntimeError(
                     f"Rank {rank} received too many events.")
             i += 1
-    print(f"{socket.gethostname()} loaded slices.", flush=True)
+    if parms.verbosity > 0:
+        print(f"{socket.gethostname()} loaded slices.", flush=True)
 
 
 @task(privileges=[WD])
 def load_slices_hdf5(slices, rank, N_images_per_rank):
+    if parms.verbosity > 0:
+        print(f"{socket.gethostname()} loading slices.", flush=True)
     i_start = rank * N_images_per_rank
     i_end = i_start + N_images_per_rank
     prep.load_slices(slices.data, i_start, i_end)
-    print(f"{socket.gethostname()} loaded slices.", flush=True)
+    if parms.verbosity > 0:
+        print(f"{socket.gethostname()} loaded slices.", flush=True)
 
 
 def get_slices(ds):

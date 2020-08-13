@@ -6,7 +6,7 @@
 #SBATCH --mail-type=ALL
 #SBATCH --account=m2859
 
-while getopts lmpsan:t:d: option
+while getopts lmpsavn:t:d: option
 do
 case "${option}"
 in
@@ -15,6 +15,7 @@ m) USING_MPI="1";;
 p) PROFILING="1";;
 s) SMALL_PROBLEM="1";;
 a) USE_PSANA="1";;
+v) VERBOSITY="1";;
 n) NTASKS=$OPTARG;;
 t) OMP_NUM_THREADS=$OPTARG;;
 d) DATA_MULTIPLIER=$OPTARG;;
@@ -57,6 +58,10 @@ fi
 
 if [[ -n $USE_PSANA ]]; then
     export USE_PSANA
+fi
+
+if [[ -n $VERBOSITY ]]; then
+    export VERBOSITY
 fi
 
 if [[ -z $DATA_MULTIPLIER ]]; then

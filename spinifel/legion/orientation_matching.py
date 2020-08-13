@@ -11,9 +11,13 @@ from . import utils as lgutils
 @task(privileges=[
     RO("ac"), RO("data"), WD("quaternions"), RO("reciprocal"), RO("reciprocal")])
 def match_task(phased, slices, orientations, pixel_position, pixel_distance):
-    print(f"{socket.gethostname()}:", end=" ", flush=False)
+    if parms.verbosity > 0:
+        print(f"{socket.gethostname()} starts Orientation Matching.", flush=True)
+        print(f"{socket.gethostname()}:", end=" ", flush=False)
     orientations.quaternions[:] = sequential_match(
         phased.ac, slices.data, pixel_position.reciprocal, pixel_distance.reciprocal)
+    if parms.verbosity > 0:
+        print(f"{socket.gethostname()} finished Orientation Matching.", flush=True)
 
 
 def match(phased, slices, slices_p, pixel_position, pixel_distance):
