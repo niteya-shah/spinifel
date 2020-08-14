@@ -115,6 +115,7 @@ def solve_ac(generation,
     Mtot = M**3
     N_images = slices_.shape[0]
     N = utils.prod(slices_.shape)
+    Ntot = N * comm.size
     reciprocal_extent = pixel_distance_reciprocal.max()
     use_reciprocal_symmetry = True
 
@@ -135,7 +136,7 @@ def solve_ac(generation,
     weights = np.ones(N)
 
     alambda = 1
-    rlambda = 1e-8 * pow(100, comm.rank)
+    rlambda = Mtot/Ntot * 1e2**(comm.rank - comm.size/2)
     flambda = 0  # 1e5 * pow(10, comm.rank - comm.size//2)
     maxiter = 100
 

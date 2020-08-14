@@ -108,7 +108,7 @@ def solve_ac(generation,
     weights = np.ones(N)
 
     alambda = 1
-    rlambda = 1e-9
+    rlambda = Mtot/N / 1000
     flambda = 1e3
     maxiter = 100
 

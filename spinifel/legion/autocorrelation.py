@@ -317,7 +317,7 @@ def solve_ac(generation,
     results = [Region((M,)*3, {"ac": pygion.float64}) for i in range(N_ranks)]
 
     alambda = 1
-    rlambdas = 1e-7 * 100**np.arange(N_ranks)
+    rlambdas = Mtot/Ntot * 1e2**(np.arange(N_ranks) - N_ranks/2)
     flambda = 0
     summary = []
 
