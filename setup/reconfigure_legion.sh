@@ -2,12 +2,15 @@
 
 set -e
 
-root_dir="$(dirname "${BASH_SOURCE[0]}")"
+root_dir="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
 source "$root_dir"/env.sh
 
-rm -rf "$root_dir"/legion/build
-mkdir "$root_dir"/legion/build
-pushd "$root_dir"/legion/build
+legion_build="$(mktemp -d)"
+cat > "$root_dir"/legion_build_dir.sh <<EOF
+legion_build="$legion_build"
+EOF
+
+pushd "$legion_build"
 
 cmake -DCMAKE_PREFIX_PATH="$CONDA_ENV_DIR" \
     -DCMAKE_BUILD_TYPE=$([ $LEGION_DEBUG -eq 1 ] && echo Debug || echo Release) \
@@ -25,6 +28,6 @@ cmake -DCMAKE_PREFIX_PATH="$CONDA_ENV_DIR" \
     -DLegion_MAX_DIM=$MAX_DIM \
     -DCMAKE_INSTALL_PREFIX="$LEGION_INSTALL_DIR" \
     -DCMAKE_INSTALL_LIBDIR="$LEGION_INSTALL_DIR/lib" \
-    ..
+    "$root_dir"/legion
 
 popd
