@@ -26,6 +26,23 @@ export USE_OPENMP=${USE_OPENMP:-1}
 export USE_GASNET=${USE_GASNET:-1}
 export CONDUIT=${CONDUIT:-aries}
 EOF
+elif [[ $(hostname --fqdn) = *"summit"* ]]; then
+    cat > env.sh <<EOF
+module load gcc/9.1.0
+module load fftw/3.3.8
+module load cuda/9.2.148
+module load gsl
+export CC=gcc
+export CXX=g++
+
+export USE_CUDA=${USE_CUDA:-0}
+export USE_OPENMP=${USE_OPENMP:-1}
+export USE_GASNET=${USE_GASNET:-1}
+export CONDUIT=${CONDUIT:-ibv}
+
+# for Numba
+export CUDA_HOME=\$OLCF_CUDA_ROOT
+EOF
 else
     echo "I don't know how to build it on this machine..."
     exit 1
@@ -108,6 +125,8 @@ conda install -y bitstruct krtc -c conda-forge
 
 if [[ $(hostname) = "cori"* ]]; then
     CC=gcc MPICC=cc pip install -v --no-binary mpi4py mpi4py
+elif [[ $(hostname --fqdn) = *"summit"* ]]; then
+    CC=$OMPI_CC MPICC=mpicc pip install -v --no-binary mpi4py mpi4py
 fi
 
 if [[ $USE_GASNET -eq 1 && $GASNET_ROOT == $PWD/gasnet/release ]]; then
