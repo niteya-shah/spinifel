@@ -151,7 +151,7 @@ git clone https://github.com/slac-lcls/lcls2.git $LCLS2_DIR
 ./psana_clean_build.sh
 
 rm -rf finufft
-git clone git@github.com:AntoineDujardin/finufft.git
+git clone https://github.com/elliottslaughter/finufft.git
 ./rebuild_finufft.sh
 
 rm -rf pysingfel
