@@ -15,6 +15,10 @@ export CC=cc
 export CXX=CC
 export CRAYPE_LINK_TYPE=dynamic # allow dynamic linking
 
+# compilers for mpi4py
+export MPI4PY_CC=gcc
+export MPI4PY_MPICC=cc
+
 # disable Cori-specific Python environment
 unset PYTHONSTARTUP
 
@@ -35,6 +39,10 @@ module load gsl
 export CC=gcc
 export CXX=g++
 
+# compilers for mpi4py
+export MPI4PY_CC=\$OMPI_CC
+export MPI4PY_MPICC=mpicc
+
 export USE_CUDA=${USE_CUDA:-0}
 export USE_OPENMP=${USE_OPENMP:-1}
 export USE_GASNET=${USE_GASNET:-1}
@@ -49,6 +57,10 @@ module load oneapi # just get some sort of a compiler loaded
 module load mpi
 export CC=clang
 export CXX=clang++
+
+# compilers for mpi4py
+export MPI4PY_CC=clang
+export MPI4PY_MPICC=mpicc
 
 export USE_CUDA=${USE_CUDA:-0}
 export USE_OPENMP=${USE_OPENMP:-1}
@@ -135,13 +147,7 @@ conda activate "$CONDA_ENV_DIR"
 conda install -y amityping -c lcls-ii
 conda install -y bitstruct krtc -c conda-forge
 
-if [[ $(hostname) = "cori"* ]]; then
-    CC=gcc MPICC=cc pip install -v --no-binary mpi4py mpi4py
-elif [[ $(hostname) = "jlse"* ]]; then # iris, yarrow
-    CC=clang MPICC=mpicc pip install -v --no-binary mpi4py mpi4py
-elif [[ $(hostname --fqdn) = *"summit"* ]]; then
-    CC=$OMPI_CC MPICC=mpicc pip install -v --no-binary mpi4py mpi4py
-fi
+CC=$MPI4PY_CC MPICC=$MPI4PY_MPICC pip install -v --no-binary mpi4py mpi4py
 
 if [[ $USE_GASNET -eq 1 && $GASNET_ROOT == $PWD/gasnet/release ]]; then
     rm -rf gasnet
