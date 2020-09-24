@@ -43,6 +43,18 @@ export CONDUIT=${CONDUIT:-ibv}
 # for Numba
 export CUDA_HOME=\$OLCF_CUDA_ROOT
 EOF
+elif [[ $(hostname --fqdn) = *"jlse"* ]]; then # iris, yarrow
+    cat > env.sh <<EOF
+module load oneapi # just get some sort of a compiler loaded
+module load mpi
+export CC=clang
+export CXX=clang++
+
+export USE_CUDA=${USE_CUDA:-0}
+export USE_OPENMP=${USE_OPENMP:-1}
+export USE_GASNET=${USE_GASNET:-0} # FIXME: GASNet on iris is currently broken
+export CONDUIT=${CONDUIT:-ibv}
+EOF
 else
     echo "I don't know how to build it on this machine..."
     exit 1
@@ -125,6 +137,8 @@ conda install -y bitstruct krtc -c conda-forge
 
 if [[ $(hostname) = "cori"* ]]; then
     CC=gcc MPICC=cc pip install -v --no-binary mpi4py mpi4py
+elif [[ $(hostname) = "jlse"* ]]; then # iris, yarrow
+    CC=clang MPICC=mpicc pip install -v --no-binary mpi4py mpi4py
 elif [[ $(hostname --fqdn) = *"summit"* ]]; then
     CC=$OMPI_CC MPICC=mpicc pip install -v --no-binary mpi4py mpi4py
 fi
