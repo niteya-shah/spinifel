@@ -55,12 +55,17 @@ elif [[ $(hostname --fqdn) = *"jlse"* ]]; then # iris, yarrow
     cat > env.sh <<EOF
 module load oneapi # just get some sort of a compiler loaded
 module load mpi
-export CC=clang
-export CXX=clang++
+export CC=clang # icc
+export CXX=clang++ # icpc
 
 # compilers for mpi4py
 export MPI4PY_CC=clang
 export MPI4PY_MPICC=mpicc
+
+# compilers for psana
+# Hack: we cannot compile Legion with icc, but we cannot compile psana with clang
+export PSANA_CC=icc
+export PSANA_CXX=icpc
 
 export USE_CUDA=${USE_CUDA:-0}
 export USE_OPENMP=${USE_OPENMP:-1}
