@@ -4,9 +4,27 @@ import numpy as np
 import pysingfel as ps
 
 
-def forward(ugrid, H_, K_, L_, support, M, N,
-            recip_extent, use_recip_sym):
-    """Apply the forward, NUFFT2- problem."""
+#________________________________________________________________________________
+# TRY to import cufinufft -- if it exists in the path. If cufinufft could be
+# loaded, then the forward and adjoint functions default to the GPU version
+#
+
+import finufftpy as nfft
+
+CUFINUFFT_LOADER    = importlib.find_loader("cufinufft")
+CUFINUFFT_AVAILABLE = CUFINUFFT_LOADER is not None
+
+if CUFINUFFT_AVAILABLE:
+    import pycuda.autoinit # NOQA:401
+    from   pycuda.gpuarray import GPUArray, to_gpu
+    from   cufinufft       import cufinufft
+
+#-------------------------------------------------------------------------------
+
+
+
+def forward_cpu(ugrid, H_, K_, L_, support, M, N, recip_extent, use_recip_sym):
+    """Apply the forward, NUFFT2- problem -- CPU Implementation"""
     if use_recip_sym:
         assert np.all(np.isreal(ugrid))
     ugrid *= support  # /!\ overwrite
@@ -15,15 +33,149 @@ def forward(ugrid, H_, K_, L_, support, M, N,
     return nuvect / M**3
 
 
-def adjoint(nuvect, H_, K_, L_, support, M,
-            recip_extent, use_recip_sym):
-    """Apply the adjoint, NUFFT1+ problem."""
+def forward_gpu(ugrid, H_, K_, L_, support, M, N, recip_extent, use_recip_sym):
+    """Apply the forward, NUFFT2- problem -- CUDA Implementation."""
+
+    # Set up data types/dim/shape of transform
+    complex_dtype = np.complex128
+    dtype         = np.float64
+    dim           = 3
+    shape         = (M, M, M)
+    tol           = 1e-12
+
+    # Ensure that H_, K_, and L_ have the same shape
+    assert H_.shape == K_.shape == L_.shape
+
+    # Apply Support
+    ugrid *= support  # /!\ overwrite
+
+    # Copy input data to Device (if not already there)
+    if not isinstance(H_, GPUArray):
+        H_gpu = to_gpu(H_)
+        K_gpu = to_gpu(K_)
+        L_gpu = to_gpu(L_)
+        ugrid_gpu = to_gpu(ugrid.astype(complex_dtype))
+    else:
+        H_gpu = H_
+        K_gpu = K_
+        L_gpu = L_
+        ugrid_gpu = ugrid.astype(complex_dtype)
+
+    # Check if recip symmetry is met
+    if use_recip_sym:
+        assert np.all(np.isreal(ugrid))
+
+    # Allocate space on Device
+    # nuvect = np.zeros(N, dtype=np.complex)
+    nuvect_gpu = GPUArray(shape=(N,), dtype=complex_dtype)
+
+    #___________________________________________________________________________
+    # Solve the NUFFT
+    #
+
+    # Change default NUFFT Behaviour
+    forward_opts = cufinufft.default_opts(nufft_type=2, dim=dim)
+    forward_opts.gpu_method = 1   # Override with method 1. The default is 2
+
+    # Run NUFFT
+    plan = cufinufft(2, shape, -1, tol, dtype=dtype, opts=forward_opts)
+    plan.set_pts(H_.shape[0], H_gpu, K_gpu, L_gpu)
+    plan.execute(nuvect_gpu, ugrid_gpu)
+
+    #
+    #---------------------------------------------------------------------------
+
+    # Copy result back to host -- if the incoming data was on host
+    if not isinstance(H_, GPUArray):
+        nuvect = nuvect_gpu.get()
+    else:
+        nuvect = nuvect_gpu
+
+    return nuvect / M**3
+
+
+def adjoint_cpu(nuvect, H_, K_, L_, support, M, recip_extent, use_recip_sym):
+    """Apply the adjoint, NUFFT1+ problem -- CPU Implementation"""
     ugrid = np.zeros((M,)*3, dtype=np.complex, order='F')
     assert not nfft.nufft3d1(H_, K_, L_, nuvect, +1, 1e-12, M, M, M, ugrid)
     ugrid *= support
     if use_recip_sym:
         ugrid = ugrid.real
     return ugrid
+
+
+def adjoint_gpu(nuvect, H_, K_, L_, support, M, recip_extent, use_recip_sym):
+    """Apply the adjoint, NUFFT1+ problem -- CUDA Implementation."""
+
+    # Set up data types/dim/shape of transform
+    complex_dtype = np.complex128
+    dtype         = np.float64
+    dim           = 3
+    shape         = (M, M, M)
+    tol           = 1e-12
+
+    # Ensure that H_, K_, and L_ have the same shape
+    assert H_.shape == K_.shape == L_.shape
+
+    # Copy input data to Device (if not already there)
+    if not isinstance(H_, GPUArray):
+        H_gpu = to_gpu(H_)
+        K_gpu = to_gpu(K_)
+        L_gpu = to_gpu(L_)
+        nuvect_gpu = to_gpu(nuvect.astype(complex_dtype))
+    else:
+        H_gpu = H_
+        K_gpu = K_
+        L_gpu = L_
+        nuvect_gpu = nuvect.astype(complex_dtype)
+
+    # Allocate space on Device
+    ugrid_gpu = GPUArray(shape, dtype=complex_dtype, order="F")
+
+    #___________________________________________________________________________
+    # Solve the NUFFT
+    #
+
+    # Change default NUFFT Behaviour
+    adjoint_opts = cufinufft.default_opts(nufft_type=1, dim=dim)
+    adjoint_opts.gpu_method = 1   # Override with method 1. The default is 2
+
+    # Run NUFFT
+    plan = cufinufft(1, shape, 1, tol, dtype=dtype, opts=adjoint_opts)
+    plan.set_pts(H_.shape[0], H_gpu, K_gpu, L_gpu)
+    plan.execute(nuvect_gpu, ugrid_gpu)
+
+    #
+    #---------------------------------------------------------------------------
+
+    # Copy result back to host -- if the incoming data was on host
+    if not isinstance(H_, GPUArray):
+        ugrid = ugrid_gpu.get()
+    else:
+        ugrid = ugrid_gpu
+
+    # Apply support
+    ugrid *= support
+
+    # Apply recip symmetry
+    if use_recip_sym:
+        ugrid = ugrid.real
+
+    return ugrid
+
+
+#_______________________________________________________________________________
+# Select the GPU vs the CPU version dependion on weather cufinufft is available
+#
+
+if CUFINUFFT_AVAILABLE:
+    forward = forward_gpu
+    adjoint = adjoint_gpu
+else:
+    forward = forward_cpu
+    adjoint = adjoint_cpu
+
+#-------------------------------------------------------------------------------
 
 
 def core_problem(uvect, H_, K_, L_, ac_support, weights, M, N,

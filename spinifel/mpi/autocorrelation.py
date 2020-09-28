@@ -1,6 +1,5 @@
 from mpi4py import MPI
 
-import finufftpy as nfft
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import LogNorm
