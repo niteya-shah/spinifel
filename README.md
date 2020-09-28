@@ -43,5 +43,6 @@ bsub -P CHM137 -J fxs -W 2:00 -nnodes 1 -e error.log -o output.log "sh scripts/r
 ## Bugs and Issues
 Build:
 1) The GCC compiler version is changed to 6.4.0. When executing the script by enable CUDA through 'export USE_CUDA=${USE_CUDA:-1}', it results in build errors as it does not support any GCC version greater 7.0.
+
 Execution:
 1) Line 15 in spinifel/image.py which contains 'plt.savefig(parms.out_dir / filename)' instruction is commented out while running on Summit, as it is producing a matplotlib package error. The error is being raised only on Summit runs (Code works fine on Cori with the instruction).
