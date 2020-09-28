@@ -35,10 +35,9 @@ An additional flag '-c' is included in the script.
 CUDA C code for nearest neighbors (Euclidean distance and Heap sort) is executed when the flag is set.
 Sklearn library function for nearest neighbors (Euclidean distance and np.argmin) is executed if the flag is not passed as an command argument.
 
-bsub command to run CUDA C code:
-bsub -P CHM137 -J fxs -W 2:00 -nnodes 1 -e error.log -o output.log "sh scripts/run_summit.sh -m -c -n 1 -t 1 -d 1"
-bsub command to run Sklearn code:
-bsub -P CHM137 -J fxs -W 2:00 -nnodes 1 -e error.log -o output.log "sh scripts/run_summit.sh -m -n 1 -t 1 -d 1"
+bsub command to run CUDA C code: bsub -P CHM137 -J fxs -W 2:00 -nnodes 1 -e error.log -o output.log "sh scripts/run_summit.sh -m -c -n 1 -t 1 -d 1"
+
+bsub command to run Sklearn code: bsub -P CHM137 -J fxs -W 2:00 -nnodes 1 -e error.log -o output.log "sh scripts/run_summit.sh -m -n 1 -t 1 -d 1"
 
 ## Bugs and Issues
 Build:
