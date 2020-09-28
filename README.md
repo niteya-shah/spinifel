@@ -3,19 +3,26 @@ Applies the M-TIP algorithm to SPI data.
 
 
 ## Installation
-As of writing, spinifel is designed to work on Cori Haswell only.
+
+As of writing, spinifel has been tested on Cori Haswell and Summit.
 
 To install spinifel, clone the repository and run
+
 ```
 ./setup/build_from_scratch.sh
 ```
+
 from its base directory.
 
 This will create a conda environment, install everything you need inside, and
 produce a `env.sh` file to set it up when needed.  To use that environment, use
+
 ```
 source setup/env.sh
 ```
+
+This is included in most scripts, so it is not normally necessary to
+do this manually.
 
 ### Git clone through SSH
 The `build_from_scratch.sh` script clones some directories through ssh.  For
