@@ -12,7 +12,7 @@ def show_image(pixel_index_map, image, filename):
     buffer[pixel_index_map[0], pixel_index_map[1]] = image
     plt.imshow(buffer, norm=LogNorm())
     plt.colorbar()
-    plt.savefig(parms.out_dir / filename)
+#    plt.savefig(parms.out_dir / filename)
     plt.cla()
     plt.clf()
 

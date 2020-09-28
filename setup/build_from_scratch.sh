@@ -32,7 +32,7 @@ export CONDUIT=${CONDUIT:-aries}
 EOF
 elif [[ $(hostname --fqdn) = *"summit"* ]]; then
     cat > env.sh <<EOF
-module load gcc/9.1.0
+module load gcc/6.4.0
 module load fftw/3.3.8
 module load cuda/9.2.148
 module load gsl
@@ -43,7 +43,7 @@ export CXX=g++
 export MPI4PY_CC=\$OMPI_CC
 export MPI4PY_MPICC=mpicc
 
-export USE_CUDA=${USE_CUDA:-0}
+export USE_CUDA=${USE_CUDA:-1}
 export USE_OPENMP=${USE_OPENMP:-1}
 export USE_GASNET=${USE_GASNET:-1}
 export CONDUIT=${CONDUIT:-ibv}
@@ -175,7 +175,7 @@ git clone https://github.com/elliottslaughter/finufft.git
 ./rebuild_finufft.sh
 
 rm -rf pysingfel
-git clone git@github.com:AntoineDujardin/pysingfel.git
+git clone https://github.com/AntoineDujardin/pysingfel.git
 ./rebuild_pysingfel.sh
 
 pip check
