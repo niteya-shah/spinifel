@@ -14,7 +14,7 @@ To use that environment, use
 source setup/env.sh
 ```
 
-### Git clone through SSH
+## Git clone through SSH
 The `build_from_scratch.sh` script clones some directories through ssh.
 For this to work properly, you need to have access to the repositories (if they are private) and to have the SSH key corresponding to the computer you are using registered on your GitHub account.
 
@@ -24,11 +24,11 @@ By default, it expects the data to be located in the `$SCRATCH/spinifel_data` di
 As of writing, the reference file is `2CEX-10k-2.h5` and is available in the `$CFS/m2859/dujardin/spi` directory.
 Create the `spinifel_data` directory in your scratch system and copy the data file.
 
-##CUDA Modules
+## CUDA Modules
 'orientation_matching.cu' file is added to spinifel/sequential/ folder, and changes are made in spinifel/sequential/orientation_matching.py to import CUDA C code from orientation_matching.cu.
 These CUDA changes replace the 'euclidean_distances' function from Sklearn, and 'argmin' from numpy packages (in spinifel/sequential/orientation_matching.py file) with handwritten CUDA C kernels (in spinifel/sequential/orientation_matching.cu file) invoked from python through pybind11 package.
 
-##Run on Summit
+## Run on Summit
 'run_summit.sh' file is included in scripts/ path. The script file is written for Spinifel MPI version. Spinifel Legion version is not yet tested with CUDA modules. Many of the parameters are hardcoded (for now).
 
 An additional flag '-c' is included in the script. 
@@ -40,7 +40,7 @@ bsub -P CHM137 -J fxs -W 2:00 -nnodes 1 -e error.log -o output.log "sh scripts/r
 bsub command to run Sklearn code:
 bsub -P CHM137 -J fxs -W 2:00 -nnodes 1 -e error.log -o output.log "sh scripts/run_summit.sh -m -n 1 -t 1 -d 1"
 
-##Bugs and Issues
+## Bugs and Issues
 Build:
 1) The GCC compiler version is changed to 6.4.0. When executing the script by enable CUDA through 'export USE_CUDA=${USE_CUDA:-1}', it results in build errors as it does not support any GCC version greater 7.0.
 Execution:
