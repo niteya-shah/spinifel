@@ -19,6 +19,7 @@ typedef float dtype;
 const int TILE = 16;
 const int imgPerThread = 6;
 
+//CUDA kernel used to computed Euclidean distance across data images and reference images.
 __global__ void computeEuDistSharReg(float *dataImgs, float *refImgs, float *euDist, int numDataImgs, int numRefImgs, long int totalPixels)
 {
         int txId = threadIdx.x;
@@ -26,7 +27,7 @@ __global__ void computeEuDistSharReg(float *dataImgs, float *refImgs, float *euD
         int bxId = blockIdx.x;
         int byId = blockIdx.y;
 
-        //Allocate tiles on the shared memory
+        //Shared variables
         __shared__ dtype sImg0[TILE][TILE+1];
         __shared__ dtype sMod0[TILE][TILE+1];
         __shared__ dtype sImg1[TILE][TILE+1];
@@ -40,7 +41,7 @@ __global__ void computeEuDistSharReg(float *dataImgs, float *refImgs, float *euD
         __shared__ dtype sImg5[TILE][TILE+1];
         __shared__ dtype sMod5[TILE][TILE+1];
 
-        //Allocate registers
+        //Register variables
         dtype rImg_0_0,rImg_0_1,rImg_0_2,rImg_0_3,rImg_0_4,rImg_0_5,rImg_0_6,rImg_0_7;
         dtype rImg_0_8,rImg_0_9,rImg_0_10,rImg_0_11,rImg_0_12,rImg_0_13,rImg_0_14,rImg_0_15;
         dtype rMod_0_0,rMod_0_1,rMod_0_2,rMod_0_3,rMod_0_4,rMod_0_5,rMod_0_6,rMod_0_7;
@@ -66,6 +67,7 @@ __global__ void computeEuDistSharReg(float *dataImgs, float *refImgs, float *euD
         dtype rMod_5_0,rMod_5_1,rMod_5_2,rMod_5_3,rMod_5_4,rMod_5_5,rMod_5_6,rMod_5_7;
         dtype rMod_5_8,rMod_5_9,rMod_5_10,rMod_5_11,rMod_5_12,rMod_5_13,rMod_5_14,rMod_5_15;
 
+	//euclidean distance variable in each thread.
         float dist00 = 0.0, dist01 = 0.0, dist02 = 0.0, dist03 = 0.0, dist04 = 0.0, dist05 = 0.0;
         float dist10 = 0.0, dist11 = 0.0, dist12 = 0.0, dist13 = 0.0, dist14 = 0.0, dist15 = 0.0;
         float dist20 = 0.0, dist21 = 0.0, dist22 = 0.0, dist23 = 0.0, dist24 = 0.0, dist25 = 0.0;
@@ -75,32 +77,32 @@ __global__ void computeEuDistSharReg(float *dataImgs, float *refImgs, float *euD
         int y0Id,yRefs0Id,y1Id,yRefs1Id,y2Id,yRefs2Id,y3Id,yRefs3Id,y4Id,yRefs4Id,y5Id,yRefs5Id;
 
         int valx = (bxId*TILE*imgPerThread); int valy = (byId*TILE*imgPerThread);
-        //1st
+        //1st Row
         if((valy+(0*TILE)+tyId)>=numDataImgs) y0Id= (valy+(0*TILE)+0);
         if((valy+(0*TILE)+tyId)<numDataImgs)  y0Id= (valy+(0*TILE)+tyId);
         if((valx+(0*TILE)+tyId)>=numRefImgs) yRefs0Id= (valx+(0*TILE)+0);
         if((valx+(0*TILE)+tyId)<numRefImgs)  yRefs0Id= (valx+(0*TILE)+tyId);
-        //2nd
+        //2nd Row
         if((valy+(1*TILE)+tyId)>=numDataImgs) y1Id= (valy+(0*TILE)+0);
         if((valy+(1*TILE)+tyId)<numDataImgs)  y1Id= (valy+(1*TILE)+tyId);
         if((valx+(1*TILE)+tyId)>=numRefImgs) yRefs1Id= (valx+(0*TILE)+0);
         if((valx+(1*TILE)+tyId)<numRefImgs)  yRefs1Id= (valx+(1*TILE)+tyId);
-        //3rd
+        //3rd Row
         if((valy+(2*TILE)+tyId)>=numDataImgs) y2Id= (valy+(0*TILE)+0);
         if((valy+(2*TILE)+tyId)<numDataImgs)  y2Id= (valy+(2*TILE)+tyId);
         if((valx+(2*TILE)+tyId)>=numRefImgs) yRefs2Id= (valx+(0*TILE)+0);
         if((valx+(2*TILE)+tyId)<numRefImgs)  yRefs2Id= (valx+(2*TILE)+tyId);
-        //4th
+        //4th Row
         if((valy+(3*TILE)+tyId)>=numDataImgs) y3Id= (valy+(0*TILE)+0);
         if((valy+(3*TILE)+tyId)<numDataImgs)  y3Id= (valy+(3*TILE)+tyId);
         if((valx+(3*TILE)+tyId)>=numRefImgs) yRefs3Id= (valx+(0*TILE)+0);
         if((valx+(3*TILE)+tyId)<numRefImgs)  yRefs3Id= (valx+(3*TILE)+tyId);
-        //5th
+        //5th Row
         if((valy+(4*TILE)+tyId)>=numDataImgs) y4Id= (valy+(0*TILE)+0);
         if((valy+(4*TILE)+tyId)<numDataImgs)  y4Id= (valy+(4*TILE)+tyId);
         if((valx+(4*TILE)+tyId)>=numRefImgs) yRefs4Id= (valx+(0*TILE)+0);
         if((valx+(4*TILE)+tyId)<numRefImgs)  yRefs4Id= (valx+(4*TILE)+tyId);
-        //6th
+        //6th Row
         if((valy+(5*TILE)+tyId)>=numDataImgs) y5Id= (valy+(0*TILE)+0);
         if((valy+(5*TILE)+tyId)<numDataImgs)  y5Id= (valy+(5*TILE)+tyId);
         if((valx+(5*TILE)+tyId)>=numRefImgs) yRefs5Id= (valx+(0*TILE)+0);
@@ -122,7 +124,7 @@ __global__ void computeEuDistSharReg(float *dataImgs, float *refImgs, float *euD
                 sMod5[tyId][txId] = refImgs[(yRefs5Id*totalPixels) + ((tileIter*TILE) + txId)];
 
                 __syncthreads();
-                //1st
+                //1st Row
                 rImg_0_0=sImg0[tyId][0];rImg_0_1=sImg0[tyId][1];rImg_0_2=sImg0[tyId][2];rImg_0_3=sImg0[tyId][3];
                 rImg_0_4=sImg0[tyId][4];rImg_0_5=sImg0[tyId][5];rImg_0_6=sImg0[tyId][6];rImg_0_7=sImg0[tyId][7];
                 rImg_0_8=sImg0[tyId][8];rImg_0_9=sImg0[tyId][9];rImg_0_10=sImg0[tyId][10];rImg_0_11=sImg0[tyId][11];
@@ -131,7 +133,7 @@ __global__ void computeEuDistSharReg(float *dataImgs, float *refImgs, float *euD
                 rMod_0_4=sMod0[txId][4];rMod_0_5=sMod0[txId][5];rMod_0_6=sMod0[txId][6];rMod_0_7=sMod0[txId][7];
                 rMod_0_8=sMod0[txId][8];rMod_0_9=sMod0[txId][9];rMod_0_10=sMod0[txId][10];rMod_0_11=sMod0[txId][11];
                 rMod_0_12=sMod0[txId][12];rMod_0_13=sMod0[txId][13];rMod_0_14=sMod0[txId][14];rMod_0_15=sMod0[txId][15];
-                //2nd
+                //2nd Row
                 rImg_1_0=sImg1[tyId][0];rImg_1_1=sImg1[tyId][1];rImg_1_2=sImg1[tyId][2];rImg_1_3=sImg1[tyId][3];
                 rImg_1_4=sImg1[tyId][4];rImg_1_5=sImg1[tyId][5];rImg_1_6=sImg1[tyId][6];rImg_1_7=sImg1[tyId][7];
                 rImg_1_8=sImg1[tyId][8];rImg_1_9=sImg1[tyId][9];rImg_1_10=sImg1[tyId][10];rImg_1_11=sImg1[tyId][11];
@@ -140,7 +142,7 @@ __global__ void computeEuDistSharReg(float *dataImgs, float *refImgs, float *euD
                 rMod_1_4=sMod1[txId][4];rMod_1_5=sMod1[txId][5];rMod_1_6=sMod1[txId][6];rMod_1_7=sMod1[txId][7];
                 rMod_1_8=sMod1[txId][8];rMod_1_9=sMod1[txId][9];rMod_1_10=sMod1[txId][10];rMod_1_11=sMod1[txId][11];
                 rMod_1_12=sMod1[txId][12];rMod_1_13=sMod1[txId][13];rMod_1_14=sMod1[txId][14];rMod_1_15=sMod1[txId][15];
-                //3rd
+                //3rd Row
                 rImg_2_0=sImg2[tyId][0];rImg_2_1=sImg2[tyId][1];rImg_2_2=sImg2[tyId][2];rImg_2_3=sImg2[tyId][3];
                 rImg_2_4=sImg2[tyId][4];rImg_2_5=sImg2[tyId][5];rImg_2_6=sImg2[tyId][6];rImg_2_7=sImg2[tyId][7];
                 rImg_2_8=sImg2[tyId][8];rImg_2_9=sImg2[tyId][9];rImg_2_10=sImg2[tyId][10];rImg_2_11=sImg2[tyId][11];
@@ -149,7 +151,7 @@ __global__ void computeEuDistSharReg(float *dataImgs, float *refImgs, float *euD
                 rMod_2_4=sMod2[txId][4];rMod_2_5=sMod2[txId][5];rMod_2_6=sMod2[txId][6];rMod_2_7=sMod2[txId][7];
                 rMod_2_8=sMod2[txId][8];rMod_2_9=sMod2[txId][9];rMod_2_10=sMod2[txId][10];rMod_2_11=sMod2[txId][11];
                 rMod_2_12=sMod2[txId][12];rMod_2_13=sMod2[txId][13];rMod_2_14=sMod2[txId][14];rMod_2_15=sMod2[txId][15];
-                //4th
+                //4th Row
                 rImg_3_0=sImg3[tyId][0];rImg_3_1=sImg3[tyId][1];rImg_3_2=sImg3[tyId][2];rImg_3_3=sImg3[tyId][3];
                 rImg_3_4=sImg3[tyId][4];rImg_3_5=sImg3[tyId][5];rImg_3_6=sImg3[tyId][6];rImg_3_7=sImg3[tyId][7];
                 rImg_3_8=sImg3[tyId][8];rImg_3_9=sImg3[tyId][9];rImg_3_10=sImg3[tyId][10];rImg_3_11=sImg3[tyId][11];
@@ -158,7 +160,7 @@ __global__ void computeEuDistSharReg(float *dataImgs, float *refImgs, float *euD
                 rMod_3_4=sMod3[txId][4];rMod_3_5=sMod3[txId][5];rMod_3_6=sMod3[txId][6];rMod_3_7=sMod3[txId][7];
                 rMod_3_8=sMod3[txId][8];rMod_3_9=sMod3[txId][9];rMod_3_10=sMod3[txId][10];rMod_3_11=sMod3[txId][11];
                 rMod_3_12=sMod3[txId][12];rMod_3_13=sMod3[txId][13];rMod_3_14=sMod3[txId][14];rMod_3_15=sMod3[txId][15];
-                //5th
+                //5th Row
                 rImg_4_0=sImg4[tyId][0];rImg_4_1=sImg4[tyId][1];rImg_4_2=sImg4[tyId][2];rImg_4_3=sImg4[tyId][3];
                 rImg_4_4=sImg4[tyId][4];rImg_4_5=sImg4[tyId][5];rImg_4_6=sImg4[tyId][6];rImg_4_7=sImg4[tyId][7];
                 rImg_4_8=sImg4[tyId][8];rImg_4_9=sImg4[tyId][9];rImg_4_10=sImg4[tyId][10];rImg_4_11=sImg4[tyId][11];
@@ -167,7 +169,7 @@ __global__ void computeEuDistSharReg(float *dataImgs, float *refImgs, float *euD
                 rMod_4_4=sMod4[txId][4];rMod_4_5=sMod4[txId][5];rMod_4_6=sMod4[txId][6];rMod_4_7=sMod4[txId][7];
                 rMod_4_8=sMod4[txId][8];rMod_4_9=sMod4[txId][9];rMod_4_10=sMod4[txId][10];rMod_4_11=sMod4[txId][11];
                 rMod_4_12=sMod4[txId][12];rMod_4_13=sMod4[txId][13];rMod_4_14=sMod4[txId][14];rMod_4_15=sMod4[txId][15];
-                //6th
+                //6th Row
                 rImg_5_0=sImg5[tyId][0];rImg_5_1=sImg5[tyId][1];rImg_5_2=sImg5[tyId][2];rImg_5_3=sImg5[tyId][3];
                 rImg_5_4=sImg5[tyId][4];rImg_5_5=sImg5[tyId][5];rImg_5_6=sImg5[tyId][6];rImg_5_7=sImg5[tyId][7];
                 rImg_5_8=sImg5[tyId][8];rImg_5_9=sImg5[tyId][9];rImg_5_10=sImg5[tyId][10];rImg_5_11=sImg5[tyId][11];
@@ -517,6 +519,7 @@ __global__ void computeEuDistSharReg(float *dataImgs, float *refImgs, float *euD
         if(((valy+(5*TILE)+tyId)<numDataImgs)&&((valx+(5*TILE)+txId)<numRefImgs)) euDist[(valy*numRefImgs)+(5*TILE*numRefImgs)+(tyId*numRefImgs)+valx+(5*TILE)+txId]=dist55;
 }
 
+//CUDA kernel used to identify maximum value and index of the value in a vector.
 __device__ int maxDistId(float *dist, int totalNN)
 {
         float maxDist; int maxId;
@@ -529,6 +532,7 @@ __device__ int maxDistId(float *dist, int totalNN)
         return maxId;
 }
 
+//CUDA kernel used to compute k-Neareast Neighbor.
 __global__ void computeKNeighbors(dtype *dEuDist, dtype *dKDist, int *dKIndex, int numDataImgs, int numRefImgs, int totalNN)
 {
         int imgId = (blockIdx.x*blockDim.x)+threadIdx.x;
@@ -555,6 +559,8 @@ __global__ void computeKNeighbors(dtype *dEuDist, dtype *dKDist, int *dKIndex, i
         }
 }
 
+// dHeapify is a CUDA version of heapify code from GeeksforGeeks
+// https://www.geeksforgeeks.org/heap-sort/
 __device__ void dHeapify(float *arr, int *idx, int n, int i)
 {
         int largest = i; // Initialize largest as root
@@ -579,6 +585,8 @@ __device__ void dHeapify(float *arr, int *idx, int n, int i)
         }
 }
 
+// dHeapify is a CUDA version of heapify code from GeeksforGeeks
+// https://www.geeksforgeeks.org/heap-sort/
 __global__ void computeKSort(float *dKDist, int *dKIndex, int numDataImgs, int totalNN)
 {
         int imgId = (blockIdx.x*blockDim.x)+threadIdx.x;
@@ -601,6 +609,7 @@ __global__ void computeKSort(float *dKDist, int *dKIndex, int numDataImgs, int t
         }
 }
 
+//Function used to invoke CUDA kernels.
 py::array_t<dtype> cudaComputeEuclideanDistance(py::array_t<dtype> dataImgs, py::array_t<dtype> refImgs, int numDataImgs, int numRefImgs, int totalPixels)
 {
 	cout<<"[CUDA] In CUDA Euclidean distance function."<<endl;
