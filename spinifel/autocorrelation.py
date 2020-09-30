@@ -9,6 +9,7 @@ import pysingfel as ps
 # loaded, then the forward and adjoint functions default to the GPU version
 #
 
+import importlib
 import finufftpy as nfft
 
 CUFINUFFT_LOADER    = importlib.find_loader("cufinufft")
