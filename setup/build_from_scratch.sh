@@ -51,7 +51,7 @@ export CONDUIT=${CONDUIT:-ibv}
 # for Numba
 export CUDA_HOME=\$OLCF_CUDA_ROOT
 EOF
-elif [[ $(hostname --fqdn) = *"jlse"* ]]; then # iris, yarrow
+elif [[ $(hostname) = *"jlse"* ]]; then # iris, yarrow
     cat > env.sh <<EOF
 module load oneapi # just get some sort of a compiler loaded
 module load mpi
@@ -70,6 +70,33 @@ export PSANA_CXX=icpc
 export USE_CUDA=${USE_CUDA:-0}
 export USE_OPENMP=${USE_OPENMP:-1}
 export USE_GASNET=${USE_GASNET:-0} # FIXME: GASNet on iris is currently broken
+export CONDUIT=${CONDUIT:-ibv}
+EOF
+elif [[ $(hostname) = *"tulip"* ]]; then
+    cat > env.sh <<EOF
+# module load gcc/9.2.0
+# module load openmpi/mlnx/gcc/64/4.0.3rc4 # mpich/ge/gcc/64/3.3.2
+
+# load a ROCm-compatible MPI
+module use /home/users/twhite/share/modulefiles
+module load ompi
+module load fftw3/openmpi/gcc/64/3.3.8
+
+export CC=gcc
+export CXX=g++
+
+# compilers for mpi4py
+export MPI4PY_CC=gcc
+export MPI4PY_MPICC=mpicc
+
+# settings for finufft
+export FINUFFT_CFLAGS="$(PKG_CONFIG_PATH=$FFTWDIR/pkgconfig pkg-config fftw3 --cflags)"
+export FINUFFT_LDFLAGS="$(PKG_CONFIG_PATH=$FFTWDIR/pkgconfig pkg-config fftw3 --libs-only-L)"
+export FINUFFT_OMP=OFF
+
+export USE_CUDA=${USE_CUDA:-0}
+export USE_OPENMP=${USE_OPENMP:-1}
+export USE_GASNET=${USE_GASNET:-1}
 export CONDUIT=${CONDUIT:-ibv}
 EOF
 else
