@@ -32,7 +32,7 @@ export CONDUIT=${CONDUIT:-aries}
 EOF
 elif [[ $(hostname --fqdn) = *"summit"* ]]; then
     cat > env.sh <<EOF
-module load gcc/9.1.0
+module load gcc/7.4.0
 module load fftw/3.3.8
 module load cuda/9.2.148
 module load gsl
