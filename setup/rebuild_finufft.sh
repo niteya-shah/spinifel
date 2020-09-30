@@ -7,7 +7,12 @@ source "$root_dir"/env.sh
 
 pushd "$root_dir"/finufft
 
+cat > make.inc <<EOF
+CFLAGS+=$FINUFFT_CFLAGS
+LIBS+=$FINUFFT_LDFLAGS
+EOF
+
 make -j8 lib
-pip install --no-deps .
+CFLAGS="$FINUFFT_CFLAGS" pip install --no-deps .
 
 popd
