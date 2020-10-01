@@ -79,6 +79,9 @@ bsub command to run CUDA C code: bsub -P CHM137 -J fxs -W 2:00 -nnodes 1 -e erro
 
 bsub command to run Sklearn code: bsub -P CHM137 -J fxs -W 2:00 -nnodes 1 -e error.log -o output.log "sh scripts/run_summit_mpi.sh -m -n 1 -t 1 -d 1"
 
+Below line is used to compile the 'orientation_matching.cu' with NVCC compiler and generate a .so file which can be imported into python.
+nvcc -O3 -shared -std=c++11 `python3 -m pybind11 --includes` orientation_matching.cu -o pyCudaKNearestNeighbors`python3-config --extension-suffix`
+
 ## Bugs and Issues
 
 1) Line 15 in spinifel/image.py which contains 'plt.savefig(parms.out_dir / filename)' instruction is commented out while running on Summit, as it is producing a matplotlib package error. The error is being raised only on Summit runs (Code works fine on Cori with the instruction). 
