@@ -7,7 +7,7 @@ source "$root_dir"/env.sh
 
 pushd "$root_dir"
 
-rm fftw-3.3.8.tar.gz
+rm -f fftw-3.3.8.tar.gz
 rm -rf fftw-3.3.8
 
 wget http://www.fftw.org/fftw-3.3.8.tar.gz
