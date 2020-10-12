@@ -19,7 +19,7 @@ d) DATA_MULTIPLIER=$OPTARG;;
 esac
 done
 
-#export LD_PRELOAD=/sw/summit/gcc/8.1.1-cuda10.1.168/lib64/libgomp.so.1
+export LD_PRELOAD=/sw/summit/gcc/8.1.1-cuda10.1.168/lib64/libgomp.so.1
 if [[ -n $USING_MPI ]]; then
     export USING_MPI
     echo "USING_MPI: $USING_MPI"
@@ -32,13 +32,13 @@ source "$root_dir"/setup/env.sh
 
 
 export PYTHONPATH="$PYTHONPATH:$root_dir"
-export MPLCONFIGDIR=/gpfs/alpine/scratch/pkommera/chm137/mtipProxy/writableDirectory
+export MPLCONFIGDIR=/gpfs/alpine/scratch/$USER/chm137/mtipProxy/writableDirectory
 
 #export DATA_DIR=$SCRATCH/spinifel_data
-export DATA_DIR=/gpfs/alpine/scratch/pkommera/chm137/spinifel_data/spinifel_input
+export DATA_DIR=/gpfs/alpine/scratch/$USER/chm137/spinifel_data/spinifel_input
 
 #export OUT_DIR=$SCRATCH/spinifel_output
-export OUT_DIR=/gpfs/alpine/scratch/pkommera/chm137/spinifel_data/spinifel_output
+export OUT_DIR=/gpfs/alpine/scratch/$USER/chm137/spinifel_data/spinifel_output
 mkdir -p $OUT_DIR
 rm -rf $OUT_DIR/*
 
