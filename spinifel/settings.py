@@ -38,6 +38,7 @@ class SpinifelSettings(metaclass=Singleton):
         self._out_dir         = Path("")
         self._data_multiplier = 1
         self._small_problem   = False
+        self._using_cuda      = False
 
         self.refresh()
 
@@ -67,7 +68,8 @@ class SpinifelSettings(metaclass=Singleton):
         if "SMALL_PROBLEM" in environ:
             self._small_problem = get_bool("SMALL_PROBLEM")
 
-            
+        if "USING_CUDA" in environ:
+            self._using_cuda = get_bool("USING_CUDA")
 
 
     def __str__(self):
@@ -125,3 +127,8 @@ class SpinifelSettings(metaclass=Singleton):
     @property
     def small_problem(self):
         return self._small_problem
+
+
+    @property
+    def using_cuda(self):
+        return self._using_cuda

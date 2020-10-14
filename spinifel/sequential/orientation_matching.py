@@ -3,7 +3,9 @@ from sklearn.metrics.pairwise import euclidean_distances
 
 import pysingfel as ps
 
-from spinifel import parms, utils, autocorrelation
+from spinifel import parms, utils, autocorrelation, SpinifelSettings
+
+settings = SpinifelSettings()
 
 #Packages for CUDA
 import os
@@ -38,7 +40,7 @@ def match(ac, slices_, pixel_position_reciprocal, pixel_distance_reciprocal):
     print(f"Data/Model std ratio: {data_model_scaling_ratio}.", flush=True)
     model_slices *= data_model_scaling_ratio
 
-    if os.environ.get("USING_CUDA") == "1":
+    if settings.using_cuda:
         print("Implementing nearest neighbor using CUDA.")
         model_slices_flat = model_slices.flatten()
         slices_flat = slices_.flatten()

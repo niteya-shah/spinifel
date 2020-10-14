@@ -3,7 +3,7 @@ import numpy
 import os
 from pathlib import Path
 
-from . import SpinifelSettings
+from spinifel import SpinifelSettings
 
 settings = SpinifelSettings()
 
