@@ -17,3 +17,5 @@ core
 *.err
 *.log
 *.out
+
+__pycache__

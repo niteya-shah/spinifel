@@ -3,6 +3,10 @@ import numpy
 import os
 from pathlib import Path
 
+from . import SpinifelSettings
+
+settings = SpinifelSettings()
+
 matplotlib.use("Agg")
 numpy.seterr(divide='ignore', invalid='ignore')
 
@@ -16,21 +20,21 @@ pixel_index_shape = (2,) + det_shape
 pixel_index_type_str = "int32"
 oversampling = 1
 
-data_dir = Path(os.environ.get("DATA_DIR", ""))
+data_dir  = settings.data_dir
 data_path = data_dir / "2CEX-10k-2.h5"
-if os.environ.get("USE_PSANA") == "1":
+if settings.use_psana:
     use_psana = True
     exp = 'xpptut15'
     runnum = 1
 else:
     use_psana = False
 
-out_dir = Path(os.environ.get("OUT_DIR", ""))
+out_dir = settings.out_dir
 
-data_multiplier = int(os.environ.get("DATA_MULTIPLIER", 1))
-verbosity = int(os.environ.get("VERBOSITY", 0))
+data_multiplier = settings.data_multiplier
+verbosity = settings.verbosity
 
-if os.environ.get("SMALL_PROBLEM") == "1":
+if settings.small_problem:
     N_images_per_rank = 10 * data_multiplier
     nER = 10
     nHIO = 5
