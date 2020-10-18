@@ -5,6 +5,7 @@
 
 /fftw-*
 /finufft
+/cufinufft
 /pysingfel
 /cupy
 /gasnet

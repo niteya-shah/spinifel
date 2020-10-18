@@ -30,6 +30,24 @@ export USE_OPENMP=${USE_OPENMP:-1}
 export USE_GASNET=${USE_GASNET:-1}
 export CONDUIT=${CONDUIT:-aries}
 EOF
+elif [[ $(hostname) = "cgpu"* ]]; then
+    cat > env.sh <<EOF
+module purge
+module load cgpu gcc cuda openmpi fftw python
+
+export CC=gcc
+export CXX=g++
+# compilers for mpi4py
+export MPI4PY_CC=gcc
+export MPI4PY_MPICC=\$(which mpicc)
+
+export USE_CUDA=${USE_CUDA:-1}
+export USE_OPENMP=${USE_OPENMP:-1}
+export USE_GASNET=${USE_GASNET:-1}
+# NOTE: not sure if this is the best choice -- investigate further if this
+# becomes a problem elsewhere
+export CONDUIT=${CONDUIT:-ibv}
+EOF
 elif [[ $(hostname --fqdn) = *"summit"* ]]; then
     cat > env.sh <<EOF
 module load gcc/7.4.0
@@ -116,8 +134,20 @@ export CONDA_ENV_DIR="\$CONDA_ROOT/envs/myenv"
 export LCLS2_DIR="$PWD/lcls2"
 
 # settings for finufft
-export FINUFFT_CFLAGS="-I\$CONDA_ENV_DIR/include"
-export FINUFFT_LDFLAGS="-L\$CONDA_ENV_DIR/lib"
+if [[ -z \${FFTW_INC+x} ]]; then
+    export FINUFFT_CFLAGS="-I\$CONDA_ENV_DIR/include"
+else
+    export FINUFFT_CFLAGS="-I\$FFTW_INC -I\$CONDA_ENV_DIR/include"
+fi
+if [[ -z \${FFTW_DIR+x} ]]; then
+    export FINUFFT_LDFLAGS="-L\$CONDA_ENV_DIR/lib"
+else
+    export FINUFFT_LDFLAGS="-L\$FFTW_DIR -L\$CONDA_ENV_DIR/lib"
+fi
+
+#cufinufft library dir
+export CUFINUFFT_DIR="$PWD/cufinufft/lib"
+export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:\$CUFINUFFT_DIR
 
 export PATH="\$LCLS2_DIR/install/bin:\$PATH"
 export PYTHONPATH="\$LCLS2_DIR/install/lib/python\$PYVER/site-packages:\$PYTHONPATH"
@@ -132,11 +162,16 @@ EOF
 rm -rf conda
 
 source env.sh
+# sometimes LD_PRELOAD can inverfere with other scripts here -- temporarily
+# disable it (it is re-enabled at the end of this script)
+__LD_PRELOAD=$LD_PRELOAD
+unset LD_PRELOAD
 
 # Install Conda environment.
 wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-$(uname -p).sh -O conda-installer.sh
 bash ./conda-installer.sh -b -p $CONDA_ROOT
 rm conda-installer.sh
+
 source $CONDA_ROOT/etc/profile.d/conda.sh
 
 # conda install -y conda-build # Must be installed in root environment
@@ -206,12 +241,21 @@ git clone https://github.com/elliottslaughter/finufft.git
 ./rebuild_finufft.sh
 
 rm -rf pysingfel
-git clone git@github.com:AntoineDujardin/pysingfel.git
+git clone https://github.com/AntoineDujardin/pysingfel.git
 ./rebuild_pysingfel.sh
 
+rm -rf cufinufft
+git clone https://github.com/JBlaschke/cufinufft.git
+./rebuild_cufinufft.sh
+
 ./mapper_clean_build.sh
+
+pip install callmonitor
 
 pip check
 
 echo
 echo "Done. Please run 'source env.sh' to use this build."
+
+# Restore the LD_PRELOAD variable
+export LD_PRELOAD=$__LD_PRELOAD
