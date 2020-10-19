@@ -14,5 +14,7 @@
 /mpi4py-*
 
 /env.sh
+/unenv.sh
+/saved-env.sh
 /legion_build_dir.sh
 /temp_env_create.yaml
