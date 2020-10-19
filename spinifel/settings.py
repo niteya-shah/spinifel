@@ -66,10 +66,10 @@ class SpinifelSettings(metaclass=Singleton):
             self._verbosity = self.get_int("VERBOSITY")
 
         if "SMALL_PROBLEM" in environ:
-            self._small_problem = get_bool("SMALL_PROBLEM")
+            self._small_problem = self.get_bool("SMALL_PROBLEM")
 
         if "USING_CUDA" in environ:
-            self._using_cuda = get_bool("USING_CUDA")
+            self._using_cuda = self.get_bool("USING_CUDA")
 
 
     def __str__(self):
