@@ -1,15 +1,13 @@
-import numpy as np
-from sklearn.metrics.pairwise import euclidean_distances
-
+import numpy     as np
 import pysingfel as ps
 
-from spinifel import parms, utils, autocorrelation, SpinifelSettings
+from   spinifel import parms, utils, autocorrelation, SpinifelSettings
+import spinifel.sequential.nearest_neighbor as nn
+
 
 settings = SpinifelSettings()
 
-#Packages for CUDA
-import os
-import spinifel.sequential.pyCudaKNearestNeighbors as pyCu
+
 
 def match(ac, slices_, pixel_position_reciprocal, pixel_distance_reciprocal):
     Mquat = parms.Mquat
@@ -39,21 +37,5 @@ def match(ac, slices_, pixel_position_reciprocal, pixel_distance_reciprocal):
     data_model_scaling_ratio = slices_.std() / model_slices.std()
     print(f"Data/Model std ratio: {data_model_scaling_ratio}.", flush=True)
     model_slices *= data_model_scaling_ratio
-
-    if settings.using_cuda:
-        print("Implementing nearest neighbor using CUDA.")
-        model_slices_flat = model_slices.flatten()
-        slices_flat = slices_.flatten()
-        euDist = pyCu.cudaEuclideanDistance(slices_flat,model_slices_flat,slices_.shape[0],model_slices.shape[0],slices_.shape[1])
-        ed_argmin = pyCu.cudaHeapSort(euDist,slices_.shape[0],model_slices.shape[0],slices_.shape[1],1)
-#        index = np.zeros(slices_.shape[0],dtype=np.int32)
-#        print("Shape of model_slices_flat: ",model_slices_flat.shape,", slices_flat: ",slices_flat.shape," and index: ",index.shape)
-#        print("index values: ",index[:])
-    else:
-        print("Implementing nearest neighbor using sklearn package.")
-        ed = euclidean_distances(model_slices, slices_)
-        ed_argmin = np.argmin(ed, axis=0)
-#        print("Shape of model_slices: ",model_slices.shape,", slices_: ",slices_.shape," and index: ",index.shape)
-#        print("index values: ",index[:])
-
-    return ref_orientations[ed_argmin]
+    index = nn.nearest_neighbor(model_slices, slices_)
+    return ref_orientations[index]
