@@ -1,8 +1,8 @@
-import finufftpy as nfft
-import numpy as np
-
+import numpy     as np
 import pysingfel as ps
+from   spinifel  import SpinifelSettings
 
+settings = SpinifelSettings()
 
 #________________________________________________________________________________
 # TRY to import cufinufft -- if it exists in the path. If cufinufft could be
@@ -15,7 +15,7 @@ import finufftpy as nfft
 CUFINUFFT_LOADER    = importlib.find_loader("cufinufft")
 CUFINUFFT_AVAILABLE = CUFINUFFT_LOADER is not None
 
-if CUFINUFFT_AVAILABLE:
+if settings.using_cuda and  CUFINUFFT_AVAILABLE:
     import pycuda.autoinit # NOQA:401
     from   pycuda.gpuarray import GPUArray, to_gpu
     from   cufinufft       import cufinufft
@@ -26,16 +26,38 @@ if CUFINUFFT_AVAILABLE:
 
 def forward_cpu(ugrid, H_, K_, L_, support, M, N, recip_extent, use_recip_sym):
     """Apply the forward, NUFFT2- problem -- CPU Implementation"""
+
+    if settings.verbose:
+        print("Using CPU to solve the forward transform")
+
+    # Check if recip symmetry is met
     if use_recip_sym:
         assert np.all(np.isreal(ugrid))
+
+    # Apply Support
     ugrid *= support  # /!\ overwrite
+
+    # Allocate space in memory
     nuvect = np.zeros(N, dtype=np.complex)
+
+    #___________________________________________________________________________
+    # Solve the NUFFT
+    #
+
     assert not nfft.nufft3d2(H_, K_, L_, nuvect, -1, 1e-12, ugrid)
+
+    #
+    #---------------------------------------------------------------------------
+
     return nuvect / M**3
+
 
 
 def forward_gpu(ugrid, H_, K_, L_, support, M, N, recip_extent, use_recip_sym):
     """Apply the forward, NUFFT2- problem -- CUDA Implementation."""
+
+    if settings.verbose:
+        print("Using CUDA to solve the forward transform")
 
     # Set up data types/dim/shape of transform
     complex_dtype = np.complex128
@@ -95,18 +117,41 @@ def forward_gpu(ugrid, H_, K_, L_, support, M, N, recip_extent, use_recip_sym):
     return nuvect / M**3
 
 
+
 def adjoint_cpu(nuvect, H_, K_, L_, support, M, recip_extent, use_recip_sym):
     """Apply the adjoint, NUFFT1+ problem -- CPU Implementation"""
+
+    if settings.verbose:
+        print("Using CPU to solve the adjoint transform")
+
+    # Allocating space in memory
     ugrid = np.zeros((M,)*3, dtype=np.complex, order='F')
+
+    #___________________________________________________________________________
+    # Solve the NUFFT
+    #
+
     assert not nfft.nufft3d1(H_, K_, L_, nuvect, +1, 1e-12, M, M, M, ugrid)
+
+    #
+    #---------------------------------------------------------------------------
+
+    # Apply support
     ugrid *= support
+
+    # Apply recip symmetry
     if use_recip_sym:
         ugrid = ugrid.real
+
     return ugrid
+
 
 
 def adjoint_gpu(nuvect, H_, K_, L_, support, M, recip_extent, use_recip_sym):
     """Apply the adjoint, NUFFT1+ problem -- CUDA Implementation."""
+
+    if settings.verbose:
+        print("Using CUDA to solve the adjoint transform")
 
     # Set up data types/dim/shape of transform
     complex_dtype = np.complex128
@@ -165,11 +210,12 @@ def adjoint_gpu(nuvect, H_, K_, L_, support, M, recip_extent, use_recip_sym):
     return ugrid
 
 
+
 #_______________________________________________________________________________
 # Select the GPU vs the CPU version dependion on weather cufinufft is available
 #
 
-if CUFINUFFT_AVAILABLE:
+if settings.using_cuda and CUFINUFFT_AVAILABLE:
     forward = forward_gpu
     adjoint = adjoint_gpu
 else:
@@ -177,6 +223,7 @@ else:
     adjoint = adjoint_cpu
 
 #-------------------------------------------------------------------------------
+
 
 
 def core_problem(uvect, H_, K_, L_, ac_support, weights, M, N,
@@ -191,6 +238,7 @@ def core_problem(uvect, H_, K_, L_, ac_support, weights, M, N,
         reciprocal_extent, use_reciprocal_symmetry)
     uvect_ADA = ugrid_ADA.flatten()
     return uvect_ADA
+
 
 
 def core_problem_convolution(uvect, M, F_ugrid_conv_, M_ups, ac_support,
@@ -216,6 +264,7 @@ def core_problem_convolution(uvect, M, F_ugrid_conv_, M_ups, ac_support,
     return ugrid_conv_out.flatten()
 
 
+
 def fourier_reg(uvect, support, F_antisupport, M, use_recip_sym):
     ugrid = uvect.reshape((M,)*3) * support
     if use_recip_sym:
@@ -227,6 +276,7 @@ def fourier_reg(uvect, support, F_antisupport, M, use_recip_sym):
     if use_recip_sym:
         uvect = uvect.real
     return uvect
+
 
 
 def gen_nonuniform_positions(orientations, pixel_position_reciprocal):
