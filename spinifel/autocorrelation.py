@@ -74,14 +74,24 @@ def forward_gpu(ugrid, H_, K_, L_, support, M, N, recip_extent, use_recip_sym):
 
     # Copy input data to Device (if not already there)
     if not isinstance(H_, GPUArray):
-        H_gpu = to_gpu(H_)
+        # Due to a change to the cufinufft API, these need to be re-ordered
+        # TODO: Restore when cpu finufft version has been updated
+        # H_gpu = to_gpu(H_)
+        # K_gpu = to_gpu(K_)
+        # L_gpu = to_gpu(L_)
+        H_gpu = to_gpu(L_)
         K_gpu = to_gpu(K_)
-        L_gpu = to_gpu(L_)
+        L_gpu = to_gpu(H_)
         ugrid_gpu = to_gpu(ugrid.astype(complex_dtype))
     else:
-        H_gpu = H_
+        # Due to a change to the cufinufft API, these need to be re-ordered
+        # TODO: Restore when cpu finufft version has been updated
+        # H_gpu = H_
+        # K_gpu = K_
+        # L_gpu = L_
+        H_gpu = L_
         K_gpu = K_
-        L_gpu = L_
+        L_gpu = H_
         ugrid_gpu = ugrid.astype(complex_dtype)
 
     # Check if recip symmetry is met
@@ -165,14 +175,24 @@ def adjoint_gpu(nuvect, H_, K_, L_, support, M, recip_extent, use_recip_sym):
 
     # Copy input data to Device (if not already there)
     if not isinstance(H_, GPUArray):
-        H_gpu = to_gpu(H_)
+        # Due to a change to the cufinufft API, these need to be re-ordered
+        # TODO: Restore when cpu finufft version has been updated
+        # H_gpu = to_gpu(H_)
+        # K_gpu = to_gpu(K_)
+        # L_gpu = to_gpu(L_)
+        H_gpu = to_gpu(L_)
         K_gpu = to_gpu(K_)
-        L_gpu = to_gpu(L_)
+        L_gpu = to_gpu(H_)
         nuvect_gpu = to_gpu(nuvect.astype(complex_dtype))
     else:
-        H_gpu = H_
+        # Due to a change to the cufinufft API, these need to be re-ordered
+        # TODO: Restore when cpu finufft version has been updated
+        # H_gpu = H_
+        # K_gpu = K_
+        # L_gpu = L_
+        H_gpu = L_
         K_gpu = K_
-        L_gpu = L_
+        L_gpu = H_
         nuvect_gpu = nuvect.astype(complex_dtype)
 
     # Allocate space on Device
