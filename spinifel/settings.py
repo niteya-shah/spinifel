@@ -5,10 +5,9 @@
 from os      import environ
 from inspect import getmembers
 from pathlib import Path
+from atexit  import register
 
 from .utils import Singleton
-
-
 
 
 
@@ -30,15 +29,16 @@ class SpinifelSettings(metaclass=Singleton):
 
 
     def __init__(self):
-        self._test            = ""
-        self._verbose         = False
-        self._verbosity       = 0
-        self._data_dir        = Path("")
-        self._use_psana       = False
-        self._out_dir         = Path("")
-        self._data_multiplier = 1
-        self._small_problem   = False
-        self._using_cuda      = False
+        self._test             = ""
+        self._verbose          = False
+        self._verbosity        = 0
+        self._data_dir         = Path("")
+        self._use_psana        = False
+        self._out_dir          = Path("")
+        self._data_multiplier  = 1
+        self._small_problem    = False
+        self._using_cuda       = False
+        self._ranks_per_device = 0
 
         self.refresh()
 
@@ -70,6 +70,9 @@ class SpinifelSettings(metaclass=Singleton):
 
         if "USING_CUDA" in environ:
             self._using_cuda = self.get_bool("USING_CUDA")
+
+        if "DEVICES_PER_NODE" in environ:
+            self._devices_per_node = self.get_int("DEVICES_PER_NODE")
 
 
     def __str__(self):
@@ -132,3 +135,65 @@ class SpinifelSettings(metaclass=Singleton):
     @property
     def using_cuda(self):
         return self._using_cuda
+
+
+    @property
+    def devices_per_node(self):
+        return self._devices_per_node
+
+
+
+class SpinifelContexts(metaclass=Singleton):
+
+    def __init__(self):
+
+        self._rank   = 0
+        self._comm   = None
+        self._dev_id = 0;
+
+
+    def init_mpi(self):
+        from mpi4py import MPI
+
+        self._comm = MPI.COMM_WORLD
+        self._rank = self.comm.Get_rank()
+
+        register(MPI.Finalize)
+
+        settings = SpinifelSettings()
+        if settings.verbose:
+            print(f"MPI has been initialized on rank {self.rank}")
+
+
+    def init_cuda(self):
+        import pycuda
+        import pycuda.driver as drv
+
+        drv.init()
+
+        settings     = SpinifelSettings()
+        self._dev_id = self.rank%settings.devices_per_node
+
+        dev = drv.Device(self.dev_id)
+        ctx = dev.make_context() 
+
+        register(ctx.pop)
+
+        settings = SpinifelSettings()
+        if settings.verbose:
+            print(f"Rank {self.rank} has been assigned to device {self.dev_id}")
+
+
+    @property
+    def rank(self):
+        return self._rank
+
+
+    @property
+    def comm(self):
+        return self._comm
+
+
+    @property
+    def dev_id(self):
+        return self._dev_id

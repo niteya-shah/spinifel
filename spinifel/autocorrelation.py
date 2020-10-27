@@ -1,8 +1,9 @@
 import numpy     as np
 import pysingfel as ps
-from   spinifel  import SpinifelSettings
+from   spinifel  import SpinifelSettings, SpinifelContexts
 
 settings = SpinifelSettings()
+context  = SpinifelContexts()
 
 #________________________________________________________________________________
 # TRY to import cufinufft -- if it exists in the path. If cufinufft could be
@@ -16,9 +17,12 @@ CUFINUFFT_LOADER    = importlib.find_loader("cufinufft")
 CUFINUFFT_AVAILABLE = CUFINUFFT_LOADER is not None
 
 if settings.using_cuda and  CUFINUFFT_AVAILABLE:
-    import pycuda.autoinit # NOQA:401
-    from   pycuda.gpuarray import GPUArray, to_gpu
-    from   cufinufft       import cufinufft
+    # HACK: only manage MPI via contexts! But let's leave this here for now
+    context.init_mpi()  # Ensures that MPI has been initalized
+    context.init_cuda() # this must be called _after_ init_mpi
+    from pycuda.gpuarray import GPUArray, to_gpu
+    from cufinufft       import cufinufft
+
 
 #-------------------------------------------------------------------------------
 
@@ -56,8 +60,9 @@ def forward_cpu(ugrid, H_, K_, L_, support, M, N, recip_extent, use_recip_sym):
 def forward_gpu(ugrid, H_, K_, L_, support, M, N, recip_extent, use_recip_sym):
     """Apply the forward, NUFFT2- problem -- CUDA Implementation."""
 
+    dev_id = context.dev_id
     if settings.verbose:
-        print("Using CUDA to solve the forward transform")
+        print(f"Using CUDA to solve the forward transform on device {dev_id}")
 
     # Set up data types/dim/shape of transform
     complex_dtype = np.complex128
@@ -109,6 +114,7 @@ def forward_gpu(ugrid, H_, K_, L_, support, M, N, recip_extent, use_recip_sym):
     # Change default NUFFT Behaviour
     forward_opts = cufinufft.default_opts(nufft_type=2, dim=dim)
     forward_opts.gpu_method = 1   # Override with method 1. The default is 2
+    forward_opts.cuda_device_id = dev_id
 
     # Run NUFFT
     plan = cufinufft(2, shape, -1, tol, dtype=dtype, opts=forward_opts)
@@ -160,8 +166,9 @@ def adjoint_cpu(nuvect, H_, K_, L_, support, M, recip_extent, use_recip_sym):
 def adjoint_gpu(nuvect, H_, K_, L_, support, M, recip_extent, use_recip_sym):
     """Apply the adjoint, NUFFT1+ problem -- CUDA Implementation."""
 
+    dev_id = context.dev_id
     if settings.verbose:
-        print("Using CUDA to solve the adjoint transform")
+        print(f"Using CUDA to solve the adjoint transform on device {dev_id}")
 
     # Set up data types/dim/shape of transform
     complex_dtype = np.complex128
@@ -205,6 +212,7 @@ def adjoint_gpu(nuvect, H_, K_, L_, support, M, recip_extent, use_recip_sym):
     # Change default NUFFT Behaviour
     adjoint_opts = cufinufft.default_opts(nufft_type=1, dim=dim)
     adjoint_opts.gpu_method = 1   # Override with method 1. The default is 2
+    adjoint_opts.cuda_device_id = dev_id
 
     # Run NUFFT
     plan = cufinufft(1, shape, 1, tol, dtype=dtype, opts=adjoint_opts)
