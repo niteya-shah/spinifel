@@ -84,7 +84,7 @@ elif [[ $(hostname --fqdn) = *"summit"* ]]; then
     cat >> env.sh <<EOF
 module load gcc/7.4.0
 module load fftw/3.3.8
-module load cuda/9.2.148
+module load cuda/10.2.89
 module load gsl
 export CC=gcc
 export CXX=g++
