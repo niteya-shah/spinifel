@@ -107,6 +107,9 @@ bsub -P CHM137 -J fxs -W 2:00 -nnodes 1 -e error.log -o output.log "sh scripts/r
 enable CUDA through `export USE_CUDA=${USE_CUDA:-1}`, it results in build
 errors as it does not support any GCC version greater 7.0.
 
+2. Segfault problem with cunuifft multi-gpu. Use cuda 10.2 or above then do not use
+cache when installing pycuda (pip config set global.cache-dir false).
+
 
 ### Execution:
 
