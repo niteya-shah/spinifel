@@ -34,6 +34,11 @@ def get_slices(comm, N_images_per_rank, ds):
     if ds is None:
         i_start = comm.rank * N_images_per_rank
         i_end = i_start + N_images_per_rank
+        my_file_no = int( (i_end - 1) / parms.N_images_max )
+        parms.data_path =f"{parms.data_dir}/2CEX-10k-copy-{my_file_no}.h5" 
+        i_start = i_start % parms.N_images_max
+        i_end = i_start + N_images_per_rank
+        print(f"get_slices rank={comm.rank} file_no={my_file_no} st={i_start} en={i_end}")
         prep.load_slices(slices_, i_start, i_end)
         return slices_
     else:
