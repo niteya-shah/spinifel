@@ -201,7 +201,7 @@ git clone https://github.com/elliottslaughter/finufft.git
 ./rebuild_finufft.sh
 
 rm -rf pysingfel
-git clone git@github.com:AntoineDujardin/pysingfel.git
+git clone https://github.com/AntoineDujardin/pysingfel.git
 ./rebuild_pysingfel.sh
 
 ./mapper_clean_build.sh
