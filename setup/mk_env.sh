@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -e
+
 root_dir=$(dirname "${BASH_SOURCE[0]}")
 pushd $root_dir
 
