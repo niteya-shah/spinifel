@@ -76,10 +76,10 @@ if [[ $LG_RT_DIR == $PWD/legion/runtime ]]; then
 fi
 
 rm -rf lcls2
-git clone https://github.com/slac-lcls/lcls2.git $LCLS2_DIR
+git clone -b 3.2.0-legion https://github.com/slac-lcls/lcls2.git $LCLS2_DIR
 ./psana_clean_build.sh
 
-if [[ $(hostname) = *"tulip"* ]]; then
+if [[ $(hostname) = *"tulip"* || $(hostname) = *"jlse"* ]]; then
     ./rebuild_fftw.sh
 fi
 

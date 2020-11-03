@@ -24,12 +24,6 @@ source setup/env.sh
 This is included in most scripts, so it is not normally necessary to
 do this manually.
 
-### Git clone through SSH
-The `build_from_scratch.sh` script clones some directories through ssh.  For
-this to work properly, you need to have access to the repositories (if they are
-    private) and to have the SSH key corresponding to the computer you are
-using registered on your GitHub account.
-
 
 ## Data
 Spinifel needs input data.  By default, it expects the data to be located in
