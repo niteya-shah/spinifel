@@ -15,7 +15,7 @@ pathappend() {
     for ARG in "\$@"
     do
         if [ -d "\$ARG" ] && [[ ":\$PATH:" != *":\$ARG:"* ]]; then
-            export PATH="$\{PATH:+"\$PATH:"}\$ARG"
+            export PATH="\${PATH:+"\$PATH:"}\$ARG"
         fi
     done
 }
