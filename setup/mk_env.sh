@@ -15,7 +15,7 @@ pathappend() {
     for ARG in "\$@"
     do
         if [ -d "\$ARG" ] && [[ ":\$PATH:" != *":\$ARG:"* ]]; then
-            export PATH="$\{PATH:+"\$PATH:"}\$ARG"
+            export PATH="\${PATH:+"\$PATH:"}\$ARG"
         fi
     done
 }
@@ -105,8 +105,10 @@ export CUDA_HOME=\$OLCF_CUDA_ROOT
 EOF
 elif [[ $(hostname) = *"jlse"* ]]; then # iris, yarrow
     cat >> env.sh <<EOF
-module load oneapi # just get some sort of a compiler loaded
+module load oneapi/2020.09.15.001
+module load python/2020.09.15.003
 module load mpi
+module load cmake
 export CC=icx
 export CXX=icpx
 
@@ -157,8 +159,8 @@ pathappend \$LEGION_INSTALL_DIR/bin
 ldpathappend \$LEGION_INSTALL_DIR/lib
 pythonpathappend \$LEGION_INSTALL_DIR/lib/python\$PYVER/site-packages
 
-export CONDA_ROOT="$PWD/conda"
-export CONDA_ENV_DIR="\$CONDA_ROOT/envs/myenv"
+export CONDA_ROOT="\$IDPROOT"
+export CONDA_ENV_DIR="$PWD/conda/envs/myenv"
 
 export LCLS2_DIR="$PWD/lcls2"
 
@@ -181,7 +183,7 @@ ldpathappend \$CUFINUFFT_DIR
 pathappend \$LCLS2_DIR/install/bin
 pythonpathappend \$LCLS2_DIR/install/lib/python\$PYVER/site-packages
 
-if [[ -d \$CONDA_ROOT ]]; then
+if [[ -d \$CONDA_ENV_DIR ]]; then
   source "\$CONDA_ROOT/etc/profile.d/conda.sh"
   conda activate "\$CONDA_ENV_DIR"
 fi

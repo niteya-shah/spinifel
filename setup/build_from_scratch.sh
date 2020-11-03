@@ -18,9 +18,13 @@ __LD_PRELOAD=$LD_PRELOAD
 unset LD_PRELOAD
 
 # Install Conda environment.
-wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-$(uname -p).sh -O conda-installer.sh
-bash ./conda-installer.sh -b -p $CONDA_ROOT
-rm conda-installer.sh
+
+# wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-$(uname -p).sh -O conda-installer.sh
+# bash ./conda-installer.sh -b -p $CONDA_ROOT
+# rm conda-installer.sh
+mkdir $PWD/conda
+mkdir $PWD/conda/envs
+cp -r $CONDA_ROOT/envs/numba-dppy-env-2020_10_21 $CONDA_ENV_DIR
 
 source $CONDA_ROOT/etc/profile.d/conda.sh
 
@@ -28,14 +32,14 @@ source $CONDA_ROOT/etc/profile.d/conda.sh
 PACKAGE_LIST=(
     python=$PYVER
     matplotlib
-    numpy
+    # numpy
     scipy
     pytest
     h5py
 
     cffi  # Legion
     pybind11  # FINUFFT
-    numba  # pysingfel
+    # numba  # pysingfel
     scikit-learn  # pysingfel
     tqdm  # convenience
 
@@ -53,9 +57,10 @@ PACKAGE_LIST=(
     prometheus_client
 )
 
-conda create -y -p "$CONDA_ENV_DIR" "${PACKAGE_LIST[@]}" -c defaults -c anaconda
+# conda create -y -p "$CONDA_ENV_DIR" "${PACKAGE_LIST[@]}" -c defaults -c anaconda
 conda activate "$CONDA_ENV_DIR"
 # Extra lcls2 deps
+conda install -y "${PACKAGE_LIST[@]}" -c defaults -c anaconda
 conda install -y amityping -c lcls-ii
 conda install -y bitstruct krtc -c conda-forge
 
