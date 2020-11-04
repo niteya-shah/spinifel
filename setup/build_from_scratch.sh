@@ -30,7 +30,7 @@ source $CONDA_ROOT/etc/profile.d/conda.sh
 
 # conda install -y conda-build # Must be installed in root environment
 PACKAGE_LIST=(
-    python=$PYVER
+    # python=$PYVER
     matplotlib
     # numpy
     scipy
@@ -44,9 +44,9 @@ PACKAGE_LIST=(
     tqdm  # convenience
 
     # lcls2
-    setuptools=46.4.0  # temp need specific version
+    # setuptools=46.4.0  # temp need specific version
     cmake
-    cython
+    # cython
     mongodb
     pymongo
     curl
@@ -60,9 +60,11 @@ PACKAGE_LIST=(
 # conda create -y -p "$CONDA_ENV_DIR" "${PACKAGE_LIST[@]}" -c defaults -c anaconda
 conda activate "$CONDA_ENV_DIR"
 # Extra lcls2 deps
+set -x
 conda install -y "${PACKAGE_LIST[@]}" -c defaults -c anaconda
 conda install -y amityping -c lcls-ii
 conda install -y bitstruct krtc -c conda-forge
+set +x
 
 CC=$MPI4PY_CC MPICC=$MPI4PY_MPICC pip install -v --no-binary mpi4py mpi4py
 

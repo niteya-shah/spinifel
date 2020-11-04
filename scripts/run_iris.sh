@@ -32,7 +32,7 @@ source "$root_dir"/setup/env.sh
 
 export PYTHONPATH="$PYTHONPATH:$root_dir"
 
-export DATA_DIR=/gpfs/jlse-fs0/users/$USER/spinifel_data
+export DATA_DIR=/gpfs/jlse-fs0/users/$USER/spinifel_data_h5
 
 export OUT_DIR=/gpfs/jlse-fs0/users/$USER/spinifel_output
 mkdir -p $OUT_DIR
