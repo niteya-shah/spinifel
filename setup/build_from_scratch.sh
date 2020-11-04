@@ -2,6 +2,8 @@
 
 set -e
 
+root_dir="$(dirname "${BASH_SOURCE[0]}")"
+cd "$root_dir"
 
 # Clean up any previous installs.
 rm -rf conda

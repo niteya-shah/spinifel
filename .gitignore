@@ -19,3 +19,5 @@ core
 *.out
 
 __pycache__
+
+saved-env.sh
