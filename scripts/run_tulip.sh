@@ -3,11 +3,12 @@
 #SBATCH --time=00:30:00
 #SBATCH --partition amdMI100
 
-while getopts lmpsavn:t:d: option
+while getopts lcmpsavn:t:d: option
 do
 case "${option}"
 in
 l) USING_LEGION="1";;
+c) USING_CUDA="1";;
 m) USING_MPI="1";;
 p) PROFILING="1";;
 s) SMALL_PROBLEM="1";;
@@ -53,6 +54,16 @@ if [[ -n $SMALL_PROBLEM ]]; then
     export SMALL_PROBLEM
 fi
 
+if [[ -n $USING_CUDA ]]; then
+    export USING_CUDA
+    echo "CUDA: $USING_CUDA"
+    cd "$root_dir"/spinifel/sequential/
+    set -x
+    hipcc -O3 -fPIC -shared -std=c++11 --amdgpu-target=gfx908 `python3 -m pybind11 --includes` orientation_matching.cu -o pyCudaKNearestNeighbors`python3-config --extension-suffix`
+    set +x
+    cd "$root_dir"
+fi
+
 if [[ -n $USE_PSANA ]]; then
     export USE_PSANA
 fi
@@ -70,7 +81,7 @@ if [[ -n $USING_CUDA ]]; then
     export USING_CUDA
     echo "CUDA: $USING_CUDA"
     cd "$root_dir"/spinifel/sequential/
-    nvcc -O3 -shared -std=c++11 --compiler-options -fPIC `python3 -m pybind11 --includes` orientation_matching.cu -o pyCudaKNearestNeighbors`python3-config --extension-suffix`
+    hipcc -O3 -fPIC -shared -std=c++11 `python3 -m pybind11 --includes` orientation_matching.cu -o pyCudaKNearestNeighbors`python3-config --extension-suffix`
     cd "$root_dir"
 fi
 
@@ -86,5 +97,5 @@ else
         PYFLAGS="-m cProfile -o $OUT_DIR/main.prof "$PYFLAGS
     fi
     DATA_MULTIPLIER=$(echo $(( DATA_MULTIPLIER * NTASKS )) )  # use same amount of data as distributed app
-    python $PYFLAGS sequential_main.py
+    srun -n 1 python $PYFLAGS sequential_main.py
 fi
