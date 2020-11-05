@@ -24,7 +24,7 @@ unset LD_PRELOAD
 # rm conda-installer.sh
 mkdir $PWD/conda
 mkdir $PWD/conda/envs
-cp -r $CONDA_ROOT/envs/numba-dppy-env-2020_10_21 $CONDA_ENV_DIR
+#cp -r $CONDA_ROOT/envs/numba-dppy-env-2020_10_21 $CONDA_ENV_DIR
 
 source $CONDA_ROOT/etc/profile.d/conda.sh
 
@@ -58,6 +58,7 @@ PACKAGE_LIST=(
 )
 
 # conda create -y -p "$CONDA_ENV_DIR" "${PACKAGE_LIST[@]}" -c defaults -c anaconda
+conda create --clone "$CONDA_ROOT"/envs/numba-dppy-env-2020_10_21 -p "$CONDA_ENV_DIR"
 conda activate "$CONDA_ENV_DIR"
 # Extra lcls2 deps
 set -x
