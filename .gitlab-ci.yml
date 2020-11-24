@@ -1,0 +1,26 @@
+# this configuration is intended for use at https://code.ornl.gov
+
+variables:
+  SCHEDULER_PARAMETERS: "-P CHM137 -W 30 -nnodes 1 -alloc_flags gpumps"
+  GIT_STRATEGY: clone
+  EXTERNAL_WORKDIR: /gpfs/wolf/chm137/proj-shared/ci/${CI_PIPELINE_ID}
+  DATA_DIR: /gpfs/wolf/chm137/proj-shared/spinifel_data
+  OUT_DIR: /gpfs/wolf/chm137/proj-shared/ci/${CI_PIPELINE_ID}/spinifel_output
+  THREADS: 32
+
+stages:
+  - build_and_test
+
+build_and_test:
+  stage: build_and_test
+  before_script:
+    - mkdir -p $(dirname ${EXTERNAL_WORKDIR})
+    - cp -r ${CI_PROJECT_DIR} ${EXTERNAL_WORKDIR}
+    - cd ${EXTERNAL_WORKDIR}
+    - git clean -fxd
+  script:
+    - ./setup/build_from_scratch.sh
+    - bash ./scripts/run_summit.sh -s
+    - rm -rf ${EXTERNAL_WORKDIR}
+  tags:
+    - batch

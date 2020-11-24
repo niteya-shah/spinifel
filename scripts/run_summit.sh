@@ -35,10 +35,10 @@ export PYTHONPATH="$PYTHONPATH:$root_dir"
 export MPLCONFIGDIR=/gpfs/alpine/scratch/$USER/chm137/mtipProxy/writableDirectory
 
 #export DATA_DIR=$SCRATCH/spinifel_data
-export DATA_DIR=/gpfs/alpine/scratch/$USER/chm137/spinifel_data/spinifel_input
+export DATA_DIR=${DATA_DIR:-/gpfs/alpine/scratch/$USER/chm137/spinifel_data/spinifel_input}
 
 #export OUT_DIR=$SCRATCH/spinifel_output
-export OUT_DIR=/gpfs/alpine/scratch/$USER/chm137/spinifel_data/spinifel_output
+export OUT_DIR=${OUT_DIR:-/gpfs/alpine/scratch/$USER/chm137/spinifel_data/spinifel_output}
 mkdir -p $OUT_DIR
 rm -rf $OUT_DIR/*
 

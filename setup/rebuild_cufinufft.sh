@@ -8,9 +8,9 @@ source "$root_dir"/env.sh
 pushd "$root_dir"/cufinufft
 
 if [[ $(hostname) = "cgpu"* ]]; then
-    make -j8 site=nersc_cgpu lib
-elif [[ $(hostname --fqdn) = *"summit"* ]]; then
-    make -j8 site=olcf_summit lib
+    make -j${THREADS:-8} site=nersc_cgpu lib
+elif [[ $(hostname --fqdn) = *"summit"* || $(hostname --fqdn) = *"ascent"* ]]; then
+    make -j${THREADS:-8} site=olcf_summit lib
 else
     echo "Cannot build cuFINUFFT for this architecture"
     exit

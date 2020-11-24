@@ -65,7 +65,7 @@ if [[ $USE_GASNET -eq 1 && $GASNET_ROOT == $PWD/gasnet/release ]]; then
     rm -rf gasnet
     git clone https://github.com/StanfordLegion/gasnet.git
     pushd gasnet
-    make -j8
+    make -j${THREADS:-8}
     popd
 fi
 

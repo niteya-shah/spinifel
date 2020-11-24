@@ -82,7 +82,7 @@ export USE_GASNET=${USE_GASNET:-1}
 # becomes a problem elsewhere
 export CONDUIT=${CONDUIT:-ibv}
 EOF
-elif [[ $(hostname --fqdn) = *"summit"* ]]; then
+elif [[ $(hostname --fqdn) = *"summit"* || $(hostname --fqdn) = *"ascent"* ]]; then
     cat >> env.sh <<EOF
 module load gcc/7.4.0
 module load fftw/3.3.8

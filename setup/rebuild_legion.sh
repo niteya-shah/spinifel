@@ -9,7 +9,7 @@ source "$root_dir"/legion_build_dir.sh
 
 pushd "$legion_build"
 
-make -j8
+make -j${THREADS:-8}
 make install
 
 popd
