@@ -7,7 +7,7 @@
 #BSUB -e error.%J.log         # error file name in which %J is replaced by the job ID
 #BSUB -o output.%J.log        # output file name in which %J is replaced by the job ID
 
-while getopts mscn:t:d:g:N: option
+while getopts mscn:t:d:g:N:f option
 do
 case "${option}"
 in
@@ -19,6 +19,7 @@ t) OMP_NUM_THREADS=$OPTARG;;
 d) DATA_MULTIPLIER=$OPTARG;;
 g) DEVICES_PER_NODE=$OPTARG;;
 N) NNODES=$OPTARG;;
+f) USE_CUFINUFFT="1";;
 esac
 done
 
@@ -69,14 +70,19 @@ fi
 if [[ -n $USING_CUDA ]]; then
     export USING_CUDA
     echo "CUDA: $USING_CUDA"
-    cd "$root_dir"/spinifel/sequential/
-    nvcc -O3 -shared -std=c++11 `python3 -m pybind11 --includes` orientation_matching.cu -o pyCudaKNearestNeighbors`python3-config --extension-suffix`
-    cd "$root_dir"
+    #cd "$root_dir"/spinifel/sequential/
+    #nvcc -O3 -shared -std=c++11 `python3 -m pybind11 --includes` orientation_matching.cu -o pyCudaKNearestNeighbors`python3-config --extension-suffix`
+    #cd "$root_dir"
 fi
 
 if [[ -n $USE_PSANA ]]; then
     export USE_PSANA
 fi
+
+if [[ -n $USE_CUFINUFFT ]]; then
+    export USE_CUFINUFFT
+fi
+echo "USE_CUFINUFFT: $USE_CUFINUFFT"
 
 if [[ -z $DATA_MULTIPLIER ]]; then
     DATA_MULTIPLIER="1"
@@ -94,4 +100,4 @@ echo "MPI run"
 export PS_PARALLEL=mpi
 export VERBOSE=true
 #jsrun -n 1 -a 42 -c 42 -r 1 -g 6 python mpi_main.py
-jsrun -n $NNODES -a $NTASKS_PER_NODE -c $NTASKS_PER_NODE -g $DEVICES_PER_NODE -r 1 -l CPU-CPU -d packed -b packed:1 python mpi_main.py
+jsrun -n $NNODES -a $NTASKS_PER_NODE -c $NTASKS_PER_NODE -g $DEVICES_PER_NODE python mpi_main.py
