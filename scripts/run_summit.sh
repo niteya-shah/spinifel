@@ -6,7 +6,7 @@
 ##BSUB -e error.%J.log     # error file name in which %J is replaced by the job ID
 ##BSUB -o output.%J.log     # output file name in which %J is replaced by the job ID
 
-while getopts mscn:t:d: option
+while getopts mscn:t:d:e option
 do
 case "${option}"
 in
