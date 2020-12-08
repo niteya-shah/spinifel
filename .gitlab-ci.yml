@@ -20,7 +20,7 @@ build_and_test:
     - git clean -fxd
   script:
     - ./setup/build_from_scratch.sh
-    - bash ./scripts/run_summit.sh -s
+    - bash ./scripts/run_summit.sh -s -e
     - rm -rf ${EXTERNAL_WORKDIR}
   tags:
     - batch

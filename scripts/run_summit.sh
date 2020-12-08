@@ -16,8 +16,14 @@ c) USING_CUDA="1";;
 n) NTASKS=$OPTARG;;
 t) OMP_NUM_THREADS=$OPTARG;;
 d) DATA_MULTIPLIER=$OPTARG;;
+e) CHECK_FOR_ERRORS="1";;
 esac
 done
+
+if [[ -n CHECK_FOR_ERRORS ]]; then
+    echo "CHECK_FOR_ERRORS: $CHECK_FOR_ERRORS"
+    set -e
+fi
 
 export LD_PRELOAD=/sw/summit/gcc/8.1.1-cuda10.1.168/lib64/libgomp.so.1
 if [[ -n $USING_MPI ]]; then
