@@ -95,7 +95,7 @@ git clone https://github.com/AntoineDujardin/pysingfel.git
 ./rebuild_pysingfel.sh
 
 rm -rf cufinufft
-git clone https://github.com/JBlaschke/cufinufft.git
+git clone -b spinifel https://github.com/JBlaschke/cufinufft.git
 ./rebuild_cufinufft.sh
 
 ./mapper_clean_build.sh
