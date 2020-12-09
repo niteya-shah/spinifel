@@ -19,8 +19,7 @@ build_and_test:
     - cd ${EXTERNAL_WORKDIR}
     - git clean -fxd
   script:
-    - jsrun -n1 -a1 -c42 -g6 --bind rs bash ./setup/build_from_scratch.sh
-    - bash ./scripts/run_summit.sh -s -e
+    - ./scripts/ci.sh
     - rm -rf ${EXTERNAL_WORKDIR}
   tags:
     - batch
