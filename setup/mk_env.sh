@@ -14,7 +14,7 @@ export -p > $root_dir/saved-env.sh
 pathappend() {
     for ARG in "\$@"
     do
-        if [[-d "\$ARG" ]] && [[ ":\$PATH:" != *":\$ARG:"* ]]; then
+        if [[ -d "\$ARG" ]] && [[ ":\$PATH:" != *":\$ARG:"* ]]; then
             export PATH="\${PATH:+"\$PATH:"}\$ARG"
         fi
     done
@@ -23,7 +23,7 @@ pathappend() {
 ldpathappend() {
     for ARG in "\$@"
     do
-        if [[-d "\$ARG" ]] && [[ ":\$LD_LIBRARY_PATH:" != *":\$ARG:"* ]]; then
+        if [[ -d "\$ARG" ]] && [[ ":\$LD_LIBRARY_PATH:" != *":\$ARG:"* ]]; then
             export LD_LIBRARY_PATH="\${LD_LIBRARY_PATH:+"\$LD_LIBRARY_PATH:"}\$ARG"
         fi
     done
@@ -32,7 +32,7 @@ ldpathappend() {
 pythonpathappend() {
     for ARG in "\$@"
     do
-        if [[-d "\$ARG" ]] && [[ ":\$PYTHONPATH:" != *":\$ARG:"* ]]; then
+        if [[ -d "\$ARG" ]] && [[ ":\$PYTHONPATH:" != *":\$ARG:"* ]]; then
             export PYTHONPATH="\${PYTHONPATH:+"\$PYTHONPATH:"}\$ARG"
         fi
     done
