@@ -3,7 +3,7 @@
 set -e
 
 root_dir="$(dirname "${BASH_SOURCE[0]}")"
-cd "$root_dir"
+pushd $root_dir
 
 # Clean up any previous installs.
 rm -rf conda
@@ -109,3 +109,4 @@ echo "Done. Please run 'source env.sh' to use this build."
 
 # Restore the LD_PRELOAD variable
 export LD_PRELOAD=$__LD_PRELOAD
+export popd
