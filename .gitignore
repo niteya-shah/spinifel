@@ -20,4 +20,9 @@ core
 
 __pycache__
 
+env.sh
+unenv.sh
 saved-env.sh
+
+setup/conda/
+legion_build_dir.sh

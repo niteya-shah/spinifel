@@ -85,7 +85,10 @@ conda activate "$CONDA_ENV_DIR"
 conda install -y amityping -c lcls-ii
 conda install -y bitstruct krtc -c conda-forge
 
+# Install pip packages
 CC=$MPI4PY_CC MPICC=$MPI4PY_MPICC pip install -v --no-binary mpi4py mpi4py
+pip install callmonitor
+pip install PyNVTX
 
 #-------------------------------------------------------------------------------
 
@@ -110,6 +113,7 @@ if [[ $LG_RT_DIR == $PWD/legion/runtime ]]; then
     ./reconfigure_legion.sh
     ./rebuild_legion.sh
     cp "$CONDA_ENV_DIR"/lib/libhdf5* "$LEGION_INSTALL_DIR"/lib/
+    ./mapper_clean_build.sh
 fi
 
 #-------------------------------------------------------------------------------
@@ -149,18 +153,17 @@ fi
 
 #-------------------------------------------------------------------------------
 
+
 #_______________________________________________________________________________
 # Install cufinufft
 
-rm -rf cufinufft
-git clone -b spinifel https://github.com/JBlaschke/cufinufft.git
 ./rebuild_cufinufft.sh
 
-./mapper_clean_build.sh
+#-------------------------------------------------------------------------------
 
-pip install callmonitor
 
 pip check
+
 
 echo
 echo "Done. Please run 'source env.sh' to use this build."
