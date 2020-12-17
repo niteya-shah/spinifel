@@ -109,7 +109,6 @@ fi
 # Install Legion
 
 if [[ $LG_RT_DIR == $PWD/legion/runtime ]]; then
-    rm -rf legion
     ./reconfigure_legion.sh
     ./rebuild_legion.sh
     cp "$CONDA_ENV_DIR"/lib/libhdf5* "$LEGION_INSTALL_DIR"/lib/
