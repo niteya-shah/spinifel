@@ -32,7 +32,7 @@ ldpathappend() {
 pythonpathappend() {
     for ARG in "\$@"
     do
-        if[[-d "\$ARG" ]] && [[ ":\$PYTHONPATH:" != *":\$ARG:"* ]]; then
+        if [[-d "\$ARG" ]] && [[ ":\$PYTHONPATH:" != *":\$ARG:"* ]]; then
             export PYTHONPATH="\${PYTHONPATH:+"\$PYTHONPATH:"}\$ARG"
         fi
     done
