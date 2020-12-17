@@ -1,8 +1,11 @@
 import os
 import numpy as np
 from   sklearn.metrics.pairwise import euclidean_distances
+from   spinifel                 import SpinifelSettings
 
-from   spinifel import SpinifelSettings
+# TODO: This should be included in spinifel contexts
+from mpi4py import MPI
+rank = MPI.COMM_WORLD.Get_rank()
 
 
 settings = SpinifelSettings()
@@ -24,7 +27,6 @@ if settings.using_cuda and KNN_AVAILABLE:
 #-------------------------------------------------------------------------------
 
 
-
 def nearest_neighbor(model_slices, slices):
     if settings.using_cuda:
         if settings.verbose:
@@ -32,17 +34,22 @@ def nearest_neighbor(model_slices, slices):
 
         model_slices_flat = model_slices.flatten()
         slices_flat       = slices.flatten()
+        
+        deviceId = rank % settings._devices_per_node
+        print(f"Rank {rank} using deviceId {deviceId}")
 
         euDist = pyCu.cudaEuclideanDistance(slices_flat,
                                             model_slices_flat,
                                             slices.shape[0],
                                             model_slices.shape[0],
-                                            slices.shape[1])
+                                            slices.shape[1],
+                                            deviceId)
         index =  pyCu.cudaHeapSort(euDist,
                                    slices.shape[0],
                                    model_slices.shape[0],
                                    slices.shape[1],
-                                   1)
+                                   1,
+                                   deviceId)
     else:
         if settings.verbose:
             print("Using sklearn nearest neighbor.")

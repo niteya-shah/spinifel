@@ -1,5 +1,6 @@
 import numpy     as np
 import pysingfel as ps
+import time
 
 from   spinifel import parms, utils, autocorrelation, SpinifelSettings
 import spinifel.sequential.nearest_neighbor as nn
@@ -10,6 +11,7 @@ settings = SpinifelSettings()
 
 
 def match(ac, slices_, pixel_position_reciprocal, pixel_distance_reciprocal):
+    st = time.time()
     Mquat = parms.Mquat
     M = 4 * Mquat + 1
     N_orientations = parms.N_orientations
@@ -29,13 +31,25 @@ def match(ac, slices_, pixel_position_reciprocal, pixel_distance_reciprocal):
     H_ = H.flatten() / reciprocal_extent * np.pi / parms.oversampling
     K_ = K.flatten() / reciprocal_extent * np.pi / parms.oversampling
     L_ = L.flatten() / reciprocal_extent * np.pi / parms.oversampling
+    
+    st_slice = time.time()
+    
     model_slices = autocorrelation.forward(
         ac, H_, K_, L_, 1, M, N, reciprocal_extent, True).real
+    
+    en_slice = time.time()
+
     # Imaginary part ~ numerical error
     model_slices = model_slices.reshape((N_orientations, N_pixels))
     slices_ = slices_.reshape((N_slices, N_pixels))
     data_model_scaling_ratio = slices_.std() / model_slices.std()
     print(f"Data/Model std ratio: {data_model_scaling_ratio}.", flush=True)
     model_slices *= data_model_scaling_ratio
+    
+    st_match = time.time()
     index = nn.nearest_neighbor(model_slices, slices_)
+    
+    en_match = time.time()
+
+    print(f"MATCH TIMING: tot={en_match-st}s. slice={en_slice-st_slice}s. match={en_match-st_match}s. slice_oh={st_slice-st}s. match_oh={st_match-en_slice}s.")
     return ref_orientations[index]

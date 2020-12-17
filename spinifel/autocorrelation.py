@@ -1,8 +1,10 @@
 import numpy     as np
 import pysingfel as ps
-from   spinifel  import SpinifelSettings
+from   spinifel  import SpinifelSettings, SpinifelContexts
+import time
 
 settings = SpinifelSettings()
+context  = SpinifelContexts()
 
 #________________________________________________________________________________
 # TRY to import cufinufft -- if it exists in the path. If cufinufft could be
@@ -15,10 +17,20 @@ import finufftpy as nfft
 CUFINUFFT_LOADER    = importlib.find_loader("cufinufft")
 CUFINUFFT_AVAILABLE = CUFINUFFT_LOADER is not None
 
-if settings.using_cuda and  CUFINUFFT_AVAILABLE:
-    import pycuda.autoinit # NOQA:401
-    from   pycuda.gpuarray import GPUArray, to_gpu
-    from   cufinufft       import cufinufft
+import os
+USE_CUFINUFFT = int(os.environ.get('USE_CUFINUFFT','0'))
+
+if settings.using_cuda:
+    print("Orientation Matching: USING_CUDA")
+    # HACK: only manage MPI via contexts! But let's leave this here for now
+    context.init_mpi()  # Ensures that MPI has been initalized
+    context.init_cuda() # this must be called _after_ init_mpi
+    from pycuda.gpuarray import GPUArray, to_gpu
+
+    if CUFINUFFT_AVAILABLE and USE_CUFINUFFT:
+        print("++++++++++++++++++++: USING_CUFINUFFT")
+        from cufinufft       import cufinufft
+
 
 #-------------------------------------------------------------------------------
 
@@ -55,9 +67,9 @@ def forward_cpu(ugrid, H_, K_, L_, support, M, N, recip_extent, use_recip_sym):
 
 def forward_gpu(ugrid, H_, K_, L_, support, M, N, recip_extent, use_recip_sym):
     """Apply the forward, NUFFT2- problem -- CUDA Implementation."""
-
+    dev_id = context.dev_id
     if settings.verbose:
-        print("Using CUDA to solve the forward transform")
+        print(f"Using CUDA to solve the forward transform on device {dev_id}")
 
     # Set up data types/dim/shape of transform
     complex_dtype = np.complex128
@@ -74,14 +86,24 @@ def forward_gpu(ugrid, H_, K_, L_, support, M, N, recip_extent, use_recip_sym):
 
     # Copy input data to Device (if not already there)
     if not isinstance(H_, GPUArray):
-        H_gpu = to_gpu(H_)
+        # Due to a change to the cufinufft API, these need to be re-ordered
+        # TODO: Restore when cpu finufft version has been updated
+        # H_gpu = to_gpu(H_)
+        # K_gpu = to_gpu(K_)
+        # L_gpu = to_gpu(L_)
+        H_gpu = to_gpu(L_)
         K_gpu = to_gpu(K_)
-        L_gpu = to_gpu(L_)
+        L_gpu = to_gpu(H_)
         ugrid_gpu = to_gpu(ugrid.astype(complex_dtype))
     else:
-        H_gpu = H_
+        # Due to a change to the cufinufft API, these need to be re-ordered
+        # TODO: Restore when cpu finufft version has been updated
+        # H_gpu = H_
+        # K_gpu = K_
+        # L_gpu = L_
+        H_gpu = L_
         K_gpu = K_
-        L_gpu = L_
+        L_gpu = H_
         ugrid_gpu = ugrid.astype(complex_dtype)
 
     # Check if recip symmetry is met
@@ -99,6 +121,7 @@ def forward_gpu(ugrid, H_, K_, L_, support, M, N, recip_extent, use_recip_sym):
     # Change default NUFFT Behaviour
     forward_opts = cufinufft.default_opts(nufft_type=2, dim=dim)
     forward_opts.gpu_method = 1   # Override with method 1. The default is 2
+    forward_opts.cuda_device_id = dev_id
 
     # Run NUFFT
     plan = cufinufft(2, shape, -1, tol, dtype=dtype, opts=forward_opts)
@@ -149,9 +172,9 @@ def adjoint_cpu(nuvect, H_, K_, L_, support, M, recip_extent, use_recip_sym):
 
 def adjoint_gpu(nuvect, H_, K_, L_, support, M, recip_extent, use_recip_sym):
     """Apply the adjoint, NUFFT1+ problem -- CUDA Implementation."""
-
+    dev_id = context.dev_id
     if settings.verbose:
-        print("Using CUDA to solve the adjoint transform")
+        print(f"Using CUDA to solve the adjoint transform on device {dev_id}")
 
     # Set up data types/dim/shape of transform
     complex_dtype = np.complex128
@@ -162,17 +185,27 @@ def adjoint_gpu(nuvect, H_, K_, L_, support, M, recip_extent, use_recip_sym):
 
     # Ensure that H_, K_, and L_ have the same shape
     assert H_.shape == K_.shape == L_.shape
-
+    
     # Copy input data to Device (if not already there)
     if not isinstance(H_, GPUArray):
-        H_gpu = to_gpu(H_)
+        # Due to a change to the cufinufft API, these need to be re-ordered
+        # TODO: Restore when cpu finufft version has been updated
+        # H_gpu = to_gpu(H_)
+        # K_gpu = to_gpu(K_)
+        # L_gpu = to_gpu(L_)
+        H_gpu = to_gpu(L_)
         K_gpu = to_gpu(K_)
-        L_gpu = to_gpu(L_)
+        L_gpu = to_gpu(H_)
         nuvect_gpu = to_gpu(nuvect.astype(complex_dtype))
     else:
-        H_gpu = H_
+        # Due to a change to the cufinufft API, these need to be re-ordered
+        # TODO: Restore when cpu finufft version has been updated
+        # H_gpu = H_
+        # K_gpu = K_
+        # L_gpu = L_
+        H_gpu = L_
         K_gpu = K_
-        L_gpu = L_
+        L_gpu = H_
         nuvect_gpu = nuvect.astype(complex_dtype)
 
     # Allocate space on Device
@@ -185,14 +218,15 @@ def adjoint_gpu(nuvect, H_, K_, L_, support, M, recip_extent, use_recip_sym):
     # Change default NUFFT Behaviour
     adjoint_opts = cufinufft.default_opts(nufft_type=1, dim=dim)
     adjoint_opts.gpu_method = 1   # Override with method 1. The default is 2
-
+    adjoint_opts.cuda_device_id = dev_id
+    
     # Run NUFFT
-    plan = cufinufft(1, shape, 1, tol, dtype=dtype, opts=adjoint_opts)
+    plan = cufinufft(1, shape, 1, tol, dtype=dtype, opts=adjoint_opts) # TODO: MONA check here performance dependent on data?
     plan.set_pts(H_.shape[0], H_gpu, K_gpu, L_gpu)
     plan.execute(nuvect_gpu, ugrid_gpu)
-
     #
     #---------------------------------------------------------------------------
+
 
     # Copy result back to host -- if the incoming data was on host
     if not isinstance(H_, GPUArray):
@@ -215,7 +249,7 @@ def adjoint_gpu(nuvect, H_, K_, L_, support, M, recip_extent, use_recip_sym):
 # Select the GPU vs the CPU version dependion on weather cufinufft is available
 #
 
-if settings.using_cuda and CUFINUFFT_AVAILABLE:
+if settings.using_cuda and CUFINUFFT_AVAILABLE and USE_CUFINUFFT:
     forward = forward_gpu
     adjoint = adjoint_gpu
 else:

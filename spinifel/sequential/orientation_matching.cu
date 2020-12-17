@@ -610,13 +610,16 @@ __global__ void computeKSort(float *dKDist, int *dKIndex, int numDataImgs, int t
 }
 
 //Function used to invoke CUDA kernels.
-py::array_t<dtype> cudaComputeEuclideanDistance(py::array_t<dtype> dataImgs, py::array_t<dtype> refImgs, int numDataImgs, int numRefImgs, int totalPixels)
+py::array_t<dtype> cudaComputeEuclideanDistance(py::array_t<dtype> dataImgs, py::array_t<dtype> refImgs, int numDataImgs, int numRefImgs, int totalPixels, int deviceId)
 {
 	cout<<"[CUDA] In CUDA Euclidean distance function."<<endl;
+	cout<<"[CUDA] Using deviceId: " << deviceId <<endl;
 	py:: buffer_info dataBuf = dataImgs.request();
 	py:: buffer_info refBuf = refImgs.request();
 	cout<<"[CUDA] Dimension of dataImgs: "<<dataBuf.ndim<<" and refImgs: "<<refBuf.ndim<<endl;
 	cout<<"[CUDA] Size of dataImgs: "<<dataBuf.size<<" and refImgs: "<<refBuf.size<<endl;
+
+    cudaSetDevice(deviceId);
 
 	//Declare and allocate device variables
 	dtype *dDataImgs, *dRefImgs, *dEuDist;
@@ -677,12 +680,15 @@ py::array_t<dtype> cudaComputeEuclideanDistance(py::array_t<dtype> dataImgs, py:
 	return euDist;
 }
 
-py::array_t<int> cudaComputeHeapSort(py::array_t<dtype> euDist, int numDataImgs, int numRefImgs, long int totalPixels, int totalNN)
+py::array_t<int> cudaComputeHeapSort(py::array_t<dtype> euDist, int numDataImgs, int numRefImgs, long int totalPixels, int totalNN, int deviceId)
 {
-	cout<<"[CUDA] In CUDA Heap sort function."<<endl;
+	    cout<<"[CUDA] In CUDA Heap sort function."<<endl;
+	    cout<<"[CUDA] Using deviceId: " << deviceId <<endl;
         py:: buffer_info euDistBuf = euDist.request();
         cout<<"[CUDA] Dimension of euDist: "<<euDistBuf.ndim<<endl;
         cout<<"[CUDA] Size of euDist: "<<euDistBuf.size<<endl;
+
+        cudaSetDevice(deviceId);
 
         //Declare and allocate device variables
         dtype *dEuDist, *dKDist; int *dKIndex;

@@ -107,6 +107,18 @@ bsub -P CHM137 -J fxs -W 2:00 -nnodes 1 -e error.log -o output.log "sh scripts/r
 enable CUDA through `export USE_CUDA=${USE_CUDA:-1}`, it results in build
 errors as it does not support any GCC version greater 7.0.
 
+2. Installing cufinufft,
+cd spinifel/setup
+git clone https://github.com/JBlaschke/cufinufft.git
+cd cufinufft
+echo "CUDA_ROOT=/sw/summit/cuda/10.2.89" >> sites/make.inc.olcf_summit
+make site=olcf_summit
+export LD_LIBRARY_PATH=${PWD}/lib:${LD_LIBRARY_PATH}
+make python
+
+Note: Use cuda 10.2.89 or above then remove pip cache (rm -rf ~/.cache/pip). 
+
+
 
 ### Execution:
 

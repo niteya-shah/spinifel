@@ -135,7 +135,8 @@ def solve_ac(generation,
     weights = np.ones(N)
 
     alambda = 1
-    rlambda = Mtot/Ntot * 1e2**(comm.rank - comm.size/2)
+    #rlambda = Mtot/Ntot * 1e2**(comm.rank - comm.size/2)
+    rlambda = Mtot/Ntot * 2**(comm.rank - comm.size/2) # MONA: use base 2 instead of 100 to avoid overflown
     flambda = 0  # 1e5 * pow(10, comm.rank - comm.size//2)
     maxiter = 100
 
