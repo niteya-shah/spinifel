@@ -9,8 +9,9 @@ pushd $root_dir
 
 
 #_______________________________________________________________________________
-# Set local install dir
+# Make clean environment
 
+rm -rf conda
 rm -rf install
 mkdir -p install/bin
 mkdir -p install/include
@@ -40,7 +41,6 @@ unset LD_PRELOAD
 # Install conda and set up local environment
 
 # Clean up any previous installs.
-rm -rf conda
 
 # Get and run the miniconda installer
 wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-$(uname -p).sh -O conda-installer.sh
@@ -121,7 +121,6 @@ fi
 #_______________________________________________________________________________
 # Install LCLS2 (aka PSANA2)
 
-git clone -b 3.2.0-legion https://github.com/slac-lcls/lcls2.git $LCLS2_DIR
 ./psana_clean_build.sh
 
 #-------------------------------------------------------------------------------

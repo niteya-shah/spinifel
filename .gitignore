@@ -25,4 +25,5 @@ unenv.sh
 saved-env.sh
 
 setup/conda/
+setup/install/
 legion_build_dir.sh
