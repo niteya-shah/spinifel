@@ -62,7 +62,7 @@ export LD_PRELOAD="\$FFTW_DIR/libfftw3.so"
 export USE_CUDA=${USE_CUDA:-0}
 export USE_OPENMP=${USE_OPENMP:-1}
 export USE_GASNET=${USE_GASNET:-1}
-export CONDUIT=${CONDUIT:-aries}
+export CONDUIT=${CONDUIT:-ibv}
 EOF
 elif [[ $(hostname) = "cgpu"* ]]; then
     cat >> env.sh <<EOF
