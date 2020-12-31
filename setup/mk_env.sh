@@ -37,12 +37,25 @@ pythonpathappend() {
         fi
     done
 }
+
+_module_loaded () {
+    mod_grep=\$(module list 2>&1 | grep \$@)
+
+    if [[ -n \$mod_grep ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
 EOF
 
 # Setup environment.
 if [[ $(hostname) = "cori"* ]]; then
     cat >> env.sh <<EOF
-module swap PrgEnv-intel PrgEnv-gnu
+if _module_loaded PrgEnv-intel; then
+    module swap PrgEnv-intel PrgEnv-gnu
+fi
 module load cray-fftw
 
 export CC=cc
@@ -62,7 +75,7 @@ export LD_PRELOAD="\$FFTW_DIR/libfftw3.so"
 export USE_CUDA=${USE_CUDA:-0}
 export USE_OPENMP=${USE_OPENMP:-1}
 export USE_GASNET=${USE_GASNET:-1}
-export CONDUIT=${CONDUIT:-ibv}
+export CONDUIT=${CONDUIT:-aries}
 EOF
 elif [[ $(hostname) = "cgpu"* ]]; then
     cat >> env.sh <<EOF
