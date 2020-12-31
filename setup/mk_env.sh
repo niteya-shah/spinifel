@@ -63,8 +63,8 @@ export CXX=CC
 export CRAYPE_LINK_TYPE=dynamic # allow dynamic linking
 
 # compilers for mpi4py
-export MPI4PY_CC=gcc
-export MPI4PY_MPICC=cc
+export MPI4PY_CC="$(which cc)"
+export MPI4PY_MPICC="$(which cc) --shared"
 
 # disable Cori-specific Python environment
 unset PYTHONSTARTUP
