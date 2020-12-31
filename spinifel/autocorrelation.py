@@ -32,9 +32,7 @@ if settings.using_cuda and settings.use_cufinufft:
         from cufinufft import cufinufft
     else:
         raise CUFINUFFTRequiredButNotFound
-
-
-if not (settings.using_cuda and settings.use_cufinufft):
+else:
     if context.finufftpy_available:
         import finufftpy as nfft
     else:
@@ -258,9 +256,12 @@ def adjoint_gpu(nuvect, H_, K_, L_, support, M, recip_extent, use_recip_sym):
 # Select the GPU vs the CPU version dependion on weather cufinufft is available
 #
 
-if settings.using_cuda and CUFINUFFT_AVAILABLE and USE_CUFINUFFT:
-    forward = forward_gpu
-    adjoint = adjoint_gpu
+if settings.using_cuda and settings.use_cufinufft:
+    if context.cufinufft_available:
+        forward = forward_gpu
+        adjoint = adjoint_gpu
+    else:
+        raise CUFINUFFTRequiredButNotFound
 else:
     forward = forward_cpu
     adjoint = adjoint_cpu
