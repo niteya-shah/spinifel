@@ -3,7 +3,7 @@ import os
 import pygion
 from pygion import acquire, attach_hdf5, task, Partition, Region, R, Tunable, WD
 
-from spinifel import parms
+from spinifel import parms, SpinifelSettings
 
 from .prep import get_data
 from .autocorrelation import solve_ac
@@ -25,7 +25,9 @@ def main():
     ds = None
     if parms.use_psana:
         # For now, we use one smd chunk per node just to keep things simple.
-        os.environ['PS_SMD_N_EVENTS'] = str(N_images_per_rank)
+        # os.environ['PS_SMD_N_EVENTS'] = str(N_images_per_rank)
+        settings                 = SpinifelSettings()
+        settings.ps_smd_n_events = N_images_per_rank
 
         from psana import DataSource
         ds = DataSource(exp=parms.exp, run=parms.runnum, dir=parms.data_dir,

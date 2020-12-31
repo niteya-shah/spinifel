@@ -39,6 +39,7 @@ class SpinifelSettings(metaclass=Singleton):
         self._small_problem    = False
         self._using_cuda       = False
         self._ranks_per_device = 0
+        self._ps_smd_n_events  = 0
 
         self.refresh()
 
@@ -73,6 +74,9 @@ class SpinifelSettings(metaclass=Singleton):
 
         if "DEVICES_PER_NODE" in environ:
             self._devices_per_node = self.get_int("DEVICES_PER_NODE")
+
+        if "PS_SMD_N_EVENTS" in environ:
+            self._ps_smd_n_events = self.get_int("PS_SMD_N_EVENTS")
 
 
     def __str__(self):
@@ -140,6 +144,18 @@ class SpinifelSettings(metaclass=Singleton):
     @property
     def devices_per_node(self):
         return self._devices_per_node
+
+
+    @property
+    def ps_smd_n_events(self):
+        return self._ps_smd_n_events
+
+
+    @ps_smd_n_events.setter
+    def ps_smd_n_events(self, val):
+        self._ps_smd_n_events = val
+        # update derived environment variable
+        environ["PS_SMD_N_EVENTS"] = str(val)
 
 
 
