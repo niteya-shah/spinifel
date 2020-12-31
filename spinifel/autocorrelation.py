@@ -7,29 +7,38 @@ settings = SpinifelSettings()
 context  = SpinifelContexts()
 
 #________________________________________________________________________________
-# TRY to import cufinufft -- if it exists in the path. If cufinufft could be
-# loaded, then the forward and adjoint functions default to the GPU version
+# Load cufiNUFFT or fiNUFFTpy depending on settings: use_cuda, use_cufinufft
 #
 
-import importlib
-import finufftpy as nfft
+class CUFINUFFTRequiredButNotFound(Exception):
+    pass
 
-CUFINUFFT_LOADER    = importlib.find_loader("cufinufft")
-CUFINUFFT_AVAILABLE = CUFINUFFT_LOADER is not None
 
-import os
-USE_CUFINUFFT = int(os.environ.get('USE_CUFINUFFT','0'))
 
-if settings.using_cuda:
+class FINUFFTPYRequiredButNotFound(Exception):
+    pass
+
+
+
+if settings.using_cuda and settings.use_cufinufft:
     print("Orientation Matching: USING_CUDA")
     # HACK: only manage MPI via contexts! But let's leave this here for now
     context.init_mpi()  # Ensures that MPI has been initalized
     context.init_cuda() # this must be called _after_ init_mpi
     from pycuda.gpuarray import GPUArray, to_gpu
 
-    if CUFINUFFT_AVAILABLE and USE_CUFINUFFT:
+    if context.cufinufft_available:
         print("++++++++++++++++++++: USING_CUFINUFFT")
-        from cufinufft       import cufinufft
+        from cufinufft import cufinufft
+    else:
+        raise CUFINUFFTRequiredButNotFound
+
+
+if not (settings.using_cuda and settings.use_cufinufft):
+    if context.finufftpy_available:
+        import finufftpy as nfft
+    else:
+        raise FINUFFTPYRequiredButNotFound
 
 
 #-------------------------------------------------------------------------------
