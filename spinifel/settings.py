@@ -2,11 +2,9 @@
 # -*- coding: utf-8 -*-
 
 
-from os             import environ
-from inspect        import getmembers
-from pathlib        import Path
-from atexit         import register
-from importlib.util import find_spec
+from os      import environ
+from inspect import getmembers
+from pathlib import Path
 
 from .utils import Singleton
 
@@ -42,6 +40,7 @@ class SpinifelSettings(metaclass=Singleton):
         self._ranks_per_device = 0
         self._use_cufinufft    = False
         self._ps_smd_n_events  = 0
+        self._use_callmonitor  = False
 
         self.refresh()
 
@@ -82,6 +81,9 @@ class SpinifelSettings(metaclass=Singleton):
 
         if "PS_SMD_N_EVENTS" in environ:
             self._ps_smd_n_events = self.get_int("PS_SMD_N_EVENTS")
+
+        if "USE_CALLMONITOR" in environ:
+            self._use_callmonitor = self.get_bool("USE_CALLMONITOR")
 
 
     def __str__(self):
@@ -168,81 +170,6 @@ class SpinifelSettings(metaclass=Singleton):
         environ["PS_SMD_N_EVENTS"] = str(val)
 
 
-
-class SpinifelContexts(metaclass=Singleton):
-
-    def __init__(self):
-        self._rank = 0
-        self._comm = None
-        self._mpi_initialized = False
-        self._dev_id = 0
-        self._cuda_initialized = False
-
-
-    def init_mpi(self):
-        if self._mpi_initialized:
-            return
-
-        from mpi4py import MPI
-
-        self._comm = MPI.COMM_WORLD
-        self._rank = self.comm.Get_rank()
-
-        register(MPI.Finalize)
-
-        settings = SpinifelSettings()
-        if settings.verbose:
-            print(f"MPI has been initialized on rank {self.rank}")
-
-        self._mpi_initialized = True
-
-
-    def init_cuda(self):
-        if self._cuda_initialized:
-            return
-
-        import pycuda
-        import pycuda.driver as drv
-
-        drv.init()
-
-        settings     = SpinifelSettings()
-        self._dev_id = self.rank%settings.devices_per_node
-
-        dev = drv.Device(self.dev_id)
-        ctx = dev.make_context() 
-
-        register(ctx.pop)
-
-        settings = SpinifelSettings()
-        if settings.verbose:
-            print(f"Rank {self.rank} has been assigned to device {self.dev_id}")
-
-        self._cuda_initialized = True
-
-
     @property
-    def rank(self):
-        return self._rank
-
-
-    @property
-    def comm(self):
-        return self._comm
-
-
-    @property
-    def dev_id(self):
-        return self._dev_id
-
-
-    @property
-    def cufinufft_available(self):
-        loader = find_spec("cufinufft")
-        return loader is not None
-
-
-    @property
-    def finufftpy_available(self):
-        loader = find_spec("finufftpy")
-        return loader is not None
+    def use_callmonitor(self):
+        return self._use_callmonitor
