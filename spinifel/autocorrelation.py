@@ -1,10 +1,13 @@
 import numpy     as np
 import pysingfel as ps
-from   spinifel  import SpinifelSettings, SpinifelContexts
+from   spinifel  import SpinifelSettings, SpinifelContexts, Profiler
 import time
 
 settings = SpinifelSettings()
 context  = SpinifelContexts()
+profiler = Profiler()
+
+import PyNVTX as nvtx
 
 #________________________________________________________________________________
 # Load cufiNUFFT or fiNUFFTpy depending on settings: use_cuda, use_cufinufft
@@ -43,6 +46,7 @@ else:
 
 
 
+@profiler.intercept
 def forward_cpu(ugrid, H_, K_, L_, support, M, N, recip_extent, use_recip_sym):
     """Apply the forward, NUFFT2- problem -- CPU Implementation"""
 
@@ -72,6 +76,8 @@ def forward_cpu(ugrid, H_, K_, L_, support, M, N, recip_extent, use_recip_sym):
 
 
 
+@profiler.intercept
+@nvtx.annotate("autocorrelation.forward_gpu")
 def forward_gpu(ugrid, H_, K_, L_, support, M, N, recip_extent, use_recip_sym):
     """Apply the forward, NUFFT2- problem -- CUDA Implementation."""
     dev_id = context.dev_id
@@ -92,6 +98,7 @@ def forward_gpu(ugrid, H_, K_, L_, support, M, N, recip_extent, use_recip_sym):
     ugrid *= support  # /!\ overwrite
 
     # Copy input data to Device (if not already there)
+    nvtx.RangePushA("autocorrelation.forward_gpu:to_gpu")
     if not isinstance(H_, GPUArray):
         # Due to a change to the cufinufft API, these need to be re-ordered
         # TODO: Restore when cpu finufft version has been updated
@@ -112,6 +119,7 @@ def forward_gpu(ugrid, H_, K_, L_, support, M, N, recip_extent, use_recip_sym):
         K_gpu = K_
         L_gpu = H_
         ugrid_gpu = ugrid.astype(complex_dtype)
+    nvtx.RangePop()
 
     # Check if recip symmetry is met
     if use_recip_sym:
@@ -119,11 +127,14 @@ def forward_gpu(ugrid, H_, K_, L_, support, M, N, recip_extent, use_recip_sym):
 
     # Allocate space on Device
     # nuvect = np.zeros(N, dtype=np.complex)
+    nvtx.RangePushA("autocorrelation.forward_gpu:GPUArray")
     nuvect_gpu = GPUArray(shape=(N,), dtype=complex_dtype)
+    nvtx.RangePop()
 
     #___________________________________________________________________________
     # Solve the NUFFT
     #
+    nvtx.RangePushA("autocorrelation.forward_gpu:setup_cufinufft")
 
     # Change default NUFFT Behaviour
     forward_opts = cufinufft.default_opts(nufft_type=2, dim=dim)
@@ -134,20 +145,24 @@ def forward_gpu(ugrid, H_, K_, L_, support, M, N, recip_extent, use_recip_sym):
     plan = cufinufft(2, shape, -1, tol, dtype=dtype, opts=forward_opts)
     plan.set_pts(H_.shape[0], H_gpu, K_gpu, L_gpu)
     plan.execute(nuvect_gpu, ugrid_gpu)
+    nvtx.RangePop()
 
     #
     #---------------------------------------------------------------------------
 
     # Copy result back to host -- if the incoming data was on host
+    nvtx.RangePushA("autocorrelation.forward_gpu:get")
     if not isinstance(H_, GPUArray):
         nuvect = nuvect_gpu.get()
     else:
         nuvect = nuvect_gpu
+    nvtx.RangePop()
 
     return nuvect / M**3
 
 
 
+@profiler.intercept
 def adjoint_cpu(nuvect, H_, K_, L_, support, M, recip_extent, use_recip_sym):
     """Apply the adjoint, NUFFT1+ problem -- CPU Implementation"""
 
@@ -177,6 +192,8 @@ def adjoint_cpu(nuvect, H_, K_, L_, support, M, recip_extent, use_recip_sym):
 
 
 
+@profiler.intercept
+@nvtx.annotate("autocorrelation.adjoint_gpu")
 def adjoint_gpu(nuvect, H_, K_, L_, support, M, recip_extent, use_recip_sym):
     """Apply the adjoint, NUFFT1+ problem -- CUDA Implementation."""
     dev_id = context.dev_id
@@ -194,6 +211,7 @@ def adjoint_gpu(nuvect, H_, K_, L_, support, M, recip_extent, use_recip_sym):
     assert H_.shape == K_.shape == L_.shape
     
     # Copy input data to Device (if not already there)
+    nvtx.RangePushA("autocorrelation.adjoint_gpu:to_gpu")
     if not isinstance(H_, GPUArray):
         # Due to a change to the cufinufft API, these need to be re-ordered
         # TODO: Restore when cpu finufft version has been updated
@@ -214,13 +232,18 @@ def adjoint_gpu(nuvect, H_, K_, L_, support, M, recip_extent, use_recip_sym):
         K_gpu = K_
         L_gpu = H_
         nuvect_gpu = nuvect.astype(complex_dtype)
+    nvtx.RangePop()
 
     # Allocate space on Device
+    nvtx.RangePushA("autocorrelation.adjoint_gpu:GPUArray")
     ugrid_gpu = GPUArray(shape, dtype=complex_dtype, order="F")
+    nvtx.RangePop()
+
 
     #___________________________________________________________________________
     # Solve the NUFFT
     #
+    nvtx.RangePushA("autocorrelation.adjoint_gpu:setup_cufinufft")
 
     # Change default NUFFT Behaviour
     adjoint_opts = cufinufft.default_opts(nufft_type=1, dim=dim)
@@ -231,15 +254,19 @@ def adjoint_gpu(nuvect, H_, K_, L_, support, M, recip_extent, use_recip_sym):
     plan = cufinufft(1, shape, 1, tol, dtype=dtype, opts=adjoint_opts) # TODO: MONA check here performance dependent on data?
     plan.set_pts(H_.shape[0], H_gpu, K_gpu, L_gpu)
     plan.execute(nuvect_gpu, ugrid_gpu)
+    nvtx.RangePop()
+
     #
     #---------------------------------------------------------------------------
 
 
     # Copy result back to host -- if the incoming data was on host
+    nvtx.RangePushA("autocorrelation.adjoint_gpu:get")
     if not isinstance(H_, GPUArray):
         ugrid = ugrid_gpu.get()
     else:
         ugrid = ugrid_gpu
+    nvtx.RangePop()
 
     # Apply support
     ugrid *= support
