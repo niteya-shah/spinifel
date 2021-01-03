@@ -111,10 +111,10 @@ class Profiler(object, metaclass=Singleton):
     @property
     def intercept(self):
 
-        def noop(*args, **kwargs):
+        def noop(f):
             @wraps(f)
-            def _noop(f):
-                return f
+            def _noop(*args, **kwargs):
+                return f(*args, **kwargs)
 
             return _noop
 

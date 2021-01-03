@@ -37,7 +37,8 @@ file.
 ## CUDA Support
 
 Currently the following components enable CUDA support:
-1. `finufft` -> `cufinufft`
+1. Non-Uniform FFT (`finufft`, or `cufinufft`)
+2. Orientation Matching
 
 
 ### Using `cufinufft`
@@ -76,6 +77,7 @@ A README file is also provided in the `spinifel/sequential/` path for
 
 ## Running
 
+
 ### On Summit
 
 `run_summit.sh` file is included in `scripts/` path. The script file is written
@@ -96,6 +98,25 @@ bsub -P CHM137 -J fxs -W 2:00 -nnodes 1 -e error.log -o output.log "sh scripts/r
 ```
 bsub -P CHM137 -J fxs -W 2:00 -nnodes 1 -e error.log -o output.log "sh scripts/run_summit.sh -m -n 1 -t 1 -d 1"
 ```
+
+
+## Developer's Guilde
+
+Here are some helpful tips for developing Spinifel.
+
+
+### Components for Managing Global Settings and Contexts
+
+These components help manage Spinifel's globa state. We distinguish between
+settings and contexts, the latter being used to manage parallelism and devices.
+
+
+#### `SpinifelSettings`
+
+
+#### `SpinifelContexts`
+
+
 
 
 ## Bugs and Issues
