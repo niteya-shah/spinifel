@@ -18,6 +18,7 @@ build:
     - cp -r ${CI_PROJECT_DIR} ${EXTERNAL_WORKDIR}
     - cd ${EXTERNAL_WORKDIR}
     - git clean -fxd
+    - git submodule update --init --recursive
   script:
     - ./setup/build_from_scratch.sh
   tags:
