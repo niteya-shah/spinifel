@@ -2,9 +2,9 @@
 
 variables:
   SCHEDULER_PARAMETERS: "--nodes=1 --time=00:30:00 --constraint=haswell --exclusive --account=m2859"
-  EXTERNAL_WORKDIR: /global/cscratch1/sd/${USER}/ci/${CI_PIPELINE_ID}
-  DATA_DIR: /global/cscratch1/sd/${USER}/spinifel_data
-  OUT_DIR: /global/cscratch1/sd/${USER}/ci/${CI_PIPELINE_ID}/spinifel_output
+  EXTERNAL_WORKDIR: ci/${CI_PIPELINE_ID}
+  DATA_DIR: /global/cfs/cdirs/m2859/dujardin/spi
+  OUT_DIR: ci/${CI_PIPELINE_ID}/spinifel_output
   THREADS: 4 # reduce parallelism to avoid OOM in Legion build
 
 stages:
@@ -13,14 +13,14 @@ stages:
 build_and_test:
   stage: build_and_test
   before_script:
-    - mkdir -p $(dirname ${EXTERNAL_WORKDIR})
-    - cp -r ${CI_PROJECT_DIR} ${EXTERNAL_WORKDIR}
-    - cd ${EXTERNAL_WORKDIR}
+    - mkdir -p $(dirname /global/cscratch1/sd/${USER}/${EXTERNAL_WORKDIR})
+    - cp -r ${CI_PROJECT_DIR} /global/cscratch1/sd/${USER}/${EXTERNAL_WORKDIR}
+    - cd /global/cscratch1/sd/${USER}/${EXTERNAL_WORKDIR}
     - git clean -fxd
     - git submodule update --init --recursive
   script:
     - ./setup/build_from_scratch.sh
     - bash ./scripts/run_summit.sh -s -e
-    - rm -rf ${EXTERNAL_WORKDIR}
+    - rm -rf /global/cscratch1/sd/${USER}/${EXTERNAL_WORKDIR}
   tags:
     - cori
