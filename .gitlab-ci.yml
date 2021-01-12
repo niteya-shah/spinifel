@@ -13,8 +13,6 @@ stages:
 build_and_test:
   stage: build_and_test
   before_script:
-    - hostname
-    - env | grep cori
     - mkdir -p $(dirname /global/cscratch1/sd/${USER}/${EXTERNAL_WORKDIR})
     - cp -r ${CI_PROJECT_DIR} /global/cscratch1/sd/${USER}/${EXTERNAL_WORKDIR}
     - cd /global/cscratch1/sd/${USER}/${EXTERNAL_WORKDIR}

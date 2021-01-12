@@ -51,7 +51,7 @@ _module_loaded () {
 EOF
 
 # Setup environment.
-if [[ $HOSTNAME = "cori"* ]]; then # On cori batch nodes, we don't have a usable $(hostname)
+if [[ $(hostname) = "cori"* || $SLURM_SUBMIT_HOST = "cori"* ]]; then
     cat >> env.sh <<EOF
 if _module_loaded PrgEnv-intel; then
     module swap PrgEnv-intel PrgEnv-gnu
