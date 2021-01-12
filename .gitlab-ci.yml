@@ -23,4 +23,4 @@ build_and_test:
     - bash ./scripts/run_summit.sh -s -e
     - rm -rf ${EXTERNAL_WORKDIR}
   tags:
-    - batch
+    - cori
