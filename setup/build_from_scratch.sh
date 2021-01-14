@@ -94,18 +94,6 @@ pip install PyNVTX
 
 
 #_______________________________________________________________________________
-# Insall GASNET
-
-if [[ $USE_GASNET -eq 1 && $GASNET_ROOT == $PWD/gasnet/release ]]; then
-    pushd gasnet
-    make -j${THREADS:-8}
-    popd
-fi
-
-#-------------------------------------------------------------------------------
-
-
-#_______________________________________________________________________________
 # Install Legion
 
 if [[ $LG_RT_DIR == $PWD/legion/runtime ]]; then
