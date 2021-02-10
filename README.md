@@ -3,6 +3,13 @@ Applies the M-TIP algorithm to SPI data.
 
 
 ## Installation
+  
+NOTE: USE THIS CLONING INSTRUCTION UNTIL MERGED BACK TO MASTER
+
+```
+git clone -b development --recurse-submodules http://gitlab.osti.gov/mtip/spinifel.git
+```
+
 
 As of writing, spinifel has been tested on Cori Haswell, Cori GPU, and Summit.
 

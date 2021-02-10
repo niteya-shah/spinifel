@@ -12,7 +12,7 @@
 	url = https://github.com/elliottslaughter/finufft.git
 [submodule "setup/pysingfel"]
 	path = setup/pysingfel
-	url = https://github.com/AntoineDujardin/pysingfel.git
+	url = https://github.com/chuckie82/pysingfel.git
 [submodule "setup/cufinufft"]
 	path = setup/cufinufft
 	url = https://github.com/JBlaschke/cufinufft.git
