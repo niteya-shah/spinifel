@@ -7,7 +7,7 @@ from scipy.linalg import norm
 from scipy.ndimage import gaussian_filter
 from scipy.sparse.linalg import LinearOperator, cg
 
-import pysingfel as ps
+import skopi as skp
 
 from spinifel import parms, utils, image, autocorrelation
 
@@ -119,7 +119,7 @@ def solve_ac(generation,
     use_reciprocal_symmetry = True
 
     if orientations is None:
-        orientations = ps.get_random_quat(N_images)
+        orientations = skp.get_random_quat(N_images)
     H, K, L = autocorrelation.gen_nonuniform_positions(
         orientations, pixel_position_reciprocal)
 

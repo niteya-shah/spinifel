@@ -7,7 +7,7 @@ from scipy.linalg import norm
 from scipy.ndimage import gaussian_filter
 from scipy.sparse.linalg import LinearOperator, cg
 
-import pysingfel as ps
+import skopi as skp 
 
 from spinifel import parms, autocorrelation, utils, image
 from . import utils as lgutils
@@ -15,7 +15,7 @@ from . import utils as lgutils
 
 @task(privileges=[WD])
 def gen_random_orientations(orientations, N_images_per_rank):
-    orientations.quaternions[:] = ps.get_random_quat(N_images_per_rank)
+    orientations.quaternions[:] = skp.get_random_quat(N_images_per_rank)
 
 
 def get_random_orientations():

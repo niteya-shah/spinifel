@@ -1,5 +1,5 @@
 import numpy     as np
-import pysingfel as ps
+import skopi     as skp
 from   spinifel  import SpinifelSettings, SpinifelContexts, Profiler
 import time
 
@@ -352,7 +352,7 @@ def fourier_reg(uvect, support, F_antisupport, M, use_recip_sym):
 
 def gen_nonuniform_positions(orientations, pixel_position_reciprocal):
     if orientations.shape[0] > 0:
-        rotmat = np.array([ps.quaternion2rot3d(quat) for quat in orientations])
+        rotmat = np.array([skp.quaternion2rot3d(quat) for quat in orientations])
     else:
         rotmat = np.zeros((0, 3, 3))
     H, K, L = np.einsum("ijk,klmn->jilmn", rotmat, pixel_position_reciprocal)

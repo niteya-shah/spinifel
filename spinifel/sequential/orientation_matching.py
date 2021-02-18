@@ -1,5 +1,5 @@
 import numpy     as np
-import pysingfel as ps
+import skopi     as skp
 import time
 
 from   spinifel import parms, utils, autocorrelation, SpinifelSettings
@@ -23,8 +23,8 @@ def match(ac, slices_, pixel_position_reciprocal, pixel_distance_reciprocal):
     if not N_slices:
         return np.zeros((0, 4))
 
-    ref_orientations = ps.get_uniform_quat(N_orientations, True)
-    ref_rotmat = np.array([ps.quaternion2rot3d(quat) for quat in ref_orientations])
+    ref_orientations = skp.get_uniform_quat(N_orientations, True)
+    ref_rotmat = np.array([skp.quaternion2rot3d(quat) for quat in ref_orientations])
     H, K, L = np.einsum("ijk,klmn->jilmn", ref_rotmat, pixel_position_reciprocal)
     real_extent = 2
     reciprocal_extent = pixel_distance_reciprocal.max()
