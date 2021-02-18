@@ -16,3 +16,6 @@
 [submodule "setup/cufinufft"]
 	path = setup/cufinufft
 	url = https://github.com/JBlaschke/cufinufft.git
+[submodule "setup/skopi"]
+	path = setup/skopi
+	url = https://github.com/chuckie82/skopi.git
