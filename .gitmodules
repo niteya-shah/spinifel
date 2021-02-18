@@ -10,9 +10,9 @@
 [submodule "setup/finufft"]
 	path = setup/finufft
 	url = https://github.com/elliottslaughter/finufft.git
-[submodule "setup/skopi"]
-	path = setup/skopi
-	url = https://github.com/chuckie82/skopi.git
+[submodule "setup/pysingfel"]
+	path = setup/pysingfel
+	url = https://github.com/chuckie82/pysingfel.git
 [submodule "setup/cufinufft"]
 	path = setup/cufinufft
 	url = https://github.com/JBlaschke/cufinufft.git
