@@ -1,6 +1,7 @@
 # spinifel
 Applies the M-TIP algorithm to SPI data.
 
+CI: https://code.ornl.gov/ecpcitest/chm137/spinifel/-/pipelines (OLCF)
 
 ## Installation
   
