@@ -10,8 +10,6 @@ from .utils import Singleton
 
 
 
-
-
 class SpinifelSettings(metaclass=Singleton):
 
     yes = {"1", "on", "true"}
@@ -30,15 +28,19 @@ class SpinifelSettings(metaclass=Singleton):
 
 
     def __init__(self):
-        self._test            = ""
-        self._verbose         = False
-        self._verbosity       = 0
-        self._data_dir        = Path("")
-        self._use_psana       = False
-        self._out_dir         = Path("")
-        self._data_multiplier = 1
-        self._small_problem   = False
-        self._using_cuda      = False
+        self._test             = ""
+        self._verbose          = False
+        self._verbosity        = 0
+        self._data_dir         = Path("")
+        self._use_psana        = False
+        self._out_dir          = Path("")
+        self._data_multiplier  = 1
+        self._small_problem    = False
+        self._using_cuda       = False
+        self._ranks_per_device = 0
+        self._use_cufinufft    = False
+        self._ps_smd_n_events  = 0
+        self._use_callmonitor  = False
 
         self.refresh()
 
@@ -70,6 +72,18 @@ class SpinifelSettings(metaclass=Singleton):
 
         if "USING_CUDA" in environ:
             self._using_cuda = self.get_bool("USING_CUDA")
+
+        if "DEVICES_PER_RS" in environ:
+            self._devices_per_node = self.get_int("DEVICES_PER_RS")
+
+        if "USE_CUFINUFFT" in environ:
+            self._use_cufinufft = self.get_bool("USE_CUFINUFFT")
+
+        if "PS_SMD_N_EVENTS" in environ:
+            self._ps_smd_n_events = self.get_int("PS_SMD_N_EVENTS")
+
+        if "USE_CALLMONITOR" in environ:
+            self._use_callmonitor = self.get_bool("USE_CALLMONITOR")
 
 
     def __str__(self):
@@ -132,3 +146,30 @@ class SpinifelSettings(metaclass=Singleton):
     @property
     def using_cuda(self):
         return self._using_cuda
+
+
+    @property
+    def devices_per_node(self):
+        return self._devices_per_node
+
+
+    @property
+    def use_cufinufft(self):
+        return self._use_cufinufft
+
+
+    @property
+    def ps_smd_n_events(self):
+        return self._ps_smd_n_events
+
+
+    @ps_smd_n_events.setter
+    def ps_smd_n_events(self, val):
+        self._ps_smd_n_events = val
+        # update derived environment variable
+        environ["PS_SMD_N_EVENTS"] = str(val)
+
+
+    @property
+    def use_callmonitor(self):
+        return self._use_callmonitor

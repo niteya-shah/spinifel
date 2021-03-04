@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
-root_dir=$(dirname "${BASH_SOURCE[0]}")
+set -e
+
+root_dir=$(readlink -f $(dirname "${BASH_SOURCE[0]}"))
 pushd $root_dir
 
 # Basics
@@ -12,8 +14,8 @@ export -p > $root_dir/saved-env.sh
 pathappend() {
     for ARG in "\$@"
     do
-        if [ -d "\$ARG" ] && [[ ":\$PATH:" != *":\$ARG:"* ]]; then
-            export PATH="$\{PATH:+"\$PATH:"}\$ARG"
+        if [[ -d "\$ARG" ]] && [[ ":\$PATH:" != *":\$ARG:"* ]]; then
+            export PATH="\${PATH:+"\$PATH:"}\$ARG"
         fi
     done
 }
@@ -21,7 +23,7 @@ pathappend() {
 ldpathappend() {
     for ARG in "\$@"
     do
-        if [ -d "\$ARG" ] && [[ ":\$LD_LIBRARY_PATH:" != *":\$ARG:"* ]]; then
+        if [[ -d "\$ARG" ]] && [[ ":\$LD_LIBRARY_PATH:" != *":\$ARG:"* ]]; then
             export LD_LIBRARY_PATH="\${LD_LIBRARY_PATH:+"\$LD_LIBRARY_PATH:"}\$ARG"
         fi
     done
@@ -30,17 +32,30 @@ ldpathappend() {
 pythonpathappend() {
     for ARG in "\$@"
     do
-        if [ -d "\$ARG" ] && [[ ":\$PYTHONPATH:" != *":\$ARG:"* ]]; then
+        if [[ -d "\$ARG" ]] && [[ ":\$PYTHONPATH:" != *":\$ARG:"* ]]; then
             export PYTHONPATH="\${PYTHONPATH:+"\$PYTHONPATH:"}\$ARG"
         fi
     done
 }
+
+_module_loaded () {
+    mod_grep=\$(module list 2>&1 | grep \$@)
+
+    if [[ -n \$mod_grep ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
 EOF
 
 # Setup environment.
 if [[ $(hostname) = "cori"* ]]; then
     cat >> env.sh <<EOF
-module swap PrgEnv-intel PrgEnv-gnu
+if _module_loaded PrgEnv-intel; then
+    module swap PrgEnv-intel PrgEnv-gnu
+fi
 module load cray-fftw
 
 export CC=cc
@@ -48,8 +63,8 @@ export CXX=CC
 export CRAYPE_LINK_TYPE=dynamic # allow dynamic linking
 
 # compilers for mpi4py
-export MPI4PY_CC=gcc
-export MPI4PY_MPICC=cc
+export MPI4PY_CC="$(which cc)"
+export MPI4PY_MPICC="$(which cc) --shared"
 
 # disable Cori-specific Python environment
 unset PYTHONSTARTUP
@@ -80,11 +95,11 @@ export USE_GASNET=${USE_GASNET:-1}
 # becomes a problem elsewhere
 export CONDUIT=${CONDUIT:-ibv}
 EOF
-elif [[ $(hostname --fqdn) = *"summit"* ]]; then
+elif [[ $(hostname --fqdn) = *"summit"* || $(hostname --fqdn) = *"ascent"* ]]; then
     cat >> env.sh <<EOF
 module load gcc/7.4.0
 module load fftw/3.3.8
-module load cuda/9.2.148
+module load cuda/10.2.89
 module load gsl
 export CC=gcc
 export CXX=g++

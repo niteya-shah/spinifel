@@ -7,6 +7,8 @@ from .autocorrelation import solve_ac
 from .phasing import phase
 from .orientation_matching import match
 
+import numpy as np
+
 
 def main():
     comm = MPI.COMM_WORLD
@@ -45,7 +47,11 @@ def main():
 
     ac_phased, support_, rho_ = phase(0, ac)
     logger.log(f"Problem phased in {timer.lap():.2f}s.")
-
+    
+    # Use imrovement of cc(prev_rho, cur_rho) to detemine if
+    # we should terimate the loop
+    cov_xy = 0 
+    cov_delta = .05
     for generation in range(1, 10):
         orientations = match(
             ac_phased, slices_,
@@ -57,7 +63,22 @@ def main():
             slices_, orientations, ac_phased)
         logger.log(f"AC recovered in {timer.lap():.2f}s.")
 
+        if comm.rank == 0: prev_rho_ = rho_[:]
         ac_phased, support_, rho_ = phase(generation, ac, support_, rho_)
-        logger.log(f"Problem phased in {timer.lap():.2f}s.")
+        
+        if comm.rank == 0:
+            cc_matrix = np.corrcoef(prev_rho_.flatten(), rho_.flatten())
+            prev_cov_xy = cov_xy
+            cov_xy = cc_matrix[0,1]
+        else:
+            prev_cov_xy = None
+            cov_xy = None
+        prev_cov_xy = comm.bcast(prev_cov_xy, root=0)
+        cov_xy = comm.bcast(cov_xy, root=0)
+
+        logger.log(f"Problem phased in {timer.lap():.2f}s. cc={cov_xy:.2f} delta={cov_xy-prev_cov_xy:.2f}")
+        if cov_xy - prev_cov_xy < cov_delta:
+            break
+        
 
     logger.log(f"Total: {timer.total():.2f}s.")

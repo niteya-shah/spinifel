@@ -3,8 +3,14 @@
 
 
 from .settings import SpinifelSettings
+from .context  import SpinifelContexts, Profiler
 
 
 
-# Initialize the state of the SpinifelSettings singleton class
-SpinifelSettings()
+# Initialize the state of the SpinifelSettings/Contexts singleton classes
+settings = SpinifelSettings()
+context  = SpinifelContexts()
+profiler = Profiler()
+
+# Configure profiler
+profiler.callmonitor_enabled = settings.use_callmonitor

@@ -1,12 +1,9 @@
 #!/bin/bash
 #SBATCH --nodes=1
-#SBATCH --time=04:00:00
-#SBATCH --qos=premium
-#SBATCH --constraint=haswell
-#SBATCH --mail-type=ALL
-#SBATCH --account=m2859
+#SBATCH --time=00:30:00
+#SBATCH --partition amdMI100
 
-while getopts lmpscavn:t:d:f option
+while getopts lmpsavn:t:d: option
 do
 case "${option}"
 in
@@ -14,13 +11,11 @@ l) USING_LEGION="1";;
 m) USING_MPI="1";;
 p) PROFILING="1";;
 s) SMALL_PROBLEM="1";;
-c) USING_CUDA="1";;
 a) USE_PSANA="1";;
 v) VERBOSITY="1";;
 n) NTASKS=$OPTARG;;
 t) OMP_NUM_THREADS=$OPTARG;;
 d) DATA_MULTIPLIER=$OPTARG;;
-f) USE_CUFINUFFT="1";;
 esac
 done
 
@@ -35,9 +30,9 @@ source "$root_dir"/setup/env.sh
 
 export PYTHONPATH="$PYTHONPATH:$root_dir"
 
-export DATA_DIR=$SCRATCH/spinifel_data
+export DATA_DIR=$HOME/spinifel_data_h5
 
-export OUT_DIR=$SCRATCH/spinifel_output
+export OUT_DIR=$HOME/spinifel_output
 mkdir -p $OUT_DIR
 rm -rf $OUT_DIR/*
 
@@ -66,11 +61,6 @@ if [[ -n $VERBOSITY ]]; then
     export VERBOSITY
 fi
 
-if [[ -n $USE_CUFINUFFT ]]; then
-    export USE_CUFINUFFT
-fi
-echo "USE_CUFINUFFT: $USE_CUFINUFFT"
-
 if [[ -z $DATA_MULTIPLIER ]]; then
     DATA_MULTIPLIER="1"
 fi
@@ -79,9 +69,9 @@ export DATA_MULTIPLIER
 if [[ -n $USING_CUDA ]]; then
     export USING_CUDA
     echo "CUDA: $USING_CUDA"
-    # cd "$root_dir"/spinifel/sequential/
-    # nvcc -O3 -shared -std=c++11 --compiler-options -fPIC `python3 -m pybind11 --includes` orientation_matching.cu -o pyCudaKNearestNeighbors`python3-config --extension-suffix`
-    # cd "$root_dir"
+    cd "$root_dir"/spinifel/sequential/
+    nvcc -O3 -shared -std=c++11 --compiler-options -fPIC `python3 -m pybind11 --includes` orientation_matching.cu -o pyCudaKNearestNeighbors`python3-config --extension-suffix`
+    cd "$root_dir"
 fi
 
 if [[ $USING_LEGION -eq 1 ]]; then

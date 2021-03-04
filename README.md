@@ -3,6 +3,13 @@ Applies the M-TIP algorithm to SPI data.
 
 
 ## Installation
+  
+NOTE: USE THIS CLONING INSTRUCTION UNTIL MERGED BACK TO MASTER
+
+```
+git clone -b development --recurse-submodules http://gitlab.osti.gov/mtip/spinifel.git
+```
+
 
 As of writing, spinifel has been tested on Cori Haswell, Cori GPU, and Summit.
 
@@ -37,7 +44,8 @@ file.
 ## CUDA Support
 
 Currently the following components enable CUDA support:
-1. `finufft` -> `cufinufft`
+1. Non-Uniform FFT (`finufft`, or `cufinufft`)
+2. Orientation Matching
 
 
 ### Using `cufinufft`
@@ -76,6 +84,7 @@ A README file is also provided in the `spinifel/sequential/` path for
 
 ## Running
 
+
 ### On Summit
 
 `run_summit.sh` file is included in `scripts/` path. The script file is written
@@ -97,6 +106,29 @@ bsub -P CHM137 -J fxs -W 2:00 -nnodes 1 -e error.log -o output.log "sh scripts/r
 bsub -P CHM137 -J fxs -W 2:00 -nnodes 1 -e error.log -o output.log "sh scripts/run_summit.sh -m -n 1 -t 1 -d 1"
 ```
 
+3. Testing on interactive node with development version*: 
+```
+./scripts/run_summit_mult.sh -m -n 1 -a 1 -g 1 -r 1 -d 1 -c -f
+```
+
+## Developer's Guilde
+
+Here are some helpful tips for developing Spinifel.
+
+
+### Components for Managing Global Settings and Contexts
+
+These components help manage Spinifel's globa state. We distinguish between
+settings and contexts, the latter being used to manage parallelism and devices.
+
+
+#### `SpinifelSettings`
+
+
+#### `SpinifelContexts`
+
+
+
 
 ## Bugs and Issues
 
@@ -106,6 +138,18 @@ bsub -P CHM137 -J fxs -W 2:00 -nnodes 1 -e error.log -o output.log "sh scripts/r
 1. The GCC compiler version is changed to 6.4.0. When executing the script by
 enable CUDA through `export USE_CUDA=${USE_CUDA:-1}`, it results in build
 errors as it does not support any GCC version greater 7.0.
+
+2. Installing cufinufft,
+cd spinifel/setup
+git clone https://github.com/JBlaschke/cufinufft.git
+cd cufinufft
+echo "CUDA_ROOT=/sw/summit/cuda/10.2.89" >> sites/make.inc.olcf_summit
+make site=olcf_summit
+export LD_LIBRARY_PATH=${PWD}/lib:${LD_LIBRARY_PATH}
+make python
+
+Note: Use cuda 10.2.89 or above then remove pip cache (rm -rf ~/.cache/pip). 
+
 
 
 ### Execution:
