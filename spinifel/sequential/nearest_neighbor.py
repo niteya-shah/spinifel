@@ -25,12 +25,10 @@ if settings.using_cuda and KNN_AVAILABLE:
     import spinifel.sequential.pyCudaKNearestNeighbors as pyCu
 
 #-------------------------------------------------------------------------------
-
-
-def nearest_neighbor(model_slices, slices):
+def calc_eudist(model_slices, slices):
     if settings.using_cuda:
         if settings.verbose:
-            print("Using CUDA nearest neighbor.")
+            print("Using CUDA Euclidean Distance Calculation.")
 
         model_slices_flat = model_slices.flatten()
         slices_flat       = slices.flatten()
@@ -44,18 +42,40 @@ def nearest_neighbor(model_slices, slices):
                                             model_slices.shape[0],
                                             slices.shape[1],
                                             deviceId)
+    else:
+        if settings.verbose:
+            print("Using sklearn Euclidean Distance Calculation.")
+
+        euDist    = euclidean_distances(model_slices, slices)
+
+    return euDist
+
+def calc_argmin(euDist, n_images, n_refs, n_pixels):
+    if settings.using_cuda:
+        if settings.verbose:
+            print("Using CUDA heap sort")
+
+        deviceId = rank % settings._devices_per_node
+        print(f"Rank {rank} using deviceId {deviceId}")
+
         index =  pyCu.cudaHeapSort(euDist,
-                                   slices.shape[0],
-                                   model_slices.shape[0],
-                                   slices.shape[1],
+                                   n_images,
+                                   n_refs,
+                                   n_pixels,
                                    1,
                                    deviceId)
     else:
         if settings.verbose:
-            print("Using sklearn nearest neighbor.")
+            print("Using sklearn numpy argmin")
 
-        ed    = euclidean_distances(model_slices, slices)
-        index = np.argmin(ed, axis=0)
+        index = np.argmin(euDist, axis=0)
+    return index
 
+def nearest_neighbor(model_slices, slices):
+    euDist = calc_eudist(model_slices, slices)
+    index = calc_argmin(euDist, 
+                        slices.shape[0],
+                        model_slices.shape[0],
+                        slices.shape[1])
     return index
 

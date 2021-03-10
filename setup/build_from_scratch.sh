@@ -59,8 +59,8 @@ PACKAGE_LIST=(
 
     cffi  # Legion
     pybind11  # FINUFFT
-    numba  # pysingfel
-    scikit-learn  # pysingfel
+    numba  # skopi 
+    scikit-learn  # skopi
     tqdm  # convenience
 
     # lcls2
@@ -145,9 +145,9 @@ fi
 
 
 #_______________________________________________________________________________
-# Install pysingfel
+# Install skopi (formerly known as pysingfel) 
 
-./rebuild_pysingfel.sh
+./rebuild_skopi.sh
 
 #-------------------------------------------------------------------------------
 

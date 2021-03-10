@@ -73,8 +73,8 @@ class SpinifelSettings(metaclass=Singleton):
         if "USING_CUDA" in environ:
             self._using_cuda = self.get_bool("USING_CUDA")
 
-        if "DEVICES_PER_NODE" in environ:
-            self._devices_per_node = self.get_int("DEVICES_PER_NODE")
+        if "DEVICES_PER_RS" in environ:
+            self._devices_per_node = self.get_int("DEVICES_PER_RS")
 
         if "USE_CUFINUFFT" in environ:
             self._use_cufinufft = self.get_bool("USE_CUFINUFFT")

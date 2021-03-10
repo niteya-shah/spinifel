@@ -1,5 +1,5 @@
 import numpy     as np
-import pysingfel as ps
+import skopi     as skp
 import time
 
 from   spinifel import parms, utils, autocorrelation, SpinifelSettings
@@ -11,6 +11,19 @@ settings = SpinifelSettings()
 
 
 def match(ac, slices_, pixel_position_reciprocal, pixel_distance_reciprocal):
+    """ 
+    TODO MONA: add batch_size to avoid running out of memory 
+    when no. of reference orientations increase. 
+
+    Note that N_pixels also grown when N_binning is small but 
+    it's harder to divide an image up at the moment.
+
+    For each batch in batched ref. orientations
+        get H, K, L for this batch
+        generate model_slices for this H, K, L
+        get indices of the best matched 
+        
+    """
     st = time.time()
     Mquat = parms.Mquat
     M = 4 * Mquat + 1
@@ -23,8 +36,8 @@ def match(ac, slices_, pixel_position_reciprocal, pixel_distance_reciprocal):
     if not N_slices:
         return np.zeros((0, 4))
 
-    ref_orientations = ps.get_uniform_quat(N_orientations, True)
-    ref_rotmat = np.array([ps.quaternion2rot3d(quat) for quat in ref_orientations])
+    ref_orientations = skp.get_uniform_quat(N_orientations, True)
+    ref_rotmat = np.array([skp.quaternion2rot3d(quat) for quat in ref_orientations])
     H, K, L = np.einsum("ijk,klmn->jilmn", ref_rotmat, pixel_position_reciprocal)
     real_extent = 2
     reciprocal_extent = pixel_distance_reciprocal.max()
@@ -51,5 +64,5 @@ def match(ac, slices_, pixel_position_reciprocal, pixel_distance_reciprocal):
     
     en_match = time.time()
 
-    print(f"MATCH TIMING: tot={en_match-st}s. slice={en_slice-st_slice}s. match={en_match-st_match}s. slice_oh={st_slice-st}s. match_oh={st_match-en_slice}s.")
+    print(f"Match tot:{en_match-st:.2f}s. slice={en_slice-st_slice:.2f}s. match={en_match-st_match:.2f}s. slice_oh={st_slice-st:.2f}s. match_oh={st_match-en_slice:.2f}s.")
     return ref_orientations[index]
