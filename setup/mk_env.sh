@@ -135,8 +135,8 @@ EOF
 elif [[ $(hostname) = *"tulip"* ]]; then
     cat >> env.sh <<EOF
 # load a ROCm-compatible MPI
-module use /home/users/twhite/share/modulefiles
-module load ompi
+module use /home/groups/coegroup/share/coe/modulefiles
+module load ompi/4.1.0/llvm/rocm/4.1.0
 
 export CC=gcc
 export CXX=g++
