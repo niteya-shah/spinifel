@@ -77,14 +77,6 @@ if [[ -z $DATA_MULTIPLIER ]]; then
 fi
 export DATA_MULTIPLIER
 
-if [[ -n $USING_CUDA ]]; then
-    export USING_CUDA
-    echo "CUDA: $USING_CUDA"
-    cd "$root_dir"/spinifel/sequential/
-    hipcc -O3 -fPIC -shared -std=c++11 `python3 -m pybind11 --includes` orientation_matching.cu -o pyCudaKNearestNeighbors`python3-config --extension-suffix`
-    cd "$root_dir"
-fi
-
 if [[ $USING_LEGION -eq 1 ]]; then
     export PS_PARALLEL=legion
     srun -n $NTASKS -N $nodes --cpus-per-task=$(( total_cores * 2 / (NTASKS / nodes) )) legion_python legion_main.py -ll:csize 65536 -ll:py 1 -ll:pyomp $(( total_cores - 2 )) $LGFLAGS
