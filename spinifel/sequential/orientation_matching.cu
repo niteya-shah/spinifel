@@ -617,7 +617,7 @@ py::array_t<dtype> cudaComputeEuclideanDistance(py::array_t<dtype> dataImgs, py:
 	cout<<"[CUDA] Dimension of dataImgs: "<<dataBuf.ndim<<" and refImgs: "<<refBuf.ndim<<endl;
 	cout<<"[CUDA] Size of dataImgs: "<<dataBuf.size<<" and refImgs: "<<refBuf.size<<endl;
 
-    cudaSetDevice(deviceId);
+    hipSetDevice(deviceId);
 
 	//Declare and allocate device variables
 	dtype *dDataImgs, *dRefImgs, *dEuDist;
@@ -686,7 +686,7 @@ py::array_t<int> cudaComputeHeapSort(py::array_t<dtype> euDist, int numDataImgs,
         cout<<"[CUDA] Dimension of euDist: "<<euDistBuf.ndim<<endl;
         cout<<"[CUDA] Size of euDist: "<<euDistBuf.size<<endl;
 
-        cudaSetDevice(deviceId);
+        hipSetDevice(deviceId);
 
         //Declare and allocate device variables
         dtype *dEuDist, *dKDist; int *dKIndex;
