@@ -89,5 +89,5 @@ else
         PYFLAGS="-m cProfile -o $OUT_DIR/main.prof "$PYFLAGS
     fi
     DATA_MULTIPLIER=$(echo $(( DATA_MULTIPLIER * NTASKS )) )  # use same amount of data as distributed app
-    srun -n 1 python $PYFLAGS sequential_main.py
+    srun -n 1 env LD_PRELOAD=/opt/rocm-4.1.0/lib/libhsa-runtime64.so.1 python $PYFLAGS sequential_main.py
 fi
