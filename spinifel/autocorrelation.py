@@ -2,12 +2,18 @@ import numpy     as np
 import skopi     as skp
 from   spinifel  import SpinifelSettings, SpinifelContexts, Profiler
 import time
+import logging
 
 settings = SpinifelSettings()
 context  = SpinifelContexts()
 profiler = Profiler()
 
 import PyNVTX as nvtx
+
+import sys
+
+
+import pycuda.driver as cuda
 
 #________________________________________________________________________________
 # Load cufiNUFFT or fiNUFFTpy depending on settings: use_cuda, use_cufinufft
@@ -80,6 +86,11 @@ def forward_cpu(ugrid, H_, K_, L_, support, M, N, recip_extent, use_recip_sym):
 @nvtx.annotate("autocorrelation.forward_gpu")
 def forward_gpu(ugrid, H_, K_, L_, support, M, N, recip_extent, use_recip_sym):
     """Apply the forward, NUFFT2- problem -- CUDA Implementation."""
+    logger = logging.getLogger(__name__)
+
+    gpu_free, gpu_total = cuda.mem_get_info()
+    logger.debug(f'init gpu_free={gpu_free/1e9:.2f}GB gpu_total={gpu_total/1e9:.2f}GB')
+    
     dev_id = context.dev_id
     if settings.verbose:
         print(f"Using CUDA to solve the forward transform on device {dev_id}")
@@ -105,9 +116,18 @@ def forward_gpu(ugrid, H_, K_, L_, support, M, N, recip_extent, use_recip_sym):
         # H_gpu = to_gpu(H_)
         # K_gpu = to_gpu(K_)
         # L_gpu = to_gpu(L_)
+        
         H_gpu = to_gpu(L_)
+        gpu_free, gpu_total = cuda.mem_get_info()
+        logger.debug(f'H={sys.getsizeof(L_)/1e9:.2f}GB copied gpu_free={gpu_free/1e9:.2f}GB gpu_total={gpu_total/1e9:.2f}GB')
+        
         K_gpu = to_gpu(K_)
+        gpu_free, gpu_total = cuda.mem_get_info()
+        logger.debug(f'K={sys.getsizeof(K_)/1e9:.2f}GB copied gpu_free={gpu_free/1e9:.2f}GB gpu_total={gpu_total/1e9:.2f}GB')
+        
         L_gpu = to_gpu(H_)
+        gpu_free, gpu_total = cuda.mem_get_info()
+        logger.debug(f'L={sys.getsizeof(H_)/1e9:.2f}GB copied gpu_free={gpu_free/1e9:.2f}GB gpu_total={gpu_total/1e9:.2f}GB')
         ugrid_gpu = to_gpu(ugrid.astype(complex_dtype))
     else:
         # Due to a change to the cufinufft API, these need to be re-ordered
@@ -128,7 +148,11 @@ def forward_gpu(ugrid, H_, K_, L_, support, M, N, recip_extent, use_recip_sym):
     # Allocate space on Device
     # nuvect = np.zeros(N, dtype=np.complex)
     nvtx.RangePushA("autocorrelation.forward_gpu:GPUArray")
+
+    
     nuvect_gpu = GPUArray(shape=(N,), dtype=complex_dtype)
+    gpu_free, gpu_total = cuda.mem_get_info()
+    logger.debug(f'nuvect_gpu={sys.getsizeof(nuvect_gpu)/1e9:.2f}GB allocated gpu_free={gpu_free/1e9:.2f}GB gpu_total={gpu_total/1e9:.2f}GB')
     nvtx.RangePop()
 
     #___________________________________________________________________________
@@ -196,6 +220,8 @@ def adjoint_cpu(nuvect, H_, K_, L_, support, M, recip_extent, use_recip_sym):
 @nvtx.annotate("autocorrelation.adjoint_gpu")
 def adjoint_gpu(nuvect, H_, K_, L_, support, M, recip_extent, use_recip_sym):
     """Apply the adjoint, NUFFT1+ problem -- CUDA Implementation."""
+    logger = logging.getLogger(__name__)
+
     dev_id = context.dev_id
     if settings.verbose:
         print(f"Using CUDA to solve the adjoint transform on device {dev_id}")
@@ -218,6 +244,7 @@ def adjoint_gpu(nuvect, H_, K_, L_, support, M, recip_extent, use_recip_sym):
         # H_gpu = to_gpu(H_)
         # K_gpu = to_gpu(K_)
         # L_gpu = to_gpu(L_)
+        logging.debug(f'L={L_.shape}/{L_.dtype}/{sys.getsizeof(L_)} K={K_.shape}/{K_.dtype}/{sys.getsizeof(K_)} H={H_.shape}/{H_.dtype}/{sys.getsizeof(H_)}')
         H_gpu = to_gpu(L_)
         K_gpu = to_gpu(K_)
         L_gpu = to_gpu(H_)
