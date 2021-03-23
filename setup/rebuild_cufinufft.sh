@@ -15,5 +15,5 @@ else
     echo "Cannot build cuFINUFFT for this architecture"
     exit
 fi
-LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CUFINUFFT_DIR make python
+LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CUFINUFFT_DIR pip install . --no-cache-dir
 popd
