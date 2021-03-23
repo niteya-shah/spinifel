@@ -15,5 +15,6 @@ else
     echo "Cannot build cuFINUFFT for this architecture"
     exit
 fi
-LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CUFINUFFT_DIR pip install . --no-cache-dir
+pip install --no-cache-dir pycuda
+LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CUFINUFFT_DIR pip install --no-cache-dir .
 popd
