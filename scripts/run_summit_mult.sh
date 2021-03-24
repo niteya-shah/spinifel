@@ -7,7 +7,7 @@
 #BSUB -e error.%J.log         # error file name in which %J is replaced by the job ID
 #BSUB -o output.%J.log        # output file name in which %J is replaced by the job ID
 
-while getopts msca:t:d:g:n:fr: option
+while getopts msca:t:d:g:n:fr:e option
 do
 case "${option}"
 in
@@ -21,8 +21,14 @@ g) DEVICES_PER_RS=$OPTARG;;
 n) NRESOURCESETS=$OPTARG;;
 f) USE_CUFINUFFT="1";;
 r) NRSS_PER_NODE=$OPTARG;;
+e) CHECK_FOR_ERRORS="1";;
 esac
 done
+
+if [[ -n CHECK_FOR_ERRORS ]]; then
+    echo "CHECK_FOR_ERRORS: $CHECK_FOR_ERRORS"
+    set -e
+fi
 
 export LD_PRELOAD=/sw/summit/gcc/8.1.1-cuda10.1.168/lib64/libgomp.so.1
 if [[ -n $USING_MPI ]]; then
@@ -40,11 +46,11 @@ export PYTHONPATH="$PYTHONPATH:$root_dir"
 export MPLCONFIGDIR=/gpfs/alpine/scratch/$USER/chm137/mtipProxy/writableDirectory
 
 #export DATA_DIR=$SCRATCH/spinifel_data
-export DATA_DIR=/gpfs/alpine/proj-shared/chm137/data/spi
+export DATA_DIR=${DATA_DIR:-/gpfs/alpine/proj-shared/chm137/data/spi}
 #export DATA_DIR=/gpfs/alpine/proj-shared/chm137/iris
 
 #export OUT_DIR=$SCRATCH/spinifel_output
-export OUT_DIR=/gpfs/alpine/proj-shared/chm137/$USER/spinifel_output
+export OUT_DIR=${OUT_DIR:-/gpfs/alpine/proj-shared/chm137/$USER/spinifel_output}
 mkdir -p $OUT_DIR
 rm -rf $OUT_DIR/*
 
