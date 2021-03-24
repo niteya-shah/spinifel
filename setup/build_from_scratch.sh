@@ -87,8 +87,8 @@ conda install -y bitstruct krtc -c conda-forge
 
 # Install pip packages
 CC=$MPI4PY_CC MPICC=$MPI4PY_MPICC pip install -v --no-binary mpi4py mpi4py
-pip install callmonitor
-pip install PyNVTX
+pip install --no-cache-dir callmonitor
+pip install --no-cache-dir PyNVTX
 
 #-------------------------------------------------------------------------------
 
