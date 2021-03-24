@@ -44,7 +44,7 @@ export DATA_DIR=/gpfs/alpine/proj-shared/chm137/data/spi
 #export DATA_DIR=/gpfs/alpine/proj-shared/chm137/iris
 
 #export OUT_DIR=$SCRATCH/spinifel_output
-export OUT_DIR=/gpfs/alpine/proj-shared/chm137/blaschke/spinifel_output
+export OUT_DIR=/gpfs/alpine/proj-shared/chm137/$USER/spinifel_output
 mkdir -p $OUT_DIR
 rm -rf $OUT_DIR/*
 
