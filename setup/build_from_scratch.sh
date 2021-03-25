@@ -4,7 +4,7 @@
 set -e
 
 
-root_dir="$(dirname "${BASH_SOURCE[0]}")"
+root_dir=$(readlink -f $(dirname "${BASH_SOURCE[0]}"))
 pushd $root_dir
 
 # Enable host overwrite
