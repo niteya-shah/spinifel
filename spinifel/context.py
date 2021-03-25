@@ -1,18 +1,55 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+"""Manages Global Contexts, eg MPI and CUDA"""
+
+
 
 from atexit         import register
 from importlib.util import find_spec
-from callmonitor    import intercept as cm_intercept
 from functools      import wraps
+from callmonitor    import intercept as cm_intercept
 
 from .settings import SpinifelSettings
 from .utils    import Singleton
 
+MPI4PY_AVAILABLE = False
+if find_spec("mpi4py") is not None:
+    from mpi4py import MPI
+    MPI4PY_AVAILABLE = True
+
+PYCUDA_AVAILABLE = False
+if find_spec("pycuda") is not None:
+    import pycuda
+    import pycuda.driver as drv
+    PYCUDA_AVAILABLE = True
+
+
+
+
+class CUFINUFFTRequiredButNotFound(Exception):
+    """Settings require cufiNUFFT, but the module is unavailable"""
+
+
+
+class FINUFFTPYRequiredButNotFound(Exception):
+    """Settings require cufiNUFFT, but the module is unavailable"""
+
 
 
 class SpinifelContexts(metaclass=Singleton):
+    """
+    Singleton Class SpinifelContexts.
+
+    Singleton: Will be initialized once -- repeted calls to constructor will
+    return singleton instance
+
+    Manages global contexts for MPI and CUDA
+
+    Initializers:
+        init_mpi
+        init_cuda
+    """
 
     def __init__(self):
         self._rank = 0
@@ -23,10 +60,13 @@ class SpinifelContexts(metaclass=Singleton):
 
 
     def init_mpi(self):
+        """
+        does nothing if already initialized
+        initializes mpi4py and registers MPI.Finalize on atexit stack
+        """
+
         if self._mpi_initialized:
             return
-
-        from mpi4py import MPI
 
         self._comm = MPI.COMM_WORLD
         self._rank = self.comm.Get_rank()
@@ -41,58 +81,95 @@ class SpinifelContexts(metaclass=Singleton):
 
 
     def init_cuda(self):
+        """
+        does nothing if already initialized
+        initializes pycuda and creates context bound to device:
+            <MPI Rank> % <Devices Per Resource Set>
+        and registers context cleanup on atexit stack
+        """
         if self._cuda_initialized:
             return
-
-        import pycuda
-        import pycuda.driver as drv
 
         drv.init()
 
         settings     = SpinifelSettings()
-        self._dev_id = self.rank%settings.devices_per_node
+        self._dev_id = self.rank % settings.devices_per_node
 
         dev = drv.Device(self.dev_id)
-        ctx = dev.make_context() 
+        ctx = dev.make_context()
 
         register(ctx.pop)
 
         settings = SpinifelSettings()
         if settings.verbose:
-            print(f"Rank {self.rank} has been assigned to device {self.dev_id}")
+            print(f"Rank {self.rank} assigned to device {self.dev_id}")
 
         self._cuda_initialized = True
 
 
     @property
     def rank(self):
+        """
+        Get MPI Rank
+        """
         return self._rank
 
 
     @property
     def comm(self):
+        """
+        Get MPI Communicator
+        """
         return self._comm
 
 
     @property
     def dev_id(self):
+        """
+        Get CUDA device ID
+        """
         return self._dev_id
 
 
     @property
+    def cuda_mem_info(self):
+        """
+        Get CUDA memory info
+        Returns gpu_free, gpu_total
+        """
+        if PYCUDA_AVAILABLE:
+            return pycuda.mem_get_info()
+        return -1, -1
+
+
+    @property
     def cufinufft_available(self):
+        """
+        Return true if the cufinufft module is available
+        """
         loader = find_spec("cufinufft")
         return loader is not None
 
 
     @property
     def finufftpy_available(self):
+        """
+        Return true if the finufftpy module is available
+        """
         loader = find_spec("finufftpy")
         return loader is not None
 
 
 
-class Profiler(object, metaclass=Singleton):
+class Profiler(metaclass=Singleton):
+    """
+    Singleton Class Profiler
+
+    Singleton: Will be initialized once -- repeted calls to constructor will
+    return singleton instance
+
+    Switchable profiling dectorators
+    """
 
     def __init__(self):
         self._callmonitor_enabled = False
@@ -100,6 +177,9 @@ class Profiler(object, metaclass=Singleton):
 
     @property
     def callmonitor_enabled(self):
+        """
+        Controll callmonitor wrapper if set to true
+        """
         return self._callmonitor_enabled
 
 
@@ -110,15 +190,18 @@ class Profiler(object, metaclass=Singleton):
 
     @property
     def intercept(self):
+        """
+        Generate the intercept wrapper: if callmonitor_enabled=False, then this
+        wrapper is a no-op
+        """
 
-        def noop(f):
-            @wraps(f)
+        def noop(func):
+            @wraps(func)
             def _noop(*args, **kwargs):
-                return f(*args, **kwargs)
+                return func(*args, **kwargs)
 
             return _noop
 
         if self.callmonitor_enabled:
             return cm_intercept
-        else:
-            return noop
+        return noop
