@@ -50,8 +50,11 @@ _module_loaded () {
 
 EOF
 
+# Enable host overwrite
+target=${SPINIFEL_TARGET:-$(hostname)}
+
 # Setup environment.
-if [[ $(hostname) = "cori"* ]]; then
+if [[ ${target} = "cori"* ]]; then
     cat >> env.sh <<EOF
 if _module_loaded PrgEnv-intel; then
     module swap PrgEnv-intel PrgEnv-gnu
@@ -77,7 +80,7 @@ export USE_OPENMP=${USE_OPENMP:-1}
 export USE_GASNET=${USE_GASNET:-1}
 export CONDUIT=${CONDUIT:-aries}
 EOF
-elif [[ $(hostname) = "cgpu"* ]]; then
+elif [[ ${target} = "cgpu"* ]]; then
     cat >> env.sh <<EOF
 module purge
 module load cgpu gcc cuda openmpi fftw python
@@ -116,7 +119,7 @@ export CONDUIT=${CONDUIT:-ibv}
 # for Numba
 export CUDA_HOME=\$OLCF_CUDA_ROOT
 EOF
-elif [[ $(hostname) = *"jlse"* ]]; then # iris, yarrow
+elif [[ ${target} = *"jlse"* ]]; then # iris, yarrow
     cat >> env.sh <<EOF
 module load oneapi # just get some sort of a compiler loaded
 module load mpi
@@ -132,7 +135,7 @@ export USE_OPENMP=${USE_OPENMP:-1}
 export USE_GASNET=${USE_GASNET:-0} # FIXME: GASNet on iris is currently broken
 export CONDUIT=${CONDUIT:-ibv}
 EOF
-elif [[ $(hostname) = *"tulip"* ]]; then
+elif [[ ${target} = *"tulip"* ]]; then
     cat >> env.sh <<EOF
 # load a ROCm-compatible MPI
 module use /home/users/twhite/share/modulefiles
