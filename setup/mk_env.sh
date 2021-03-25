@@ -51,7 +51,7 @@ _module_loaded () {
 EOF
 
 # Enable host overwrite
-target=${SPINIFEL_TARGET:-$(hostname)}
+target=${SPINIFEL_TARGET:-$(hostname --fqdn)}
 
 # Setup environment.
 if [[ ${target} = "cori"* ]]; then
@@ -98,7 +98,7 @@ export USE_GASNET=${USE_GASNET:-1}
 # becomes a problem elsewhere
 export CONDUIT=${CONDUIT:-ibv}
 EOF
-elif [[ $(hostname --fqdn) = *"summit"* || $(hostname --fqdn) = *"ascent"* ]]; then
+elif [[ ${target} = *"summit"* || ${target} = *"ascent"* ]]; then
     cat >> env.sh <<EOF
 module load gcc/7.4.0
 module load fftw/3.3.8

@@ -5,11 +5,14 @@ set -e
 root_dir="$(dirname "${BASH_SOURCE[0]}")"
 source "$root_dir"/env.sh
 
+# Enable host overwrite
+target=${SPINIFEL_TARGET:-$(hostname --fqdn)}
+
 pushd "$root_dir"/cufinufft
 
-if [[ $(hostname) = "cgpu"* ]]; then
+if [[ ${target} = "cgpu"* ]]; then
     make -j${THREADS:-8} site=nersc_cgpu lib
-elif [[ $(hostname --fqdn) = *"summit"* || $(hostname --fqdn) = *"ascent"* ]]; then
+elif [[ ${target} = *"summit"* || ${target} = *"ascent"* ]]; then
     make -j${THREADS:-8} site=olcf_summit lib
 else
     echo "Cannot build cuFINUFFT for this architecture"

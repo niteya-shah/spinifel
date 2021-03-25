@@ -7,6 +7,9 @@ set -e
 root_dir="$(dirname "${BASH_SOURCE[0]}")"
 pushd $root_dir
 
+# Enable host overwrite
+target=${SPINIFEL_TARGET:-$(hostname)}
+
 
 #_______________________________________________________________________________
 # Make clean environment
@@ -129,7 +132,7 @@ fi
 #_______________________________________________________________________________
 # Rebuild FFTW (only needed on some systems -- that don't supply their own)
 
-if [[ $(hostname) = *"tulip"* || $(hostname) = *"jlse"* ]]; then
+if [[ ${target} = *"tulip"* || ${target} = *"jlse"* ]]; then
     ./rebuild_fftw.sh
 fi
 
