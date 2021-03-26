@@ -1,2 +1,2 @@
 [MESSAGE CONTROL]
-disable = import-error, c-extension-no-member
+disable = invalid-name, too-many-arguments, too-many-locals, import-error, c-extension-no-member

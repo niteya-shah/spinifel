@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+
 """Manages Global Contexts, eg MPI and CUDA"""
 
 
@@ -20,20 +21,11 @@ if find_spec("mpi4py") is not None:
 
 PYCUDA_AVAILABLE = False
 if find_spec("pycuda") is not None:
-    import pycuda
+    # import pycuda
     import pycuda.driver as drv
     PYCUDA_AVAILABLE = True
 
 
-
-
-class CUFINUFFTRequiredButNotFound(Exception):
-    """Settings require cufiNUFFT, but the module is unavailable"""
-
-
-
-class FINUFFTPYRequiredButNotFound(Exception):
-    """Settings require cufiNUFFT, but the module is unavailable"""
 
 
 
@@ -138,7 +130,7 @@ class SpinifelContexts(metaclass=Singleton):
         Returns gpu_free, gpu_total
         """
         if PYCUDA_AVAILABLE:
-            return pycuda.mem_get_info()
+            return drv.mem_get_info()
         return -1, -1
 
 
