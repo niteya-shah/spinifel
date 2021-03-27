@@ -45,11 +45,13 @@ if settings.using_cuda and settings.use_cufinufft:
 
     if context.cufinufft_available:
         from cufinufft import cufinufft
+        FINUFFT_CUDA=True
     else:
         raise CUFINUFFTRequiredButNotFound
 else:
     if context.finufftpy_available:
         import finufftpy as nfft
+        FINUFFT_CUDA=False
     else:
         raise FINUFFTPYRequiredButNotFound
 
@@ -335,8 +337,9 @@ if settings.using_cuda and settings.use_cufinufft:
 
     if context.cufinufft_available:
         print("++++++++++++++++++++: USING_CUFINUFFT")
-        nufft_3d_t1 = nufft_3d_t1_cufinufft_v1
-        nufft_3d_t2 = nufft_3d_t2_cufinufft_v1
+        if cufinufft.__version__ < "1.2":
+            nufft_3d_t1 = nufft_3d_t1_cufinufft_v1
+            nufft_3d_t2 = nufft_3d_t2_cufinufft_v1
     else:
         raise CUFINUFFTRequiredButNotFound
 else:
