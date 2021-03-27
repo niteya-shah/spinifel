@@ -11,7 +11,7 @@ pushd $root_dir
 target=${SPINIFEL_TARGET:-$(hostname)}
 
 # Enable CUDA build
-cuda_build=${SPINIFEL_BUILD_CUDA:-True}
+cuda_build=${SPINIFEL_BUILD_CUDA:-true}
 
 
 #_______________________________________________________________________________
@@ -161,7 +161,7 @@ fi
 #_______________________________________________________________________________
 # Install cufinufft
 
-if [[ ${cuda_build} == True ]]
+if [[ ${cuda_build} == true ]]
 then
     ./rebuild_cufinufft.sh
 fi
@@ -172,7 +172,7 @@ fi
 #_______________________________________________________________________________
 # Install CUDA KNN implmentation
 
-if [[ ${cuda_build} == True ]]
+if [[ ${cuda_build} == true ]]
 then
     ./rebuild_knn.sh
 fi
