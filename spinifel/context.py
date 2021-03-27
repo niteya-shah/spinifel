@@ -123,13 +123,12 @@ class SpinifelContexts(metaclass=Singleton):
         return self._dev_id
 
 
-    @property
     def cuda_mem_info(self):
         """
         Get CUDA memory info
         Returns gpu_free, gpu_total
         """
-        if PYCUDA_AVAILABLE:
+        if self._cuda_initialized and PYCUDA_AVAILABLE:
             return drv.mem_get_info()
         return -1, -1
 
