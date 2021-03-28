@@ -126,6 +126,13 @@ def nufft_3d_t2_finufft_v1(x, y, z, ugrid, sign, eps, n):
 
 
 
+@nvtx.annotate("extern.transpose")
+def transpose(x, y, z):
+    """Transposes the order of the (x, y, z) coordinates to (z, y, x)"""
+    return z, y, x
+
+
+
 @profiler.intercept
 @nvtx.annotate("extern.nufft_3d_t2_cufinufft_v1")
 def nufft_3d_t1_cufinufft_v1(H_, K_, L_, nuvect, sign, eps, nx, ny, nz):
@@ -146,14 +153,12 @@ def nufft_3d_t1_cufinufft_v1(H_, K_, L_, nuvect, sign, eps, nx, ny, nz):
     # Ensure that H_, K_, and L_ have the same shape
     assert H_.shape == K_.shape == L_.shape
 
+    # The rest of Spinifel uses Fortran coordinate order:
+    H_, K_, L_ = transpose(H_, K_, L_)
+
     # Copy input data to Device (if not already there)
     nvtx.RangePushA("extren.nufft_3d_t1_cufinufft_v1:to_gpu")
     if not isinstance(H_, GPUArray):
-        # Due to a change to the cufinufft API, these need to be re-ordered
-        # TODO: Restore when cpu finufft version has been updated
-        # H_gpu = to_gpu(H_)
-        # K_gpu = to_gpu(K_)
-        # L_gpu = to_gpu(L_)
         logger.debug(
                 (
                     f"L={L_.shape}/{L_.dtype}/{getsizeof(L_)} ",
@@ -161,19 +166,14 @@ def nufft_3d_t1_cufinufft_v1(H_, K_, L_, nuvect, sign, eps, nx, ny, nz):
                     f"H={H_.shape}/{H_.dtype}/{getsizeof(H_)}"
                 )
             )
-        H_gpu = to_gpu(L_)
+        H_gpu = to_gpu(H_)
         K_gpu = to_gpu(K_)
-        L_gpu = to_gpu(H_)
+        L_gpu = to_gpu(L_)
         nuvect_gpu = to_gpu(nuvect.astype(complex_dtype))
     else:
-        # Due to a change to the cufinufft API, these need to be re-ordered
-        # TODO: Restore when cpu finufft version has been updated
-        # H_gpu = H_
-        # K_gpu = K_
-        # L_gpu = L_
-        H_gpu = L_
+        H_gpu = H_
         K_gpu = K_
-        L_gpu = H_
+        L_gpu = L_
         nuvect_gpu = nuvect.astype(complex_dtype)
     nvtx.RangePop()
 
@@ -244,20 +244,17 @@ def nufft_3d_t2_cufinufft_v1(H_, K_, L_, ugrid, sign, eps, N):
     # Ensure that H_, K_, and L_ have the same shape
     assert H_.shape == K_.shape == L_.shape
 
+    # The rest of Spinifel uses Fortran coordinate order:
+    H_, K_, L_ = transpose(H_, K_, L_)
+
     # Copy input data to Device (if not already there)
     nvtx.RangePushA("extern.nufft_3d_t2_cufinufft_v1:to_gpu")
     if not isinstance(H_, GPUArray):
-        # Due to a change to the cufinufft API, these need to be re-ordered
-        # TODO: Restore when cpu finufft version has been updated
-        # H_gpu = to_gpu(H_)
-        # K_gpu = to_gpu(K_)
-        # L_gpu = to_gpu(L_)
-
-        H_gpu = to_gpu(L_)
+        H_gpu = to_gpu(H_)
         gpu_free, gpu_total = context.cuda_mem_info()
         logger.debug(
                 (
-                    f"H={getsizeof(L_)/1e9:.2f}GB copied ",
+                    f"H={getsizeof(H_)/1e9:.2f}GB copied ",
                     f"gpu_free={gpu_free/1e9:.2f}GB ",
                     f"gpu_total={gpu_total/1e9:.2f}GB"
                 )
@@ -273,25 +270,20 @@ def nufft_3d_t2_cufinufft_v1(H_, K_, L_, ugrid, sign, eps, N):
                 )
             )
 
-        L_gpu = to_gpu(H_)
+        L_gpu = to_gpu(L_)
         gpu_free, gpu_total = context.cuda_mem_info()
         logger.debug(
                 (
-                    f"L={getsizeof(H_)/1e9:.2f}GB copied ",
+                    f"L={getsizeof(L_)/1e9:.2f}GB copied ",
                     f"gpu_free={gpu_free/1e9:.2f}GB ",
                     f"gpu_total={gpu_total/1e9:.2f}GB"
                 )
             )
         ugrid_gpu = to_gpu(ugrid.astype(complex_dtype))
     else:
-        # Due to a change to the cufinufft API, these need to be re-ordered
-        # TODO: Restore when cpu finufft version has been updated
-        # H_gpu = H_
-        # K_gpu = K_
-        # L_gpu = L_
-        H_gpu = L_
+        H_gpu = H_
         K_gpu = K_
-        L_gpu = H_
+        L_gpu = L_
         ugrid_gpu = ugrid.astype(complex_dtype)
     nvtx.RangePop()
 
