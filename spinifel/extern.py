@@ -5,8 +5,9 @@
 """Manages external libraries"""
 
 
-from   logging  import getLogger
-from   sys      import getsizeof
+from   logging            import getLogger
+from   sys                import getsizeof
+from   importlib.metadata import version
 import numpy    as np
 import PyNVTX   as nvtx
 from   spinifel import SpinifelSettings, SpinifelContexts, Profiler
@@ -32,8 +33,19 @@ class CUFINUFFTRequiredButNotFound(Exception):
 
 
 
+class CUFINUFFTVersionUnsupported(Exception):
+    """The detected version of cufiNUFFT, is unsupported"""
+
+
+
 class FINUFFTPYRequiredButNotFound(Exception):
     """Settings require cufiNUFFT, but the module is unavailable"""
+
+
+
+class FINUFFTPYVersionUnsupported(Exception):
+    """The detected version of fiNUFFT, is unsupported"""
+
 
 
 
@@ -45,13 +57,13 @@ if settings.using_cuda and settings.use_cufinufft:
 
     if context.cufinufft_available:
         from cufinufft import cufinufft
-        FINUFFT_CUDA=True
+        FINUFFT_CUDA = True
     else:
         raise CUFINUFFTRequiredButNotFound
 else:
     if context.finufftpy_available:
         import finufftpy as nfft
-        FINUFFT_CUDA=False
+        FINUFFT_CUDA = False
     else:
         raise FINUFFTPYRequiredButNotFound
 
@@ -337,14 +349,20 @@ if settings.using_cuda and settings.use_cufinufft:
 
     if context.cufinufft_available:
         print("++++++++++++++++++++: USING_CUFINUFFT")
-        if cufinufft.__version__ < "1.2":
+        if version("cufinufft") == "1.1":
             nufft_3d_t1 = nufft_3d_t1_cufinufft_v1
             nufft_3d_t2 = nufft_3d_t2_cufinufft_v1
+        else:
+            raise CUFINUFFTVersionUnsupported
     else:
         raise CUFINUFFTRequiredButNotFound
 else:
     if context.finufftpy_available:
-        nufft_3d_t1 = nufft_3d_t1_finufft_v1
-        nufft_3d_t2 = nufft_3d_t2_finufft_v1
+        print("++++++++++++++++++++: USING_FINUFFTPY")
+        if version("finufftpy") == "1.1.2":
+            nufft_3d_t1 = nufft_3d_t1_finufft_v1
+            nufft_3d_t2 = nufft_3d_t2_finufft_v1
+        else:
+            raise FINUFFTPYVersionUnsupported
     else:
         raise FINUFFTPYRequiredButNotFound
