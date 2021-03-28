@@ -16,7 +16,6 @@ from   .        import transpose, CUFINUFFTRequiredButNotFound, \
 
 
 
-
 #______________________________________________________________________________
 # Load global settings, and contexts
 #

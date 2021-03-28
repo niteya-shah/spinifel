@@ -40,7 +40,9 @@ if settings.using_cuda and settings.use_cufinufft:
     if context.cufinufft_available:
         from cufinufft      import cufinufft
         from .cufinufft_ext import nufft_3d_t1_cufinufft_v1, \
-                                   nufft_3d_t2_cufinufft_v1
+                                   nufft_3d_t2_cufinufft_v1, \
+                                   nufft_3d_t1_cufinufft_v2, \
+                                   nufft_3d_t2_cufinufft_v2
         FINUFFT_CUDA = True
     else:
         raise CUFINUFFTRequiredButNotFound
