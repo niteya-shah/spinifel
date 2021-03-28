@@ -5,13 +5,13 @@
 """Manages external libraries"""
 
 
-from   logging            import getLogger
-from   sys                import getsizeof
-from   importlib.metadata import version
+from   logging  import getLogger
+from   sys      import getsizeof
 import numpy    as np
 import PyNVTX   as nvtx
 from   spinifel import SpinifelSettings, SpinifelContexts, Profiler
-
+from   .        import transpose, CUFINUFFTRequiredButNotFound, \
+                       FINUFFTPYRequiredButNotFound
 
 
 #______________________________________________________________________________
@@ -28,108 +28,13 @@ profiler = Profiler()
 # Load cufiNUFFT or fiNUFFTpy depending on settings: use_cuda, use_cufinufft
 #
 
-class CUFINUFFTRequiredButNotFound(Exception):
-    """Settings require cufiNUFFT, but the module is unavailable"""
-
-
-
-class CUFINUFFTVersionUnsupported(Exception):
-    """The detected version of cufiNUFFT, is unsupported"""
-
-
-
-class FINUFFTPYRequiredButNotFound(Exception):
-    """Settings require cufiNUFFT, but the module is unavailable"""
-
-
-
-class FINUFFTPYVersionUnsupported(Exception):
-    """The detected version of fiNUFFT, is unsupported"""
-
-
-
-
 if settings.using_cuda and settings.use_cufinufft:
-    # TODO: only manage MPI via contexts! But let's leave this here for now
-    context.init_mpi()  # Ensures that MPI has been initalized
-    context.init_cuda() # this must be called _after_ init_mpi
-    from pycuda.gpuarray import GPUArray, to_gpu
+    from . import GPUArray, to_gpu
 
     if context.cufinufft_available:
-        from cufinufft import cufinufft
-        FINUFFT_CUDA = True
+        from . import cufinufft
     else:
         raise CUFINUFFTRequiredButNotFound
-else:
-    if context.finufftpy_available:
-        import finufftpy as nfft
-        FINUFFT_CUDA = False
-    else:
-        raise FINUFFTPYRequiredButNotFound
-
-
-
-@profiler.intercept
-def nufft_3d_t1_finufft_v1(x, y, z, nuvect, sign, eps, nx, ny, nz):
-    """
-    Version 1 of fiNUFFT 3D type 1
-    """
-
-    if settings.verbose:
-        print("Using CPU to solve the NUFFT 3D T1")
-
-    # Ensure that x, y, and z have the same shape
-    assert x.shape == y.shape == z.shape
-
-    # Allocating space in memory
-    ugrid = np.zeros((nx, ny, nz), dtype=np.complex, order='F')
-
-    #__________________________________________________________________________
-    # Solve the NUFFT
-    #
-
-    assert not nfft.nufft3d1(x, y, z, nuvect, sign, eps, nx, ny, nz, ugrid)
-
-    #
-    #--------------------------------------------------------------------------
-
-    return ugrid
-
-
-
-@profiler.intercept
-def nufft_3d_t2_finufft_v1(x, y, z, ugrid, sign, eps, n):
-    """
-    Version 1 of fiNUFFT 3D type 2
-    """
-
-    if settings.verbose:
-        print("Using CPU to solve the NUFFT 3D T2")
-
-    # Ensure that x, y, and z have the same shape
-    assert x.shape == y.shape == z.shape
-
-    # Allocate space in memory
-    nuvect = np.zeros(n, dtype=np.complex)
-
-    #__________________________________________________________________________
-    # Solve the NUFFT
-    #
-
-    assert not nfft.nufft3d2(x, y, z, nuvect, sign, eps, ugrid)
-
-    #
-    #--------------------------------------------------------------------------
-
-
-    return nuvect
-
-
-
-@nvtx.annotate("extern.transpose")
-def transpose(x, y, z):
-    """Transposes the order of the (x, y, z) coordinates to (z, y, x)"""
-    return z, y, x
 
 
 
@@ -329,32 +234,3 @@ def nufft_3d_t2_cufinufft_v1(H_, K_, L_, ugrid, sign, eps, N):
     nvtx.RangePop()
 
     return nuvect
-
-
-
-#______________________________________________________________________________
-# Alias the nufft functions to their cpu/gpu implementations
-#
-
-if settings.using_cuda and settings.use_cufinufft:
-    print("Orientation Matching: USING_CUDA")
-
-    if context.cufinufft_available:
-        print("++++++++++++++++++++: USING_CUFINUFFT")
-        if version("cufinufft") == "1.1":
-            nufft_3d_t1 = nufft_3d_t1_cufinufft_v1
-            nufft_3d_t2 = nufft_3d_t2_cufinufft_v1
-        else:
-            raise CUFINUFFTVersionUnsupported
-    else:
-        raise CUFINUFFTRequiredButNotFound
-else:
-    if context.finufftpy_available:
-        print("++++++++++++++++++++: USING_FINUFFTPY")
-        if version("finufftpy") == "1.1.2":
-            nufft_3d_t1 = nufft_3d_t1_finufft_v1
-            nufft_3d_t2 = nufft_3d_t2_finufft_v1
-        else:
-            raise FINUFFTPYVersionUnsupported
-    else:
-        raise FINUFFTPYRequiredButNotFound
