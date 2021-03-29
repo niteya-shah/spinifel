@@ -70,6 +70,9 @@ if settings.using_cuda and settings.use_cufinufft:
         if version("cufinufft") == "1.1":
             nufft_3d_t1 = nufft_3d_t1_cufinufft_v1
             nufft_3d_t2 = nufft_3d_t2_cufinufft_v1
+        elif version("cufinufft") >= "1.2":
+            nufft_3d_t1 = nufft_3d_t1_cufinufft_v2
+            nufft_3d_t2 = nufft_3d_t2_cufinufft_v2
         else:
             raise CUFINUFFTVersionUnsupported
     else:
