@@ -10,8 +10,7 @@ from   sys      import getsizeof
 import numpy    as np
 import PyNVTX   as nvtx
 from   spinifel import SpinifelSettings, SpinifelContexts, Profiler
-from   .        import transpose, CUFINUFFTRequiredButNotFound, \
-                       FINUFFTPYRequiredButNotFound
+from   .        import transpose, CUFINUFFTRequiredButNotFound
 
 
 
@@ -274,7 +273,7 @@ def nufft_3d_t1_cufinufft_v2(H_, K_, L_, nuvect, sign, eps, nx, ny, nz):
     nvtx.RangePushA("extern.nufft_3d_t1_cufinufft_v2:setup_cufinufft")
     # TODO: MONA check here performance dependent on data?
     plan = cufinufft(
-            1, shape, 1, eps, isign=1, dtype=dtype,
+            1, shape, 1, eps, isign=sign, dtype=dtype,
             gpu_method=1, gpu_device_id=dev_id
         )
     plan.set_pts(H_gpu, K_gpu, L_gpu)
@@ -343,7 +342,7 @@ def nufft_3d_t2_cufinufft_v2(H_, K_, L_, ugrid, sign, eps, N):
     #
     nvtx.RangePushA("extern.nufft_3d_t2_cufinufft_v2:setup_cufinufft")
     plan = cufinufft(
-            2, ugrid.shape, 1, eps, isign=-1, dtype=dtype,
+            2, ugrid.shape, 1, eps, isign=sign, dtype=dtype,
             gpu_method=1, gpu_device_id=dev_id)
     plan.set_pts(H_gpu, K_gpu, L_gpu)
     plan.execute(nuvect_gpu, ugrid_gpu)
@@ -355,4 +354,3 @@ def nufft_3d_t2_cufinufft_v2(H_, K_, L_, ugrid, sign, eps, N):
     nuvect = result_to_cpu(nuvect_gpu, H_)
 
     return nuvect
-
