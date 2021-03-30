@@ -8,7 +8,7 @@ root_dir="$(dirname "${BASH_SOURCE[0]}")"
 pushd $root_dir
 
 # Enable host overwrite
-target=${SPINIFEL_TARGET:-$(hostname)}
+target=${SPINIFEL_TARGET:-$(hostname --fqdn)}
 
 # Enable CUDA build
 cuda_build=${SPINIFEL_BUILD_CUDA:-true}
