@@ -1,20 +1,15 @@
 # spinifel
-Applies the M-TIP algorithm to SPI data.
-
-CI: https://code.ornl.gov/ecpcitest/chm137/spinifel/-/pipelines (OLCF)
 
 ## Installation
-  
-NOTE: USE THIS CLONING INSTRUCTION UNTIL MERGED BACK TO MASTER
 
 ```
-git clone -b development --recurse-submodules http://gitlab.osti.gov/mtip/spinifel.git
+git clone -b $BRANCH --recurse-submodules http://gitlab.osti.gov/mtip/spinifel.git
 ```
+Where `$BRANCH` can be development, master or other branch.
 
+As of this writing, spinifel has been tested on Cori Haswell, Cori GPU, and Summit.
 
-As of writing, spinifel has been tested on Cori Haswell, Cori GPU, and Summit.
-
-To install spinifel, clone the repository and run
+To install spinifel, after cloning the repository run:
 
 ```
 ./setup/build_from_scratch.sh
@@ -23,50 +18,31 @@ To install spinifel, clone the repository and run
 from its base directory.
 
 This will create a conda environment, install everything you need inside, and
-produce a `env.sh` file to set it up when needed.  To use that environment, use
+produce a `env.sh` file to set it up when needed.  To use that environment, use:
 
 ```
 source setup/env.sh
 ```
 
-This is included in most scripts, so it is not normally necessary to do this
-manually.
+However, the environment setup script `env.sh` is included in most scripts (eg `build_from_scratch.sh`
+and the `run_*.sh` scripts), so it is not normally necessary to do this manually unless running spinifel interactively.
 
 
 ## Data
 
 Spinifel needs input data.  By default, it expects the data to be located in
-the `$SCRATCH/spinifel_data` directory.  As of writing, the reference file is
-`2CEX-10k-2.h5` and is available in the `$CFS/m2859/dujardin/spi` directory.
-Create the `spinifel_data` directory in your scratch system and copy the data
-file.
+the `$DATA_DIR` directory specified in the `scripts/run_*.sh` scripts.  As of writing,
+the reference file is `2CEX-10k-2.h5` and is available on the Summit platform
+in `/gpfs/alpine/chm137/proj-shared/data/spi` and on the Cori platform in `$CFS/m2859/dujardin/spi`.
 
+You may create a `spinifel_data` directory in your scratch system and copy the data file.  You may consider putting your output also in this directory.  On Summit, one could create the directory typically as
+`/gpfs/alpine/scratch/$USER/chm137/spinifel_data`.  On Cori, it could be created as `$SCRATCH/spinifel_data`.
 
 ## CUDA Support
 
 Currently the following components enable CUDA support:
 1. Non-Uniform FFT (`finufft`, or `cufinufft`)
 2. Orientation Matching
-
-
-### Using `cufinufft`
-
-`cufinufft` uses CUDA to compute the non-uniform FFT. Spinifel will look for
-`cufinufft` in the python environment, and -- if it finds it -- it will use
-`cufinufft` to compute the `autocorrelation.forward` and
-`autocorrelation.adjoint` operations. Since it is not the "default" way to run
-Spinifel, it is not automatically installed. To install `cufinufft`, clone:
-```
-https://github.com/flatironinstitute/cufinufft
-```
-and follow the installation instructions here:
-https://github.com/flatironinstitute/cufinufft#advanced-makefile-usage
-
-**Note:** you need to install `cufinufft` to the conda environment used by
-Spinifel (by activating it before running `make python`); or alternatively
-point the `PYTHONPATH` variable to the `cufinufft` install location. Also: you
-will need to add the location of the `cufinufft/lib/libcufinufft.so` to the
-`LD_LIBRARY_PATH`.
 
 
 ### Using CUDA Orientation Matching
@@ -96,21 +72,28 @@ An additional flag `-c` is included in the script.  CUDA C code for nearest
 neighbors (Euclidean distance and Heap sort) is executed when the flag is set.
 `Sklearn` library function for nearest neighbors (Euclidean distance and
 `np.argmin`) is executed if the flag is not passed as an command argument.
+The flag `-f` is used to indicate that you want to run cufinufft.
 
 1. `bsub` command to run CUDA C code:
 ```
-bsub -P CHM137 -J fxs -W 2:00 -nnodes 1 -e error.log -o output.log "sh scripts/run_summit.sh -m -c -n 1 -t 1 -d 1"
+bsub -P CHM137 -J spinifel -W 2:00 -nnodes 1 -e error.log -o output.log "sh scripts/run_summit.sh -m -c -n 1 -t 1 -d 1"
 ```
 
 2. `bsub` command to run Sklearn code: 
 ```
-bsub -P CHM137 -J fxs -W 2:00 -nnodes 1 -e error.log -o output.log "sh scripts/run_summit.sh -m -n 1 -t 1 -d 1"
+bsub -P CHM137 -J spinifel -W 2:00 -nnodes 1 -e error.log -o output.log "sh scripts/run_summit.sh -m -n 1 -t 1 -d 1"
 ```
 
 3. Testing on interactive node with development version*: 
 ```
 ./scripts/run_summit_mult.sh -m -n 1 -a 1 -g 1 -r 1 -d 1 -c -f
 ```
+## Continuous Integration
+
+Continuous integration for spinifel on Summit-like machine (Ascent) applies the M-TIP algorithm to SPI data.
+
+CI: https://code.ornl.gov/ecpcitest/chm137/spinifel/-/pipelines (OLCF)
+
 
 ## Developer's Guilde
 
@@ -129,8 +112,6 @@ settings and contexts, the latter being used to manage parallelism and devices.
 #### `SpinifelContexts`
 
 
-
-
 ## Bugs and Issues
 
 
@@ -140,7 +121,8 @@ settings and contexts, the latter being used to manage parallelism and devices.
 enable CUDA through `export USE_CUDA=${USE_CUDA:-1}`, it results in build
 errors as it does not support any GCC version greater 7.0.
 
-2. Installing cufinufft,
+2. Installing cufinufft if needing to work with it separately.  Normally this is installed by the build script.
+```
 cd spinifel/setup
 git clone https://github.com/JBlaschke/cufinufft.git
 cd cufinufft
@@ -148,9 +130,9 @@ echo "CUDA_ROOT=/sw/summit/cuda/10.2.89" >> sites/make.inc.olcf_summit
 make site=olcf_summit
 export LD_LIBRARY_PATH=${PWD}/lib:${LD_LIBRARY_PATH}
 make python
+```
 
 Note: Use cuda 10.2.89 or above then remove pip cache (rm -rf ~/.cache/pip). 
-
 
 
 ### Execution:
