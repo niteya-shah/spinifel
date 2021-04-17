@@ -12,12 +12,16 @@ numpy.seterr(divide='ignore', invalid='ignore')
 
 det_shape = (4, 512, 512)
 N_images_max = 10000
+N_generations = 10 
 data_field_name = "intensities"
 data_type_str = "float32"
 pixel_position_shape = (3,) + det_shape
 pixel_position_type_str = "float32"
 pixel_index_shape = (2,) + det_shape
 pixel_index_type_str = "int32"
+orientation_type_str = "float32"
+volume_type_str = "complex64"
+volume_shape = (151, 151, 151)
 oversampling = 1
 
 data_dir  = settings.data_dir
