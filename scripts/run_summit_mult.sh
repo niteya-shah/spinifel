@@ -112,6 +112,14 @@ echo "DATA_MULTIPLIER: $DATA_MULTIPLIER"
 echo "MPI run"
 export PS_PARALLEL=mpi
 export VERBOSE=true
-#jsrun -n 1 -a 42 -c 42 -r 1 -g 6 python mpi_main.py
+
+# TO RUN THE UNIT TEST FOR ORIENTATION MATCHING
+# Replace finufftpy with finufft
+#export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/ccs/home/monarin/sw/spinifel/setup/finufft_original/lib"
+#export PYTHONPATH="$PYTHONPATH:/ccs/home/monarin/sw/spinifel/setup/finufft_original/python"
+#export DEBUG_FLAG=1
+#jsrun -n 1 -g 1 python spinifel/tests/test_orientation_matching.py
+
 jsrun -n $NRESOURCESETS -a $NTASKS_PER_RS -c $NTASKS_PER_RS -g $DEVICES_PER_RS -r $NRSS_PER_NODE python mpi_main.py
+
 #jsrun -n $NRESOURCESETS -a $NTASKS_PER_RS -c $NTASKS_PER_RS -g $DEVICES_PER_RS gdb python -x scripts/run_gdb
