@@ -101,5 +101,13 @@ def load_slices(slices, i_start, i_end):
         slices[:] = h5f['intensities'][i_start:i_end]
 
 
+def load_orientations(orientations, i_start, i_end):
+    with h5py.File(parms.data_path, 'r') as h5f:
+        orientations[:] = h5f['orientations'][i_start:i_end]
+
+def load_volume(volume):
+    with h5py.File(parms.data_path, 'r') as h5f:
+        volume[:] = h5f['volume']
+
 def compute_pixel_distance(pixel_position_reciprocal):
     return np.sqrt((pixel_position_reciprocal**2).sum(axis=0))
