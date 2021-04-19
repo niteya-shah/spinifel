@@ -7,6 +7,7 @@
 #BSUB -e error.%J.log         # error file name in which %J is replaced by the job ID
 #BSUB -o output.%J.log        # output file name in which %J is replaced by the job ID
 
+
 while getopts msca:t:d:g:n:fr:e option
 do
 case "${option}"
@@ -115,11 +116,13 @@ export VERBOSE=true
 
 # TO RUN THE UNIT TEST FOR ORIENTATION MATCHING
 # Replace finufftpy with finufft
+#USE_ORIGINAL_FINUFFT=1
 #export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/ccs/home/monarin/sw/spinifel/setup/finufft_original/lib"
 #export PYTHONPATH="$PYTHONPATH:/ccs/home/monarin/sw/spinifel/setup/finufft_original/python"
-#export DEBUG_FLAG=1
+
 #jsrun -n 1 -g 1 python spinifel/tests/test_orientation_matching.py
 
+#export DEBUG_FLAG=1
 jsrun -n $NRESOURCESETS -a $NTASKS_PER_RS -c $NTASKS_PER_RS -g $DEVICES_PER_RS -r $NRSS_PER_NODE python mpi_main.py
 
 #jsrun -n $NRESOURCESETS -a $NTASKS_PER_RS -c $NTASKS_PER_RS -g $DEVICES_PER_RS gdb python -x scripts/run_gdb

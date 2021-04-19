@@ -16,8 +16,8 @@ import sys
 import pycuda.driver as cuda
 
 import os
-DEBUG_FLAG = int(os.environ.get('DEBUG_FLAG', '0'))
-if DEBUG_FLAG:
+USE_ORIGINAL_FINUFFT = int(os.environ.get('USE_ORIGINAL_FINUFFT', '0'))
+if USE_ORIGINAL_FINUFFT:
     import finufft as nfft_original
 
 #________________________________________________________________________________
@@ -76,7 +76,7 @@ def forward_cpu(ugrid, H_, K_, L_, support, M, N, recip_extent, use_recip_sym):
     # TODO: Current switched to finufft interface and single precision
     # Ask Elliott if we can use this main finufft instead of his fork.
     # Allocate space in memory
-    if DEBUG_FLAG:
+    if USE_ORIGINAL_FINUFFT:
         nuvect = np.zeros(H_.shape, dtype=np.complex64)
         nfft_original.nufft3d2(H_, K_, L_, ugrid, out=nuvect, eps=6e-08, isign=-1)
         return nuvect
