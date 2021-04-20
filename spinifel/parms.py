@@ -24,6 +24,8 @@ volume_type_str = "complex64"
 volume_shape = (151, 151, 151)
 oversampling = 1
 
+solve_ac_maxiter = 10
+
 data_dir  = settings.data_dir
 data_path = data_dir / "2CEX-10k-2.h5"
 if settings.use_psana:
@@ -47,7 +49,7 @@ if settings.small_problem:
     N_binning = 4
     N_orientations = 1000
     N_batch_size = 1000
-    Mquat = int(oversampling * 10)  # 1/4 of uniform grid size
+    Mquat = int(oversampling * 20)  # 1/4 of uniform grid size
 else:
     N_images_per_rank = 1000 * data_multiplier
     nER = 50

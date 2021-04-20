@@ -115,6 +115,19 @@ def solve_ac(generation,
              slices_,
              orientations=None,
              ac_estimate=None):
+    """
+    Calculate autocorrelation between the 3D intensities and the images.
+    
+    INPUT:
+    orientations: 1st Gen  - generated randomly.
+                  Next Gen - from previous best matched 
+    ac_estimate:  1st Gen  - 3D array of 0s
+                  Next Gen - ac_phased multiplied by support
+
+    INTERMEDIATE:
+    ac_support:   1st Gen  - 3D array of 1s
+                  Next Gen - Non zeros value of smoothed ac_estimate filled with 1s.  
+    """
     comm = MPI.COMM_WORLD
 
     M = parms.M
@@ -146,7 +159,7 @@ def solve_ac(generation,
     #rlambda = Mtot/Ntot * 1e2**(comm.rank - comm.size/2)
     rlambda = Mtot/Ntot * 2**(comm.rank - comm.size/2) # MONA: use base 2 instead of 100 to avoid overflown
     flambda = 0  # 1e5 * pow(10, comm.rank - comm.size//2)
-    maxiter = 100
+    maxiter = parms.solve_ac_maxiter
 
     if comm.rank == (2 if parms.use_psana else 0):
         idx = np.abs(L_) < reciprocal_extent * .01
