@@ -27,7 +27,11 @@ oversampling = 1
 solve_ac_maxiter = 10
 
 data_dir  = settings.data_dir
-data_path = data_dir / "2CEX-10k-2.h5"
+
+assert settings.data_filename, "Hdf5 filename input missing. Set DATA_FILENAME to the name of your hdf5 file."
+
+data_path = data_dir / settings.data_filename
+
 if settings.use_psana:
     use_psana = True
     exp = 'xpptut15'

@@ -46,11 +46,9 @@ source "$root_dir"/setup/env.sh
 export PYTHONPATH="$PYTHONPATH:$root_dir"
 export MPLCONFIGDIR=/gpfs/alpine/scratch/$USER/chm137/mtipProxy/writableDirectory
 
-#export DATA_DIR=$SCRATCH/spinifel_data
-export DATA_DIR=${DATA_DIR:-/gpfs/alpine/proj-shared/chm137/data/spi}
-#export DATA_DIR=/gpfs/alpine/proj-shared/chm137/iris
+export DATA_DIR=${DATA_DIR:-/gpfs/alpine/proj-shared/chm137/data/testdata/2CEX}
+export DATA_FILENAME=${DATA_FILENAME:-2CEX-10.h5}
 
-#export OUT_DIR=$SCRATCH/spinifel_output
 export OUT_DIR=${OUT_DIR:-/gpfs/alpine/proj-shared/chm137/$USER/spinifel_output}
 mkdir -p $OUT_DIR
 rm -rf $OUT_DIR/*
