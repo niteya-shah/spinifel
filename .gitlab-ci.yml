@@ -3,9 +3,15 @@
 variables:
   SCHEDULER_PARAMETERS: "-P CHM137 -W 60 -nnodes 1 -alloc_flags gpumps"
   EXTERNAL_WORKDIR: /gpfs/wolf/chm137/proj-shared/ci/${CI_PIPELINE_ID}
+
+  # for script test
   DATA_DIR: /gpfs/wolf/chm137/proj-shared/spinifel_data
   DATA_FILENAME: 2CEX-10k-2.h5
   OUT_DIR: /gpfs/wolf/chm137/proj-shared/ci/${CI_PIPELINE_ID}/spinifel_output
+
+  # for pytest
+  test_data_dir: /gpfs/wolf/chm137/proj-shared/spinifel_data/testdata
+
   THREADS: 4 # reduce parallelism to avoid OOM in Legion build
 
 stages:
@@ -30,6 +36,7 @@ test:
   before_script:
     - cd ${EXTERNAL_WORKDIR}
   script:
+    - ./scripts/test.sh
     - bash ./scripts/run_summit_mult.sh -m -n 1 -a 1 -g 1 -r 1 -d 1 -c -f -e
     - rm -rf ${EXTERNAL_WORKDIR}
   tags:
