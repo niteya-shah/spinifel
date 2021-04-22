@@ -32,6 +32,7 @@ class SpinifelSettings(metaclass=Singleton):
         self._verbose          = False
         self._verbosity        = 0
         self._data_dir         = Path("")
+        self._data_filename    = ""
         self._use_psana        = False
         self._out_dir          = Path("")
         self._data_multiplier  = 1
@@ -54,6 +55,9 @@ class SpinifelSettings(metaclass=Singleton):
 
         if "DATA_DIR" in environ:
             self._data_dir = Path(self.get_str("DATA_DIR")) 
+
+        if "DATA_FILENAME" in environ:
+            self._data_filename = self.get_str("DATA_FILENAME")
 
         if "USE_PSANA" in environ:
             self._use_psana = self.get_bool("USE_PSANA")
@@ -121,6 +125,11 @@ class SpinifelSettings(metaclass=Singleton):
     @property
     def data_dir(self):
         return self._data_dir
+
+
+    @property
+    def data_filename(self):
+        return self._data_filename
 
 
     @property

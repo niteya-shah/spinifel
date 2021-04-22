@@ -17,7 +17,7 @@ def phase(generation, ac, support_=None, rho_=None):
         ac_phased, support_, rho_ = sequential_phase(
             generation, ac, support_, rho_)
     else:
-        ac_phased = np.zeros((M,)*3, order="F")
+        ac_phased = np.zeros((M,)*3, order="F", dtype=np.float32)
         support_ = None
         rho_ = None
     comm.Bcast(ac_phased, root=0)

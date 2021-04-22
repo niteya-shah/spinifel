@@ -40,9 +40,10 @@ source "$root_dir"/setup/env.sh
 export PYTHONPATH="$PYTHONPATH:$root_dir"
 export MPLCONFIGDIR=/gpfs/alpine/scratch/$USER/chm137/mtipProxy/writableDirectory
 
-export DATA_DIR=${DATA_DIR:-/gpfs/alpine/proj-shared/chm137/data/testdata/2CEX}
-export DATA_FILENAME=${DATA_FILENAME:-2CEX-10.h5}
+#export DATA_DIR=$SCRATCH/spinifel_data
+export DATA_DIR=${DATA_DIR:-/gpfs/alpine/scratch/$USER/chm137/spinifel_data/spinifel_input}
 
+#export OUT_DIR=$SCRATCH/spinifel_output
 export OUT_DIR=${OUT_DIR:-/gpfs/alpine/scratch/$USER/chm137/spinifel_data/spinifel_output}
 mkdir -p $OUT_DIR
 rm -rf $OUT_DIR/*
@@ -82,4 +83,4 @@ echo "DATA_MULTIPLIER: $DATA_MULTIPLIER"
 
 echo "MPI run"
 export PS_PARALLEL=mpi
-jsrun -n 1 -a 1 -c 42 -r 1 -g 1 python mpi_main.py
+jsrun -n 1 -a 1 -c 42 -r 1 -g 1 nsys profile -o /gpfs/alpine/chm137/scratch/vinayr/new_%q{OMPI_COMM_WORLD_RANK} -f true --stats=true python mpi_main.py

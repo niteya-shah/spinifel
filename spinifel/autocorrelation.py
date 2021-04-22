@@ -2,12 +2,23 @@ import numpy     as np
 import skopi     as skp
 from   spinifel  import SpinifelSettings, SpinifelContexts, Profiler
 import time
+import logging
 
 settings = SpinifelSettings()
 context  = SpinifelContexts()
 profiler = Profiler()
 
 import PyNVTX as nvtx
+
+import sys
+
+
+import pycuda.driver as cuda
+
+import os
+USE_ORIGINAL_FINUFFT = int(os.environ.get('USE_ORIGINAL_FINUFFT', '0'))
+if USE_ORIGINAL_FINUFFT:
+    import finufft as nfft_original
 
 #________________________________________________________________________________
 # Load cufiNUFFT or fiNUFFTpy depending on settings: use_cuda, use_cufinufft
@@ -49,7 +60,9 @@ else:
 @profiler.intercept
 def forward_cpu(ugrid, H_, K_, L_, support, M, N, recip_extent, use_recip_sym):
     """Apply the forward, NUFFT2- problem -- CPU Implementation"""
-
+    # Note than M, N, recip_extent are not used here - only to 
+    # match the function inputs with forward_gpu
+    
     if settings.verbose:
         print("Using CPU to solve the forward transform")
 
@@ -60,7 +73,19 @@ def forward_cpu(ugrid, H_, K_, L_, support, M, N, recip_extent, use_recip_sym):
     # Apply Support
     ugrid *= support  # /!\ overwrite
 
+    # TODO: Current switched to finufft interface and single precision
+    # Ask Elliott if we can use this main finufft instead of his fork.
     # Allocate space in memory
+    if USE_ORIGINAL_FINUFFT:
+        nuvect = np.zeros(H_.shape, dtype=np.complex64)
+        nfft_original.nufft3d2(H_, K_, L_, ugrid, out=nuvect, eps=6e-08, isign=-1)
+        return nuvect
+    
+    print(f'DEBUG forward_cpu')
+    print(f'ugrid={ugrid.shape} {ugrid.dtype}')
+    print(f'H_={H_.shape} {H_.dtype}')
+    print(f'support={support}')
+    print(f'M={M} N={N} recip_extent={recip_extent} use_recip_sym={use_recip_sym}')
     nuvect = np.zeros(N, dtype=np.complex)
 
     #___________________________________________________________________________
@@ -73,6 +98,7 @@ def forward_cpu(ugrid, H_, K_, L_, support, M, N, recip_extent, use_recip_sym):
     #---------------------------------------------------------------------------
 
     return nuvect / M**3
+    #return nuvect
 
 
 
@@ -80,6 +106,11 @@ def forward_cpu(ugrid, H_, K_, L_, support, M, N, recip_extent, use_recip_sym):
 @nvtx.annotate("autocorrelation.forward_gpu")
 def forward_gpu(ugrid, H_, K_, L_, support, M, N, recip_extent, use_recip_sym):
     """Apply the forward, NUFFT2- problem -- CUDA Implementation."""
+    logger = logging.getLogger(__name__)
+
+    gpu_free, gpu_total = cuda.mem_get_info()
+    logger.debug(f'init gpu_free={gpu_free/1e9:.2f}GB gpu_total={gpu_total/1e9:.2f}GB')
+    
     dev_id = context.dev_id
     if settings.verbose:
         print(f"Using CUDA to solve the forward transform on device {dev_id}")
@@ -89,10 +120,16 @@ def forward_gpu(ugrid, H_, K_, L_, support, M, N, recip_extent, use_recip_sym):
     dtype         = np.float64
     dim           = 3
     shape         = (M, M, M)
-    tol           = 1e-12
+    tol           = 6e-08
 
     # Ensure that H_, K_, and L_ have the same shape
     assert H_.shape == K_.shape == L_.shape
+
+    # TODO 
+    H_ = H_.astype(dtype)
+    K_ = K_.astype(dtype)
+    L_ = L_.astype(dtype)
+
 
     # Apply Support
     ugrid *= support  # /!\ overwrite
@@ -105,9 +142,18 @@ def forward_gpu(ugrid, H_, K_, L_, support, M, N, recip_extent, use_recip_sym):
         # H_gpu = to_gpu(H_)
         # K_gpu = to_gpu(K_)
         # L_gpu = to_gpu(L_)
+        
         H_gpu = to_gpu(L_)
+        gpu_free, gpu_total = cuda.mem_get_info()
+        logger.debug(f'H={sys.getsizeof(L_)/1e9:.2f}GB copied gpu_free={gpu_free/1e9:.2f}GB gpu_total={gpu_total/1e9:.2f}GB')
+        
         K_gpu = to_gpu(K_)
+        gpu_free, gpu_total = cuda.mem_get_info()
+        logger.debug(f'K={sys.getsizeof(K_)/1e9:.2f}GB copied gpu_free={gpu_free/1e9:.2f}GB gpu_total={gpu_total/1e9:.2f}GB')
+        
         L_gpu = to_gpu(H_)
+        gpu_free, gpu_total = cuda.mem_get_info()
+        logger.debug(f'L={sys.getsizeof(H_)/1e9:.2f}GB copied gpu_free={gpu_free/1e9:.2f}GB gpu_total={gpu_total/1e9:.2f}GB')
         ugrid_gpu = to_gpu(ugrid.astype(complex_dtype))
     else:
         # Due to a change to the cufinufft API, these need to be re-ordered
@@ -128,8 +174,17 @@ def forward_gpu(ugrid, H_, K_, L_, support, M, N, recip_extent, use_recip_sym):
     # Allocate space on Device
     # nuvect = np.zeros(N, dtype=np.complex)
     nvtx.RangePushA("autocorrelation.forward_gpu:GPUArray")
+
+    
     nuvect_gpu = GPUArray(shape=(N,), dtype=complex_dtype)
+    gpu_free, gpu_total = cuda.mem_get_info()
+    logger.debug(f'nuvect_gpu={sys.getsizeof(nuvect_gpu)/1e9:.2f}GB allocated gpu_free={gpu_free/1e9:.2f}GB gpu_total={gpu_total/1e9:.2f}GB')
     nvtx.RangePop()
+
+
+    # TODO: It looks to me like cufinufft doesn'work the dimension is increased
+    # from 81 to 151. Ask Johannes on this. This applies for both forward and
+    # adjoint.
 
     #___________________________________________________________________________
     # Solve the NUFFT
@@ -170,7 +225,7 @@ def adjoint_cpu(nuvect, H_, K_, L_, support, M, recip_extent, use_recip_sym):
         print("Using CPU to solve the adjoint transform")
 
     # Allocating space in memory
-    ugrid = np.zeros((M,)*3, dtype=np.complex, order='F')
+    ugrid = np.zeros((M,)*3, dtype=np.complex128, order='F')
 
     #___________________________________________________________________________
     # Solve the NUFFT
@@ -196,13 +251,15 @@ def adjoint_cpu(nuvect, H_, K_, L_, support, M, recip_extent, use_recip_sym):
 @nvtx.annotate("autocorrelation.adjoint_gpu")
 def adjoint_gpu(nuvect, H_, K_, L_, support, M, recip_extent, use_recip_sym):
     """Apply the adjoint, NUFFT1+ problem -- CUDA Implementation."""
+    logger = logging.getLogger(__name__)
+
     dev_id = context.dev_id
     if settings.verbose:
         print(f"Using CUDA to solve the adjoint transform on device {dev_id}")
 
     # Set up data types/dim/shape of transform
-    complex_dtype = np.complex128
-    dtype         = np.float64
+    complex_dtype = np.complex64
+    dtype         = np.float32
     dim           = 3
     shape         = (M, M, M)
     tol           = 1e-12
@@ -218,6 +275,7 @@ def adjoint_gpu(nuvect, H_, K_, L_, support, M, recip_extent, use_recip_sym):
         # H_gpu = to_gpu(H_)
         # K_gpu = to_gpu(K_)
         # L_gpu = to_gpu(L_)
+        logging.debug(f'L={L_.shape}/{L_.dtype}/{sys.getsizeof(L_)} K={K_.shape}/{K_.dtype}/{sys.getsizeof(K_)} H={H_.shape}/{H_.dtype}/{sys.getsizeof(H_)}')
         H_gpu = to_gpu(L_)
         K_gpu = to_gpu(K_)
         L_gpu = to_gpu(H_)
@@ -351,10 +409,33 @@ def fourier_reg(uvect, support, F_antisupport, M, use_recip_sym):
 
 
 def gen_nonuniform_positions(orientations, pixel_position_reciprocal):
+    # Generate q points (h,k,l) from the given rotations and pixel positions 
+
     if orientations.shape[0] > 0:
-        rotmat = np.array([skp.quaternion2rot3d(quat) for quat in orientations])
+        #rotmat = np.array([skp.quaternion2rot3d(quat) for quat in orientations])
+        # TODO: we may not need to transpose the orientations if 
+        # they were generated randomly.
+        rotmat = np.array([np.linalg.inv(skp.quaternion2rot3d(quat)) for quat in orientations])
     else:
         rotmat = np.zeros((0, 3, 3))
-    H, K, L = np.einsum("ijk,klmn->jilmn", rotmat, pixel_position_reciprocal)
+        print(f"WARNING: gen_nonuniform_positions got empty orientation - returning h,k,l for Null rotation")
+
+    # TODO: How to ensure we support all formats of pixel_position reciprocal
+    # Current support shape is (3, 1, N_pixels) 
+    #H, K, L = np.einsum("ijk,klmn->jilmn", rotmat, pixel_position_reciprocal)
+    H, K, L = np.einsum("ijk,klm->jilm", rotmat, pixel_position_reciprocal)
     # shape -> [N_images] x det_shape
     return H, K, L
+
+def gen_nonuniform_normalized_positions(orientations, pixel_position_reciprocal, 
+        reciprocal_extent, oversampling):
+    H, K, L = gen_nonuniform_positions(orientations, pixel_position_reciprocal)
+    
+    # TODO: Control/set precisions needed here
+    # scale and change type for compatibility with finufft
+    H_ = H.astype(np.float32).flatten() / reciprocal_extent * np.pi / oversampling
+    K_ = K.astype(np.float32).flatten() / reciprocal_extent * np.pi / oversampling
+    L_ = L.astype(np.float32).flatten() / reciprocal_extent * np.pi / oversampling
+
+    return H_, K_, L_
+

@@ -150,4 +150,6 @@ def phase(generation, ac, support_=None, rho_=None):
     ac_phased = np.fft.fftshift(ac_phased_)
     image.show_volume(ac_phased, Mquat, f"autocorrelation_phased_{generation}.png")
 
+    ac_phased = ac_phased.astype(np.float32)
+
     return ac_phased, support_, rho_

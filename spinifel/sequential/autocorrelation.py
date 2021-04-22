@@ -64,7 +64,7 @@ def setup_linops(H, K, L, data,
         return uvect
 
     W = LinearOperator(
-        dtype=np.complex128,
+        dtype=np.complex64,
         shape=(Mtot, Mtot),
         matvec=W_matvec)
 

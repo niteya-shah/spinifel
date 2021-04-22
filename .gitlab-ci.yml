@@ -1,9 +1,10 @@
 # this configuration is intended for use at https://code.ornl.gov
 
 variables:
-  SCHEDULER_PARAMETERS: "-P CHM137 -W 30 -nnodes 1 -alloc_flags gpumps"
+  SCHEDULER_PARAMETERS: "-P CHM137 -W 60 -nnodes 1 -alloc_flags gpumps"
   EXTERNAL_WORKDIR: /gpfs/wolf/chm137/proj-shared/ci/${CI_PIPELINE_ID}
   DATA_DIR: /gpfs/wolf/chm137/proj-shared/spinifel_data
+  DATA_FILENAME: 2CEX-10k-2.h5
   OUT_DIR: /gpfs/wolf/chm137/proj-shared/ci/${CI_PIPELINE_ID}/spinifel_output
   THREADS: 4 # reduce parallelism to avoid OOM in Legion build
 
@@ -29,7 +30,7 @@ test:
   before_script:
     - cd ${EXTERNAL_WORKDIR}
   script:
-    - bash ./scripts/run_summit.sh -s -e
+    - bash ./scripts/run_summit_mult.sh -m -n 1 -a 1 -g 1 -r 1 -d 1 -c -f -e
     - rm -rf ${EXTERNAL_WORKDIR}
   tags:
     - batch

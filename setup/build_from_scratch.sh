@@ -4,8 +4,11 @@
 set -e
 
 
-root_dir="$(dirname "${BASH_SOURCE[0]}")"
+root_dir=$(readlink -f $(dirname "${BASH_SOURCE[0]}"))
 pushd $root_dir
+
+# Enable host overwrite
+target=${SPINIFEL_TARGET:-$(hostname)}
 
 
 #_______________________________________________________________________________
@@ -87,8 +90,8 @@ conda install -y bitstruct krtc -c conda-forge
 
 # Install pip packages
 CC=$MPI4PY_CC MPICC=$MPI4PY_MPICC pip install -v --no-binary mpi4py mpi4py
-pip install callmonitor
-pip install PyNVTX
+pip install --no-cache-dir callmonitor
+pip install --no-cache-dir PyNVTX
 
 #-------------------------------------------------------------------------------
 
@@ -129,7 +132,7 @@ fi
 #_______________________________________________________________________________
 # Rebuild FFTW (only needed on some systems -- that don't supply their own)
 
-if [[ $(hostname) = *"tulip"* || $(hostname) = *"jlse"* ]]; then
+if [[ ${target} = *"tulip"* || ${target} = *"jlse"* ]]; then
     ./rebuild_fftw.sh
 fi
 
