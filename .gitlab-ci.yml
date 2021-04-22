@@ -29,7 +29,7 @@ test:
   before_script:
     - cd ${EXTERNAL_WORKDIR}
   script:
-    - bash ./scripts/run_summit_mult.sh -m -n 1 -a 1 -g 2 -r 1 -d 1 -c -f -e
+    - bash ./scripts/run_summit_mult.sh -m -n 1 -a 1 -g 1 -r 1 -d 1 -c -f -e
     - rm -rf ${EXTERNAL_WORKDIR}
   tags:
     - batch
