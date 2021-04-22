@@ -86,7 +86,7 @@ bsub -P CHM137 -J spinifel -W 2:00 -nnodes 1 -e error.log -o output.log "sh scri
 
 3. Testing on interactive node with development version*: 
 ```
-./scripts/run_summit_mult.sh -m -n 1 -a 1 -g 1 -r 1 -d 1 -c -f
+DATA_DIR=/gpfs/alpine/proj-shared/chm137/data/spi DATA_FILENAME=2CEX-10k-2.h5 ./scripts/run_summit_mult.sh -m -n 1 -a 1 -g 1 -r 1 -d 1 -c -f -s
 ```
 ## Continuous Integration
 
