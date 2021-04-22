@@ -37,7 +37,7 @@ import os
 from spinifel import prep
 
 N_slices = 3
-N_test_orientations = 103
+test_data_dir = os.environ['test_data_dir']
 
 from dataclasses import dataclass
 
@@ -74,7 +74,7 @@ def test_match(test_case):
         # NOTE:
         # known_orientations is the correct orientations (3)
         # ref_orientations is 100 random orientations mixed in with the correct ones (3)
-        with open('/gpfs/alpine/scratch/monarin/chm137/mona/cmtip_3iyf_3.pickle','rb') as f:
+        with open(os.path.join(test_data_dir, '3IYF', 'cmtip_3iyf_3.pickle'),'rb') as f:
             test_data = pickle.load(f)
             inten_data = pickle.load(f)
             n_pixels = 1 * 128 * 128 # panels * n_pixels_x * n_pixels_y
@@ -97,11 +97,12 @@ def test_match(test_case):
         # known_orientations is the correct orientations (3)
         # ref_orientations just take the correct ones + the next orientations as stored in
         # the file.
-        test_data = h5py.File('/gpfs/alpine/proj-shared/chm137/data/spi/2CEX-10k-2.h5', 'r')
+        test_data = h5py.File(os.path.join(test_data_dir,'2CEX','2CEX-10.h5'), 'r')
         n_pixels = 4 * 512 * 512
         ac_support_size = 151
         oversampling = 1
-        batch_size = 103
+        batch_size = 10
+        N_test_orientations = 10
 
         # h5py stores panels, det_x, det_y, dimension (4, 512, 512, 3)
         # need to move dimension to the first column (3, 4, 512, 512)
