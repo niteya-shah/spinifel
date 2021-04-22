@@ -8,7 +8,7 @@
 #BSUB -o output.%J.log        # output file name in which %J is replaced by the job ID
 
 
-while getopts msca:t:d:g:n:fr:e option
+while getopts msca:t:d:g:n:fr:el: option
 do
 case "${option}"
 in
@@ -23,6 +23,7 @@ n) NRESOURCESETS=$OPTARG;;
 f) USE_CUFINUFFT="1";;
 r) NRSS_PER_NODE=$OPTARG;;
 e) CHECK_FOR_ERRORS="1";;
+l) LAUNCH_SCRIPT=$OPTARG;;
 esac
 done
 
@@ -37,7 +38,7 @@ if [[ -n $USING_MPI ]]; then
     echo "USING_MPI: $USING_MPI"
 fi
 
-root_dir="$PWD"
+root_dir=${root_dir:-"$PWD"}
 echo "root_dir: $root_dir"
 
 source "$root_dir"/setup/env.sh
@@ -107,6 +108,10 @@ fi
 export DATA_MULTIPLIER
 echo "DATA_MULTIPLIER: $DATA_MULTIPLIER"
 
+if [[ -z $LAUNCH_SCRIPT ]]; then
+    LAUNCH_SCRIPT="mpi_main.py"
+fi
+echo "LAUNCH_SCRIPT: $LAUNCH_SCRIPT"
 
 echo "MPI run"
 export PS_PARALLEL=mpi
@@ -118,9 +123,6 @@ export VERBOSE=true
 #export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/ccs/home/monarin/sw/spinifel/setup/finufft_original/lib"
 #export PYTHONPATH="$PYTHONPATH:/ccs/home/monarin/sw/spinifel/setup/finufft_original/python"
 
-#jsrun -n 1 -g 1 python spinifel/tests/test_orientation_matching.py
-
 #export DEBUG_FLAG=1
-jsrun -n $NRESOURCESETS -a $NTASKS_PER_RS -c $NTASKS_PER_RS -g $DEVICES_PER_RS -r $NRSS_PER_NODE python mpi_main.py
+jsrun -n $NRESOURCESETS -a $NTASKS_PER_RS -c $NTASKS_PER_RS -g $DEVICES_PER_RS -r $NRSS_PER_NODE python "$root_dir/$LAUNCH_SCRIPT"
 
-#jsrun -n $NRESOURCESETS -a $NTASKS_PER_RS -c $NTASKS_PER_RS -g $DEVICES_PER_RS gdb python -x scripts/run_gdb
