@@ -88,6 +88,8 @@ bsub -P CHM137 -J spinifel -W 2:00 -nnodes 1 -e error.log -o output.log "sh scri
 ```
 DATA_DIR=/gpfs/alpine/proj-shared/chm137/data/spi DATA_FILENAME=2CEX-10k-2.h5 ./scripts/run_summit_mult.sh -m -n 1 -a 1 -g 1 -r 1 -d 1 -c -f -s
 ```
+NOTE: Run script takes care of allocating resources for running spinifel. Currently, spinifel single resource set consists of one cpu (-a 1) and one gpu (-g 1) working on a N multiple of 1000 images (-d N). For Summit, there are 6 gpus per node so maximum no. of resource sets per node is 6 (-r). 
+  
 ## Continuous Integration
 
 Continuous integration for spinifel on Summit-like machine (Ascent) applies the M-TIP algorithm to SPI data.
@@ -95,6 +97,7 @@ Continuous integration for spinifel on Summit-like machine (Ascent) applies the 
 CI: https://code.ornl.gov/ecpcitest/chm137/spinifel/-/pipelines (OLCF)
 
 
+=======
 ## Developer's Guilde
 
 Here are some helpful tips for developing Spinifel.
