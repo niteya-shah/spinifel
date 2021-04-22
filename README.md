@@ -111,7 +111,8 @@ bsub -P CHM137 -J fxs -W 2:00 -nnodes 1 -e error.log -o output.log "sh scripts/r
 ```
 ./scripts/run_summit_mult.sh -m -n 1 -a 1 -g 1 -r 1 -d 1 -c -f
 ```
-
+NOTE: Run script takes care of allocating resources for running spinifel. Currently, spinifel single resource set consists of one cpu (-a 1) and one gpu (-g 1) working on a N multiple of 1000 images (-d N). For Summit, there are 6 gpus per node so maximum no. of resource sets per node is 6 (-r). 
+  
 ## Developer's Guilde
 
 Here are some helpful tips for developing Spinifel.
