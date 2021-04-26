@@ -132,7 +132,7 @@ fi
 #_______________________________________________________________________________
 # Rebuild FFTW (only needed on some systems -- that don't supply their own)
 
-if [[ ${target} = *"tulip"* || ${target} = *"jlse"* ]]; then
+if [[ ${target} = *"tulip"* || ${target} = *"jlse"* || ${target} = "g0"*".stanford.edu" ]]; then
     ./rebuild_fftw.sh
 fi
 
