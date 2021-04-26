@@ -8,11 +8,12 @@
 #BSUB -o output.%J.log        # output file name in which %J is replaced by the job ID
 
 
-while getopts msca:t:d:g:n:fr:el: option
+while getopts mLsca:t:d:g:n:fr:el: option
 do
 case "${option}"
 in
 m) USING_MPI="1";;
+L) USING_LEGION="1";;
 s) SMALL_PROBLEM="1";;
 c) USING_CUDA="1";;
 a) NTASKS_PER_RS=$OPTARG;;
@@ -33,9 +34,17 @@ if [[ -n CHECK_FOR_ERRORS ]]; then
 fi
 
 export LD_PRELOAD=/sw/summit/gcc/8.1.1-cuda10.1.168/lib64/libgomp.so.1
+if [[ -n $USING_MPI && -n $USING_LEGION ]]; then
+    echo "MPI and Legion options are mutually exclusive. Please pick one."
+    exit 1
+fi
 if [[ -n $USING_MPI ]]; then
     export USING_MPI
     echo "USING_MPI: $USING_MPI"
+fi
+if [[ -n $USING_LEGION ]]; then
+    export USING_LEGION
+    echo "USING_LEGION: $USING_LEGION"
 fi
 
 root_dir=${root_dir:-"$PWD"}
