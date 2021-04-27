@@ -41,10 +41,12 @@ fi
 if [[ -n $USING_MPI ]]; then
     export USING_MPI
     echo "USING_MPI: $USING_MPI"
-fi
-if [[ -n $USING_LEGION ]]; then
+elif [[ -n $USING_LEGION ]]; then
     export USING_LEGION
     echo "USING_LEGION: $USING_LEGION"
+else
+    echo "No runtime system was specified. Please choose either MPI or Legion."
+    exit 1
 fi
 
 root_dir=${root_dir:-"$PWD"}
@@ -118,12 +120,21 @@ export DATA_MULTIPLIER
 echo "DATA_MULTIPLIER: $DATA_MULTIPLIER"
 
 if [[ -z $LAUNCH_SCRIPT ]]; then
-    LAUNCH_SCRIPT="mpi_main.py"
+    if [[ -n $USING_MPI ]]; then
+        LAUNCH_SCRIPT=(python "$root_dir/mpi_main.py")
+    elif [[ -n $USING_LEGION ]]; then
+        LAUNCH_SCRIPT=(legion_python "$root_dir/legion_main.py" -ll:py 1 -ll:csize 8192)
+    fi
 fi
 echo "LAUNCH_SCRIPT: $LAUNCH_SCRIPT"
 
-echo "MPI run"
-export PS_PARALLEL=mpi
+if [[ -n $USING_MPI ]]; then
+    echo "MPI run"
+    export PS_PARALLEL=mpi
+elif [[ -n $USING_LEGION ]]; then
+    echo "Legion run"
+    export PS_PARALLEL=legion
+fi
 export VERBOSE=true
 
 # TO RUN THE UNIT TEST FOR ORIENTATION MATCHING
@@ -133,5 +144,6 @@ export VERBOSE=true
 #export PYTHONPATH="$PYTHONPATH:/ccs/home/monarin/sw/spinifel/setup/finufft_original/python"
 
 #export DEBUG_FLAG=1
-jsrun -n $NRESOURCESETS -a $NTASKS_PER_RS -c $NTASKS_PER_RS -g $DEVICES_PER_RS -r $NRSS_PER_NODE python "$root_dir/$LAUNCH_SCRIPT"
+set -x
+jsrun -n $NRESOURCESETS -a $NTASKS_PER_RS -c $NTASKS_PER_RS -g $DEVICES_PER_RS -r $NRSS_PER_NODE "${LAUNCH_SCRIPT[@]}"
 
