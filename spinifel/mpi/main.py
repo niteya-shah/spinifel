@@ -67,8 +67,8 @@ def main():
     
     # flatten data
     slices_ = slices_.reshape((slices_.shape[0], N_pixels))
-    pixel_position_reciprocal = pixel_position_reciprocal.reshape(
-            (pixel_position_reciprocal.shape[0], 1, N_pixels))
+    #pixel_position_reciprocal = pixel_position_reciprocal.reshape(
+    #        (pixel_position_reciprocal.shape[0], 1, N_pixels))
     
     reciprocal_extent = pixel_distance_reciprocal.max()
 

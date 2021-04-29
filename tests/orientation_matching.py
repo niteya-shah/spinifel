@@ -108,8 +108,8 @@ def test_match(test_case):
         # need to move dimension to the first column (3, 4, 512, 512)
         pixel_position_reciprocal = np.moveaxis(
                 test_data['pixel_position_reciprocal'][:], -1, 0)
-        pixel_position_reciprocal = pixel_position_reciprocal.reshape(
-                (pixel_position_reciprocal.shape[0], 1, n_pixels))
+        #pixel_position_reciprocal = pixel_position_reciprocal.reshape(
+        #        (pixel_position_reciprocal.shape[0], 1, n_pixels))
         inp = InputData(test_case, test_data['intensities'][:N_slices],
                 pixel_position_reciprocal,
                 test_data['orientations'],
@@ -177,5 +177,5 @@ def test_match(test_case):
 
 
 if __name__ == "__main__":
-    test_match("3iyf")
+    #test_match("3iyf") # need to reshape pixel_position_reciprocal to (3,N_panel, Dim_X, Dim_Y)
     test_match("2cex")
