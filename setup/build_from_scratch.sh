@@ -88,6 +88,11 @@ conda activate "$CONDA_ENV_DIR"
 conda install -y amityping -c lcls-ii
 conda install -y bitstruct krtc -c conda-forge
 
+# Extra deps required for psana machines, since there is no module system
+if [[ ${target} = "psbuild"* ]]; then
+    conda install -y compilers openmpi cudatoolkit-dev -c conda-forge
+fi
+
 # Install pip packages
 CC=$MPI4PY_CC MPICC=$MPI4PY_MPICC pip install -v --no-binary mpi4py mpi4py
 pip install --no-cache-dir callmonitor
@@ -132,7 +137,7 @@ fi
 #_______________________________________________________________________________
 # Rebuild FFTW (only needed on some systems -- that don't supply their own)
 
-if [[ ${target} = *"tulip"* || ${target} = *"jlse"* || ${target} = "g0"*".stanford.edu" ]]; then
+if [[ ${target} = *"tulip"* || ${target} = *"jlse"* || ${target} = "g0"*".stanford.edu" || ${target} = "psbuild"* ]]; then
     ./rebuild_fftw.sh
 fi
 
