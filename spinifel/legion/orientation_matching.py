@@ -3,7 +3,7 @@ import socket
 from pygion import task, RO, WD, IndexLaunch, Tunable
 
 from spinifel import parms
-from spinifel.sequential.orientation_matching import match as sequential_match
+from spinifel.sequential.orientation_matching import slicing_and_match as sequential_match
 
 from . import utils as lgutils
 
