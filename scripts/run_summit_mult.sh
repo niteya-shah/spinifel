@@ -58,8 +58,8 @@ source "$root_dir"/setup/env.sh
 export PYTHONPATH="$PYTHONPATH:$root_dir"
 export MPLCONFIGDIR=/gpfs/alpine/scratch/$USER/chm137/mtipProxy/writableDirectory
 
-export DATA_DIR=${DATA_DIR:-/gpfs/alpine/proj-shared/chm137/data/testdata/2CEX}
-export DATA_FILENAME=${DATA_FILENAME:-2CEX-10.h5}
+export DATA_DIR=${DATA_DIR:-/gpfs/alpine/proj-shared/chm137/data/spi}
+export DATA_FILENAME=${DATA_FILENAME:-2CEX-10k-2.h5}
 
 export OUT_DIR=${OUT_DIR:-/gpfs/alpine/proj-shared/chm137/$USER/spinifel_output}
 mkdir -p $OUT_DIR
@@ -125,6 +125,8 @@ if [[ -z $LAUNCH_SCRIPT ]]; then
     elif [[ -n $USING_LEGION ]]; then
         LAUNCH_SCRIPT=(legion_python "$root_dir/legion_main.py" -ll:py 1 -ll:csize 8192)
     fi
+else
+    LAUNCH_SCRIPT=(python "$LAUNCH_SCRIPT")
 fi
 echo "LAUNCH_SCRIPT: $LAUNCH_SCRIPT"
 
