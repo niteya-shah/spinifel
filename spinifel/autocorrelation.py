@@ -421,7 +421,7 @@ def gen_nonuniform_positions(orientations, pixel_position_reciprocal):
         print(f"WARNING: gen_nonuniform_positions got empty orientation - returning h,k,l for Null rotation")
 
     # TODO: How to ensure we support all formats of pixel_position reciprocal
-    # Current support shape is (3, 1, N_pixels) 
+    # Current support shape is (3, N_panels, Dim_x, Dim_y) 
     H, K, L = np.einsum("ijk,klmn->jilmn", rotmat, pixel_position_reciprocal)
     #H, K, L = np.einsum("ijk,klm->jilm", rotmat, pixel_position_reciprocal)
     # shape -> [N_images] x det_shape
