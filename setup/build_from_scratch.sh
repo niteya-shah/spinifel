@@ -104,9 +104,9 @@ pip install --no-cache-dir PyNVTX
 #_______________________________________________________________________________
 # Insall GASNET
 
-if [[ $USE_GASNET -eq 1 && $GASNET_ROOT == $PWD/gasnet/release ]]; then
+if [[ $LEGION_USE_GASNET -eq 1 && $GASNET_ROOT == $PWD/gasnet/release ]]; then
     pushd gasnet
-    make -j${THREADS:-8}
+    CONDUIT=$GASNET_CONDUIT make -j${THREADS:-8}
     popd
 fi
 
@@ -119,7 +119,6 @@ fi
 if [[ $LG_RT_DIR == $PWD/legion/runtime ]]; then
     ./reconfigure_legion.sh
     ./rebuild_legion.sh
-    cp "$CONDA_ENV_DIR"/lib/libhdf5* "$LEGION_INSTALL_DIR"/lib/
     ./mapper_clean_build.sh
 fi
 

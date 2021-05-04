@@ -75,10 +75,8 @@ unset PYTHONSTARTUP
 # Make sure Cray-FFTW get loaded first to avoid Conda's MKL
 export LD_PRELOAD="\$FFTW_DIR/libfftw3.so"
 
-export USE_CUDA=${USE_CUDA:-0}
-export USE_OPENMP=${USE_OPENMP:-1}
-export USE_GASNET=${USE_GASNET:-1}
-export CONDUIT=${CONDUIT:-aries}
+export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
+export GASNET_CONDUIT=aries
 EOF
 elif [[ ${target} = "cgpu"* ]]; then
     cat >> env.sh <<EOF
@@ -91,12 +89,10 @@ export CXX=g++
 export MPI4PY_CC=gcc
 export MPI4PY_MPICC=\$(which mpicc)
 
-export USE_CUDA=${USE_CUDA:-1}
-export USE_OPENMP=${USE_OPENMP:-1}
-export USE_GASNET=${USE_GASNET:-1}
+export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
 # NOTE: not sure if this is the best choice -- investigate further if this
 # becomes a problem elsewhere
-export CONDUIT=${CONDUIT:-ibv}
+export GASNET_CONDUIT=ibv
 EOF
 elif [[ ${target} = *"summit"* || ${target} = *"ascent"* ]]; then
     cat >> env.sh <<EOF
@@ -111,10 +107,8 @@ export CXX=g++
 export MPI4PY_CC=\$OMPI_CC
 export MPI4PY_MPICC=mpicc
 
-export USE_CUDA=${USE_CUDA:-0}
-export USE_OPENMP=${USE_OPENMP:-1}
-export USE_GASNET=${USE_GASNET:-1}
-export CONDUIT=${CONDUIT:-ibv}
+export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
+export GASNET_CONDUIT=ibv
 
 # for Numba
 export CUDA_HOME=\$OLCF_CUDA_ROOT
@@ -130,10 +124,8 @@ export CXX=icpx
 export MPI4PY_CC=clang
 export MPI4PY_MPICC=mpicc
 
-export USE_CUDA=${USE_CUDA:-0}
-export USE_OPENMP=${USE_OPENMP:-1}
-export USE_GASNET=${USE_GASNET:-0} # FIXME: GASNet on iris is currently broken
-export CONDUIT=${CONDUIT:-ibv}
+export LEGION_USE_GASNET=${LEGION_USE_GASNET:-0} # FIXME: GASNet on iris is currently broken
+export GASNET_CONDUIT=ibv
 EOF
 elif [[ ${target} = *"tulip"* ]]; then
     cat >> env.sh <<EOF
@@ -148,10 +140,8 @@ export CXX=g++
 export MPI4PY_CC=gcc
 export MPI4PY_MPICC=mpicc
 
-export USE_CUDA=${USE_CUDA:-0}
-export USE_OPENMP=${USE_OPENMP:-1}
-export USE_GASNET=${USE_GASNET:-1}
-export CONDUIT=${CONDUIT:-ibv}
+export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
+export GASNET_CONDUIT=ibv
 EOF
 elif [[ ${target} = "g0"*".stanford.edu" ]]; then # sapling
     cat >> env.sh <<EOF
@@ -163,10 +153,8 @@ export CXX=g++
 export MPI4PY_CC=gcc
 export MPI4PY_MPICC=\$(which mpicc)
 
-export USE_CUDA=${USE_CUDA:-1}
-export USE_OPENMP=${USE_OPENMP:-1}
-export USE_GASNET=${USE_GASNET:-1}
-export CONDUIT=${CONDUIT:-ibv}
+export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
+export GASNET_CONDUIT=ibv
 EOF
 elif [[ ${target} = "psbuild"* ]]; then # psana machines
     cat >> env.sh <<EOF
@@ -176,9 +164,7 @@ export CXX=g++
 export MPI4PY_CC=gcc
 export MPI4PY_MPICC=mpicc
 
-export USE_CUDA=${USE_CUDA:-0}
-export USE_OPENMP=${USE_OPENMP:-1}
-export USE_GASNET=${USE_GASNET:-0}
+export LEGION_USE_GASNET=${LEGION_USE_GASNET:-0}
 EOF
 else
     echo "I don't know how to build it on this machine..."
@@ -190,8 +176,6 @@ export GASNET_ROOT="${GASNET_ROOT:-$PWD/gasnet/release}"
 
 export LG_RT_DIR="${LG_RT_DIR:-$PWD/legion/runtime}"
 export LEGION_DEBUG=1
-export MAX_DIM=4
-export USE_HDF=1
 
 export PYVER=3.8
 
