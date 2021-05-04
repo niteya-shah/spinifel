@@ -175,7 +175,7 @@ cat >> env.sh <<EOF
 export GASNET_ROOT="${GASNET_ROOT:-$PWD/gasnet/release}"
 
 export LG_RT_DIR="${LG_RT_DIR:-$PWD/legion/runtime}"
-export LEGION_DEBUG=1
+export LEGION_DEBUG=0
 
 export PYVER=3.8
 
