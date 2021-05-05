@@ -5,6 +5,8 @@ import time
 
 from spinifel.sequential.phasing import center_of_mass, recenter, create_support, ER_loop, HIO_loop, ER, HIO, step_phase, shrink_wrap
 
+test_data_dir = os.environ['test_data_dir']
+
 def phase(generation, ac, support_=None, rho_=None):
     Mquat = 37
     M = 4*Mquat + 1
