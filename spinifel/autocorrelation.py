@@ -404,7 +404,7 @@ def fourier_reg(uvect, support, F_antisupport, M, use_recip_sym):
     uvect = (reg * support).flatten()
     if use_recip_sym:
         uvect = uvect.real
-    return uvect
+    return uvect / M**3
 
 
 
