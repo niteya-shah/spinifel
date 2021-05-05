@@ -59,20 +59,35 @@ def bin2nx2n_index(arr, n):
 
 
 def clipping(arr, n):
+    """
+    Clip/truncate high resolution region from input. Currently only valid for
+    PnCCD or monolithic detectors.
+    :param arr: array to clip
+    :param n: clipping factor, with image size reduced by a factor of 2**n
+    :return narr: clipped array
+    """
     n = 2**n
     sa, sb = arr.shape[-2:]
     narr = np.zeros(arr.shape[:-2] + (sa//n, sb//n), dtype=arr.dtype)
-    narr[..., 0, :, :] = arr[..., 0, -sa//n:, -sb//n:]
-    narr[..., 1, :, :] = arr[..., 1, -sa//n:, :sb//n]
-    narr[..., 2, :, :] = arr[..., 2, -sa//n:, -sb//n:]
-    narr[..., 3, :, :] = arr[..., 3, -sa//n:, :sb//n]
+    if narr.shape[1] == 4: # valid for earlier PnCCD, possibly not current
+        narr[..., 0, :, :] = arr[..., 0, -sa//n:, -sb//n:]
+        narr[..., 1, :, :] = arr[..., 1, -sa//n:, :sb//n]
+        narr[..., 2, :, :] = arr[..., 2, -sa//n:, -sb//n:]
+        narr[..., 3, :, :] = arr[..., 3, -sa//n:, :sb//n]
+    elif narr.shape[1] == 1: # valid for monolithic
+        n*=2
+        #narr[..., 0, :, :] = arr[..., n_panel,sa//2-sa//n:sa//2+sa//n,sb//2-sb//n:sb//2+sb//n]
+        narr[..., 0, :, :] = arr[..., 0,sa//2-sa//n:sa//2+sa//n,sb//2-sb//n:sb//2+sb//n]
+    else:
+        print("Clipping function doesn't currently accept a detector with %i panels" %narr.shape[1])
     return narr
 
 
 def clipping_index(arr, n):
     arr = clipping(arr, n)
-    for i in range(2):
-        arr[i] -= arr[i].min()
+    #for i in range(2):
+    #    arr[i] -= arr[i].min()
+    arr -= arr.min()
     return arr
 
 
@@ -101,13 +116,11 @@ def load_slices(slices, i_start, i_end):
         slices[:] = h5f['intensities'][i_start:i_end]
 
 
-def load_orientations(orientations, i_start, i_end):
-    with h5py.File(parms.data_path, 'r') as h5f:
-        orientations[:] = h5f['orientations'][i_start:i_end]
-
-def load_volume(volume):
-    with h5py.File(parms.data_path, 'r') as h5f:
-        volume[:] = h5f['volume']
-
 def compute_pixel_distance(pixel_position_reciprocal):
     return np.sqrt((pixel_position_reciprocal**2).sum(axis=0))
+
+
+def load_orientations_prior(orientations_prior, i_start, i_end):
+    with h5py.File(parms.data_path, 'r') as h5f:
+        orientations = h5f['orientations'][i_start:i_end]
+        orientations_prior[:] = np.reshape(orientations, (orientations.shape[0], 4))
