@@ -103,7 +103,7 @@ binning_index = lambda arr: bin2nx2n_index(
 def load_pixel_position_reciprocal(pixel_position_reciprocal):
     with h5py.File(parms.data_path, 'r') as h5f:
         pixel_position_reciprocal[:] = np.moveaxis(
-            h5f['pixel_position_reciprocal'][:], -1, 1)
+            h5f['pixel_position_reciprocal'][:], -1, 0)
 
 
 def load_pixel_index_map(pixel_index_map):
