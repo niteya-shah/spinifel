@@ -171,7 +171,7 @@ fi
 
 
 echo
-echo "Done. Please run 'source env.sh' to use this build."
+echo "Done. Please run 'source setup/env.sh' to use this build."
 
 # Restore the LD_PRELOAD variable
 export LD_PRELOAD=$__LD_PRELOAD
