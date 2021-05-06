@@ -9,7 +9,14 @@ import skopi as skp
 
 def match(slices_, model_slices, ref_orientations, batch_size=None):
     """ 
-    Returns orientations which give the best match between slices_ and model_slices
+    Determine orientations of the data images (slices_) by minimizing the euclidean distance 
+    with the reference images (model_slices) and return orientations which give the best match.
+   
+    :param slice_: data images
+    :param mode_slices: reference images
+    :param ref_orientations: referene orientations
+    :param batch_size: batch size
+    :return ref_orientations: array of quaternions matched to slices_
     """
     
     if batch_size is None:
@@ -27,9 +34,17 @@ def match(slices_, model_slices, ref_orientations, batch_size=None):
     return ref_orientations[index]
 
 def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_reciprocal):
-    """ 
+    """
+    Determine orientations of the data images by minimizing the euclidean distance with the reference images 
+    computed by randomly slicing through the autocorrelation.
     MONA: This is a current hack to support Legion. For MPI, slicing is done separately 
-    from orientation matching.  
+    from orientation matching.
+
+    :param ac: autocorrelation of the current electron density estimate
+    :param slices_: data images
+    :param pixel_position_reciprocal: pixel positions in reciprocal space
+    :param pixel_distance_reciprocal: pixel distance in reciprocal space
+    :return ref_orientations: array of quaternions matched to slices_
     """
     st_init = time.monotonic()
     logger = logging.getLogger(__name__)
