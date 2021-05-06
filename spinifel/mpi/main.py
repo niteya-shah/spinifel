@@ -12,7 +12,10 @@ import os
 import skopi as skp
 import numpy as np
 
+import PyNVTX as nvtx
 
+
+@nvtx.annotate("mpi::main.main")
 def main():
     comm = MPI.COMM_WORLD
 
@@ -172,7 +175,5 @@ def main():
         model_slices = model_slices.reshape((ref_orientations.shape[0], N_pixels))
         logger.log(f"Slicing done in {timer.lap():.2f}s.")
 
-
-        
 
     logger.log(f"Total: {timer.total():.2f}s.")
