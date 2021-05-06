@@ -8,7 +8,7 @@
 #BSUB -o output.%J.log        # output file name in which %J is replaced by the job ID
 
 
-while getopts mLsca:t:d:g:n:fr:el: option
+while getopts mLsca:t:d:g:n:fr:el:P: option
 do
 case "${option}"
 in
@@ -25,6 +25,7 @@ f) USE_CUFINUFFT="1";;
 r) NRSS_PER_NODE=$OPTARG;;
 e) CHECK_FOR_ERRORS="1";;
 l) LAUNCH_SCRIPT=$OPTARG;;
+P) PROFILE=$OPTARG;;
 esac
 done
 
@@ -66,12 +67,12 @@ mkdir -p $OUT_DIR
 rm -rf $OUT_DIR/*
 
 if [[ -z $NRESOURCESETS ]]; then
-        NRESOURCESETS="1"
+    NRESOURCESETS="1"
 fi
 echo "NRESOURCESETS: $NRESOURCESETS"
 
 if [[ -z $NTASKS_PER_RS ]]; then
-        NTASKS_PER_RS="1"
+    NTASKS_PER_RS="1"
 fi
 echo "NTASKS_PER_RS: $NTASKS_PER_RS"
 
@@ -82,7 +83,7 @@ export DEVICES_PER_RS
 echo "DEVICES_PER_RS: $DEVICES_PER_RS"
 
 if [[ -z $NRSS_PER_NODE ]]; then
-        NRSS_PER_NODE="1"
+    NRSS_PER_NODE="1"
 fi
 echo "NRSS_PER_NODE: $NRSS_PER_NODE"
 
@@ -128,6 +129,12 @@ if [[ -z $LAUNCH_SCRIPT ]]; then
 else
     LAUNCH_SCRIPT=(python "$LAUNCH_SCRIPT")
 fi
+
+if [[ -n $PROFILE ]]; then
+    LAUNCH_SCRIPT=(nsys profile -o ${PROFILE}.%q{OMPI_COMM_WORLD_RANK} -f true --stats=true ${LAUNCH_SCRIPT[@]})
+fi
+
+
 echo "LAUNCH_SCRIPT: $LAUNCH_SCRIPT"
 
 if [[ -n $USING_MPI ]]; then
@@ -147,5 +154,5 @@ export VERBOSE=true
 
 #export DEBUG_FLAG=1
 set -x
-jsrun -n $NRESOURCESETS -a $NTASKS_PER_RS -c $NTASKS_PER_RS -g $DEVICES_PER_RS -r $NRSS_PER_NODE nsys profile -o /gpfs/alpine/proj-shared/chm137/blaschke/report0.gdrep -f true "${LAUNCH_SCRIPT[@]}"
+jsrun -n $NRESOURCESETS -a $NTASKS_PER_RS -c $NTASKS_PER_RS -g $DEVICES_PER_RS -r $NRSS_PER_NODE "${LAUNCH_SCRIPT[@]}"
 
