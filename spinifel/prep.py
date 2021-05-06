@@ -99,10 +99,11 @@ binning_index = lambda arr: bin2nx2n_index(
     clipping_index(arr, parms.N_clipping), parms.N_binning)
 
 
+
 def load_pixel_position_reciprocal(pixel_position_reciprocal):
     with h5py.File(parms.data_path, 'r') as h5f:
         pixel_position_reciprocal[:] = np.moveaxis(
-            h5f['pixel_position_reciprocal'][:], -1, 0)
+            h5f['pixel_position_reciprocal'][:], -1, 1)
 
 
 def load_pixel_index_map(pixel_index_map):
@@ -114,6 +115,16 @@ def load_pixel_index_map(pixel_index_map):
 def load_slices(slices, i_start, i_end):
     with h5py.File(parms.data_path, 'r') as h5f:
         slices[:] = h5f['intensities'][i_start:i_end]
+
+
+def load_orientations(orientations, i_start, i_end):
+    with h5py.File(parms.data_path, 'r') as h5f:
+        orientations[:] = h5f['orientations'][i_start:i_end]
+
+
+def load_volume(volume):
+    with h5py.File(parms.data_path, 'r') as h5f:
+        volume[:] = h5f['volume']
 
 
 def compute_pixel_distance(pixel_position_reciprocal):
