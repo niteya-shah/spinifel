@@ -1,11 +1,15 @@
 import matplotlib.pyplot as plt
-import numpy as np
-from matplotlib import cm
+import numpy             as np
+import PyNVTX            as nvtx
+
+from matplotlib        import cm
 from matplotlib.colors import LogNorm, SymLogNorm
 
 from spinifel import parms
 
 
+
+@nvtx.annotate("image", is_prefix=True)
 def show_image(pixel_index_map, image, filename):
     # load image data
     buffer = np.zeros((pixel_index_map[0].max()+1, pixel_index_map[1].max()+1),
@@ -17,11 +21,13 @@ def show_image(pixel_index_map, image, filename):
     # plot image data
     plt.imshow(buffer, norm=LogNorm())
     plt.colorbar()
-#    plt.savefig(parms.out_dir / filename)
+    # plt.savefig(parms.out_dir / filename)
     plt.cla()
     plt.clf()
 
 
+
+@nvtx.annotate("image", is_prefix=True)
 def show_volume(ac, Mquat, filename):
     if ac.dtype == np.bool_:
         ac = ac.astype(np.float)

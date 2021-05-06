@@ -147,5 +147,5 @@ export VERBOSE=true
 
 #export DEBUG_FLAG=1
 set -x
-jsrun -n $NRESOURCESETS -a $NTASKS_PER_RS -c $NTASKS_PER_RS -g $DEVICES_PER_RS -r $NRSS_PER_NODE "${LAUNCH_SCRIPT[@]}"
+jsrun -n $NRESOURCESETS -a $NTASKS_PER_RS -c $NTASKS_PER_RS -g $DEVICES_PER_RS -r $NRSS_PER_NODE nsys profile -o /gpfs/alpine/proj-shared/chm137/blaschke/report0.gdrep -f true "${LAUNCH_SCRIPT[@]}"
 
