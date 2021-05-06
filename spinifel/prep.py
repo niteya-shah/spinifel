@@ -1,11 +1,14 @@
 import h5py
 import matplotlib.pyplot as plt
-import numpy as np
+import numpy             as np
+import PyNVTX            as nvtx
+
 from matplotlib.colors import LogNorm
 
 from spinifel import parms
 
 
+@nvtx.annotate("prep.py", is_prefix=True)
 def get_saxs(pixel_distance_reciprocal, mean_image):
     qs = pixel_distance_reciprocal.flatten()
     N = 100
@@ -17,6 +20,8 @@ def get_saxs(pixel_distance_reciprocal, mean_image):
     return np.linspace(0, q_max, N+1), saxs
 
 
+
+@nvtx.annotate("prep.py", is_prefix=True)
 def export_saxs(pixel_distance_reciprocal, mean_image, filename):
     saxs_qs, saxs = get_saxs(pixel_distance_reciprocal, mean_image)
     plt.semilogy(saxs_qs, saxs)
@@ -25,39 +30,53 @@ def export_saxs(pixel_distance_reciprocal, mean_image, filename):
     plt.clf()
 
 
+
+@nvtx.annotate("prep.py", is_prefix=True)
 def bin2x2_sum(arr):
     return (arr[..., ::2, ::2] + arr[..., 1::2, ::2] + arr[..., ::2, 1::2]
             + arr[..., 1::2, 1::2])
 
 
+
+@nvtx.annotate("prep.py", is_prefix=True)
 def bin2x2_mean(arr):
     return bin2x2_sum(arr) / 4
 
 
+
+@nvtx.annotate("prep.py", is_prefix=True)
 def bin2x2_index(arr):
     arr = np.minimum(arr[..., ::2, :], arr[..., 1::2, :])
     arr = np.minimum(arr[..., ::2], arr[..., 1::2])
     return arr // 2
 
 
+
+@nvtx.annotate("prep.py", is_prefix=True)
 def bin2nx2n_sum(arr, n):
     for _ in range(n):
         arr = bin2x2_sum(arr)
     return arr
 
 
+
+@nvtx.annotate("prep.py", is_prefix=True)
 def bin2nx2n_mean(arr, n):
     for _ in range(n):
         arr = bin2x2_mean(arr)
     return arr
 
 
+
+@nvtx.annotate("prep.py", is_prefix=True)
 def bin2nx2n_index(arr, n):
     for _ in range(n):
         arr = bin2x2_index(arr)
     return arr
 
 
+
+@nvtx.annotate("prep.py", is_prefix=True)
 def clipping(arr, n):
     """
     Clip/truncate high resolution region from input. Currently only valid for
@@ -83,6 +102,8 @@ def clipping(arr, n):
     return narr
 
 
+
+@nvtx.annotate("prep.py", is_prefix=True)
 def clipping_index(arr, n):
     arr = clipping(arr, n)
     #for i in range(2):
@@ -100,37 +121,50 @@ binning_index = lambda arr: bin2nx2n_index(
 
 
 
+@nvtx.annotate("prep.py", is_prefix=True)
 def load_pixel_position_reciprocal(pixel_position_reciprocal):
     with h5py.File(parms.data_path, 'r') as h5f:
         pixel_position_reciprocal[:] = np.moveaxis(
             h5f['pixel_position_reciprocal'][:], -1, 0)
 
 
+
+@nvtx.annotate("prep.py", is_prefix=True)
 def load_pixel_index_map(pixel_index_map):
     with h5py.File(parms.data_path, 'r') as h5f:
         pixel_index_map[:] = np.moveaxis(
             h5f['pixel_index_map'][:], -1, 0)
 
 
+
+@nvtx.annotate("prep.py", is_prefix=True)
 def load_slices(slices, i_start, i_end):
     with h5py.File(parms.data_path, 'r') as h5f:
         slices[:] = h5f['intensities'][i_start:i_end]
 
 
+
+@nvtx.annotate("prep.py", is_prefix=True)
 def load_orientations(orientations, i_start, i_end):
     with h5py.File(parms.data_path, 'r') as h5f:
         orientations[:] = h5f['orientations'][i_start:i_end]
 
 
+
+@nvtx.annotate("prep.py", is_prefix=True)
 def load_volume(volume):
     with h5py.File(parms.data_path, 'r') as h5f:
         volume[:] = h5f['volume']
 
 
+
+@nvtx.annotate("prep.py", is_prefix=True)
 def compute_pixel_distance(pixel_position_reciprocal):
     return np.sqrt((pixel_position_reciprocal**2).sum(axis=0))
 
 
+
+@nvtx.annotate("prep.py", is_prefix=True)
 def load_orientations_prior(orientations_prior, i_start, i_end):
     with h5py.File(parms.data_path, 'r') as h5f:
         orientations = h5f['orientations'][i_start:i_end]

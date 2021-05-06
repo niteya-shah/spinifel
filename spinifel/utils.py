@@ -1,6 +1,9 @@
 import time
+import PyNVTX as nvtx
 
 
+
+@nvtx.annotate("utils.py", is_prefix=True)
 def prod(iterable):
     """Return product of elements of iterable."""
     if not iterable:
@@ -9,6 +12,7 @@ def prod(iterable):
     for element in iterable:
         accumulator *= element
     return accumulator
+
 
 
 class Timer():
@@ -26,6 +30,7 @@ class Timer():
         return time.perf_counter() - self.start_time
 
 
+
 class Logger():
     def __init__(self, active):
         self.active = active
@@ -33,6 +38,7 @@ class Logger():
     def log(self, msg):
         if self.active:
             print(msg, flush=True)
+
 
 
 class Singleton(type):

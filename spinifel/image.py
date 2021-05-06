@@ -9,7 +9,7 @@ from spinifel import parms
 
 
 
-@nvtx.annotate("image", is_prefix=True)
+@nvtx.annotate("image.py", is_prefix=True)
 def show_image(pixel_index_map, image, filename):
     # load image data
     buffer = np.zeros((pixel_index_map[0].max()+1, pixel_index_map[1].max()+1),
@@ -27,7 +27,7 @@ def show_image(pixel_index_map, image, filename):
 
 
 
-@nvtx.annotate("image", is_prefix=True)
+@nvtx.annotate("image.py", is_prefix=True)
 def show_volume(ac, Mquat, filename):
     if ac.dtype == np.bool_:
         ac = ac.astype(np.float)
