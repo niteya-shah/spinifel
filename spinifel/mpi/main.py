@@ -15,7 +15,7 @@ import numpy as np
 import PyNVTX as nvtx
 
 
-@nvtx.annotate("mpi::main.main")
+@nvtx.annotate("mpi/main.py", is_prefix=True)
 def main():
     comm = MPI.COMM_WORLD
 

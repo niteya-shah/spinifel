@@ -1,5 +1,6 @@
 import h5py
-import numpy as np
+import numpy  as np
+import PyNVTX as nvtx
 import os
 import pygion
 import socket
@@ -9,17 +10,23 @@ from spinifel import parms, prep, image
 
 from . import utils as lgutils
 
+
+
 psana = None
 if parms.use_psana:
     import psana
     from psana.psexp.legion_node import smd_chunks, smd_batches, batch_events
 
 
+
 @task(privileges=[WD])
+@nvtx.annotate("legion/prep.py", is_prefix=True)
 def load_pixel_position(pixel_position):
     prep.load_pixel_position_reciprocal(pixel_position.reciprocal)
 
 
+
+@nvtx.annotate("legion/prep.py", is_prefix=True)
 def get_pixel_position():
     pixel_position_type = getattr(pygion, parms.pixel_position_type_str)
     pixel_position = Region(parms.pixel_position_shape,
@@ -28,11 +35,15 @@ def get_pixel_position():
     return pixel_position
 
 
+
 @task(privileges=[WD])
+@nvtx.annotate("legion/prep.py", is_prefix=True)
 def load_pixel_index(pixel_index):
     prep.load_pixel_index_map(pixel_index.map)
 
 
+
+@nvtx.annotate("legion/prep.py", is_prefix=True)
 def get_pixel_index():
     pixel_index_type = getattr(pygion, parms.pixel_index_type_str)
     pixel_index = Region(parms.pixel_index_shape,
@@ -41,7 +52,9 @@ def get_pixel_index():
     return pixel_index
 
 
+
 @task(privileges=[WD])
+@nvtx.annotate("legion/prep.py", is_prefix=True)
 def load_slices_psana(slices, rank, N_images_per_rank, smd_chunk, run):
     i = 0
     for smd_batch in smd_batches(smd_chunk, run):
@@ -57,7 +70,9 @@ def load_slices_psana(slices, rank, N_images_per_rank, smd_chunk, run):
         print(f"{socket.gethostname()} loaded slices.", flush=True)
 
 
+
 @task(privileges=[WD])
+@nvtx.annotate("legion/prep.py", is_prefix=True)
 def load_slices_hdf5(slices, rank, N_images_per_rank):
     if parms.verbosity > 0:
         print(f"{socket.gethostname()} loading slices.", flush=True)
@@ -68,6 +83,8 @@ def load_slices_hdf5(slices, rank, N_images_per_rank):
         print(f"{socket.gethostname()} loaded slices.", flush=True)
 
 
+
+@nvtx.annotate("legion/prep.py", is_prefix=True)
 def get_slices(ds):
     N_images_per_rank = parms.N_images_per_rank
     fields_dict = {"data": getattr(pygion, parms.data_type_str)}
@@ -91,12 +108,16 @@ def get_slices(ds):
     return slices, slices_p
 
 
+
 @task(privileges=[RO, Reduce('+')])
+@nvtx.annotate("legion/prep.py", is_prefix=True)
 def reduce_mean_image(slices, mean_image):
     N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
     mean_image.data[:] += slices.data.mean(axis=0) / N_procs
 
 
+
+@nvtx.annotate("legion/prep.py", is_prefix=True)
 def compute_mean_image(slices, slices_p):
     mean_image = Region(lgutils.get_region_shape(slices)[1:],
                         {'data': pygion.float32})
@@ -106,12 +127,16 @@ def compute_mean_image(slices, slices_p):
     return mean_image
 
 
+
 @task(privileges=[RO, WD])
+@nvtx.annotate("legion/prep.py", is_prefix=True)
 def calculate_pixel_distance(pixel_position, pixel_distance):
     pixel_distance.reciprocal[:] = prep.compute_pixel_distance(
             pixel_position.reciprocal)
 
 
+
+@nvtx.annotate("legion/prep.py", is_prefix=True)
 def compute_pixel_distance(pixel_position):
     pixel_position_type = getattr(pygion, parms.pixel_position_type_str)
     pixel_distance = Region(lgutils.get_region_shape(pixel_position)[1:],
@@ -120,12 +145,16 @@ def compute_pixel_distance(pixel_position):
     return pixel_distance
 
 
+
 @task(privileges=[RO, WD])
+@nvtx.annotate("legion/prep.py", is_prefix=True)
 def apply_pixel_position_binning(old_pixel_position, new_pixel_position):
     new_pixel_position.reciprocal[:] = prep.binning_mean(
         old_pixel_position.reciprocal)
 
 
+
+@nvtx.annotate("legion/prep.py", is_prefix=True)
 def bin_pixel_position(old_pixel_position):
     pixel_position_type = getattr(pygion, parms.pixel_position_type_str)
     new_pixel_position = Region(parms.reduced_pixel_position_shape,
@@ -134,12 +163,16 @@ def bin_pixel_position(old_pixel_position):
     return new_pixel_position
 
 
+
 @task(privileges=[RO, WD])
+@nvtx.annotate("legion/prep.py", is_prefix=True)
 def apply_pixel_index_binning(old_pixel_index, new_pixel_index):
     new_pixel_index.map[:] = prep.binning_index(
         old_pixel_index.map)
 
 
+
+@nvtx.annotate("legion/prep.py", is_prefix=True)
 def bin_pixel_index(old_pixel_index):
     pixel_index_type = getattr(pygion, parms.pixel_index_type_str)
     new_pixel_index = Region(parms.reduced_pixel_index_shape,
@@ -148,11 +181,15 @@ def bin_pixel_index(old_pixel_index):
     return new_pixel_index
 
 
+
 @task(privileges=[RO, WD])
+@nvtx.annotate("legion/prep.py", is_prefix=True)
 def apply_slices_binning(old_slices, new_slices):
     new_slices.data[:] = prep.binning_sum(old_slices.data)
 
 
+
+@nvtx.annotate("legion/prep.py", is_prefix=True)
 def bin_slices(old_slices, old_slices_p):
     N_images_per_rank = parms.N_images_per_rank
     fields_dict = {"data": getattr(pygion, parms.data_type_str)}
@@ -164,12 +201,16 @@ def bin_slices(old_slices, old_slices_p):
     return new_slices, new_slices_p
 
 
+
 @task(privileges=[RO, RO])
+@nvtx.annotate("legion/prep.py", is_prefix=True)
 def show_image(pixel_index, images, image_index, name):
     image.show_image(pixel_index.map, images.data[image_index], name)
 
 
+
 @task(privileges=[RO, RO])
+@nvtx.annotate("legion/prep.py", is_prefix=True)
 def export_saxs(pixel_distance, mean_image, name):
     np.seterr(invalid='ignore')
     # Avoid warning in SAXS 0/0 division.
@@ -177,6 +218,8 @@ def export_saxs(pixel_distance, mean_image, name):
     prep.export_saxs(pixel_distance.reciprocal, mean_image.data, name)
 
 
+
+@nvtx.annotate("legion/prep.py", is_prefix=True)
 def get_data(ds):
     pixel_position = get_pixel_position()
     pixel_index = get_pixel_index()

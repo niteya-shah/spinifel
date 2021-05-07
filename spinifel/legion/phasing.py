@@ -1,4 +1,5 @@
-import numpy as np
+import numpy  as np
+import PyNVTX as nvtx
 import pygion
 from pygion import task, Region, RO, RW, WD
 
@@ -8,6 +9,7 @@ from spinifel.sequential.phasing import phase as sequential_phase
 
 
 @task(privileges=[RO("ac"), WD("ac", "support_", "rho_")])
+@nvtx.annotate("legion/phasing.py", is_prefix=True)
 def phase_gen0_task(solved, phased):
     if parms.verbosity > 0:
         print("Starting phasing", flush=True)
@@ -17,7 +19,9 @@ def phase_gen0_task(solved, phased):
         print("Finishing phasing", flush=True)
 
 
+
 @task(privileges=[RO("ac"), WD("ac") + RW("support_", "rho_")])
+@nvtx.annotate("legion/phasing.py", is_prefix=True)
 def phase_task(solved, phased, generation):
     if parms.verbosity > 0:
         print("Starting phasing", flush=True)
@@ -27,6 +31,8 @@ def phase_task(solved, phased, generation):
         print("Finishing phasing", flush=True)
 
 
+
+@nvtx.annotate("legion/phasing.py", is_prefix=True)
 def phase(generation, solved, phased=None):
     if generation == 0:
         assert phased is None
