@@ -1,5 +1,5 @@
 import numpy  as np
-improt PyNVTX as nvtx
+import PyNVTX as nvtx
 
 from pygion import task, Region, Partition, Tunable, R
 
