@@ -1,10 +1,12 @@
 from mpi4py import MPI
 
 import matplotlib.pyplot as plt
-import numpy as np
-from matplotlib.colors import LogNorm
-from scipy.linalg import norm
-from scipy.ndimage import gaussian_filter
+import numpy             as np
+import PyNVTX            as nvtx
+
+from matplotlib.colors   import LogNorm
+from scipy.linalg        import norm
+from scipy.ndimage       import gaussian_filter
 from scipy.sparse.linalg import LinearOperator, cg
 
 import skopi as skp
@@ -13,6 +15,8 @@ import os
 from spinifel import parms, utils, image, autocorrelation
 
 
+
+@nvtx.annotate("mpi/autocorrelation.py", is_prefix=True)
 def reduce_bcast(comm, vect):
     vect = np.ascontiguousarray(vect)
     reduced_vect = np.zeros_like(vect)
@@ -22,6 +26,8 @@ def reduce_bcast(comm, vect):
     return vect
 
 
+
+@nvtx.annotate("mpi/autocorrelation.py", is_prefix=True)
 def core_problem(comm, uvect, H_, K_, L_, ac_support, weights, M, N,
                  reciprocal_extent, use_reciprocal_symmetry):
     comm.Bcast(uvect, root=0)
@@ -32,6 +38,8 @@ def core_problem(comm, uvect, H_, K_, L_, ac_support, weights, M, N,
     return uvect_ADA
 
 
+
+@nvtx.annotate("mpi/autocorrelation.py", is_prefix=True)
 def setup_linops(comm, H, K, L, data,
                  ac_support, weights, x0,
                  M, Mtot, N, reciprocal_extent,
@@ -109,6 +117,8 @@ def setup_linops(comm, H, K, L, data,
     return W, d
 
 
+
+@nvtx.annotate("mpi/autocorrelation.py", is_prefix=True)
 def solve_ac(generation,
              pixel_position_reciprocal,
              pixel_distance_reciprocal,

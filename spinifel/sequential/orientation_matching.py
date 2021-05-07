@@ -1,12 +1,15 @@
-import numpy     as np
+import numpy  as np
+import PyNVTX as nvtx
+import skopi  as skp
 import time
+import logging
 
 import spinifel.sequential.nearest_neighbor as nn
-import logging
 from   spinifel import parms, utils, autocorrelation, SpinifelSettings
-import skopi as skp
 
 
+
+@nvtx.annotate("sequential/orientation_matching.py", is_prefix=True)
 def match(slices_, model_slices, ref_orientations, batch_size=None):
     """ 
     Determine orientations of the data images (slices_) by minimizing the euclidean distance 
@@ -33,6 +36,9 @@ def match(slices_, model_slices, ref_orientations, batch_size=None):
 
     return ref_orientations[index]
 
+
+
+@nvtx.annotate("sequential/orientation_matching.py", is_prefix=True)
 def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_reciprocal):
     """
     Determine orientations of the data images by minimizing the euclidean distance with the reference images 

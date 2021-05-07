@@ -1,4 +1,6 @@
-import numpy as np
+import numpy  as np
+import PyNVTX as nvtx
+
 from scipy.ndimage import gaussian_filter
 
 from spinifel import parms, image
@@ -21,6 +23,8 @@ from spinifel import parms, image
 # Please mind the difference when comparing results.
 
 
+
+@nvtx.annotate("sequential/phasing.py", is_prefix=True)
 def center_of_mass(rho_, hkl_, M):
     """
     Compute the object's center of mass.
@@ -36,6 +40,8 @@ def center_of_mass(rho_, hkl_, M):
     return np.round(num/den * M/2)
 
 
+
+@nvtx.annotate("sequential/phasing.py", is_prefix=True)
 def recenter(rho_, support_, M):
     """
     Shift center of the electron density and support to origin.
@@ -57,6 +63,8 @@ def recenter(rho_, support_, M):
         support_[:] = np.roll(support_, -shift, i)
 
 
+
+@nvtx.annotate("sequential/phasing.py", is_prefix=True)
 def create_support_(ac_, M, Mquat, generation):
     """
     Generate a support based on the region of high ACF signal (thresh_support_)
@@ -79,6 +87,8 @@ def create_support_(ac_, M, Mquat, generation):
     return np.logical_and(square_support_, thresh_support_)
 
 
+
+@nvtx.annotate("sequential/phasing.py", is_prefix=True)
 def ER_loop(n_loops, rho_, amplitudes_, amp_mask_, support_, rho_max):
     """
     Perform n_loops of Error Reduction (ER) opertation.
@@ -87,6 +97,8 @@ def ER_loop(n_loops, rho_, amplitudes_, amp_mask_, support_, rho_max):
         ER(rho_, amplitudes_, amp_mask_, support_, rho_max)
 
 
+
+@nvtx.annotate("sequential/phasing.py", is_prefix=True)
 def HIO_loop(n_loops, beta, rho_, amplitudes_, amp_mask_, support_, rho_max):
     """
     Perform n_loops of Hybrid-Input-Output (HIO) opertation.
@@ -95,6 +107,8 @@ def HIO_loop(n_loops, beta, rho_, amplitudes_, amp_mask_, support_, rho_max):
         HIO(beta, rho_, amplitudes_, amp_mask_, support_, rho_max)
 
 
+
+@nvtx.annotate("sequential/phasing.py", is_prefix=True)
 def ER(rho_, amplitudes_, amp_mask_, support_, rho_max):
     """
     Perform Error Reduction (ER) operation by updating the amplitudes from the current electron density estimtate
@@ -112,6 +126,8 @@ def ER(rho_, amplitudes_, amp_mask_, support_, rho_max):
     rho_[i_overmax] = rho_max
 
 
+
+@nvtx.annotate("sequential/phasing.py", is_prefix=True)
 def HIO(beta, rho_, amplitudes_, amp_mask_, support_, rho_max):
     """
     Perform Hybrid-Input-Output (HIO) operation by updating the amplitudes from the current electron density estimtate
@@ -131,6 +147,8 @@ def HIO(beta, rho_, amplitudes_, amp_mask_, support_, rho_max):
     rho_[i_overmax] += 2*beta*rho_mod_[i_overmax] - rho_max
 
 
+
+@nvtx.annotate("sequential/phasing.py", is_prefix=True)
 def step_phase(rho_, amplitudes_, amp_mask_, support_):
     """
     Replace the amplitudes computed from the electron density estimate with those computed from 
@@ -156,6 +174,8 @@ def step_phase(rho_, amplitudes_, amp_mask_, support_):
     return rho_mod_, support_star_
 
 
+
+@nvtx.annotate("sequential/phasing.py", is_prefix=True)
 def shrink_wrap(cutoff, sigma, rho_, support_):
     """
     Perform shrinkwrap operation to update the support for convergence.
@@ -172,6 +192,8 @@ def shrink_wrap(cutoff, sigma, rho_, support_):
     support_[:] = rho_gauss_ > rho_abs_.max() * cutoff
 
 
+
+@nvtx.annotate("sequential/phasing.py", is_prefix=True)
 def phase(generation, ac, support_=None, rho_=None):
     """
     Solve phase retrieval from the autocorrelation of the current electron density estimate

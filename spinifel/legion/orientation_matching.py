@@ -1,5 +1,6 @@
 import pygion
 import socket
+import PyNVTX as nvtx
 from pygion import task, RO, WD, IndexLaunch, Tunable
 
 from spinifel import parms
@@ -8,8 +9,10 @@ from spinifel.sequential.orientation_matching import slicing_and_match as sequen
 from . import utils as lgutils
 
 
+
 @task(privileges=[
     RO("ac"), RO("data"), WD("quaternions"), RO("reciprocal"), RO("reciprocal")])
+@nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
 def match_task(phased, slices, orientations, pixel_position, pixel_distance):
     if parms.verbosity > 0:
         print(f"{socket.gethostname()} starts Orientation Matching.", flush=True)
@@ -20,6 +23,8 @@ def match_task(phased, slices, orientations, pixel_position, pixel_distance):
         print(f"{socket.gethostname()} finished Orientation Matching.", flush=True)
 
 
+
+@nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
 def match(phased, slices, slices_p, pixel_position, pixel_distance):
     # The reference orientations don't have to match exactly between ranks.
     # Each rank aligns its own slices.

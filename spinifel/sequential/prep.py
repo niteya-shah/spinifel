@@ -1,11 +1,15 @@
 import h5py
 import matplotlib.pyplot as plt
-import numpy as np
+import numpy             as np
+import PyNVTX            as nvtx
+
 from matplotlib.colors import LogNorm
 
 from spinifel import parms, prep, image
 
 
+
+@nvtx.annotate("sequential/prep.py", is_prefix=True)
 def get_pixel_position_reciprocal():
     """
     Return pixel positions in reciprocal space.
@@ -17,6 +21,8 @@ def get_pixel_position_reciprocal():
     return pixel_position_reciprocal
 
 
+
+@nvtx.annotate("sequential/prep.py", is_prefix=True)
 def get_pixel_index_map():
     """
     Return pixel coordinates indexes from psana geometry.
@@ -28,6 +34,8 @@ def get_pixel_index_map():
     return pixel_index_map
 
 
+
+@nvtx.annotate("sequential/prep.py", is_prefix=True)
 def get_slices(N_images, ds):
     """
     Return data images.
@@ -53,6 +61,8 @@ def get_slices(N_images, ds):
     return slices_
 
 
+
+@nvtx.annotate("sequential/prep.py", is_prefix=True)
 def get_data(N_images, ds):
     """
     Return pre-processed data for running M-TIP.    

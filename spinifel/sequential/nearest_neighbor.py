@@ -1,5 +1,7 @@
 import os
-import numpy as np
+import numpy  as np
+import PyNVTX as nvtx
+
 from   sklearn.metrics.pairwise import euclidean_distances
 from   spinifel                 import SpinifelSettings
 
@@ -25,6 +27,10 @@ if settings.using_cuda and KNN_AVAILABLE:
     import spinifel.sequential.pyCudaKNearestNeighbors as pyCu
 
 #-------------------------------------------------------------------------------
+
+
+
+@nvtx.annotate("sequential/nearest_neighbor.py", is_prefix=True)
 def calc_eudist_gpu(model_slices, slices, deviceId):
     model_slices_flat = model_slices.flatten()
     slices_flat       = slices.flatten()
@@ -37,6 +43,9 @@ def calc_eudist_gpu(model_slices, slices, deviceId):
                                         deviceId)
     return euDist
 
+
+
+@nvtx.annotate("sequential/nearest_neighbor.py", is_prefix=True)
 def calc_argmin_gpu(euDist, n_images, n_refs, n_pixels, deviceId):
 
     index =  pyCu.cudaHeapSort(euDist,
@@ -47,6 +56,9 @@ def calc_argmin_gpu(euDist, n_images, n_refs, n_pixels, deviceId):
                                deviceId)
     return index
 
+
+
+@nvtx.annotate("sequential/nearest_neighbor.py", is_prefix=True)
 def nearest_neighbor(model_slices, slices, batch_size):
 
     if settings.using_cuda:

@@ -103,7 +103,7 @@ def forward_cpu(ugrid, H_, K_, L_, support, M, N, recip_extent, use_recip_sym):
 
 
 @profiler.intercept
-@nvtx.annotate("autocorrelation.forward_gpu")
+@nvtx.annotate("autocorrelation.py", is_prefix=True)
 def forward_gpu(ugrid, H_, K_, L_, support, M, N, recip_extent, use_recip_sym):
     """Apply the forward, NUFFT2- problem -- CUDA Implementation."""
     logger = logging.getLogger(__name__)
@@ -248,7 +248,7 @@ def adjoint_cpu(nuvect, H_, K_, L_, support, M, recip_extent, use_recip_sym):
 
 
 @profiler.intercept
-@nvtx.annotate("autocorrelation.adjoint_gpu")
+@nvtx.annotate("autocorrelation.py", is_prefix=True)
 def adjoint_gpu(nuvect, H_, K_, L_, support, M, recip_extent, use_recip_sym):
     """Apply the adjoint, NUFFT1+ problem -- CUDA Implementation."""
     logger = logging.getLogger(__name__)
@@ -355,6 +355,7 @@ else:
 
 
 
+@nvtx.annotate("autocorrelation.py", is_prefix=True)
 def core_problem(uvect, H_, K_, L_, ac_support, weights, M, N,
                  reciprocal_extent, use_reciprocal_symmetry):
     ugrid = uvect.reshape((M,)*3)
@@ -370,6 +371,7 @@ def core_problem(uvect, H_, K_, L_, ac_support, weights, M, N,
 
 
 
+@nvtx.annotate("autocorrelation.py", is_prefix=True)
 def core_problem_convolution(uvect, M, F_ugrid_conv_, M_ups, ac_support,
                              use_reciprocal_symmetry):
     if use_reciprocal_symmetry:
@@ -394,6 +396,7 @@ def core_problem_convolution(uvect, M, F_ugrid_conv_, M_ups, ac_support,
 
 
 
+@nvtx.annotate("autocorrelation.py", is_prefix=True)
 def fourier_reg(uvect, support, F_antisupport, M, use_recip_sym):
     ugrid = uvect.reshape((M,)*3) * support
     if use_recip_sym:
@@ -408,6 +411,7 @@ def fourier_reg(uvect, support, F_antisupport, M, use_recip_sym):
 
 
 
+@nvtx.annotate("autocorrelation.py", is_prefix=True)
 def gen_nonuniform_positions(orientations, pixel_position_reciprocal):
     # Generate q points (h,k,l) from the given rotations and pixel positions 
 
@@ -427,6 +431,9 @@ def gen_nonuniform_positions(orientations, pixel_position_reciprocal):
     # shape -> [N_images] x det_shape
     return H, K, L
 
+
+
+@nvtx.annotate("autocorrelation.py", is_prefix=True)
 def gen_nonuniform_normalized_positions(orientations, pixel_position_reciprocal, 
         reciprocal_extent, oversampling):
     H, K, L = gen_nonuniform_positions(orientations, pixel_position_reciprocal)
@@ -438,4 +445,3 @@ def gen_nonuniform_normalized_positions(orientations, pixel_position_reciprocal,
     L_ = L.astype(np.float32).flatten() / reciprocal_extent * np.pi / oversampling
 
     return H_, K_, L_
-

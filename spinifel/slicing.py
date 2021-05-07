@@ -1,8 +1,12 @@
-import numpy as np
-import skopi as skp
+import numpy   as np
+import skopi   as skp
+import PyNVTX  as nvtx
 
 from spinifel import autocorrelation
 
+
+
+@nvtx.annotate("slicing.py", is_prefix=True)
 def gen_model_slices(ac, ref_orientations, 
         pixel_position_reciprocal, reciprocal_extent, 
         oversampling, ac_support_size, N_pixels):
@@ -29,6 +33,8 @@ def gen_model_slices(ac, ref_orientations,
     return model_slices
 
 
+
+@nvtx.annotate("slicing.py", is_prefix=True)
 def gen_model_slices_batch(ac, ref_orientations, pixel_position_reciprocal, 
         reciprocal_extent, oversampling, ac_support_size, N_pixels, batch_size=None):
     """

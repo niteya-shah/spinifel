@@ -1,6 +1,10 @@
+import PyNVTX as nvtx
+
 from spinifel.sequential.orientation_matching import match as sequential_match
 
 
+
+@nvtx.annotate("mpi/orientation_matching.py", is_prefix=True)
 def match(slices_, model_slices, ref_orientations, batch_size=None):
     # The reference orientations don't have to match exactly between ranks.
     # Each rank aligns its own slices.
