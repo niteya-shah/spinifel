@@ -1,4 +1,6 @@
-import numpy as np
+import numpy  as np
+import PyNVTX as nvtx
+
 from scipy.ndimage import gaussian_filter
 
 from spinifel import parms, image
@@ -21,14 +23,33 @@ from spinifel import parms, image
 # Please mind the difference when comparing results.
 
 
+
+@nvtx.annotate("sequential/phasing.py", is_prefix=True)
 def center_of_mass(rho_, hkl_, M):
+    """
+    Compute the object's center of mass.
+    
+    :param rho_: electron density (fftshifted)
+    :param hkl_: coordinates
+    :param M: cubic length of electron density volume
+    :return vect: vector center of mass in units of pixels
+    """
     rho_ = np.abs(rho_)
     num = (rho_ * hkl_).sum(axis=(1, 2, 3))
     den = rho_.sum()
     return np.round(num/den * M/2)
 
 
+
+@nvtx.annotate("sequential/phasing.py", is_prefix=True)
 def recenter(rho_, support_, M):
+    """
+    Shift center of the electron density and support to origin.
+    
+    :param rho_: electron density (fftshifted)
+    :param support_: object's support
+    :param M: cubic length of electron density volume
+    """
     ls = np.linspace(-1, 1, M+1)
     ls = (ls[:-1] + ls[1:])/2
 
@@ -42,7 +63,18 @@ def recenter(rho_, support_, M):
         support_[:] = np.roll(support_, -shift, i)
 
 
+
+@nvtx.annotate("sequential/phasing.py", is_prefix=True)
 def create_support_(ac_, M, Mquat, generation):
+    """
+    Generate a support based on the region of high ACF signal (thresh_support_)
+    inside the central quarter region of the full ACF volume (square_support_).
+    
+    :param ac_: autocorrelation volume, fftshifted
+    :param M: cubic length of autocorrelation volume
+    :param Mquat: cubic length of region of interest
+    :param generation: current iteration
+    """
     sl = slice(Mquat, -Mquat)
     square_support = np.zeros((M, M, M), dtype=np.bool_)
     square_support[sl, sl, sl] = 1
@@ -55,31 +87,82 @@ def create_support_(ac_, M, Mquat, generation):
     return np.logical_and(square_support_, thresh_support_)
 
 
+
+@nvtx.annotate("sequential/phasing.py", is_prefix=True)
 def ER_loop(n_loops, rho_, amplitudes_, amp_mask_, support_, rho_max):
+    """
+    Perform n_loops of Error Reduction (ER) opertation.
+    """
     for k in range(n_loops):
         ER(rho_, amplitudes_, amp_mask_, support_, rho_max)
 
 
+
+@nvtx.annotate("sequential/phasing.py", is_prefix=True)
 def HIO_loop(n_loops, beta, rho_, amplitudes_, amp_mask_, support_, rho_max):
+    """
+    Perform n_loops of Hybrid-Input-Output (HIO) opertation.
+    """
     for k in range(n_loops):
         HIO(beta, rho_, amplitudes_, amp_mask_, support_, rho_max)
 
 
+
+@nvtx.annotate("sequential/phasing.py", is_prefix=True)
 def ER(rho_, amplitudes_, amp_mask_, support_, rho_max):
+    """
+    Perform Error Reduction (ER) operation by updating the amplitudes from the current electron density estimtate
+    with those computed from the autocorrelation, and enforcing electron density to be positive (real space constraint).
+
+    :param rho_: current electron density estimate
+    :param amplitudes_: amplitudes computed from the autocorrelation
+    :param amp_mask_: amplitude mask
+    :param support_: binary mask for object's support
+    :param rho_mask: maximum permitted electron density value
+    """
     rho_mod_, support_star_ = step_phase(rho_, amplitudes_, amp_mask_, support_)
     rho_[:] = np.where(support_star_, rho_mod_, 0)
     i_overmax = rho_mod_ > rho_max
     rho_[i_overmax] = rho_max
 
 
+
+@nvtx.annotate("sequential/phasing.py", is_prefix=True)
 def HIO(beta, rho_, amplitudes_, amp_mask_, support_, rho_max):
+    """
+    Perform Hybrid-Input-Output (HIO) operation by updating the amplitudes from the current electron density estimtate
+    with those computed from the autocorrelation, and using negative feedback in Fourier space in order to progressively 
+    force the solution to conform to the Fourier domain constraints (support). 
+    
+    :param beta: feedback constant
+    :param rho_: electron density estimate
+    :param amplitudes_: amplitudes computed from the autocorrelation
+    :param amp_mask_: amplitude mask
+    :param support_: binary mask for object's support
+    :param rho_mask: maximum permitted electron density value
+    """
     rho_mod_, support_star_ = step_phase(rho_, amplitudes_, amp_mask_, support_)
     rho_[:] = np.where(support_star_, rho_mod_, rho_-beta*rho_mod_)
     i_overmax = rho_mod_ > rho_max
     rho_[i_overmax] += 2*beta*rho_mod_[i_overmax] - rho_max
 
 
+
+@nvtx.annotate("sequential/phasing.py", is_prefix=True)
 def step_phase(rho_, amplitudes_, amp_mask_, support_):
+    """
+    Replace the amplitudes computed from the electron density estimate with those computed from 
+    the autocorrelation function, except for the amplitude of the central/max peak of the Fourier domain.
+    Then recalculate the estimated electron density and update the support, with positivity of 
+    the density enforced for the latter.
+    
+    :param rho_: electron density estimate
+    :param amplitudes_: amplitudes computed from the autocorrelation
+    :param amp_mask_: amplitude mask
+    :param support_: binary mask for object's support
+    :return rho_mod_: updated density estimate 
+    :return support_star_: updated support
+    """
     rho_hat_ = np.fft.fftn(rho_)
     phases_ = np.angle(rho_hat_)
     rho_hat_mod_ = np.where(
@@ -91,7 +174,17 @@ def step_phase(rho_, amplitudes_, amp_mask_, support_):
     return rho_mod_, support_star_
 
 
+
+@nvtx.annotate("sequential/phasing.py", is_prefix=True)
 def shrink_wrap(cutoff, sigma, rho_, support_):
+    """
+    Perform shrinkwrap operation to update the support for convergence.
+
+    :param cutoff: threshold as a fraction of maximum density value
+    :param sigma: Gaussian standard deviation to low-pass filter density with
+    :param rho_: electron density estimate
+    :param support_: object support
+    """
     rho_abs_ = np.absolute(rho_)
     # By using 'wrap', we don't need to fftshift it back and forth
     rho_gauss_ = gaussian_filter(
@@ -99,7 +192,27 @@ def shrink_wrap(cutoff, sigma, rho_, support_):
     support_[:] = rho_gauss_ > rho_abs_.max() * cutoff
 
 
+
+@nvtx.annotate("sequential/phasing.py", is_prefix=True)
 def phase(generation, ac, support_=None, rho_=None):
+    """
+    Solve phase retrieval from the autocorrelation of the current electron density estimate
+    by performing cycles of ER/HIO/shrinkwrap combination.
+    Note that this function currently is composed of three components:
+    (1) convert ac to amplitude,
+    (2) perform phase retrieval,
+    (3) convert rho_ to ac_phased.
+    We might revisit it to break it down to three modules.
+
+    :param generation: current iteration of M-TIP loop
+    :param ac: autocorrelation of the current electron density estimate
+    :param support_: initial object support
+    :param rho_: initial electron density estimate
+    :return ac_phased: updated autocorrelation estimate
+    :return support_: updated support estimate
+    :return rho_: updated density estimate
+    """
+
     Mquat = parms.Mquat
     M = 4*Mquat + 1
     Mtot = M**3
@@ -149,5 +262,7 @@ def phase(generation, ac, support_=None, rho_=None):
     ac_phased_ = np.abs(np.fft.ifftn(intensities_phased_))
     ac_phased = np.fft.fftshift(ac_phased_)
     image.show_volume(ac_phased, Mquat, f"autocorrelation_phased_{generation}.png")
+
+    ac_phased = ac_phased.astype(np.float32)
 
     return ac_phased, support_, rho_

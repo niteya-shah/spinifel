@@ -1,6 +1,8 @@
-import numpy as np
+import numpy  as np
+import PyNVTX as nvtx
 import os
 import pygion
+
 from pygion import acquire, attach_hdf5, task, Partition, Region, R, Tunable, WD
 
 from spinifel import parms, SpinifelSettings
@@ -13,6 +15,7 @@ from . import mapper
 
 
 @task(replicable=True)
+@nvtx.annotate("legion/main.py", is_prefix=True)
 def main():
     print("In Legion main", flush=True)
 

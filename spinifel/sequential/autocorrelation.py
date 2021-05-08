@@ -1,7 +1,9 @@
 import matplotlib.pyplot as plt
-import numpy as np
-from matplotlib.colors import LogNorm
-from scipy.ndimage import gaussian_filter
+import numpy             as np
+import PyNVTX            as nvtx
+
+from matplotlib.colors   import LogNorm
+from scipy.ndimage       import gaussian_filter
 from scipy.sparse.linalg import LinearOperator, cg
 
 import skopi as skp
@@ -9,6 +11,8 @@ import skopi as skp
 from spinifel import parms, utils, image, autocorrelation
 
 
+
+@nvtx.annotate("sequential/autocorrelation.py", is_prefix=True)
 def setup_linops(H, K, L, data,
                  ac_support, weights, x0,
                  M, Mtot, N, reciprocal_extent,
@@ -64,7 +68,7 @@ def setup_linops(H, K, L, data,
         return uvect
 
     W = LinearOperator(
-        dtype=np.complex128,
+        dtype=np.complex64,
         shape=(Mtot, Mtot),
         matvec=W_matvec)
 
@@ -78,6 +82,8 @@ def setup_linops(H, K, L, data,
     return W, d
 
 
+
+@nvtx.annotate("sequential/autocorrelation.py", is_prefix=True)
 def solve_ac(generation,
              pixel_position_reciprocal,
              pixel_distance_reciprocal,

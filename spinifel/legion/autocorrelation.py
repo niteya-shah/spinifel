@@ -1,23 +1,28 @@
 import matplotlib.pyplot as plt
-import numpy as np
+import numpy             as np
+import skopi             as skp
+import PyNVTX            as nvtx
 import pygion
 import socket
-from pygion import task, IndexLaunch, Partition, Region, RO, WD, Reduce, Tunable
-from scipy.linalg import norm
-from scipy.ndimage import gaussian_filter
-from scipy.sparse.linalg import LinearOperator, cg
 
-import skopi as skp 
+from pygion import task, IndexLaunch, Partition, Region, RO, WD, Reduce, Tunable
+from scipy.linalg        import norm
+from scipy.ndimage       import gaussian_filter
+from scipy.sparse.linalg import LinearOperator, cg
 
 from spinifel import parms, autocorrelation, utils, image
 from . import utils as lgutils
 
 
+
 @task(privileges=[WD])
+@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def gen_random_orientations(orientations, N_images_per_rank):
     orientations.quaternions[:] = skp.get_random_quat(N_images_per_rank)
 
 
+
+@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def get_random_orientations():
     N_images_per_rank = parms.N_images_per_rank
     fields_dict = {"quaternions": pygion.float64}
@@ -30,7 +35,9 @@ def get_random_orientations():
     return orientations, orientations_p
 
 
+
 @task(privileges=[RO, WD])
+@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def gen_nonuniform_positions_v(nonuniform, nonuniform_v, reciprocal_extent):
     nonuniform_v.H[:] = (nonuniform.H.flatten()
         / reciprocal_extent * np.pi / parms.oversampling)
@@ -40,6 +47,8 @@ def gen_nonuniform_positions_v(nonuniform, nonuniform_v, reciprocal_extent):
         / reciprocal_extent * np.pi / parms.oversampling)
 
 
+
+@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def get_nonuniform_positions_v(nonuniform, nonuniform_p, reciprocal_extent):
     """Flatten and calibrate nonuniform positions."""
     N_vals_per_rank = (
@@ -56,7 +65,9 @@ def get_nonuniform_positions_v(nonuniform, nonuniform_p, reciprocal_extent):
     return nonuniform_v, nonuniform_v_p
 
 
+
 @task(privileges=[RO, WD, RO])
+@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def gen_nonuniform_positions(orientations, nonuniform, pixel_position):
     H, K, L = autocorrelation.gen_nonuniform_positions(
         orientations.quaternions, pixel_position.reciprocal)
@@ -65,6 +76,8 @@ def gen_nonuniform_positions(orientations, nonuniform, pixel_position):
     nonuniform.L[:] = L
 
 
+
+@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def get_nonuniform_positions(orientations, orientations_p, pixel_position):
     N_images_per_rank = parms.N_images_per_rank
     fields_dict = {"H": pygion.float64, "K": pygion.float64,
@@ -79,7 +92,9 @@ def get_nonuniform_positions(orientations, orientations_p, pixel_position):
     return nonuniform, nonuniform_p
 
 
+
 @task(privileges=[RO, Reduce('+', 'ADb'), RO, RO])
+@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def right_hand_ADb_task(slices, uregion, nonuniform_v, ac, weights, M,
                         reciprocal_extent, use_reciprocal_symmetry):
     if parms.verbosity > 0:
@@ -98,6 +113,8 @@ def right_hand_ADb_task(slices, uregion, nonuniform_v, ac, weights, M,
         print(f"{socket.gethostname()} computed ADb.", flush=True)
 
 
+
+@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def right_hand(slices, slices_p, uregion, nonuniform_v, nonuniform_v_p,
                ac, weights, M,
                reciprocal_extent, use_reciprocal_symmetry):
@@ -109,7 +126,9 @@ def right_hand(slices, slices_p, uregion, nonuniform_v, nonuniform_v_p,
                             reciprocal_extent, use_reciprocal_symmetry)
 
 
+
 @task(privileges=[Reduce('+', 'F_conv_'), RO, RO])
+@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def prep_Fconv_task(uregion_ups, nonuniform_v, ac, weights, M_ups, Mtot, N,
                     reciprocal_extent, use_reciprocal_symmetry):
     if parms.verbosity > 0:
@@ -127,6 +146,8 @@ def prep_Fconv_task(uregion_ups, nonuniform_v, ac, weights, M_ups, Mtot, N,
         print(f"{socket.gethostname()} computed Fconv.", flush=True)
 
 
+
+@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def prep_Fconv(uregion_ups, nonuniform_v, nonuniform_v_p,
                ac, weights, M_ups, Mtot, N,
                reciprocal_extent, use_reciprocal_symmetry):
@@ -138,7 +159,9 @@ def prep_Fconv(uregion_ups, nonuniform_v, nonuniform_v_p,
                         reciprocal_extent, use_reciprocal_symmetry)
 
 
+
 @task(privileges=[WD("F_antisupport")])
+@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def prep_Fantisupport(uregion, M):
     lu = np.linspace(-np.pi, np.pi, M)
     Hu_, Ku_, Lu_ = np.meshgrid(lu, lu, lu, indexing='ij')
@@ -152,6 +175,8 @@ def prep_Fantisupport(uregion, M):
     assert np.all(Fantisup[:] == Fantisup[::-1, ::-1, ::-1])
 
 
+
+@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def prepare_solve(slices, slices_p, nonuniform, nonuniform_p,
                   ac, weights, M, Mtot, M_ups, N,
                   reciprocal_extent, use_reciprocal_symmetry):
@@ -170,14 +195,18 @@ def prepare_solve(slices, slices_p, nonuniform, nonuniform_p,
     return uregion, uregion_ups
 
 
+
 @task(privileges=[RO("ac"), WD("support", "estimate")])
+@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def phased_to_constrains(phased, ac):
     ac_smoothed = gaussian_filter(phased.ac, 0.5)
     ac.support[:] = (ac_smoothed > 1e-12).astype(np.float)
     ac.estimate[:] = phased.ac * ac.support
 
 
+
 @task(privileges=[RO, RO, RO, WD, WD])
+@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def solve(uregion, uregion_ups, ac, result, summary,
           weights, M, M_ups, Mtot, N,
           generation, rank, alambda, rlambda, flambda,
@@ -246,7 +275,9 @@ def solve(uregion, uregion_ups, ac, result, summary,
     summary.v2[0] = v2
 
 
+
 @task(privileges=[None, RO])
+@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def select_ac(generation, summary):
     if generation == 0:
         # Expect non-convergence => weird results.
@@ -276,6 +307,8 @@ def select_ac(generation, summary):
     return iref
 
 
+
+@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def solve_ac(generation,
              pixel_position,
              pixel_distance,
