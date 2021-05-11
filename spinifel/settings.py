@@ -7,23 +7,11 @@
 
 
 
-from enum    import Enum, auto
 from os      import environ
 from inspect import getmembers
 from pathlib import Path
 
 from .utils import Singleton
-
-
-
-class EnvironType(Enum):
-    """
-    Enumerates the different kinds of environment variables
-    """
-    STR  = auto()
-    INT  = auto()
-    BOOL = auto()
-    PATH = auto()
 
 
 
@@ -60,35 +48,54 @@ class SpinifelSettings(metaclass=Singleton):
 
 
     def __init__(self):
-        self._test             = ""
-        self._verbose          = False
-        self._verbosity        = 0
-        self._data_dir         = Path("")
-        self._use_psana        = False
-        self._out_dir          = Path("")
-        self._data_multiplier  = 1
-        self._small_problem    = False
-        self._using_cuda       = False
-        self._devices_per_node = 0
-        self._use_cufinufft    = False
-        self._ps_smd_n_events  = 0
-        self._use_callmonitor  = False
+        # self._test             = ""
+        # self._verbose          = False
+        # self._verbosity        = 0
+        # self._data_dir         = Path("")
+        # self._data_filename    = ""
+        # self._use_psana        = False
+        # self._out_dir          = Path("")
+        # self._data_multiplier  = 1
+        # self._small_problem    = False
+        # self._using_cuda       = False
+        # self._devices_per_node = 0
+        # self._use_cufinufft    = False
+        # self._ps_smd_n_events  = 0
+        # self._use_callmonitor  = False
+
+        self._inputs = {
+            "_test": ("debug", "test", str, ""),
+            "_verbose": ("debug", "verbose", bool, False),
+            "_verbosity": ("debug", "verbosity", int, 0),
+            "_data_dir": ("data", "in_dir", Path, Path("")),
+            "_data_filename": ("data", "name", str, ""),
+            "_use_psana": ("psana", "enable", bool, False),
+            "_out_dir": ("data", "out_dir", Path, Path("")),
+            "_data_multiplier": ("runtime", "data_multiplier", int, 1),
+            "_small_problem": ("runtime", "small_problem", bool, False),
+            "_using_cuda": ("runtime", "using_cuda", bool, False),
+            "_devices_per_node": ("gpu", "devices_per_node", int, 0),
+            "_use_cufinufft": ("runtime", "use_cufinufft", bool, False),
+            "_ps_smd_n_events": ("psana", "ps_smd_n_events", int, 0),
+            "_use_callmonitor": ("debug", "use_callmonitor", bool, False)
+        }
+
 
         self._environ = {
-                "TEST": ("_test", EnvironType.STR),
-                "VERBOSE": ("_verbose", EnvironType.BOOL),
-                "DATA_DIR": ("_data_dir", EnvironType.PATH),
-                "USE_PSANA": ("_use_psana", EnvironType.BOOL),
-                "OUT_DIR": ("_out_dir", EnvironType.PATH),
-                "DATA_MULTIPLIER": ("_data_multiplier", EnvironType.INT),
-                "VERBOSITY": ("_verbose", EnvironType.INT),
-                "SMALL_PROBLEM": ("_small_problem", EnvironType.BOOL),
-                "USING_CUDA": ("_using_cuda", EnvironType.BOOL),
-                "DEVICES_PER_RS": ("_devices_per_node", EnvironType.INT),
-                "USE_CUFINUFFT": ("_use_cufinufft", EnvironType.BOOL),
-                "PS_SMD_N_EVENTS": ("_ps_smd_n_events", EnvironType.INT),
-                "USE_CALLMONITOR": ("_use_callmonitor", EnvironType.BOOL)
-            }
+            "TEST": ("_test", SpinifelSettings.get_str),
+            "VERBOSE": ("_verbose", SpinifelSettings.get_bool),
+            "DATA_DIR": ("_data_dir", SpinifelSettings.get_str),
+            "USE_PSANA": ("_use_psana", SpinifelSettings.get_bool),
+            "OUT_DIR": ("_out_dir", SpinifelSettings.get_str),
+            "DATA_MULTIPLIER": ("_data_multiplier", SpinifelSettings.get_int),
+            "VERBOSITY": ("_verbose", SpinifelSettings.get_int),
+            "SMALL_PROBLEM": ("_small_problem", SpinifelSettings.get_bool),
+            "USING_CUDA": ("_using_cuda", SpinifelSettings.get_bool),
+            "DEVICES_PER_RS": ("_devices_per_node", SpinifelSettings.get_int),
+            "USE_CUFINUFFT": ("_use_cufinufft", SpinifelSettings.get_bool),
+            "PS_SMD_N_EVENTS": ("_ps_smd_n_events", SpinifelSettings.get_int),
+            "USE_CALLMONITOR": ("_use_callmonitor", SpinifelSettings.get_bool)
+        }
 
         self.refresh()
 
@@ -97,22 +104,20 @@ class SpinifelSettings(metaclass=Singleton):
         """
         Refresh internal state using environment variables
         """
+        for attr in self._inputs:
+
+            _, _, _, default = self._inputs[attr]
+            setattr(self, attr, default)
+
+
 
         for key in self._environ:
 
             if key not in environ:
                 continue
 
-            name, env_type = self._environ[key]
-
-            if env_type == EnvironType.STR:
-                env_val = SpinifelSettings.get_str(key)
-            elif env_type == EnvironType.INT:
-                env_val = SpinifelSettings.get_int(key)
-            elif env_type == EnvironType.BOOL:
-                env_val = SpinifelSettings.get_bool(key)
-            elif env_type == EnvironType.PATH:
-                env_val = Path(SpinifelSettings.get_str(key))
+            name, env_parser = self._environ[key]
+            env_val = env_parser(key)
 
             setattr(self, name, env_val)
 
@@ -136,77 +141,84 @@ class SpinifelSettings(metaclass=Singleton):
     @property
     def test(self):
         """test field used for debugging"""
-        return self._test
+        return self._test # noqa: E1101  pylint: disable=no-member
 
 
     @property
     def verbose(self):
         """is verbosity > 0"""
-        return self._verbose or self._verbosity > 0
+        return (self._verbose or      # noqa: E1101 pylint: disable=no-member
+                self._verbosity > 0)  # noqa: E1101 pylint: disable=no-member
 
 
     @property
     def verbosity(self):
         """reporting verbosity"""
-        if self._verbosity == 0:
-            if self._verbose:
+        if self._verbosity == 0:  # noqa: E1101  pylint: disable=no-member
+            if self._verbose:     # noqa: E1101 pylint: disable=no-member
                 return 1
             return 0
-        return self._verbosity
+        return self._verbosity # noqa: E1101 pylint: disable=no-member
 
 
     @property
     def data_dir(self):
         """data dir"""
-        return self._data_dir
+        return self._data_dir # noqa: E1101 pylint: disable=no-member
+
+
+    @property
+    def data_filename(self):
+        """data file name"""
+        return self._data_filename # noqa: E1101 pylint: disable=no-member
 
 
     @property
     def use_psana(self):
         """enable PSANA"""
-        return self._use_psana
+        return self._use_psana # noqa: E1101 pylint: disable=no-member
 
 
     @property
     def out_dir(self):
         """output dir"""
-        return self._out_dir
+        return self._out_dir # noqa: E1101 pylint: disable=no-member
 
 
     @property
     def data_multiplier(self):
         """data multiplier"""
-        return self._data_multiplier
+        return self._data_multiplier # noqa: E1101 pylint: disable=no-member
 
 
     @property
     def small_problem(self):
         """run in small problem mode"""
-        return self._small_problem
+        return self._small_problem # noqa: E1101 pylint: disable=no-member
 
 
     @property
     def using_cuda(self):
         """use cuda wherever possible"""
-        return self._using_cuda
+        return self._using_cuda # noqa: E1101 pylint: disable=no-member
 
 
     @property
     def devices_per_node(self):
         """gpu-device count per node/resource set"""
-        return self._devices_per_node
+        return self._devices_per_node # noqa: E1101 pylint: disable=no-member
 
 
     @property
     def use_cufinufft(self):
         """use cufinufft for nufft support"""
-        return self._use_cufinufft
+        return self._use_cufinufft # noqa: E1101 pylint: disable=no-member
 
 
     @property
     def ps_smd_n_events(self):
         """ps smd n events setting"""
-        return self._ps_smd_n_events
+        return self._ps_smd_n_events # noqa: E1101 pylint: disable=no-member
 
 
     @ps_smd_n_events.setter
@@ -219,4 +231,4 @@ class SpinifelSettings(metaclass=Singleton):
     @property
     def use_callmonitor(self):
         """enable call-monitor"""
-        return self._use_callmonitor
+        return self._use_callmonitor # noqa: E1101 pylint: disable=no-member

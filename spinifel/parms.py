@@ -12,16 +12,26 @@ numpy.seterr(divide='ignore', invalid='ignore')
 
 det_shape = (4, 512, 512)
 N_images_max = 10000
+N_generations = 10 
 data_field_name = "intensities"
 data_type_str = "float32"
 pixel_position_shape = (3,) + det_shape
 pixel_position_type_str = "float32"
 pixel_index_shape = (2,) + det_shape
 pixel_index_type_str = "int32"
+orientation_type_str = "float32"
+volume_type_str = "complex64"
+volume_shape = (151, 151, 151)
 oversampling = 1
 
+solve_ac_maxiter = 10
+
 data_dir  = settings.data_dir
-data_path = data_dir / "2CEX-10k-2.h5"
+
+assert settings.data_filename, "Hdf5 filename input missing. Set DATA_FILENAME to the name of your hdf5 file."
+
+data_path = data_dir / settings.data_filename
+
 if settings.use_psana:
     use_psana = True
     exp = 'xpptut15'
@@ -43,7 +53,7 @@ if settings.small_problem:
     N_binning = 4
     N_orientations = 1000
     N_batch_size = 1000
-    Mquat = int(oversampling * 10)  # 1/4 of uniform grid size
+    Mquat = int(oversampling * 20)  # 1/4 of uniform grid size
 else:
     N_images_per_rank = 1000 * data_multiplier
     nER = 50

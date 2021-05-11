@@ -37,7 +37,7 @@ else:
 
 
 @profiler.intercept
-@nvtx.annotate("extern.nufft_3d_t1_finufft_v1")
+@nvtx.annotate("extern/finufft_ext.py", is_prefix=True)
 def nufft_3d_t1_finufft_v1(x, y, z, nuvect, sign, eps, nx, ny, nz):
     """
     Version 1 of fiNUFFT 3D type 1
@@ -66,7 +66,7 @@ def nufft_3d_t1_finufft_v1(x, y, z, nuvect, sign, eps, nx, ny, nz):
 
 
 @profiler.intercept
-@nvtx.annotate("extern.nufft_3d_t2_finufft_v1")
+@nvtx.annotate("extern/finufft_ext.py", is_prefix=True)
 def nufft_3d_t2_finufft_v1(x, y, z, ugrid, sign, eps, n):
     """
     Version 1 of fiNUFFT 3D type 2

@@ -4,11 +4,11 @@
 set -e
 
 
-root_dir="$(dirname "${BASH_SOURCE[0]}")"
+root_dir=$(readlink -f $(dirname "${BASH_SOURCE[0]}"))
 pushd $root_dir
 
 # Enable host overwrite
-target=${SPINIFEL_TARGET:-$(hostname)}
+target=${SPINIFEL_TARGET:-$(hostname --fqdn)}
 
 # Enable CUDA build
 cuda_build=${SPINIFEL_BUILD_CUDA:-true}
@@ -91,6 +91,11 @@ conda activate "$CONDA_ENV_DIR"
 conda install -y amityping -c lcls-ii
 conda install -y bitstruct krtc -c conda-forge
 
+# Extra deps required for psana machines, since there is no module system
+if [[ ${target} = "psbuild"* ]]; then
+    conda install -y compilers openmpi cudatoolkit-dev -c conda-forge
+fi
+
 # Install pip packages
 CC=$MPI4PY_CC MPICC=$MPI4PY_MPICC pip install -v --no-binary mpi4py mpi4py
 pip install --no-cache-dir callmonitor
@@ -102,9 +107,9 @@ pip install --no-cache-dir PyNVTX
 #_______________________________________________________________________________
 # Insall GASNET
 
-if [[ $USE_GASNET -eq 1 && $GASNET_ROOT == $PWD/gasnet/release ]]; then
+if [[ $LEGION_USE_GASNET -eq 1 && $GASNET_ROOT == $PWD/gasnet/release ]]; then
     pushd gasnet
-    make -j${THREADS:-8}
+    CONDUIT=$GASNET_CONDUIT make -j${THREADS:-8}
     popd
 fi
 
@@ -117,7 +122,6 @@ fi
 if [[ $LG_RT_DIR == $PWD/legion/runtime ]]; then
     ./reconfigure_legion.sh
     ./rebuild_legion.sh
-    cp "$CONDA_ENV_DIR"/lib/libhdf5* "$LEGION_INSTALL_DIR"/lib/
     ./mapper_clean_build.sh
 fi
 
@@ -135,7 +139,7 @@ fi
 #_______________________________________________________________________________
 # Rebuild FFTW (only needed on some systems -- that don't supply their own)
 
-if [[ ${target} = *"tulip"* || ${target} = *"jlse"* ]]; then
+if [[ ${target} = *"tulip"* || ${target} = *"jlse"* || ${target} = "g0"*".stanford.edu" || ${target} = "psbuild"* ]]; then
     ./rebuild_fftw.sh
 fi
 
@@ -187,7 +191,7 @@ fi
 
 
 echo
-echo "Done. Please run 'source env.sh' to use this build."
+echo "Done. Please run 'source setup/env.sh' to use this build."
 
 # Restore the LD_PRELOAD variable
 export LD_PRELOAD=$__LD_PRELOAD

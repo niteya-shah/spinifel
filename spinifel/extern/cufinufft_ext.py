@@ -39,7 +39,7 @@ if settings.using_cuda and settings.use_cufinufft:
 
 
 @profiler.intercept
-@nvtx.annotate("extern.pts_to_gpu")
+@nvtx.annotate("extern/cufinufft_ext.py", is_prefix=True)
 def pts_to_gpu(data, H_, K_, L_, logger):
     """
     Send data to GPU
@@ -87,7 +87,7 @@ def pts_to_gpu(data, H_, K_, L_, logger):
 
 
 @profiler.intercept
-@nvtx.annotate("extern.result_to_cpu")
+@nvtx.annotate("extern/cufinufft_ext.py", is_prefix=True)
 def result_to_cpu(data_gpu, H_):
     """
     Send data to CPU
@@ -103,7 +103,7 @@ def result_to_cpu(data_gpu, H_):
 
 
 @profiler.intercept
-@nvtx.annotate("extern.nufft_3d_t1_cufinufft_v1")
+@nvtx.annotate("extern/cufinufft_ext.py", is_prefix=True)
 def nufft_3d_t1_cufinufft_v1(H_, K_, L_, nuvect, sign, eps, nx, ny, nz):
     """
     Version 1 of cufiNUFFT 3D type 1
@@ -162,7 +162,7 @@ def nufft_3d_t1_cufinufft_v1(H_, K_, L_, nuvect, sign, eps, nx, ny, nz):
 
 
 @profiler.intercept
-@nvtx.annotate("extern.nufft_3d_t2_cufinufft_v1")
+@nvtx.annotate("extern/cufinufft_ext.py", is_prefix=True)
 def nufft_3d_t2_cufinufft_v1(H_, K_, L_, ugrid, sign, eps, N):
     """
     Version 1 of cufiNUFFT 3D type 2
@@ -236,7 +236,7 @@ def nufft_3d_t2_cufinufft_v1(H_, K_, L_, ugrid, sign, eps, N):
 
 
 @profiler.intercept
-@nvtx.annotate("extern.nufft_3d_t1_cufinufft_v2")
+@nvtx.annotate("extern/cufinufft_ext.py", is_prefix=True)
 def nufft_3d_t1_cufinufft_v2(H_, K_, L_, nuvect, sign, eps, nx, ny, nz):
     """
     Version 2 of cufiNUFFT 3D type 1
@@ -290,7 +290,7 @@ def nufft_3d_t1_cufinufft_v2(H_, K_, L_, nuvect, sign, eps, nx, ny, nz):
 
 
 @profiler.intercept
-@nvtx.annotate("extern.nufft_3d_t2_cufinufft_v2")
+@nvtx.annotate("extern/cufinufft_ext.py", is_prefix=True)
 def nufft_3d_t2_cufinufft_v2(H_, K_, L_, ugrid, sign, eps, N):
     """
     Version 2 of cufiNUFFT 3D type 2

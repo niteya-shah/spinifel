@@ -1,3 +1,5 @@
+import PyNVTX as nvtx
+
 from spinifel import parms, utils
 
 from .prep import get_data
@@ -6,6 +8,8 @@ from .phasing import phase
 from .orientation_matching import match
 
 
+
+@nvtx.annotate("sequential/main.py", is_prefix=True)
 def main():
     logger = utils.Logger(True)
     logger.log("In sequential main")

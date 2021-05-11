@@ -1,30 +1,56 @@
-import numpy     as np
-import skopi     as skp
+import numpy  as np
+import PyNVTX as nvtx
+import skopi  as skp
 import time
 import logging
 
-from   spinifel import parms, utils, autocorrelation, SpinifelSettings
 import spinifel.sequential.nearest_neighbor as nn
+from   spinifel import parms, utils, autocorrelation, SpinifelSettings
 
 
-settings = SpinifelSettings()
 
-
-def match(ac, slices_, pixel_position_reciprocal, pixel_distance_reciprocal):
+@nvtx.annotate("sequential/orientation_matching.py", is_prefix=True)
+def match(slices_, model_slices, ref_orientations, batch_size=None):
     """ 
-    MONA: add batch_size to avoid running out of memory 
-    when no. of reference orientations increase. 
+    Determine orientations of the data images (slices_) by minimizing the euclidean distance 
+    with the reference images (model_slices) and return orientations which give the best match.
+   
+    :param slice_: data images
+    :param mode_slices: reference images
+    :param ref_orientations: referene orientations
+    :param batch_size: batch size
+    :return ref_orientations: array of quaternions matched to slices_
+    """
+    
+    if batch_size is None:
+        batch_size = model_slices.shape[0]
+    
+    N_slices = slices_.shape[0]
+    # TODO move this up to main level
+    #assert slices_.shape == (N_slices,) + parms.reduced_det_shape
 
-    Note that N_pixels also growis when N_binning is small but 
-    it's harder to divide an image up at the moment...
+    if not N_slices:
+        return np.zeros((0, 4))
 
-    Some pseudo:
-    For each batch in batched ref. orientations
-        get H, K, L for this batch
-        generate model_slices for this H, K, L
-        calculate euclidean distant for this batch
-    Get indices of the orientations for all batches
-        
+    index = nn.nearest_neighbor(model_slices, slices_, batch_size)
+
+    return ref_orientations[index]
+
+
+
+@nvtx.annotate("sequential/orientation_matching.py", is_prefix=True)
+def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_reciprocal):
+    """
+    Determine orientations of the data images by minimizing the euclidean distance with the reference images 
+    computed by randomly slicing through the autocorrelation.
+    MONA: This is a current hack to support Legion. For MPI, slicing is done separately 
+    from orientation matching.
+
+    :param ac: autocorrelation of the current electron density estimate
+    :param slices_: data images
+    :param pixel_position_reciprocal: pixel positions in reciprocal space
+    :param pixel_distance_reciprocal: pixel distance in reciprocal space
+    :return ref_orientations: array of quaternions matched to slices_
     """
     st_init = time.monotonic()
     logger = logging.getLogger(__name__)
@@ -72,22 +98,10 @@ def match(ac, slices_, pixel_position_reciprocal, pixel_distance_reciprocal):
     print(f"New Data/Model std ratio: {data_model_scaling_ratio}.", flush=True)
     model_slices_new *= data_model_scaling_ratio
     
-    st_match = time.monotonic()
-
     # Calculate Euclidean distance in batch to avoid running out of GPU Memory
-    euDistNew = np.zeros((slices_.shape[0], model_slices_new.shape[0]), dtype=np.float32)
-    for i in range(model_slices_new.shape[0]//N_batch_size):
-        st = i * N_batch_size
-        en = st + N_batch_size
-        euDistNew[:, st:en] = nn.calc_eudist(model_slices_new[st:en], slices_).reshape(slices_.shape[0], N_batch_size)
-    euDistNew = euDistNew.flatten()
-
-    indexNew = nn.calc_argmin(euDistNew, 
-                        slices_.shape[0],
-                        model_slices_new.shape[0],
-                        slices_.shape[1])
-    
+    st_match = time.monotonic()
+    index = nn.nearest_neighbor(model_slices_new, slices_, N_batch_size)
     en_match = time.monotonic()
 
     print(f"Match tot:{en_match-st_init:.2f}s. slice={en_slice-st_slice:.2f}s. match={en_match-st_match:.2f}s. slice_oh={st_slice-st_init:.2f}s. match_oh={st_match-en_slice:.2f}s.")
-    return ref_orientations[indexNew]
+    return ref_orientations[index]
