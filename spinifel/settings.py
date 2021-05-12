@@ -15,6 +15,7 @@ from .utils import Singleton
 
 
 
+
 class SpinifelSettings(metaclass=Singleton):
     """
     Singleton Class SpinifelSettings
@@ -48,24 +49,10 @@ class SpinifelSettings(metaclass=Singleton):
 
 
     def __init__(self):
-        # self._test             = ""
-        # self._verbose          = False
-        # self._verbosity        = 0
-        # self._data_dir         = Path("")
-        # self._data_filename    = ""
-        # self._use_psana        = False
-        # self._out_dir          = Path("")
-        # self._data_multiplier  = 1
-        # self._small_problem    = False
-        # self._using_cuda       = False
-        # self._devices_per_node = 0
-        # self._use_cufinufft    = False
-        # self._ps_smd_n_events  = 0
-        # self._use_callmonitor  = False
 
-        self._inputs = {
+        self.__properties = {
             "_test": ("debug", "test", str, ""),
-            "_verbose": ("debug", "verbose", bool, False),
+            "_verbose": ("debug", "verbose", bool, True),
             "_verbosity": ("debug", "verbosity", int, 0),
             "_data_dir": ("data", "in_dir", Path, Path("")),
             "_data_filename": ("data", "name", str, ""),
@@ -80,6 +67,7 @@ class SpinifelSettings(metaclass=Singleton):
             "_use_callmonitor": ("debug", "use_callmonitor", bool, False)
         }
 
+        self.__init_internals()
 
         self._environ = {
             "TEST": ("_test", SpinifelSettings.get_str),
@@ -100,16 +88,22 @@ class SpinifelSettings(metaclass=Singleton):
         self.refresh()
 
 
+    def __init_internals(self):
+        """
+        Set up internal properties based in the _properties spec defined in
+        __init__
+        """
+        for attr in self.__properties:
+
+            _, _, _, default = self.__properties[attr]
+            setattr(self, attr, default)
+
+
+
     def refresh(self):
         """
         Refresh internal state using environment variables
         """
-        for attr in self._inputs:
-
-            _, _, _, default = self._inputs[attr]
-            setattr(self, attr, default)
-
-
 
         for key in self._environ:
 
