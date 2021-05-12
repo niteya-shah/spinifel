@@ -51,20 +51,34 @@ class SpinifelSettings(metaclass=Singleton):
     def __init__(self):
 
         self.__properties = {
-            "_test": ("debug", "test", str, ""),
-            "_verbose": ("debug", "verbose", bool, True),
-            "_verbosity": ("debug", "verbosity", int, 0),
-            "_data_dir": ("data", "in_dir", Path, Path("")),
-            "_data_filename": ("data", "name", str, ""),
-            "_use_psana": ("psana", "enable", bool, False),
-            "_out_dir": ("data", "out_dir", Path, Path("")),
-            "_data_multiplier": ("runtime", "data_multiplier", int, 1),
-            "_small_problem": ("runtime", "small_problem", bool, False),
-            "_using_cuda": ("runtime", "using_cuda", bool, False),
-            "_devices_per_node": ("gpu", "devices_per_node", int, 0),
-            "_use_cufinufft": ("runtime", "use_cufinufft", bool, False),
-            "_ps_smd_n_events": ("psana", "ps_smd_n_events", int, 0),
-            "_use_callmonitor": ("debug", "use_callmonitor", bool, False)
+            "_test": ("debug", "test", str, "",
+                "test field used for debugging"),
+            "_verbose": ("debug", "verbose", bool, True,
+                "is verbosity > 0"),
+            "_verbosity": ("debug", "verbosity", int, 0,
+                "reporting verbosity"),
+            "_data_dir": ("data", "in_dir", Path, Path(""),
+                "data dir"),
+            "_data_filename": ("data", "name", str, "",
+                "data file name"),
+            "_use_psana": ("psana", "enable", bool, False,
+                "enable PSANA"),
+            "_out_dir": ("data", "out_dir", Path, Path(""),
+                "output dir"),
+            "_data_multiplier": ("runtime", "data_multiplier", int, 1,
+                "data multiplier"),
+            "_small_problem": ("runtime", "small_problem", bool, False,
+                "run in small problem mode"),
+            "_using_cuda": ("runtime", "using_cuda", bool, False,
+                "use cuda wherever possible"),
+            "_devices_per_node": ("gpu", "devices_per_node", int, 0,
+                "gpu-device count per node/resource set"),
+            "_use_cufinufft": ("runtime", "use_cufinufft", bool, False,
+                "use cufinufft for nufft support"),
+            "_ps_smd_n_events": ("psana", "ps_smd_n_events", int, 0,
+                "ps smd n events setting"),
+            "_use_callmonitor": ("debug", "use_callmonitor", bool, False,
+                "enable call-monitor")
         }
 
         self.__init_internals()
@@ -95,8 +109,12 @@ class SpinifelSettings(metaclass=Singleton):
         """
         for attr in self.__properties:
 
-            _, _, _, default = self.__properties[attr]
+            _, _, _, default, _ = self.__properties[attr]
             setattr(self, attr, default)
+
+
+
+
 
 
 
