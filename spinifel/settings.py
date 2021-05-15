@@ -102,6 +102,11 @@ class SpinifelSettings(metaclass=Singleton):
         self.refresh()
 
 
+    def __fget(self, attr):
+        """Creates closure for fget lambda"""
+        return lambda x: getattr(self, attr)
+
+
     def __init_internals(self):
         """
         Set up internal properties based in the _properties spec defined in
@@ -109,13 +114,22 @@ class SpinifelSettings(metaclass=Singleton):
         """
         for attr in self.__properties:
 
-            _, _, _, default, _ = self.__properties[attr]
+            _, _, _, default, doc = self.__properties[attr]
             setattr(self, attr, default)
 
+            # Let the user define custon setting function, by defining
+            # `@property` members => don't overwrite these with the plain
+            # lambda
+            if self.isprop(attr[1:]):
+                continue
 
-
-
-
+            type.__setattr__(
+                type(self), attr[1:],
+                property(
+                    fget=self.__fget(attr),
+                    doc=doc
+                )
+            )
 
 
     def refresh(self):
@@ -151,12 +165,6 @@ class SpinifelSettings(metaclass=Singleton):
 
 
     @property
-    def test(self):
-        """test field used for debugging"""
-        return self._test # noqa: E1101  pylint: disable=no-member
-
-
-    @property
     def verbose(self):
         """is verbosity > 0"""
         return (self._verbose or      # noqa: E1101 pylint: disable=no-member
@@ -174,60 +182,6 @@ class SpinifelSettings(metaclass=Singleton):
 
 
     @property
-    def data_dir(self):
-        """data dir"""
-        return self._data_dir # noqa: E1101 pylint: disable=no-member
-
-
-    @property
-    def data_filename(self):
-        """data file name"""
-        return self._data_filename # noqa: E1101 pylint: disable=no-member
-
-
-    @property
-    def use_psana(self):
-        """enable PSANA"""
-        return self._use_psana # noqa: E1101 pylint: disable=no-member
-
-
-    @property
-    def out_dir(self):
-        """output dir"""
-        return self._out_dir # noqa: E1101 pylint: disable=no-member
-
-
-    @property
-    def data_multiplier(self):
-        """data multiplier"""
-        return self._data_multiplier # noqa: E1101 pylint: disable=no-member
-
-
-    @property
-    def small_problem(self):
-        """run in small problem mode"""
-        return self._small_problem # noqa: E1101 pylint: disable=no-member
-
-
-    @property
-    def using_cuda(self):
-        """use cuda wherever possible"""
-        return self._using_cuda # noqa: E1101 pylint: disable=no-member
-
-
-    @property
-    def devices_per_node(self):
-        """gpu-device count per node/resource set"""
-        return self._devices_per_node # noqa: E1101 pylint: disable=no-member
-
-
-    @property
-    def use_cufinufft(self):
-        """use cufinufft for nufft support"""
-        return self._use_cufinufft # noqa: E1101 pylint: disable=no-member
-
-
-    @property
     def ps_smd_n_events(self):
         """ps smd n events setting"""
         return self._ps_smd_n_events # noqa: E1101 pylint: disable=no-member
@@ -238,9 +192,3 @@ class SpinifelSettings(metaclass=Singleton):
         self._ps_smd_n_events = val
         # update derived environment variable
         environ["PS_SMD_N_EVENTS"] = str(val)
-
-
-    @property
-    def use_callmonitor(self):
-        """enable call-monitor"""
-        return self._use_callmonitor # noqa: E1101 pylint: disable=no-member
