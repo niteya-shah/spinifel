@@ -1,12 +1,14 @@
 import h5py
 import matplotlib.pyplot as plt
 import numpy as np
+import PyNVTX as nvtx
 from matplotlib.colors import LogNorm
 from mpi4py import MPI
 
 from spinifel import parms, prep, image
 
 
+@nvtx.annotate("mpi/prep.py", is_prefix=True)
 def get_pixel_position_reciprocal(comm):
     pixel_position_type = getattr(np, parms.pixel_position_type_str)
     pixel_position_reciprocal = np.zeros(parms.pixel_position_shape,
@@ -17,6 +19,7 @@ def get_pixel_position_reciprocal(comm):
     return pixel_position_reciprocal
 
 
+@nvtx.annotate("mpi/prep.py", is_prefix=True)
 def get_pixel_index_map(comm):
     pixel_index_type = getattr(np, parms.pixel_index_type_str)
     pixel_index_map = np.zeros(parms.pixel_index_shape,
@@ -27,6 +30,7 @@ def get_pixel_index_map(comm):
     return pixel_index_map
 
 
+@nvtx.annotate("mpi/prep.py", is_prefix=True)
 def get_slices(comm, N_images_per_rank, ds):
     data_type = getattr(np, parms.data_type_str)
     slices_ = np.zeros((N_images_per_rank,) + parms.det_shape,
@@ -51,6 +55,7 @@ def get_slices(comm, N_images_per_rank, ds):
         return slices_[:i]
 
 
+@nvtx.annotate("mpi/prep.py", is_prefix=True)
 def compute_mean_image(comm, slices_):
     images_sum = slices_.sum(axis=0)
     N_images = slices_.shape[0]
@@ -64,6 +69,7 @@ def compute_mean_image(comm, slices_):
         return None
 
 
+@nvtx.annotate("mpi/prep.py", is_prefix=True)
 def get_data(N_images_per_rank, ds):
     comm = MPI.COMM_WORLD
     rank = comm.rank
