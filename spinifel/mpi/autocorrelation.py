@@ -1,22 +1,17 @@
 from mpi4py import MPI
 
 import matplotlib.pyplot as plt
-import numpy             as np
-import PyNVTX            as nvtx
-
-from matplotlib.colors   import LogNorm
-from scipy.linalg        import norm
-from scipy.ndimage       import gaussian_filter
+import numpy as np
+from matplotlib.colors import LogNorm
+from scipy.linalg import norm
+from scipy.ndimage import gaussian_filter
 from scipy.sparse.linalg import LinearOperator, cg
 
 import skopi as skp
-import os
 
 from spinifel import parms, utils, image, autocorrelation
 
 
-
-@nvtx.annotate("mpi/autocorrelation.py", is_prefix=True)
 def reduce_bcast(comm, vect):
     vect = np.ascontiguousarray(vect)
     reduced_vect = np.zeros_like(vect)
@@ -26,8 +21,6 @@ def reduce_bcast(comm, vect):
     return vect
 
 
-
-@nvtx.annotate("mpi/autocorrelation.py", is_prefix=True)
 def core_problem(comm, uvect, H_, K_, L_, ac_support, weights, M, N,
                  reciprocal_extent, use_reciprocal_symmetry):
     comm.Bcast(uvect, root=0)
@@ -38,8 +31,6 @@ def core_problem(comm, uvect, H_, K_, L_, ac_support, weights, M, N,
     return uvect_ADA
 
 
-
-@nvtx.annotate("mpi/autocorrelation.py", is_prefix=True)
 def setup_linops(comm, H, K, L, data,
                  ac_support, weights, x0,
                  M, Mtot, N, reciprocal_extent,
@@ -66,18 +57,13 @@ def setup_linops(comm, H, K, L, data,
 
     lu = np.linspace(-np.pi, np.pi, M)
     Hu_, Ku_, Lu_ = np.meshgrid(lu, lu, lu, indexing='ij')
-    Qu_ = np.sqrt(Hu_**2 + Ku_**2 + Lu_**2)
+    #Qu_ = np.sqrt(Hu_**2 + Ku_**2 + Lu_**2)
+    Qu_ = np.around(np.sqrt(Hu_**2 + Ku_**2 + Lu_**2), 4)
     F_antisupport = Qu_ > np.pi / parms.oversampling
-
-    # TODO: In DEBUG mode, I stop the check if the antisupport
-    # is symetrical. Somehow, with dimension = 151 x 151 x 151
-    # the result of the above is not symmetrical
-    DEBUG_FLAG = int(os.environ.get('DEBUG_FLAG', '0'))
-    if not DEBUG_FLAG:
-        assert np.all(F_antisupport == F_antisupport[::-1, :, :])
-        assert np.all(F_antisupport == F_antisupport[:, ::-1, :])
-        assert np.all(F_antisupport == F_antisupport[:, :, ::-1])
-        assert np.all(F_antisupport == F_antisupport[::-1, ::-1, ::-1])
+    assert np.all(F_antisupport == F_antisupport[::-1, :, :])
+    assert np.all(F_antisupport == F_antisupport[:, ::-1, :])
+    assert np.all(F_antisupport == F_antisupport[:, :, ::-1])
+    assert np.all(F_antisupport == F_antisupport[::-1, ::-1, ::-1])
 
     # Using upsampled convolution technique instead of ADA
     M_ups = parms.M_ups
@@ -102,11 +88,11 @@ def setup_linops(comm, H, K, L, data,
         return uvect
 
     W = LinearOperator(
-        dtype=np.complex64,
+        dtype=np.complex128,
         shape=(Mtot, Mtot),
         matvec=W_matvec)
 
-    nuvect_Db = (data * weights).astype(np.float32)
+    nuvect_Db = data * weights
     uvect_ADb = autocorrelation.adjoint(
         nuvect_Db, H_, K_, L_, ac_support, M,
         reciprocal_extent, use_reciprocal_symmetry
@@ -117,27 +103,12 @@ def setup_linops(comm, H, K, L, data,
     return W, d
 
 
-
-@nvtx.annotate("mpi/autocorrelation.py", is_prefix=True)
 def solve_ac(generation,
              pixel_position_reciprocal,
              pixel_distance_reciprocal,
              slices_,
              orientations=None,
              ac_estimate=None):
-    """
-    Calculate autocorrelation between the 3D intensities and the images.
-    
-    INPUT:
-    orientations: 1st Gen  - generated randomly.
-                  Next Gen - from previous best matched 
-    ac_estimate:  1st Gen  - 3D array of 0s
-                  Next Gen - ac_phased multiplied by support
-
-    INTERMEDIATE:
-    ac_support:   1st Gen  - 3D array of 1s
-                  Next Gen - Non zeros value of smoothed ac_estimate filled with 1s.  
-    """
     comm = MPI.COMM_WORLD
 
     M = parms.M
@@ -150,9 +121,8 @@ def solve_ac(generation,
 
     if orientations is None:
         orientations = skp.get_random_quat(N_images)
-    H_, K_, L_ = autocorrelation.gen_nonuniform_normalized_positions(
-        orientations, pixel_position_reciprocal,
-        reciprocal_extent, parms.oversampling)
+    H, K, L = autocorrelation.gen_nonuniform_positions(
+        orientations, pixel_position_reciprocal)
 
     data = slices_.flatten()
 
@@ -169,17 +139,11 @@ def solve_ac(generation,
     #rlambda = Mtot/Ntot * 1e2**(comm.rank - comm.size/2)
     rlambda = Mtot/Ntot * 2**(comm.rank - comm.size/2) # MONA: use base 2 instead of 100 to avoid overflown
     flambda = 0  # 1e5 * pow(10, comm.rank - comm.size//2)
-    maxiter = parms.solve_ac_maxiter
+    maxiter = 100
 
     if comm.rank == (2 if parms.use_psana else 0):
-        idx = np.abs(L_) < reciprocal_extent * .01
-
-        # TODO: Check dimension for H,K,L and slices flatten
-        # Currently H,K,L flatten to (3,1 N_pixels) but
-        # slices_ is flatten to (3, N_pixels). Hack to convert slices_
-        # but this needs clean up
-        slices_ = slices_.reshape(H_.shape)
-        plt.scatter(H_[idx], K_[idx], c=slices_[idx], s=1, norm=LogNorm())
+        idx = np.abs(L) < reciprocal_extent * .01
+        plt.scatter(H[idx], K[idx], c=slices_[idx], s=1, norm=LogNorm())
         plt.axis('equal')
         plt.colorbar()
         plt.savefig(parms.out_dir / f"star_{generation}.png")
@@ -191,19 +155,7 @@ def solve_ac(generation,
     callback.counter = 0
 
     x0 = ac_estimate.flatten()
-    
-    print(f'DEBUG solve_ac ')
-    print(f'  H_={H_.shape} {H_.dtype}')
-    print(f'  slices_={slices_.shape}')
-    print(f'  data={data.shape}')
-    print(f'  ac_support={ac_support.shape}')
-    print(f'  weights={weights.shape}')
-    print(f'  x0={x0.shape}')
-    print(f'  M={M} Mtot={Mtot} N={N} reciprocal_extent={reciprocal_extent}')
-    print(f'  alambda={alambda} rlambda={rlambda} flambda={flambda}')
-    print(f'  use_reciprocal_symmetry={use_reciprocal_symmetry}')
-    
-    W, d = setup_linops(comm, H_, K_, L_, data,
+    W, d = setup_linops(comm, H, K, L, data,
                         ac_support, weights, x0,
                         M, Mtot, N, reciprocal_extent,
                         alambda, rlambda, flambda,
@@ -214,8 +166,14 @@ def solve_ac(generation,
     v2 = norm(W*ret-d)
 
     summary = comm.gather((comm.rank, rlambda, v1, v2), root=0)
+    print("summary =", summary)
     if comm.rank == 0:
         ranks, lambdas, v1s, v2s = [np.array(el) for el in zip(*summary)]
+        print("ranks =", ranks)
+        print("lambdas =", lambdas)
+        print("v1s =", v1s)
+        print("v2s =", v2s)
+        np.savez(parms.out_dir / f"summary-{generation}", ranks=ranks, lambdas=lambdas, v1s=v1s, v2s=v2s)
 
         if generation == 0:
             # Expect non-convergence => weird results.
@@ -228,15 +186,20 @@ def solve_ac(generation,
             iref = np.argmin(v1s+v2s)
         ref_rank = ranks[iref]
 
-        fig, axes = plt.subplots(figsize=(6.0, 6.0), nrows=2, ncols=1)
-        axes[0].semilogx(lambdas, v1s)
-        axes[0].semilogx(lambdas[iref], v1s[iref], "rD")
-        axes[0].set_xlabel("$\\lambda_r$")
-        axes[0].set_ylabel("$\\|x\\|$")
-        axes[1].semilogx(lambdas, v2s)
-        axes[1].semilogx(lambdas[iref], v2s[iref], "rD")
-        axes[1].set_xlabel("$\\lambda_r$")
-        axes[1].set_ylabel("$\\|W x - d\\|$")
+        fig, axes = plt.subplots(figsize=(6.0, 8.0), nrows=3, ncols=1)
+        axes[0].loglog(lambdas, v1s)
+        axes[0].loglog(lambdas[iref], v1s[iref], "rD")
+        axes[0].set_xlabel("$\lambda_{r}$")
+        axes[0].set_ylabel("$||x_{\lambda_{r}}||_{2}$")
+        axes[1].loglog(lambdas, v2s)
+        axes[1].loglog(lambdas[iref], v2s[iref], "rD")
+        axes[1].set_xlabel("$\lambda_{r}$")
+        axes[1].set_ylabel("$||W \lambda_{r}-d||_{2}$")
+        axes[2].loglog(v2s, v1s) # L-curve
+        axes[2].loglog(v2s[iref], v1s[iref], "rD")
+        axes[2].set_xlabel("Residual norm $||W \lambda_{r}-d||_{2}$")
+        axes[2].set_ylabel("Solution norm $||x_{\lambda_{r}}||_{2}$")
+        fig.tight_layout()
         plt.savefig(parms.out_dir / f"summary_{generation}.png")
         plt.close('all')
     else:
@@ -247,7 +210,6 @@ def solve_ac(generation,
     if use_reciprocal_symmetry:
         assert np.all(np.isreal(ac))
     ac = np.ascontiguousarray(ac.real)
-    ac = ac.astype(np.float32)
     it_number = callback.counter
 
     print(f"Rank {comm.rank} got AC in {it_number} iterations.", flush=True)
