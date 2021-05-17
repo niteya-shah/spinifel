@@ -9,7 +9,9 @@ from .orientation_matching import match
 
 import numpy as np
 
+import PyNVTX as nvtx
 
+@nvtx.annotate("mpi/main.py", is_prefix=True)
 def main():
     comm = MPI.COMM_WORLD
 
@@ -27,6 +29,9 @@ def main():
     if parms.use_psana:
         from psana import DataSource
         logger.log("Using psana")
+        N_big_data_nodes = comm.size - 2
+        batch_size = min(N_images_per_rank, 100)
+        max_events = min(parms.N_images_max, N_big_data_nodes*N_images_per_rank)
         def destination(timestamp):
             # Return big data node destination, numbered from 1, round-robin
             destination.last = destination.last % N_big_data_nodes + 1
@@ -52,7 +57,9 @@ def main():
     # we should terminate the loop
     cov_xy = 0 
     cov_delta = .05
-    for generation in range(1, 10):
+
+    N_generations = parms.N_generations
+    for generation in range(1, N_generations):
         print("generation =", generation)
         orientations = match(
             ac_phased, slices_,
