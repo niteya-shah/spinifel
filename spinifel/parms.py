@@ -24,7 +24,7 @@ volume_type_str = "complex64"
 volume_shape = (151, 151, 151)
 oversampling = 1
 
-solve_ac_maxiter = 10
+solve_ac_maxiter = 100
 
 data_dir  = settings.data_dir
 
@@ -60,8 +60,8 @@ else:
     nHIO = 25
     N_phase_loops = 10
     N_clipping = 0
-    N_binning = 3 
-    N_orientations = 2000 #model_slices
+    N_binning = 0
+    N_orientations = 3000 # model_slices
     N_batch_size = 100
     Mquat = int(oversampling * 20)  # 1/4 of uniform grid size
 
