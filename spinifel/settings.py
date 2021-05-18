@@ -7,12 +7,21 @@
 
 
 
-from os      import environ
-from inspect import getmembers
-from pathlib import Path
+from os       import environ
+from inspect  import getmembers
+from pathlib  import Path
+from os.path  import join, abspath, dirname
+from toml     import load
+from argparse import ArgumentParser
 
 from .utils import Singleton
 
+
+
+class MalformedSettingsException(Exception):
+    """
+    Raise this error whenever settings inputs don't follow the format: `a.b = c`
+    """
 
 
 
@@ -83,7 +92,7 @@ class SpinifelSettings(metaclass=Singleton):
 
         self.__init_internals()
 
-        self._environ = {
+        self.__environ = {
             "TEST": ("_test", SpinifelSettings.get_str),
             "VERBOSE": ("_verbose", SpinifelSettings.get_bool),
             "DATA_DIR": ("_data_dir", SpinifelSettings.get_str),
@@ -98,6 +107,14 @@ class SpinifelSettings(metaclass=Singleton):
             "PS_SMD_N_EVENTS": ("_ps_smd_n_events", SpinifelSettings.get_int),
             "USE_CALLMONITOR": ("_use_callmonitor", SpinifelSettings.get_bool)
         }
+
+        parser = ArgumentParser()
+        parser.add_argument(
+            "--settings", type=str, nargs=1,
+            default=join(dirname(abspath(__file__)), "..", "settings", "test.toml")
+        )
+
+        self.__args, self.__params = parser.parse_known_args()
 
         self.refresh()
 
@@ -137,15 +154,31 @@ class SpinifelSettings(metaclass=Singleton):
         Refresh internal state using environment variables
         """
 
-        for key in self._environ:
+        for key in self.__environ:
 
             if key not in environ:
                 continue
 
-            name, env_parser = self._environ[key]
+            name, env_parser = self.__environ[key]
             env_val = env_parser(key)
 
             setattr(self, name, env_val)
+
+        toml_settings = load(self.__args.settings)
+
+        for param in self.__params:
+
+            if not ("." in param and "=" in param):
+                raise MalformedSettingsException
+
+            setting, val = param.split("=")
+            c, k         = setting.split(".")
+            toml_settings[c][k] = val
+
+        for attr in self.__properties:
+
+            c, k, parser, _, _ = self.__properties[attr]
+            setattr(self, attr, parser(toml_settings[c][k]))
 
 
     def __str__(self):
@@ -153,7 +186,9 @@ class SpinifelSettings(metaclass=Singleton):
         str_repr  = "SpinifelSettings:\n"
         for prop in propnames:
             if self.isprop(prop):
+                c, k, _, _, doc = self.__properties["_" + prop]
                 str_repr += f"  + {prop}={getattr(self, prop)}\n"
+                str_repr += f"    source: {c}.{k}, description: {doc}\n"
         return str_repr
 
 
