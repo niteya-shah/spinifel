@@ -25,6 +25,15 @@ class MalformedSettingsException(Exception):
 
 
 
+class CannotProcessSettingsFile(Exception):
+    """
+    Raise this error whenever the user has not provided a path to a settings
+    file, or has provided a settings file that doesn't exists, or has provided
+    multiple settings files.
+    """
+
+
+
 class SpinifelSettings(metaclass=Singleton):
     """
     Singleton Class SpinifelSettings
@@ -62,7 +71,7 @@ class SpinifelSettings(metaclass=Singleton):
         self.__properties = {
             "_test": ("debug", "test", str, "",
                 "test field used for debugging"),
-            "_verbose": ("debug", "verbose", bool, True,
+            "_verbose": ("debug", "verbose", bool, False,
                 "is verbosity > 0"),
             "_verbosity": ("debug", "verbosity", int, 0,
                 "reporting verbosity"),
@@ -93,28 +102,33 @@ class SpinifelSettings(metaclass=Singleton):
         self.__init_internals()
 
         self.__environ = {
-            "TEST": ("_test", SpinifelSettings.get_str),
-            "VERBOSE": ("_verbose", SpinifelSettings.get_bool),
-            "DATA_DIR": ("_data_dir", SpinifelSettings.get_str),
-            "USE_PSANA": ("_use_psana", SpinifelSettings.get_bool),
-            "OUT_DIR": ("_out_dir", SpinifelSettings.get_str),
-            "DATA_MULTIPLIER": ("_data_multiplier", SpinifelSettings.get_int),
-            "VERBOSITY": ("_verbose", SpinifelSettings.get_int),
-            "SMALL_PROBLEM": ("_small_problem", SpinifelSettings.get_bool),
-            "USING_CUDA": ("_using_cuda", SpinifelSettings.get_bool),
-            "DEVICES_PER_RS": ("_devices_per_node", SpinifelSettings.get_int),
-            "USE_CUFINUFFT": ("_use_cufinufft", SpinifelSettings.get_bool),
             "PS_SMD_N_EVENTS": ("_ps_smd_n_events", SpinifelSettings.get_int),
-            "USE_CALLMONITOR": ("_use_callmonitor", SpinifelSettings.get_bool)
         }
 
         parser = ArgumentParser()
-        parser.add_argument(
-            "--settings", type=str, nargs=1,
-            default=join(dirname(abspath(__file__)), "..", "settings", "test.toml")
-        )
+        parser.add_argument("--settings", type=str, nargs=1, default=None)
+        parser.add_argument("--default-settings", type=str, nargs=1, default=None)
+        parser.add_argument("--mode", type=str, nargs=1, required=True)
 
         self.__args, self.__params = parser.parse_known_args()
+
+        if (self.__args.settings is None) \
+        and (self.__args.default_settings is None):
+            raise CannotProcessSettingsFile
+        
+        if (self.__args.settings is not None) \
+        and (self.__args.default_settings is not None):
+            raise CannotProcessSettingsFile
+ 
+        if self.__args.default_settings is not None:
+            self.__toml = join(
+                dirname(abspath(__file__)), "..", "settings",
+                self.__args.default_settings[0]
+            )
+        else:
+            self.__toml = self.__args.settings[0]
+
+        self.mode = self.__args.mode
 
         self.refresh()
 
@@ -154,17 +168,7 @@ class SpinifelSettings(metaclass=Singleton):
         Refresh internal state using environment variables
         """
 
-        for key in self.__environ:
-
-            if key not in environ:
-                continue
-
-            name, env_parser = self.__environ[key]
-            env_val = env_parser(key)
-
-            setattr(self, name, env_val)
-
-        toml_settings = load(self.__args.settings)
+        toml_settings = load(self.__toml)
 
         for param in self.__params:
 
@@ -179,6 +183,22 @@ class SpinifelSettings(metaclass=Singleton):
 
             c, k, parser, _, _ = self.__properties[attr]
             setattr(self, attr, parser(toml_settings[c][k]))
+
+        for key in self.__environ:
+
+            if key not in environ:
+                continue
+
+            print(f"WARNING! The environment variable {key} supersedes all "
+                  f"other inputs for this setting. If this is unintensional "
+                  f"unset {key}.")
+
+            name, env_parser = self.__environ[key]
+            env_val = env_parser(key)
+
+            setattr(self, name, env_val)
+
+
 
 
     def __str__(self):
