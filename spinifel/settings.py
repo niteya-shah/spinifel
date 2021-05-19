@@ -115,11 +115,11 @@ class SpinifelSettings(metaclass=Singleton):
         if (self.__args.settings is None) \
         and (self.__args.default_settings is None):
             raise CannotProcessSettingsFile
-        
+
         if (self.__args.settings is not None) \
         and (self.__args.default_settings is not None):
             raise CannotProcessSettingsFile
- 
+
         if self.__args.default_settings is not None:
             self.__toml = join(
                 dirname(abspath(__file__)), "..", "settings",
