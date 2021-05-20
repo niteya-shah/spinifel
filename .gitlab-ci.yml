@@ -16,7 +16,10 @@ variables:
 
 stages:
   - build
+  - unit-test
+  - new-test
   - test
+  - cleanup
 
 build:
   stage: build
@@ -37,7 +40,6 @@ test:
     - cd ${EXTERNAL_WORKDIR}
   script:
     - ./scripts/test.sh
-    - rm -rf ${EXTERNAL_WORKDIR}
   tags:
     - batch
 
@@ -47,7 +49,6 @@ test:
     - cd ${EXTERNAL_WORKDIR}
   script:
     - bash source ./setup/env.sh && jsrun -n1 -a1 -g1 python -m spinifel --default-settings=summit_quickstart.toml --mode=mpi
-    - rm -rf ${EXTERNAL_WORKDIR}
   tags:
     - batch
 
@@ -58,6 +59,13 @@ test:
   script:
     - bash ./scripts/run_summit_mult.sh -m -n 1 -a 1 -g 1 -r 1 -d 1 -c -f -s -e
     - bash ./scripts/run_summit_mult.sh -L -n 1 -a 1 -g 1 -r 1 -d 1 -c    -s -e # -f
-    - rm -rf ${EXTERNAL_WORKDIR}
   tags:
     - batch
+
+test:
+  stage: cleanup
+  before_script:
+  script:
+    - rm -rf ${EXTERNAL_WORKDIR}
+  tags:
+    - nobatch
