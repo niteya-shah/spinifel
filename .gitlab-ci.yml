@@ -34,7 +34,7 @@ build:
   tags:
     - nobatch
 
-test:
+unit_test:
   stage: unit-test
   before_script:
     - cd ${EXTERNAL_WORKDIR}
@@ -43,7 +43,7 @@ test:
   tags:
     - batch
 
-test:
+new_test:
   stage: new-test
   before_script:
     - cd ${EXTERNAL_WORKDIR}
@@ -62,7 +62,7 @@ test:
   tags:
     - batch
 
-test:
+cleanup:
   stage: cleanup
   before_script:
   script:
