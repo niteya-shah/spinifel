@@ -16,8 +16,6 @@ variables:
 
 stages:
   - build
-  - unit-test
-  - new-test
   - test
   - cleanup
 
@@ -35,7 +33,7 @@ build:
     - nobatch
 
 unit_test:
-  stage: unit-test
+  stage: test
   before_script:
     - cd ${EXTERNAL_WORKDIR}
   script:
@@ -44,11 +42,12 @@ unit_test:
     - batch
 
 new_test:
-  stage: new-test
+  stage: test
   before_script:
     - cd ${EXTERNAL_WORKDIR}
+    - source ./setup/env.sh
   script:
-    - bash source ./setup/env.sh && jsrun -n1 -a1 -g1 python -m spinifel --default-settings=summit_quickstart.toml --mode=mpi
+    - jsrun -n1 -a1 -g1 python -m spinifel --default-settings=summit_quickstart.toml --mode=mpi
   tags:
     - batch
 
