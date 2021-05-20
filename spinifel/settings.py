@@ -96,7 +96,9 @@ class SpinifelSettings(metaclass=Singleton):
             "_ps_smd_n_events": ("psana", "ps_smd_n_events", int, 0,
                 "ps smd n events setting"),
             "_use_callmonitor": ("debug", "use_callmonitor", bool, False,
-                "enable call-monitor")
+                "enable call-monitor"),
+            "_use_single_prec": ("runtime", "use_single_prec", bool, False,
+                "if true, spinifel will use single-precision floating point")
         }
 
         self.__init_internals()
