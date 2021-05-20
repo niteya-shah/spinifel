@@ -47,7 +47,7 @@ new_test:
     - cd ${EXTERNAL_WORKDIR}
     - source ./setup/env.sh
   script:
-    - jsrun -n1 -a1 -g1 python -m spinifel --default-settings=summit_quickstart.toml --mode=mpi
+    - jsrun -n1 -a1 -g1 python -m spinifel --default-settings=summit_ci.toml --mode=mpi
   tags:
     - batch
 
