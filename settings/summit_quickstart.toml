@@ -1,0 +1,25 @@
+# This toml file contains settings for the summit quicktart
+
+[debug]
+test = "Quickstart settings for Summit"
+verbose = true
+verbosity = 0
+use_callmonitor = false
+
+[data]
+in_dir = "/gpfs/alpine/proj-shared/chm137/data/spi"
+out_dir = "/gpfs/alpine/proj-shared/chm137/$USER/spinifel_output"
+name = "2CEX-10k-2.h5"
+
+[psana]
+enable = false
+ps_smd_n_events = 0
+
+[runtime]
+data_multiplier = 1
+small_problem = true
+using_cuda = true
+use_cufinufft = true
+
+[gpu]
+devices_per_node = 1
