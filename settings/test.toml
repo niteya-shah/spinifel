@@ -1,3 +1,5 @@
+# This toml file contains place holder values, used to test the settings parser
+
 [debug]
 test = "loaded from toml file"
 verbose = true

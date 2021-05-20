@@ -22,7 +22,7 @@ if __name__ == "__main__":
     elif settings.mode == "mpi":
         from .mpi import main
         main()
-    elif selttings.mode == "legion":
+    elif settings.mode == "legion":
         from .legion import main
         main()
     else:

@@ -10,7 +10,7 @@
 from os       import environ
 from inspect  import getmembers
 from pathlib  import Path
-from os.path  import join, abspath, dirname
+from os.path  import join, abspath, dirname, expandvars
 from toml     import load
 from argparse import ArgumentParser
 
@@ -128,7 +128,7 @@ class SpinifelSettings(metaclass=Singleton):
         else:
             self.__toml = self.__args.settings[0]
 
-        self.mode = self.__args.mode
+        self.mode = self.__args.mode[0]
 
         self.refresh()
 
@@ -182,7 +182,12 @@ class SpinifelSettings(metaclass=Singleton):
         for attr in self.__properties:
 
             c, k, parser, _, _ = self.__properties[attr]
-            setattr(self, attr, parser(toml_settings[c][k]))
+
+            val = toml_settings[c][k]
+            if parser == str or parser == Path:
+                val = expandvars(val)
+
+            setattr(self, attr, parser(val))
 
         for key in self.__environ:
 
