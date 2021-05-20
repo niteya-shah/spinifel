@@ -12,7 +12,7 @@ numpy.seterr(divide='ignore', invalid='ignore')
 
 det_shape = (4, 512, 512)
 N_images_max = 10000
-N_generations = 10 
+N_generations = 10
 data_field_name = "intensities"
 data_type_str = "float32"
 pixel_position_shape = (3,) + det_shape

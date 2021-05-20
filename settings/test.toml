@@ -7,7 +7,7 @@ use_callmonitor = false
 [data]
 in_dir = "spinifel_data"
 out_dir = "spinifel_output"
-name = ""
+name = "data_file"
 
 [psana]
 enable = false

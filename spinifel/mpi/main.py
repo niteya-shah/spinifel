@@ -52,10 +52,10 @@ def main():
 
     ac_phased, support_, rho_ = phase(0, ac)
     logger.log(f"Problem phased in {timer.lap():.2f}s.")
-    
+
     # Use improvement of cc(prev_rho, cur_rho) to determine if
     # we should terminate the loop
-    cov_xy = 0 
+    cov_xy = 0
     cov_delta = .05
 
     N_generations = parms.N_generations
@@ -75,9 +75,9 @@ def main():
         logger.log(f"Problem phased in {timer.lap():.2f}s.")
         if comm.rank == 0: prev_rho_ = rho_[:]
         ac_phased, support_, rho_ = phase(generation, ac, support_, rho_)
-    
+
         np.save(parms.out_dir / f"ac-{generation}.npy", ac)
-        np.save(parms.out_dir / f"rho_-{generation}.npy", rho_)        
+        np.save(parms.out_dir / f"rho_-{generation}.npy", rho_)
 
         if comm.rank == 0:
             cc_matrix = np.corrcoef(prev_rho_.flatten(), rho_.flatten())
@@ -92,5 +92,5 @@ def main():
         logger.log(f"Problem phased in {timer.lap():.2f}s. cc={cov_xy:.2f} delta={cov_xy-prev_cov_xy:.2f}")
         if cov_xy - prev_cov_xy < cov_delta:
             break
-    
+
     logger.log(f"Total: {timer.total():.2f}s.")
