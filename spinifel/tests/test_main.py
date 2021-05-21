@@ -5,11 +5,11 @@ import subprocess
 dirname = os.path.dirname
 
 class Test:
-    root_dir = dirname(dirname(os.path.realpath(__file__))) # spinifel repo root
+    test_dir = dirname(os.path.realpath(__file__))
     launch_args = "jsrun -n1".split()
     
     def test_skopi(self, ):
-        args = self.launch_args + ['python','skopi_quaternion.py']
+        args = self.launch_args + ['python', os.path.join(self.test_dir,'skopi_quaternion.py')]
         subprocess.check_call(args)
 
 
