@@ -59,36 +59,6 @@ def get_slices(comm, N_images_per_rank, ds):
 
 
 @nvtx.annotate("mpi/prep.py", is_prefix=True)
-def get_orientations(comm, N_images_per_rank, ds):
-    orientation_type = getattr(np, parms.orientation_type_str)
-    
-    # orientations store quaternion coefficients (w, x, y, z) skopi format
-    orientations_ = np.zeros((N_images_per_rank, 4),
-                               dtype=orientation_type)
-    
-    if ds is None:
-        i_start = comm.rank * N_images_per_rank
-        i_end = i_start + N_images_per_rank
-        prep.load_orientations(orientations_, i_start, i_end)
-        return orientations_
-    else:
-        assert False, "get_orientations not supported yet for psana input"
-
-
-
-@nvtx.annotate("mpi/prep.py", is_prefix=True)
-def get_volume(comm):
-    volume_type = getattr(np, parms.volume_type_str)
-    volume = np.zeros(parms.volume_shape,
-                               dtype=volume_type)
-    if comm.rank == 0:
-        prep.load_volume(volume)
-    comm.Bcast(volume, root=0)
-    return volume
-
-
-
-@nvtx.annotate("mpi/prep.py", is_prefix=True)
 def compute_mean_image(comm, slices_):
     images_sum = slices_.sum(axis=0)
     N_images = slices_.shape[0]
@@ -143,17 +113,7 @@ def get_data(N_images_per_rank, ds):
         prep.export_saxs(pixel_distance_reciprocal, mean_image,
                          "saxs_binned.png")
 
-    # DEBUG
-    orientations_ = get_orientations(comm, N_images_per_rank, ds)
-    N_orientations_local = orientations_.shape[0]
-    witness = orientations_.flatten()[0] if N_orientations_local else None
-    print(f"Rank {comm.rank}: {N_orientations_local} values, start: {witness}", flush=True)
-
-    volume = get_volume(comm)
-
     return (pixel_position_reciprocal,
             pixel_distance_reciprocal,
             pixel_index_map,
-            slices_,
-            orientations_,
-            volume)
+            slices_)
