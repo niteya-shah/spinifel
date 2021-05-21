@@ -84,7 +84,7 @@ def main():
         if cov_xy - prev_cov_xy < cov_delta:
             break
 
-        np.save(parms.out_dir / f"ac_-{generation}.npy", ac)
+        np.save(parms.out_dir / f"ac-{generation}.npy", ac)
         np.save(parms.out_dir / f"rho_-{generation}.npy", rho_)
 
     logger.log(f"Total: {timer.total():.2f}s.")
