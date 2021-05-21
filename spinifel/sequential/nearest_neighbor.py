@@ -69,7 +69,7 @@ def nearest_neighbor(model_slices, slices, batch_size):
         
         # Calculate Euclidean distance in batch to avoid running out of GPU Memory
         euDist = np.zeros((slices.shape[0], model_slices.shape[0]), dtype=slices.dtype)
-        for i in range(model_slices.shape[0]//batch_size):
+        for i in range((model_slices.shape[0]//batch_size).astype(int)):
             st = i * batch_size
             en = st + batch_size
             euDist[:, st:en] = calc_eudist_gpu(model_slices[st:en], slices, deviceId).reshape(slices.shape[0], batch_size)
