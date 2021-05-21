@@ -148,7 +148,7 @@ export VERBOSE=true
 
 # TO RUN THE UNIT TEST FOR ORIENTATION MATCHING
 # Replace finufftpy with finufft
-#USE_ORIGINAL_FINUFFT=1
+#export USE_ORIGINAL_FINUFFT=1
 #export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/ccs/home/monarin/sw/spinifel/setup/finufft_original/lib"
 #export PYTHONPATH="$PYTHONPATH:/ccs/home/monarin/sw/spinifel/setup/finufft_original/python"
 
