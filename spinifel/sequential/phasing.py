@@ -247,7 +247,7 @@ def phase(generation, ac, support_=None, rho_=None):
 
     for i in range(parms.N_phase_loops):
         ER_loop(nER, rho_, amplitudes_, amp_mask_, support_, rho_max)
-        HIO_loop(nHIO, 0.3, rho_, amplitudes_, amp_mask_, support_, rho_max)
+        HIO_loop(nHIO, 0.9, rho_, amplitudes_, amp_mask_, support_, rho_max)
         ER_loop(nER, rho_, amplitudes_, amp_mask_, support_, rho_max)
         shrink_wrap(5e-2, 1, rho_, support_)
     ER_loop(nER, rho_, amplitudes_, amp_mask_, support_, rho_max)
