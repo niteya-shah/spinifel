@@ -1,5 +1,4 @@
-
-m mpi4py import MPI
+from mpi4py import MPI
 
 from spinifel import parms, utils
 
