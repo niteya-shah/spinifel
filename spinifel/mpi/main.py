@@ -41,8 +41,7 @@ def main():
     (pixel_position_reciprocal,
      pixel_distance_reciprocal,
      pixel_index_map,
-     slices_,
-     orientations_prior) = get_data(N_images_per_rank, ds)
+     slices_) = get_data(N_images_per_rank, ds)
     logger.log(f"Loaded in {timer.lap():.2f}s.")
 
     ac = solve_ac(
