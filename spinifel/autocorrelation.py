@@ -46,11 +46,12 @@ if settings.using_cuda and settings.use_cufinufft:
         from cufinufft import cufinufft
     else:
         raise CUFINUFFTRequiredButNotFound
+
+# Mona: try to load anyway for comparison tests
+if context.finufftpy_available:
+    import finufftpy as nfft
 else:
-    if context.finufftpy_available:
-        import finufftpy as nfft
-    else:
-        raise FINUFFTPYRequiredButNotFound
+    raise FINUFFTPYRequiredButNotFound
 
 
 #-------------------------------------------------------------------------------
@@ -77,6 +78,7 @@ def forward_cpu(ugrid, H_, K_, L_, support, M, N, recip_extent, use_recip_sym):
     # Ask Elliott if we can use this main finufft instead of his fork.
     # Allocate space in memory
     if USE_ORIGINAL_FINUFFT:
+        print("Using original FINUFFT to solve the forward transform")
         nuvect = np.zeros(H_.shape, dtype=np.complex64)
         nfft_original.nufft3d2(H_, K_, L_, ugrid, out=nuvect, eps=6e-08, isign=-1)
         return nuvect
@@ -443,5 +445,8 @@ def gen_nonuniform_normalized_positions(orientations, pixel_position_reciprocal,
     H_ = H.astype(np.float32).flatten() / reciprocal_extent * np.pi / oversampling
     K_ = K.astype(np.float32).flatten() / reciprocal_extent * np.pi / oversampling
     L_ = L.astype(np.float32).flatten() / reciprocal_extent * np.pi / oversampling
+    #H_ = H.flatten() / reciprocal_extent * np.pi / oversampling
+    #K_ = K.flatten() / reciprocal_extent * np.pi / oversampling
+    #L_ = L.flatten() / reciprocal_extent * np.pi / oversampling
 
     return H_, K_, L_
