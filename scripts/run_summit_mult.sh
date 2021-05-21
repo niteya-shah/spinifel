@@ -34,7 +34,6 @@ if [[ -n CHECK_FOR_ERRORS ]]; then
     set -e
 fi
 
-export LD_PRELOAD=/sw/summit/gcc/8.1.1-cuda10.1.168/lib64/libgomp.so.1
 if [[ -n $USING_MPI && -n $USING_LEGION ]]; then
     echo "MPI and Legion options are mutually exclusive. Please pick one."
     exit 1
@@ -122,12 +121,12 @@ echo "DATA_MULTIPLIER: $DATA_MULTIPLIER"
 
 if [[ -z $LAUNCH_SCRIPT ]]; then
     if [[ -n $USING_MPI ]]; then
-        LAUNCH_SCRIPT=(python "$root_dir/mpi_main.py")
+        LAUNCH_SCRIPT=(python "$root_dir/mpi_main.py" --mode=mpi)
     elif [[ -n $USING_LEGION ]]; then
-        LAUNCH_SCRIPT=(legion_python "$root_dir/legion_main.py" -ll:py 1 -ll:csize 8192)
+        LAUNCH_SCRIPT=(legion_python "$root_dir/legion_main.py" --mode=legion -ll:py 1 -ll:csize 8192)
     fi
 else
-    LAUNCH_SCRIPT=(python "$LAUNCH_SCRIPT")
+    LAUNCH_SCRIPT=(python "$LAUNCH_SCRIPT" --mode=mpi)
 fi
 
 if [[ -n $PROFILE ]]; then
