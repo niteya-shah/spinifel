@@ -11,7 +11,7 @@ fix_lib () {
 
 if [[ -d $CONDA_PREFIX ]]
 then
-    pushd $CONDA_PREFIX/lib64
+    pushd $CONDA_PREFIX/lib
     fix_lib $OLCF_GCC_ROOT/lib64
     fix_lib /usr/lib64
     fix_lib /lib64
