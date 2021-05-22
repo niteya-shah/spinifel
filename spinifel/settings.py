@@ -50,6 +50,14 @@ class SpinifelSettings(metaclass=Singleton):
 
 
     @staticmethod
+    def get_path(x):
+        """
+        Return string representation of the environment variable `x`
+        """
+        return Path(environ[x])
+
+
+    @staticmethod
     def get_bool(x):
         """
         Return boolean representation of the environment variable `x`
@@ -104,8 +112,22 @@ class SpinifelSettings(metaclass=Singleton):
         self.__init_internals()
 
         self.__environ = {
+            "TEST": ("_test", SpinifelSettings.get_str),
+            "VERBOSE": ("_verbose", SpinifelSettings.get_bool),
+            "DATA_DIR": ("_data_dir", SpinifelSettings.get_path),
+            "DATA_FILENAME": ("_data_filename", SpinifelSettings.get_str),
+            "USE_PSANA": ("_use_psana", SpinifelSettings.get_bool),
+            "OUT_DIR": ("_out_dir", SpinifelSettings.get_path),
+            "DATA_MULTIPLIER": ("_data_multiplier", SpinifelSettings.get_int),
+            "VERBOSITY": ("_verbose", SpinifelSettings.get_int),
+            "SMALL_PROBLEM": ("_small_problem", SpinifelSettings.get_bool),
+            "USING_CUDA": ("_using_cuda", SpinifelSettings.get_bool),
+            "DEVICES_PER_RS": ("_devices_per_node", SpinifelSettings.get_int),
+            "USE_CUFINUFFT": ("_use_cufinufft", SpinifelSettings.get_bool),
             "PS_SMD_N_EVENTS": ("_ps_smd_n_events", SpinifelSettings.get_int),
+            "USE_CALLMONITOR": ("_use_callmonitor", SpinifelSettings.get_bool)
         }
+
 
         parser = ArgumentParser()
         parser.add_argument("--settings", type=str, nargs=1, default=None)
@@ -114,23 +136,28 @@ class SpinifelSettings(metaclass=Singleton):
 
         self.__args, self.__params = parser.parse_known_args()
 
-        if (self.__args.settings is None) \
-        and (self.__args.default_settings is None):
-            raise CannotProcessSettingsFile
-
-        if (self.__args.settings is not None) \
-        and (self.__args.default_settings is not None):
-            raise CannotProcessSettingsFile
-
-        if self.__args.default_settings is not None:
-            self.__toml = join(
-                dirname(abspath(__file__)), "..", "settings",
-                self.__args.default_settings[0]
-            )
-        else:
-            self.__toml = self.__args.settings[0]
-
         self.mode = self.__args.mode[0]
+
+        self.legacy = False
+        if self.mode == "legacy":
+            self.legacy = True
+
+        if not self.legacy:
+            if (self.__args.settings is None) \
+            and (self.__args.default_settings is None):
+                raise CannotProcessSettingsFile
+
+            if (self.__args.settings is not None) \
+            and (self.__args.default_settings is not None):
+                raise CannotProcessSettingsFile
+
+            if self.__args.default_settings is not None:
+                self.__toml = join(
+                    dirname(abspath(__file__)), "..", "settings",
+                    self.__args.default_settings[0]
+                )
+            else:
+                self.__toml = self.__args.settings[0]
 
         self.refresh()
 
@@ -170,26 +197,27 @@ class SpinifelSettings(metaclass=Singleton):
         Refresh internal state using environment variables
         """
 
-        toml_settings = load(self.__toml)
+        if not self.legacy:
+            toml_settings = load(self.__toml)
 
-        for param in self.__params:
+            for param in self.__params:
 
-            if not ("." in param and "=" in param):
-                raise MalformedSettingsException
+                if not ("." in param and "=" in param):
+                    raise MalformedSettingsException
 
-            setting, val = param.split("=")
-            c, k         = setting.split(".")
-            toml_settings[c][k] = val
+                setting, val = param.split("=")
+                c, k         = setting.split(".")
+                toml_settings[c][k] = val
 
-        for attr in self.__properties:
+            for attr in self.__properties:
 
-            c, k, parser, _, _ = self.__properties[attr]
+                c, k, parser, _, _ = self.__properties[attr]
 
-            val = toml_settings[c][k]
-            if parser == str or parser == Path:
-                val = expandvars(val)
+                val = toml_settings[c][k]
+                if parser == str or parser == Path:
+                    val = expandvars(val)
 
-            setattr(self, attr, parser(val))
+                setattr(self, attr, parser(val))
 
         for key in self.__environ:
 

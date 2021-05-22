@@ -100,7 +100,7 @@ if [[ -n $USING_CUDA ]]; then
     export USING_CUDA
     echo "CUDA: $USING_CUDA"
     cd "$root_dir"/spinifel/sequential/
-    nvcc -O3 -shared -std=c++11 `python3 -m pybind11 --includes` orientation_matching.cu -o pyCudaKNearestNeighbors`python3-config --extension-suffix`
+    # nvcc -O3 -shared -std=c++11 `python3 -m pybind11 --includes` orientation_matching.cu -o pyCudaKNearestNeighbors`python3-config --extension-suffix`
     cd "$root_dir"
 fi
 
@@ -121,12 +121,12 @@ echo "DATA_MULTIPLIER: $DATA_MULTIPLIER"
 
 if [[ -z $LAUNCH_SCRIPT ]]; then
     if [[ -n $USING_MPI ]]; then
-        LAUNCH_SCRIPT=(python "$root_dir/mpi_main.py" --mode=mpi)
+        LAUNCH_SCRIPT=(python "$root_dir/mpi_main.py" --mode=legacy)
     elif [[ -n $USING_LEGION ]]; then
-        LAUNCH_SCRIPT=(legion_python "$root_dir/legion_main.py" --mode=legion -ll:py 1 -ll:csize 8192)
+        LAUNCH_SCRIPT=(legion_python "$root_dir/legion_main.py" --mode=legacy -ll:py 1 -ll:csize 8192)
     fi
 else
-    LAUNCH_SCRIPT=(python "$LAUNCH_SCRIPT" --mode=mpi)
+    LAUNCH_SCRIPT=(python "$LAUNCH_SCRIPT" --mode=legacy)
 fi
 
 if [[ -n $PROFILE ]]; then
