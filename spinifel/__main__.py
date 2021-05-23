@@ -11,7 +11,7 @@ if __name__ == "__main__":
     if settings.verbose:
         print(settings)
 
-    print(f"Runtume MODE = {settings.mode}")
+    print(f"Runtime MODE = {settings.mode}")
 
     # DON'T use top-level imports here ... sequential, mpi, and legion have
     # incompatible imports for the time being (this might change in future)
