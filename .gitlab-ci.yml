@@ -26,6 +26,7 @@ build:
     - mkdir -p $(dirname ${OUT_DIR})
     - cp -r ${CI_PROJECT_DIR} ${EXTERNAL_WORKDIR}
     - cd ${EXTERNAL_WORKDIR}
+    - ls
     - git clean -fxd
     - git submodule update --init --recursive
   script:
