@@ -27,7 +27,6 @@ build:
     - cd ${EXTERNAL_WORKDIR}
     - git clean -fxd
     - git submodule update --init --recursive
-    - mkdir -p $(dirname ${OUT_DIR})
   script:
     - ./setup/build_from_scratch.sh
   tags:
@@ -46,6 +45,7 @@ new_test:
   stage: test
   before_script:
     - cd ${EXTERNAL_WORKDIR}
+    - mkdir -p ${OUT_DIR}
     - source ./setup/env.sh
   script:
     - jsrun -n1 -a1 -g1 python -m spinifel --default-settings=summit_ci.toml --mode=mpi
