@@ -23,12 +23,11 @@ build:
   stage: build
   before_script:
     - mkdir -p $(dirname ${EXTERNAL_WORKDIR})
-    - mkdir -p $(dirname ${OUT_DIR})
     - cp -r ${CI_PROJECT_DIR} ${EXTERNAL_WORKDIR}
     - cd ${EXTERNAL_WORKDIR}
-    - ls
     - git clean -fxd
     - git submodule update --init --recursive
+    - mkdir -p $(dirname ${OUT_DIR})
   script:
     - ./setup/build_from_scratch.sh
   tags:
@@ -67,7 +66,6 @@ cleanup:
   stage: cleanup
   before_script:
   script:
-    - rm -rf ${OUT_DIR}
     - rm -rf ${EXTERNAL_WORKDIR}
   tags:
     - nobatch
