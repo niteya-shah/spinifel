@@ -60,7 +60,7 @@ test_legion:
     - mkdir -p ${OUT_DIR}
     - source ./setup/env.sh
   script:
-    - jsrun -n1 -a1 -g1 legion_python -m spinifel --default-settings=summit_ci.toml --mode=legion
+    - jsrun -n1 -a1 -g1 legion_python -ll:py 1 -ll:csize 8192 -m spinifel --default-settings=summit_ci.toml --mode=legion
   tags:
     - batch
 
