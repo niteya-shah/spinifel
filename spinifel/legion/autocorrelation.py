@@ -347,20 +347,21 @@ def solve_ac(generation,
         ac, weights, M, Mtot, M_ups, N,
         reciprocal_extent, use_reciprocal_symmetry)
 
-    N_ranks = 5
-    results = Region((N_ranks * M, M, M), {"ac": pygion.float64})
-    results_p = Partition.restrict(results, (N_ranks,), [[M], [0], [0]], [M, M, M])
+    #N_ranks = 5
+    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
+    results = Region((N_procs * M, M, M), {"ac": pygion.float64})
+    results_p = Partition.restrict(results, (N_procs,), [[M], [0], [0]], [M, M, M])
 
     alambda = 1
-    rlambdas = Mtot/Ntot * 1e2**(np.arange(N_ranks) - N_ranks/2)
+    rlambdas = Mtot/Ntot * 1e2**(np.arange(N_procs) - N_procs/2)
     flambda = 0
 
-    summary = Region((N_ranks,),
+    summary = Region((N_procs,),
                 {"rank": pygion.int32, "rlambda": pygion.float32, "v1": pygion.float32, "v2": pygion.float32})
-    summary_p = Partition.equal(summary, (N_ranks,))
+    summary_p = Partition.equal(summary, (N_procs,))
 
 
-    for i in IndexLaunch((N_ranks,)):
+    for i in IndexLaunch((N_procs,)):
         solve(
             uregion, uregion_ups, ac, results_p[i], summary_p[i],
             weights, M, M_ups, Mtot, N,
