@@ -1,6 +1,7 @@
 from mpi4py import MPI
 
 from spinifel import parms, utils
+from spinifel.prep import save_mrc
 
 from .prep import get_data
 from .autocorrelation import solve_ac
@@ -84,8 +85,14 @@ def main():
         if cov_xy - prev_cov_xy < cov_delta:
             break
 
-        np.save(parms.out_dir / f"ac-{generation}.npy", ac)
-        np.save(parms.out_dir / f"rho_-{generation}.npy", rho_)
+        rho = np.fft.ifftshift(rho_)
+        print("rho =", rho)
+
+        if comm.rank == 0:
+            save_mrc(parms.out_dir / f"ac-{generation}.mrc", ac_phased)
+            save_mrc(parms.out_dir / f"rho-{generation}.mrc", rho)
+            np.save(parms.out_dir / f"ac-{generation}.npy", ac_phased)
+            np.save(parms.out_dir / f"rho-{generation}.npy", rho)
 
     logger.log(f"Total: {timer.total():.2f}s.")
 
