@@ -198,10 +198,10 @@ def solve_ac(generation,
         axes[1].loglog(lambdas, v2s)
         axes[1].loglog(lambdas[iref], v2s[iref], "rD")
         axes[1].set_xlabel("$\lambda_{r}$")
-        axes[1].set_ylabel("$||W \lambda_{r}-d||_{2}$")
+        axes[1].set_ylabel("$||W x_{\lambda_{r}}-d||_{2}$")
         axes[2].loglog(v2s, v1s) # L-curve
         axes[2].loglog(v2s[iref], v1s[iref], "rD")
-        axes[2].set_xlabel("Residual norm $||W \lambda_{r}-d||_{2}$")
+        axes[2].set_xlabel("Residual norm $||W x_{\lambda_{r}}-d||_{2}$")
         axes[2].set_ylabel("Solution norm $||x_{\lambda_{r}}||_{2}$")
         fig.tight_layout()
         plt.savefig(parms.out_dir / f"summary_{generation}.png")
