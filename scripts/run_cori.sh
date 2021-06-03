@@ -6,7 +6,7 @@
 #SBATCH --mail-type=ALL
 #SBATCH --account=m2859
 
-while getopts lmpscavn:t:d:f option
+while getopts lmpscavn:t:d:g:f option
 do
 case "${option}"
 in
@@ -20,6 +20,7 @@ v) VERBOSITY="1";;
 n) NTASKS=$OPTARG;;
 t) OMP_NUM_THREADS=$OPTARG;;
 d) DATA_MULTIPLIER=$OPTARG;;
+g) DEVICES_PER_RS=$OPTARG;;
 f) USE_CUFINUFFT="1";;
 esac
 done
@@ -35,7 +36,8 @@ source "$root_dir"/setup/env.sh
 
 export PYTHONPATH="$PYTHONPATH:$root_dir"
 
-export DATA_DIR=$SCRATCH/spinifel_data
+export DATA_DIR=$CFS/m2859/data
+export DATA_FILENAME=${DATA_FILENAME:-2CEX-10k-2.h5}
 
 export OUT_DIR=$SCRATCH/spinifel_output
 mkdir -p $OUT_DIR
@@ -48,6 +50,13 @@ if [[ -z $NTASKS ]]; then
 	NTASKS="1"
 fi
 echo "NTASKS: $NTASKS"
+
+if [[ -z $DEVICES_PER_RS ]]; then
+    DEVICES_PER_RS="1"
+fi
+export DEVICES_PER_RS
+echo "DEVICES_PER_RS: $DEVICES_PER_RS"
+
 
 if [[ -n $OMP_NUM_THREADS ]]; then
     export OMP_NUM_THREADS
