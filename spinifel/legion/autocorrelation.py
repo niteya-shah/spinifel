@@ -290,15 +290,20 @@ def select_ac(generation, summary):
         iref = np.argmin(summary.v1+summary.v2)
     ref_rank = summary.rank[iref]
 
-    fig, axes = plt.subplots(figsize=(6.0, 6.0), nrows=2, ncols=1)
-    axes[0].semilogx(summary.rlambda, summary.v1)
-    axes[0].semilogx(summary.rlambda[iref], summary.v1[iref], "rD")
-    axes[0].set_xlabel("$\\lambda_r$")
-    axes[0].set_ylabel("$\\|x\\|$")
-    axes[1].semilogx(summary.rlambda, summary.v2)
-    axes[1].semilogx(summary.rlambda[iref], summary.v2[iref], "rD")
-    axes[1].set_xlabel("$\\lambda_r$")
-    axes[1].set_ylabel("$\\|W x - d\\|$")
+    fig, axes = plt.subplots(figsize=(6.0, 8.0), nrows=3, ncols=1)
+    axes[0].loglog(summary.rlambda, summary.v1)
+    axes[0].loglog(summary.rlambda[iref], summary.v1[iref], "rD")
+    axes[0].set_xlabel("$\lambda_{r}$")
+    axes[0].set_ylabel("$||x_{\lambda_{r}}||_{2}$")
+    axes[1].loglog(summary.rlambda, summary.v2)
+    axes[1].loglog(summary.rlambda[iref], summary.v2[iref], "rD")
+    axes[1].set_xlabel("$\lambda_{r}$")
+    axes[1].set_ylabel("$||W \lambda_{r}-d||_{2}$")
+    axes[2].loglog(summary.v2, summary.v1) # L-curve
+    axes[2].loglog(summary.v2[iref], summary.v1[iref], "rD")
+    axes[2].set_xlabel("Residual norm $||W \lambda_{r}-d||_{2}$")
+    axes[2].set_ylabel("Solution norm $||x_{\lambda_{r}}||_{2}$")
+    fig.tight_layout()
     plt.savefig(parms.out_dir / f"summary_{generation}.png")
     plt.close('all')
 
@@ -347,20 +352,21 @@ def solve_ac(generation,
         ac, weights, M, Mtot, M_ups, N,
         reciprocal_extent, use_reciprocal_symmetry)
 
-    N_ranks = 5
-    results = Region((N_ranks * M, M, M), {"ac": pygion.float64})
-    results_p = Partition.restrict(results, (N_ranks,), [[M], [0], [0]], [M, M, M])
+    #N_ranks = 5
+    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
+    results = Region((N_procs * M, M, M), {"ac": pygion.float64})
+    results_p = Partition.restrict(results, (N_procs,), [[M], [0], [0]], [M, M, M])
 
     alambda = 1
-    rlambdas = Mtot/Ntot * 1e2**(np.arange(N_ranks) - N_ranks/2)
+    rlambdas = Mtot/Ntot * 1e2**(np.arange(N_procs) - N_procs/2)
     flambda = 0
 
-    summary = Region((N_ranks,),
+    summary = Region((N_procs,),
                 {"rank": pygion.int32, "rlambda": pygion.float32, "v1": pygion.float32, "v2": pygion.float32})
-    summary_p = Partition.equal(summary, (N_ranks,))
+    summary_p = Partition.equal(summary, (N_procs,))
 
 
-    for i in IndexLaunch((N_ranks,)):
+    for i in IndexLaunch((N_procs,)):
         solve(
             uregion, uregion_ups, ac, results_p[i], summary_p[i],
             weights, M, M_ups, Mtot, N,

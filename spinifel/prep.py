@@ -1,6 +1,7 @@
 import h5py
 import matplotlib.pyplot as plt
 import numpy             as np
+import mrcfile
 import PyNVTX            as nvtx
 
 from matplotlib.colors import LogNorm
@@ -169,3 +170,23 @@ def load_orientations_prior(orientations_prior, i_start, i_end):
     with h5py.File(parms.data_path, 'r') as h5f:
         orientations = h5f['orientations'][i_start:i_end]
         orientations_prior[:] = np.reshape(orientations, (orientations.shape[0], 4))
+
+
+
+@nvtx.annotate("prep.py", is_prefix=True)
+def save_mrc(savename, data, voxel_size=None):
+    """
+    Save Nd numpy array to path savename in mrc format.
+    
+    :param savename: path to which to save mrc file
+    :param data: input numpy array
+    :param voxel_size: voxel size for header, optional
+    """
+
+    mrc = mrcfile.new(savename, overwrite=True)
+    mrc.header.map = mrcfile.constants.MAP_ID
+    mrc.set_data(data.astype(np.float32))
+    if voxel_size is not None:
+        mrc.voxel_size = voxel_size
+    mrc.close()
+    return

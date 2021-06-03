@@ -55,6 +55,7 @@ def get_slices(comm, N_images_per_rank, ds):
         return slices_[:i]
 
 
+
 @nvtx.annotate("mpi/prep.py", is_prefix=True)
 def compute_mean_image(comm, slices_):
     images_sum = slices_.sum(axis=0)

@@ -148,11 +148,11 @@ export VERBOSE=true
 
 # TO RUN THE UNIT TEST FOR ORIENTATION MATCHING
 # Replace finufftpy with finufft
-#USE_ORIGINAL_FINUFFT=1
+#export USE_ORIGINAL_FINUFFT=1
 #export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/ccs/home/monarin/sw/spinifel/setup/finufft_original/lib"
 #export PYTHONPATH="$PYTHONPATH:/ccs/home/monarin/sw/spinifel/setup/finufft_original/python"
 
 #export DEBUG_FLAG=1
 set -x
-jsrun -n $NRESOURCESETS -a $NTASKS_PER_RS -c $NTASKS_PER_RS -g $DEVICES_PER_RS -r $NRSS_PER_NODE "${LAUNCH_SCRIPT[@]}"
+jsrun -n $NRESOURCESETS -a $NTASKS_PER_RS -c $NTASKS_PER_RS -g $DEVICES_PER_RS "${LAUNCH_SCRIPT[@]}"
 
