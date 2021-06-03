@@ -12,6 +12,11 @@ target=${SPINIFEL_TARGET:-$(hostname --fqdn)}
 
 # Enable CUDA build
 cuda_build=${SPINIFEL_BUILD_CUDA:-true}
+# except on certain targets
+if [[ ${target} = *"tulip"* || ${target} = *"jlse"* ]]
+then
+    cuda_build=false
+fi
 
 
 #_______________________________________________________________________________
