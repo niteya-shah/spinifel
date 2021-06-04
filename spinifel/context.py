@@ -16,6 +16,8 @@ from .utils    import Singleton
 
 MPI4PY_AVAILABLE = False
 if find_spec("mpi4py") is not None:
+    import mpi4py
+    mpi4py.rc(initialize=False, finalize=False)
     from mpi4py import MPI
     MPI4PY_AVAILABLE = True
 
@@ -59,6 +61,9 @@ class SpinifelContexts(metaclass=Singleton):
 
         if self._mpi_initialized:
             return
+
+        # Initialize MPI
+        MPI.Init()
 
         self._comm = MPI.COMM_WORLD
         self._rank = self.comm.Get_rank()

@@ -1,17 +1,16 @@
-from mpi4py import MPI
-
 import matplotlib.pyplot as plt
-import numpy as np
-import PyNVTX as nvtx
+import numpy             as np
+import PyNVTX            as nvtx
+import skopi             as skp
 
-from matplotlib.colors import LogNorm
-from scipy.linalg import norm
-from scipy.ndimage import gaussian_filter
+from mpi4py              import MPI
+from matplotlib.colors   import LogNorm
+from scipy.linalg        import norm
+from scipy.ndimage       import gaussian_filter
 from scipy.sparse.linalg import LinearOperator, cg
 
-import skopi as skp
+from spinifel import parms, utils, image, autocorrelation, contexts
 
-from spinifel import parms, utils, image, autocorrelation
 
 
 @nvtx.annotate("mpi/autocorrelation.py", is_prefix=True)
@@ -114,7 +113,7 @@ def solve_ac(generation,
              slices_,
              orientations=None,
              ac_estimate=None):
-    comm = MPI.COMM_WORLD
+    comm = contexts.comm
 
     M = parms.M
     Mtot = M**3

@@ -1,13 +1,12 @@
-from mpi4py import MPI
-
 import numpy as np
 
-from spinifel import parms
+from spinifel import parms, contexts
 from spinifel.sequential.phasing import phase as sequential_phase
 
 
 def phase(generation, ac, support_=None, rho_=None):
-    comm = MPI.COMM_WORLD
+
+    comm = contexts.comm
 
     Mquat = parms.Mquat
     M = 4*Mquat + 1
