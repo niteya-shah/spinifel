@@ -10,6 +10,7 @@ from spinifel.sequential.phasing import phase as sequential_phase
 
 @nvtx.annotate("mpi/phasing.py", is_prefix=True)
 def phase(generation, ac, support_=None, rho_=None):
+    """Phase retrieval by Rank0 and broadcast to all ranks."""
     comm = MPI.COMM_WORLD
 
     Mquat = parms.Mquat
