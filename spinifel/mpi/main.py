@@ -1,6 +1,4 @@
-from mpi4py import MPI
-
-from spinifel import parms, utils
+from spinifel import parms, utils, contexts
 from spinifel.prep import save_mrc
 
 from .prep import get_data
@@ -15,7 +13,8 @@ import PyNVTX as nvtx
 
 @nvtx.annotate("mpi/main.py", is_prefix=True)
 def main():
-    comm = MPI.COMM_WORLD
+
+    comm = contexts.comm
 
     logger = utils.Logger(comm.rank==(2 if parms.use_psana else 0))
     logger.log("In MPI main")

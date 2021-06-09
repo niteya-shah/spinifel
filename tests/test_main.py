@@ -18,12 +18,12 @@ class Test:
         args = self.launch_cmds + self.launch_args + [test_script]
         subprocess.check_call(args)
 
-    def test_forward_and_adjoint(self, ):
-        # set root_dir for run_summit_mult.sh
-        os.environ["root_dir"] = self.root_dir
-        os.environ["test_data_dir"] = "/gpfs/alpine/proj-shared/chm137/data/testdata"
-        test_script = "tests/forward_and_adjoint.py" 
-        args = self.launch_cmds + self.launch_args + [test_script]
-        subprocess.check_call(args)
+    #def test_forward_and_adjoint(self, ):
+    #    # set root_dir for run_summit_mult.sh
+    #    os.environ["root_dir"] = self.root_dir
+    #    os.environ["test_data_dir"] = "/gpfs/alpine/proj-shared/chm137/data/testdata"
+    #    test_script = "tests/forward_and_adjoint.py" 
+    #    args = self.launch_cmds + self.launch_args + [test_script]
+    #    subprocess.check_call(args)
 
 

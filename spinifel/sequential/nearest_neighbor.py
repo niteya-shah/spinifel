@@ -3,20 +3,34 @@ import numpy  as np
 import PyNVTX as nvtx
 
 from   sklearn.metrics.pairwise import euclidean_distances
-from   spinifel                 import SpinifelSettings
-
-# TODO: This should be included in spinifel contexts
-from mpi4py import MPI
-rank = MPI.COMM_WORLD.Get_rank()
+from   spinifel                 import SpinifelSettings, SpinifelContexts
 
 
+
+#______________________________________________________________________________
+# Load global settings, and contexts
+#
+
+context = SpinifelContexts()
 settings = SpinifelSettings()
+
+rank = context.rank
+
+
 
 #_______________________________________________________________________________
 # TRY to import the cuda nearest neighbor pybind11 module -- if it exists in
 # the path and we enabled `using_cuda`
 
 from importlib.util import find_spec
+
+
+class CUKNNRequiredButNotFound(Exception):
+    """
+    Settings require CUDA implementation of KNN, but the module is unavailable
+    """
+
+
 
 KNN_LOADER    = find_spec("spinifel.sequential.pyCudaKNearestNeighbors")
 KNN_AVAILABLE = KNN_LOADER is not None
@@ -25,6 +39,9 @@ if settings.verbose:
 
 if settings.using_cuda and KNN_AVAILABLE:
     import spinifel.sequential.pyCudaKNearestNeighbors as pyCu
+elif settings.using_cuda and not KNN_AVAILABLE:
+    raise CUKNNRequiredButNotFound
+
 
 #-------------------------------------------------------------------------------
 

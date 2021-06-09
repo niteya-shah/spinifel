@@ -5,7 +5,7 @@ import PyNVTX as nvtx
 from matplotlib.colors import LogNorm
 from mpi4py import MPI
 
-from spinifel import parms, prep, image
+from spinifel import parms, prep, image, contexts
 
 
 @nvtx.annotate("mpi/prep.py", is_prefix=True)
@@ -72,7 +72,7 @@ def compute_mean_image(comm, slices_):
 
 @nvtx.annotate("mpi/prep.py", is_prefix=True)
 def get_data(N_images_per_rank, ds):
-    comm = MPI.COMM_WORLD
+    comm = contexts.comm
     rank = comm.rank
     size = comm.size
 

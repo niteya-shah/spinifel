@@ -8,7 +8,15 @@ root_dir=$(readlink -f $(dirname "${BASH_SOURCE[0]}"))
 pushd $root_dir
 
 # Enable host overwrite
-target=${SPINIFEL_TARGET:-$(hostname)}
+target=${SPINIFEL_TARGET:-$(hostname --fqdn)}
+
+# Enable CUDA build
+cuda_build=${SPINIFEL_BUILD_CUDA:-true}
+# except on certain targets
+if [[ ${target} = *"tulip"* || ${target} = *"jlse"* ]]
+then
+    cuda_build=false
+fi
 
 
 #_______________________________________________________________________________
@@ -153,7 +161,7 @@ fi
 
 
 #_______________________________________________________________________________
-# Install skopi (formerly known as pysingfel) 
+# Install skopi (formerly known as pysingfel)
 
 ./rebuild_skopi.sh
 
@@ -163,9 +171,26 @@ fi
 #_______________________________________________________________________________
 # Install cufinufft
 
-./rebuild_cufinufft.sh
+if [[ ${cuda_build} == true ]]
+then
+    ./rebuild_cufinufft.sh
+fi
 
 #-------------------------------------------------------------------------------
+
+
+#_______________________________________________________________________________
+# Install CUDA KNN implmentation
+
+if [[ ${cuda_build} == true ]]
+then
+    ./rebuild_knn.sh
+fi
+
+#-------------------------------------------------------------------------------
+
+
+
 
 
 # pip check # FIXME (Elliott): this seems to be failing
