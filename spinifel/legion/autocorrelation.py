@@ -25,7 +25,7 @@ def gen_random_orientations(orientations, N_images_per_rank):
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def get_random_orientations():
     N_images_per_rank = parms.N_images_per_rank
-    fields_dict = {"quaternions": pygion.float64}
+    fields_dict = {"quaternions": pygion.float32}
     sec_shape = (4,)
     orientations, orientations_p = lgutils.create_distributed_region(
         N_images_per_rank, fields_dict, sec_shape)
@@ -80,8 +80,8 @@ def gen_nonuniform_positions(orientations, nonuniform, pixel_position):
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def get_nonuniform_positions(orientations, orientations_p, pixel_position):
     N_images_per_rank = parms.N_images_per_rank
-    fields_dict = {"H": pygion.float64, "K": pygion.float64,
-                   "L": pygion.float64}
+    fields_dict = {"H": pygion.float32, "K": pygion.float32,
+                   "L": pygion.float32}
     sec_shape = parms.reduced_det_shape
     nonuniform, nonuniform_p = lgutils.create_distributed_region(
         N_images_per_rank, fields_dict, sec_shape)
@@ -183,8 +183,8 @@ def prepare_solve(slices, slices_p, nonuniform, nonuniform_p,
     nonuniform_v, nonuniform_v_p = get_nonuniform_positions_v(
         nonuniform, nonuniform_p, reciprocal_extent)
     uregion = Region((M,)*3,
-                     {"ADb": pygion.float64, "F_antisupport": pygion.float32})
-    uregion_ups = Region((M_ups,)*3, {"F_conv_": pygion.complex128})
+                     {"ADb": pygion.float32, "F_antisupport": pygion.float32})
+    uregion_ups = Region((M_ups,)*3, {"F_conv_": pygion.complex64})
     prep_Fconv(uregion_ups, nonuniform_v, nonuniform_v_p,
                ac, weights, M_ups, Mtot, N,
                reciprocal_extent, use_reciprocal_symmetry)
@@ -210,7 +210,7 @@ def phased_to_constrains(phased, ac):
 def solve(uregion, uregion_ups, ac, result, summary,
           weights, M, M_ups, Mtot, N,
           generation, rank, alambda, rlambda, flambda,
-          reciprocal_extent, use_reciprocal_symmetry):
+          reciprocal_extent, use_reciprocal_symmetry, maxiter):
     """Solve the W @ x = d problem.
 
     W = al*A_adj*Da*A + rl*I  + fl*F_adj*Df*F
@@ -239,15 +239,13 @@ def solve(uregion, uregion_ups, ac, result, summary,
         return uvect
 
     W = LinearOperator(
-        dtype=np.complex128,
+        dtype=np.complex64,
         shape=(Mtot, Mtot),
         matvec=W_matvec)
 
     x0 = ac.estimate.flatten()
     ADb = uregion.ADb.flatten()
     d = alambda*ADb + rlambda*x0
-
-    maxiter = 100
 
     def callback(xk):
         callback.counter += 1
@@ -332,6 +330,7 @@ def solve_ac(generation,
     Ntot = N * N_procs
     reciprocal_extent = pixel_distance.reciprocal.max()
     use_reciprocal_symmetry = True
+    maxiter = parms.solve_ac_maxiter
 
     if orientations is None:
         orientations, orientations_p = get_random_orientations()
@@ -354,11 +353,12 @@ def solve_ac(generation,
 
     #N_ranks = 5
     N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
-    results = Region((N_procs * M, M, M), {"ac": pygion.float64})
+    results = Region((N_procs * M, M, M), {"ac": pygion.float32})
     results_p = Partition.restrict(results, (N_procs,), [[M], [0], [0]], [M, M, M])
 
     alambda = 1
-    rlambdas = Mtot/Ntot * 1e2**(np.arange(N_procs) - N_procs/2)
+#    rlambdas = Mtot/Ntot * 1e2**(np.arange(N_procs) - N_procs/2)
+    rlambdas = Mtot/Ntot * 2**(np.arange(N_procs) - N_procs/2)
     flambda = 0
 
     summary = Region((N_procs,),
@@ -371,7 +371,7 @@ def solve_ac(generation,
             uregion, uregion_ups, ac, results_p[i], summary_p[i],
             weights, M, M_ups, Mtot, N,
             generation, i, alambda, rlambdas[i], flambda,
-            reciprocal_extent, use_reciprocal_symmetry)
+            reciprocal_extent, use_reciprocal_symmetry, maxiter)
 
     iref = select_ac(generation, summary)
     # At this point, I just want to chose one of the results as reference.
