@@ -12,6 +12,11 @@ target=${SPINIFEL_TARGET:-$(hostname --fqdn)}
 
 # Enable CUDA build
 cuda_build=${SPINIFEL_BUILD_CUDA:-true}
+# except on certain targets
+if [[ ${target} = *"tulip"* || ${target} = *"jlse"* ]]
+then
+    cuda_build=false
+fi
 
 
 #_______________________________________________________________________________
@@ -100,6 +105,7 @@ fi
 CC=$MPI4PY_CC MPICC=$MPI4PY_MPICC pip install -v --no-binary mpi4py mpi4py
 pip install --no-cache-dir callmonitor
 pip install --no-cache-dir PyNVTX
+pip install --no-cache-dir mrcfile
 
 #-------------------------------------------------------------------------------
 

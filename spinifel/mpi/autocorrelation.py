@@ -1,17 +1,16 @@
-from mpi4py import MPI
-
 import matplotlib.pyplot as plt
-import numpy as np
-import PyNVTX as nvtx
+import numpy             as np
+import PyNVTX            as nvtx
+import skopi             as skp
 
-from matplotlib.colors import LogNorm
-from scipy.linalg import norm
-from scipy.ndimage import gaussian_filter
+from mpi4py              import MPI
+from matplotlib.colors   import LogNorm
+from scipy.linalg        import norm
+from scipy.ndimage       import gaussian_filter
 from scipy.sparse.linalg import LinearOperator, cg
 
-import skopi as skp
+from spinifel import parms, utils, image, autocorrelation, contexts
 
-from spinifel import parms, utils, image, autocorrelation
 
 
 @nvtx.annotate("mpi/autocorrelation.py", is_prefix=True)
@@ -92,11 +91,11 @@ def setup_linops(comm, H, K, L, data,
         return uvect
 
     W = LinearOperator(
-        dtype=np.complex64,
+        dtype=np.complex128,
         shape=(Mtot, Mtot),
         matvec=W_matvec)
 
-    nuvect_Db = (data * weights).astype(np.float32)
+    nuvect_Db = data * weights
     uvect_ADb = autocorrelation.adjoint(
         nuvect_Db, H_, K_, L_, ac_support, M,
         reciprocal_extent, use_reciprocal_symmetry
@@ -114,7 +113,7 @@ def solve_ac(generation,
              slices_,
              orientations=None,
              ac_estimate=None):
-    comm = MPI.COMM_WORLD
+    comm = contexts.comm
 
     M = parms.M
     Mtot = M**3
@@ -174,10 +173,10 @@ def solve_ac(generation,
     print("summary =", summary)
     if comm.rank == 0:
         ranks, lambdas, v1s, v2s = [np.array(el) for el in zip(*summary)]
-        print("ranks =", ranks)
-        print("lambdas =", lambdas)
-        print("v1s =", v1s)
-        print("v2s =", v2s)
+        print('ranks =', ranks)
+        print('lambdas =', lambdas)
+        print('v1s =', v1s)
+        print('v2s =', v2s)
         np.savez(parms.out_dir / f"summary-{generation}", ranks=ranks, lambdas=lambdas, v1s=v1s, v2s=v2s)
 
         if generation == 0:
@@ -199,10 +198,10 @@ def solve_ac(generation,
         axes[1].loglog(lambdas, v2s)
         axes[1].loglog(lambdas[iref], v2s[iref], "rD")
         axes[1].set_xlabel("$\lambda_{r}$")
-        axes[1].set_ylabel("$||W \lambda_{r}-d||_{2}$")
+        axes[1].set_ylabel("$||W x_{\lambda_{r}}-d||_{2}$")
         axes[2].loglog(v2s, v1s) # L-curve
         axes[2].loglog(v2s[iref], v1s[iref], "rD")
-        axes[2].set_xlabel("Residual norm $||W \lambda_{r}-d||_{2}$")
+        axes[2].set_xlabel("Residual norm $||W x_{\lambda_{r}}-d||_{2}$")
         axes[2].set_ylabel("Solution norm $||x_{\lambda_{r}}||_{2}$")
         fig.tight_layout()
         plt.savefig(parms.out_dir / f"summary_{generation}.png")
@@ -215,7 +214,6 @@ def solve_ac(generation,
     if use_reciprocal_symmetry:
         assert np.all(np.isreal(ac))
     ac = np.ascontiguousarray(ac.real)
-    ac = ac.astype(np.float32)
     it_number = callback.counter
 
     print(f"Rank {comm.rank} got AC in {it_number} iterations.", flush=True)

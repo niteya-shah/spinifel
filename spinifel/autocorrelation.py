@@ -147,14 +147,14 @@ def gen_nonuniform_positions(orientations, pixel_position_reciprocal):
 
 
 @nvtx.annotate("autocorrelation.py", is_prefix=True)
-def gen_nonuniform_normalized_positions(orientations, pixel_position_reciprocal, 
+def gen_nonuniform_normalized_positions(orientations, pixel_position_reciprocal,
         reciprocal_extent, oversampling):
     H, K, L = gen_nonuniform_positions(orientations, pixel_position_reciprocal)
 
     # TODO: Control/set precisions needed here
     # scale and change type for compatibility with finufft
-    H_ = H.astype(np.float32).flatten() / reciprocal_extent * np.pi / oversampling
-    K_ = K.astype(np.float32).flatten() / reciprocal_extent * np.pi / oversampling
-    L_ = L.astype(np.float32).flatten() / reciprocal_extent * np.pi / oversampling
+    H_ = H.flatten() / reciprocal_extent * np.pi / oversampling
+    K_ = K.flatten() / reciprocal_extent * np.pi / oversampling
+    L_ = L.flatten() / reciprocal_extent * np.pi / oversampling
 
     return H_, K_, L_

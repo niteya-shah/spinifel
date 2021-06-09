@@ -11,4 +11,4 @@ def match(ac, slices_, pixel_position_reciprocal, pixel_distance_reciprocal):
     # We can call the sequential function on each rank, provided that the
     # cost of generating the model_slices isn't prohibitive.
     return sequential_match(
-        ac, slices_, pixel_position_reciprocal, pixel_distance_reciprocal) 
+        ac, slices_, pixel_position_reciprocal, pixel_distance_reciprocal)
