@@ -108,6 +108,27 @@ def get_slices(ds):
     return slices, slices_p
 
 
+@task(privileges=[WD])
+def load_orientations_prior(orientations_prior, rank, N_images_per_rank):
+    if parms.verbosity > 0:
+        print(f"{socket.gethostname()} loading orientations.", flush=True)
+    i_start = rank * N_images_per_rank
+    i_end = i_start + N_images_per_rank
+    prep.load_orientations_prior(orientations_prior.quaternions, i_start, i_end)
+    if parms.verbosity > 0:
+        print(f"{socket.gethostname()} loaded orientations.", flush=True)
+
+
+def get_orientations_prior():
+    N_images_per_rank = parms.N_images_per_rank
+    fields_dict = {"quaternions": getattr(pygion, parms.data_type_str)}
+    sec_shape = parms.quaternion_shape
+    orientations_prior, orientations_prior_p = lgutils.create_distributed_region(
+        N_images_per_rank, fields_dict, sec_shape)
+    for i, orientations_prior_subr in enumerate(orientations_prior_p):
+        load_orientations_prior(orientations_prior_subr, i, N_images_per_rank, point=i)
+    return orientations_prior, orientations_prior_p
+
 
 @task(privileges=[RO, Reduce('+')])
 @nvtx.annotate("legion/prep.py", is_prefix=True)
