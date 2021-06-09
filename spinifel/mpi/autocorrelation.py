@@ -58,6 +58,7 @@ def setup_linops(comm, H, K, L, data,
     H_ = H.flatten() / reciprocal_extent * np.pi / parms.oversampling
     K_ = K.flatten() / reciprocal_extent * np.pi / parms.oversampling
     L_ = L.flatten() / reciprocal_extent * np.pi / parms.oversampling
+    data_ = data.flatten()
 
     lu = np.linspace(-np.pi, np.pi, M)
     Hu_, Ku_, Lu_ = np.meshgrid(lu, lu, lu, indexing='ij')
@@ -71,7 +72,7 @@ def setup_linops(comm, H, K, L, data,
     # Using upsampled convolution technique instead of ADA
     M_ups = parms.M_ups
     ugrid_conv = autocorrelation.adjoint(
-        np.ones_like(data), H_, K_, L_, 1, M_ups,
+        np.ones_like(data_), H_, K_, L_, 1, M_ups,
         reciprocal_extent, use_reciprocal_symmetry)
     ugrid_conv = reduce_bcast(comm, ugrid_conv)
     F_ugrid_conv_ = np.fft.fftn(np.fft.ifftshift(ugrid_conv)) / Mtot
@@ -95,7 +96,7 @@ def setup_linops(comm, H, K, L, data,
         shape=(Mtot, Mtot),
         matvec=W_matvec)
 
-    nuvect_Db = data * weights
+    nuvect_Db = (data_ * weights).astype(np.float32)
     uvect_ADb = autocorrelation.adjoint(
         nuvect_Db, H_, K_, L_, ac_support, M,
         reciprocal_extent, use_reciprocal_symmetry
@@ -118,18 +119,20 @@ def solve_ac(generation,
     M = parms.M
     Mtot = M**3
     N_images = slices_.shape[0]
-    N = utils.prod(slices_.shape)
+    N = utils.prod(slices_.shape) # no. of pixels in slices_ stack
     Ntot = N * comm.size
     reciprocal_extent = pixel_distance_reciprocal.max()
     use_reciprocal_symmetry = True
+    ref_rank = -1 
 
+    # Generate random orientations in SO(3)
     if orientations is None:
         orientations = skp.get_random_quat(N_images)
+    # Calculate hkl based on orientations
     H, K, L = autocorrelation.gen_nonuniform_positions(
         orientations, pixel_position_reciprocal)
 
-    data = slices_.flatten()
-
+    # Set up ac
     if ac_estimate is None:
         ac_support = np.ones((M,)*3)
         ac_estimate = np.zeros((M,)*3)
@@ -145,6 +148,7 @@ def solve_ac(generation,
     flambda = 0  # 1e5 * pow(10, comm.rank - comm.size//2)
     maxiter = parms.solve_ac_maxiter
 
+    # Log central slice L~=0
     if comm.rank == (2 if parms.use_psana else 0):
         idx = np.abs(L) < reciprocal_extent * .01
         plt.scatter(H[idx], K[idx], c=slices_[idx], s=1, norm=LogNorm())
@@ -156,10 +160,10 @@ def solve_ac(generation,
 
     def callback(xk):
         callback.counter += 1
-    callback.counter = 0
+    callback.counter = 0 # counts no. of iterations of conjugate gradient
 
     x0 = ac_estimate.flatten()
-    W, d = setup_linops(comm, H, K, L, data,
+    W, d = setup_linops(comm, H, K, L, slices_,
                         ac_support, weights, x0,
                         M, Mtot, N, reciprocal_extent,
                         alambda, rlambda, flambda,
@@ -169,8 +173,8 @@ def solve_ac(generation,
     v1 = norm(ret)
     v2 = norm(W*ret-d)
 
+    # Rank0 gathers rlambda, v1, v2 from all ranks
     summary = comm.gather((comm.rank, rlambda, v1, v2), root=0)
-    print("summary =", summary)
     if comm.rank == 0:
         ranks, lambdas, v1s, v2s = [np.array(el) for el in zip(*summary)]
         print('ranks =', ranks)
@@ -190,6 +194,7 @@ def solve_ac(generation,
             iref = np.argmin(v1s+v2s)
         ref_rank = ranks[iref]
 
+        # Log L-curve plot
         fig, axes = plt.subplots(figsize=(6.0, 8.0), nrows=3, ncols=1)
         axes[0].loglog(lambdas, v1s)
         axes[0].loglog(lambdas[iref], v1s[iref], "rD")
@@ -206,19 +211,21 @@ def solve_ac(generation,
         fig.tight_layout()
         plt.savefig(parms.out_dir / f"summary_{generation}.png")
         plt.close('all')
-    else:
-        ref_rank = -1
+
+    # Rank0 broadcasts rank with best autocorrelation
     ref_rank = comm.bcast(ref_rank, root=0)
 
+    # Set up ac volume
     ac = ret.reshape((M,)*3)
     if use_reciprocal_symmetry:
         assert np.all(np.isreal(ac))
-    ac = np.ascontiguousarray(ac.real)
-    it_number = callback.counter
+    ac = np.ascontiguousarray(ac.real).astype(np.float32)
+    print(f"Rank {comm.rank} got AC in {callback.counter} iterations.", flush=True)
 
-    print(f"Rank {comm.rank} got AC in {it_number} iterations.", flush=True)
+    # Log autocorrelation volume
     image.show_volume(ac, parms.Mquat, f"autocorrelation_{generation}_{comm.rank}.png")
 
+    # Rank[ref_rank] broadcasts its autocorrelation
     comm.Bcast(ac, root=ref_rank)
     if comm.rank == 0:
         print(f"Keeping result from rank {ref_rank}.")

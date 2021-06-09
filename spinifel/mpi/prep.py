@@ -10,6 +10,7 @@ from spinifel import parms, prep, image, contexts
 
 @nvtx.annotate("mpi/prep.py", is_prefix=True)
 def get_pixel_position_reciprocal(comm):
+    """Rank0 broadcast pixel reciprocal positions from input file."""
     pixel_position_type = getattr(np, parms.pixel_position_type_str)
     pixel_position_reciprocal = np.zeros(parms.pixel_position_shape,
                                          dtype=pixel_position_type)
@@ -21,6 +22,7 @@ def get_pixel_position_reciprocal(comm):
 
 @nvtx.annotate("mpi/prep.py", is_prefix=True)
 def get_pixel_index_map(comm):
+    """Rank0 broadcast pixel index map from input file."""
     pixel_index_type = getattr(np, parms.pixel_index_type_str)
     pixel_index_map = np.zeros(parms.pixel_index_shape,
                                dtype=pixel_index_type)
@@ -32,6 +34,7 @@ def get_pixel_index_map(comm):
 
 @nvtx.annotate("mpi/prep.py", is_prefix=True)
 def get_slices(comm, N_images_per_rank, ds):
+    """Each rank loads intensity slices from input file (or psana)."""
     data_type = getattr(np, parms.data_type_str)
     slices_ = np.zeros((N_images_per_rank,) + parms.det_shape,
                        dtype=data_type)
@@ -72,39 +75,41 @@ def compute_mean_image(comm, slices_):
 
 @nvtx.annotate("mpi/prep.py", is_prefix=True)
 def get_data(N_images_per_rank, ds):
+    """
+    Load intensity slices, reciprocal pixel position, index map
+    Perform binning 
+    """
     comm = contexts.comm
     rank = comm.rank
     size = comm.size
 
+    # Load intensity slices, reciprocal pixel position, index map
     pixel_position_reciprocal = get_pixel_position_reciprocal(comm)
     pixel_index_map = get_pixel_index_map(comm)
-
     slices_ = get_slices(comm, N_images_per_rank, ds)
     N_images_local = slices_.shape[0]
-    witness = slices_.flatten()[0] if N_images_local else None
-    print(f"Rank {comm.rank}: {N_images_local} values, start: {witness}", flush=True)
+    
+    # Log mean image and saxs before binning
     mean_image = compute_mean_image(comm, slices_)
-
     if rank == (2 if parms.use_psana else 0):
         image.show_image(pixel_index_map, slices_[0], "image_0.png")
-
     if rank == 0:
         pixel_distance_reciprocal = prep.compute_pixel_distance(
             pixel_position_reciprocal)
         image.show_image(pixel_index_map, mean_image, "mean_image.png")
         prep.export_saxs(pixel_distance_reciprocal, mean_image, "saxs.png")
 
+    # Bin reciprocal position, reciprocal distance, index map, slices
     pixel_position_reciprocal = prep.binning_mean(pixel_position_reciprocal)
     pixel_index_map = prep.binning_index(pixel_index_map)
     pixel_distance_reciprocal = prep.compute_pixel_distance(
             pixel_position_reciprocal)
-
     slices_ = prep.binning_sum(slices_)
-    mean_image = compute_mean_image(comm, slices_)
 
+    # Log mean image and saxs after binning
+    mean_image = compute_mean_image(comm, slices_)
     if rank == (2 if parms.use_psana else 0):
         image.show_image(pixel_index_map, slices_[0], "image_binned_0.png")
-
     if rank == 0:
         image.show_image(pixel_index_map, mean_image, "mean_image_binned.png")
         prep.export_saxs(pixel_distance_reciprocal, mean_image,
