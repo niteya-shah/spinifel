@@ -74,7 +74,7 @@ def get_data(N_images, ds):
     :return pixel_index_map: pixel coordinates indexes from psana geometry
     :return slices_: data images
     """
-    pixcel_position_reciprocal = get_pixel_position_reciprocal()
+    pixel_position_reciprocal = get_pixel_position_reciprocal()
     pixel_index_map = get_pixel_index_map()
 
     slices_ = get_slices(N_images, ds)
