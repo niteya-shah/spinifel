@@ -63,7 +63,8 @@ class SpinifelContexts(metaclass=Singleton):
             return
 
         # Initialize MPI
-        MPI.Init()
+        if not MPI.Is_initialized():
+            MPI.Init()
 
         self._comm = MPI.COMM_WORLD
         self._rank = self.comm.Get_rank()

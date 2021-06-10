@@ -33,6 +33,58 @@ class CannotProcessSettingsFile(Exception):
     """
 
 
+def get_str(x):
+    """
+    Return string representation of the environment variable `x`
+    """
+    return environ[x]
+
+
+
+def get_path(x):
+    """
+    Return string representation of the environment variable `x`
+    """
+    return Path(environ[x])
+
+
+
+def str2bool(x):
+    """
+    Parse a string representation of a boolean
+    """
+    yes = {"1", "on", "true"}
+    return x.lower() in yes
+
+
+
+def get_bool(x):
+    """
+    Return boolean representation of the environment variable `x`
+    """
+    return str2bool(environ[x].strip())
+
+
+
+def get_int(x):
+    """
+    Return integer representation of the environment variable `x`
+    """
+    return int(environ[x])
+
+
+
+def parse_bool(x):
+    """
+    Parse string, integer, or boolean representation of a boolean
+    """
+
+    if isinstance(x, str):
+        return str2bool(x)
+
+    return bool(x)
+
+
 
 class SpinifelSettings(metaclass=Singleton):
     """
@@ -41,45 +93,13 @@ class SpinifelSettings(metaclass=Singleton):
     Exposes all global settings used by Spinifel
     """
 
-    @staticmethod
-    def get_str(x):
-        """
-        Return string representation of the environment variable `x`
-        """
-        return environ[x]
-
-
-    @staticmethod
-    def get_path(x):
-        """
-        Return string representation of the environment variable `x`
-        """
-        return Path(environ[x])
-
-
-    @staticmethod
-    def get_bool(x):
-        """
-        Return boolean representation of the environment variable `x`
-        """
-        yes = {"1", "on", "true"}
-        return environ[x].strip().lower() in yes
-
-
-    @staticmethod
-    def get_int(x):
-        """
-        Return integer representation of the environment variable `x`
-        """
-        return int(environ[x])
-
 
     def __init__(self):
 
         self.__properties = {
             "_test": ("debug", "test", str, "",
                 "test field used for debugging"),
-            "_verbose": ("debug", "verbose", bool, False,
+            "_verbose": ("debug", "verbose", parse_bool, False,
                 "is verbosity > 0"),
             "_verbosity": ("debug", "verbosity", int, 0,
                 "reporting verbosity"),
@@ -87,45 +107,45 @@ class SpinifelSettings(metaclass=Singleton):
                 "data dir"),
             "_data_filename": ("data", "name", str, "",
                 "data file name"),
-            "_use_psana": ("psana", "enable", bool, False,
+            "_use_psana": ("psana", "enable", parse_bool, False,
                 "enable PSANA"),
             "_out_dir": ("data", "out_dir", Path, Path(""),
                 "output dir"),
             "_data_multiplier": ("runtime", "data_multiplier", int, 1,
                 "data multiplier"),
-            "_small_problem": ("runtime", "small_problem", bool, False,
+            "_small_problem": ("runtime", "small_problem", parse_bool, False,
                 "run in small problem mode"),
-            "_using_cuda": ("runtime", "using_cuda", bool, False,
+            "_using_cuda": ("runtime", "using_cuda", parse_bool, False,
                 "use cuda wherever possible"),
             "_devices_per_node": ("gpu", "devices_per_node", int, 0,
                 "gpu-device count per node/resource set"),
-            "_use_cufinufft": ("runtime", "use_cufinufft", bool, False,
+            "_use_cufinufft": ("runtime", "use_cufinufft", parse_bool, False,
                 "use cufinufft for nufft support"),
             "_ps_smd_n_events": ("psana", "ps_smd_n_events", int, 0,
                 "ps smd n events setting"),
-            "_use_callmonitor": ("debug", "use_callmonitor", bool, False,
+            "_use_callmonitor": ("debug", "use_callmonitor", parse_bool, False,
                 "enable call-monitor"),
-            "_use_single_prec": ("runtime", "use_single_prec", bool, False,
+            "_use_single_prec": ("runtime", "use_single_prec", parse_bool, False,
                 "if true, spinifel will use single-precision floating point")
         }
 
         self.__init_internals()
 
         self.__environ = {
-            "TEST": ("_test", SpinifelSettings.get_str),
-            "VERBOSE": ("_verbose", SpinifelSettings.get_bool),
-            "DATA_DIR": ("_data_dir", SpinifelSettings.get_path),
-            "DATA_FILENAME": ("_data_filename", SpinifelSettings.get_str),
-            "USE_PSANA": ("_use_psana", SpinifelSettings.get_bool),
-            "OUT_DIR": ("_out_dir", SpinifelSettings.get_path),
-            "DATA_MULTIPLIER": ("_data_multiplier", SpinifelSettings.get_int),
-            "VERBOSITY": ("_verbose", SpinifelSettings.get_int),
-            "SMALL_PROBLEM": ("_small_problem", SpinifelSettings.get_bool),
-            "USING_CUDA": ("_using_cuda", SpinifelSettings.get_bool),
-            "DEVICES_PER_RS": ("_devices_per_node", SpinifelSettings.get_int),
-            "USE_CUFINUFFT": ("_use_cufinufft", SpinifelSettings.get_bool),
-            "PS_SMD_N_EVENTS": ("_ps_smd_n_events", SpinifelSettings.get_int),
-            "USE_CALLMONITOR": ("_use_callmonitor", SpinifelSettings.get_bool)
+            "TEST": ("_test", get_str),
+            "VERBOSE": ("_verbose", get_bool),
+            "DATA_DIR": ("_data_dir", get_path),
+            "DATA_FILENAME": ("_data_filename", get_str),
+            "USE_PSANA": ("_use_psana", get_bool),
+            "OUT_DIR": ("_out_dir", get_path),
+            "DATA_MULTIPLIER": ("_data_multiplier", get_int),
+            "VERBOSITY": ("_verbose", get_int),
+            "SMALL_PROBLEM": ("_small_problem", get_bool),
+            "USING_CUDA": ("_using_cuda", get_bool),
+            "DEVICES_PER_RS": ("_devices_per_node", get_int),
+            "USE_CUFINUFFT": ("_use_cufinufft", get_bool),
+            "PS_SMD_N_EVENTS": ("_ps_smd_n_events", get_int),
+            "USE_CALLMONITOR": ("_use_callmonitor", get_bool)
         }
 
 
@@ -232,8 +252,6 @@ class SpinifelSettings(metaclass=Singleton):
             env_val = env_parser(key)
 
             setattr(self, name, env_val)
-
-
 
 
     def __str__(self):
