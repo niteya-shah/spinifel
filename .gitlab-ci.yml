@@ -110,24 +110,6 @@ test_nocuda:
   tags:
     - batch
 
-old_test_mpi:
-  stage: test
-  before_script:
-    - cd ${EXTERNAL_WORKDIR}
-  script:
-    - bash ./scripts/run_summit_mult.sh -m -n 1 -a 1 -g 1 -r 1 -d 1 -c -f -s -e
-  tags:
-    - batch
-
-old_test_legion:
-  stage: test
-  before_script:
-    - cd ${EXTERNAL_WORKDIR}
-  script:
-    - bash ./scripts/run_summit_mult.sh -L -n 1 -a 1 -g 1 -r 1 -d 1 -c    -s -e # -f
-  tags:
-    - batch
-
 cleanup:
   stage: cleanup
   before_script:
