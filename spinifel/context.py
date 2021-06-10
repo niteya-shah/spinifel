@@ -59,6 +59,9 @@ class SpinifelContexts(metaclass=Singleton):
         initializes mpi4py and registers MPI.Finalize on atexit stack
         """
 
+        if not MPI4PY_AVAILABLE:
+            return
+
         if self._mpi_initialized:
             return
 
@@ -85,6 +88,10 @@ class SpinifelContexts(metaclass=Singleton):
             <MPI Rank> % <Devices Per Resource Set>
         and registers context cleanup on atexit stack
         """
+
+        if not PYCUDA_AVAILABLE:
+            return
+
         if self._cuda_initialized:
             return
 
