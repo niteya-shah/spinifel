@@ -155,7 +155,7 @@ def solve_ac(generation,
 
     alambda = 1
     # remove M**3 in the numerator
-    rlambda = 1/Ntot * 100**(comm.rank - comm.size/2) 
+    rlambda = 1/Ntot * 10**(comm.rank - comm.size/2) 
     flambda = 0  # 1e5 * pow(10, comm.rank - comm.size//2)
     maxiter = parms.solve_ac_maxiter
 
