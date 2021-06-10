@@ -61,7 +61,7 @@ test_legion:
     - source ./setup/env.sh
     - export PYTHONPATH=${PYTHONPATH}:${EXTERNAL_WORKDIR}
   script:
-      - jsrun -n1 -a1 -g1 legion_python -ll:py 1 -ll:csize 8192 legion_main.py --default-settings=summit_ci.toml --mode=legion runtime.use_cufinufft=False 
+      - jsrun -n1 -a1 -g1 legion_python -ll:py 1 -ll:csize 8192 legion_main.py --default-settings=summit_ci.toml --mode=legion runtime.use_cufinufft=false
   tags:
     - batch
 
