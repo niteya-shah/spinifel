@@ -40,12 +40,12 @@ def core_problem(comm, uvect, H_, K_, L_, ac_support, weights, M, N,
 def setup_linops(comm, H, K, L, data,
                  ac_support, weights, x0,
                  M, N, reciprocal_extent,
-                 alambda, rlambda, flambda,
+                 rlambda, flambda,
                  use_reciprocal_symmetry):
     """Define W and d parts of the W @ x = d problem.
 
-    W = al*A_adj*Da*A + rl*I  + fl*F_adj*Df*F
-    d = al*A_adj*Da*b + rl*x0 + 0
+    W = A_adj*Da*A + rl*I  + fl*F_adj*Df*F
+    d = A_adj*Da*b + rl*x0 + 0
 
     Where:
         A represents the NUFFT operator
@@ -89,7 +89,7 @@ def setup_linops(comm, H, K, L, data,
             assert np.allclose(uvect_ADA, uvect_ADA_old)
         uvect_FDF = autocorrelation.fourier_reg(
             uvect, ac_support, F_antisupport, M, use_reciprocal_symmetry)
-        uvect = alambda*uvect_ADA + rlambda*uvect + flambda*uvect_FDF
+        uvect = uvect_ADA + rlambda*uvect + flambda*uvect_FDF
         return uvect
 
     W = LinearOperator(
@@ -106,7 +106,7 @@ def setup_linops(comm, H, K, L, data,
     
     uvect_ADb = reduce_bcast(comm, uvect_ADb)
     
-    d = alambda*uvect_ADb + rlambda*x0
+    d = uvect_ADb + rlambda*x0
   
     return W, d
 
@@ -143,6 +143,7 @@ def solve_ac(generation,
     # scale the magnitude of data images to match with that of the model images
     slices_ = slices_ * (M**3/N_pixels_per_image)
     data = slices_.flatten()
+    weights = np.ones(N)
 
     if ac_estimate is None:
         ac_support = np.ones((M,)*3)
@@ -151,13 +152,6 @@ def solve_ac(generation,
         ac_smoothed = gaussian_filter(ac_estimate, 0.5)
         ac_support = (ac_smoothed > 1e-12).astype(np.float)
         ac_estimate *= ac_support
-    weights = np.ones(N)
-
-    alambda = 1
-    # remove M**3 in the numerator
-    rlambda = 1/Ntot * 10**(comm.rank - comm.size/2) 
-    flambda = 0  # 1e5 * pow(10, comm.rank - comm.size//2)
-    maxiter = parms.solve_ac_maxiter
 
     if comm.rank == (2 if parms.use_psana else 0):
         idx = np.abs(L) < reciprocal_extent * .01
@@ -172,20 +166,28 @@ def solve_ac(generation,
         callback.counter += 1
     callback.counter = 0
 
+    # regularization parameters
+    rlambda = 1/Ntot * 10**(comm.rank - comm.size/2) # remove M**3 in the numerator
+    flambda = 0  # 1e5 * pow(10, comm.rank - comm.size//2)
+    
+    maxiter = parms.solve_ac_maxiter
+
     x0 = ac_estimate.flatten()
+    
     W, d = setup_linops(comm, H, K, L, data,
                         ac_support, weights, x0,
                         M, N, reciprocal_extent,
-                        alambda, rlambda, flambda,
+                        rlambda, flambda,
                         use_reciprocal_symmetry)
     
     # W_0 and d_0 are given by defining W and d with rlambda=0
     W_0, d_0 = setup_linops(comm, H, K, L, data,
                         ac_support, weights, x0,
                         M, N, reciprocal_extent,
-                        alambda, 0, flambda,
+                        0, flambda,
                         use_reciprocal_symmetry)
 
+    # reduce tolerance
     ret, info = cg(W, d, x0=x0, tol=1e-12, atol=0.0, maxiter=maxiter, callback=callback)
     print('info =', info)
     if info != 0:
