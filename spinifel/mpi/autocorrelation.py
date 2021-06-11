@@ -12,7 +12,7 @@ from scipy.sparse.linalg import LinearOperator, cg
 
 import skopi as skp
 
-from spinifel import parms, utils, image, autocorrelation
+from spinifel import parms, utils, image, autocorrelation, contexts
 
 
 @nvtx.annotate("mpi/autocorrelation.py", is_prefix=True)
@@ -118,7 +118,7 @@ def solve_ac(generation,
              slices_,
              orientations=None,
              ac_estimate=None):
-    comm = MPI.COMM_WORLD
+    comm = contexts.comm
 
     M = parms.M
     N_images = slices_.shape[0] # N images per rank
