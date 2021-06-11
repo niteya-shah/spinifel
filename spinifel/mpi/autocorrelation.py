@@ -197,7 +197,7 @@ def solve_ac(generation,
     ret /= M**3 # solution
     d_0 /= M**3
     soln = norm(ret)**2 # solution norm
-    resid = (np.dot(ret,W_0.matvec(ret)-2*d_0) + b_squared) / (N_images*comm.size) # residual norm
+    resid = (np.dot(ret,W_0.matvec(ret)-2*d_0) + b_squared) / Ntot # residual norm
 
     summary = comm.gather((comm.rank, rlambda, soln, resid), root=0)
     print('summary =', summary)
