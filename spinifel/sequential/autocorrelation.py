@@ -16,12 +16,12 @@ from spinifel import parms, utils, image, autocorrelation
 def setup_linops(H, K, L, data,
                  ac_support, weights, x0,
                  M, Mtot, N, reciprocal_extent,
-                 alambda, rlambda, flambda,
+                 rlambda, flambda,
                  use_reciprocal_symmetry):
     """Define W and d parts of the W @ x = d problem.
 
-    W = al*A_adj*Da*A + rl*I  + fl*F_adj*Df*F
-    d = al*A_adj*Da*b + rl*x0 + 0
+    W = A_adj*Da*A + rl*I  + fl*F_adj*Df*F
+    d = A_adj*Da*b + rl*x0 + 0
 
     Where:
         A represents the NUFFT operator
@@ -64,7 +64,7 @@ def setup_linops(H, K, L, data,
             assert np.allclose(uvect_ADA, uvect_ADA_old)
         uvect_FDF = autocorrelation.fourier_reg(
             uvect, ac_support, F_antisupport, M, use_reciprocal_symmetry)
-        uvect = alambda*uvect_ADA + rlambda*uvect + flambda*uvect_FDF
+        uvect = uvect_ADA + rlambda*uvect + flambda*uvect_FDF
         return uvect
 
     W = LinearOperator(
@@ -77,7 +77,7 @@ def setup_linops(H, K, L, data,
         nuvect_Db, H_, K_, L_, ac_support, M,
         reciprocal_extent, use_reciprocal_symmetry
     ).flatten()
-    d = alambda*uvect_ADb + rlambda*x0
+    d = uvect_ADb + rlambda*x0
 
     return W, d
 
@@ -113,7 +113,6 @@ def solve_ac(generation,
         ac_estimate *= ac_support
     weights = np.ones(N)
 
-    alambda = 1
     rlambda = Mtot/N / 1000
     flambda = 1e3
     maxiter = 100
@@ -134,7 +133,7 @@ def solve_ac(generation,
     W, d = setup_linops(H, K, L, data,
                         ac_support, weights, x0,
                         M, Mtot, N, reciprocal_extent,
-                        alambda, rlambda, flambda,
+                        rlambda, flambda,
                         use_reciprocal_symmetry)
     ret, info = cg(W, d, x0=x0, maxiter=maxiter, callback=callback)
     ac = ret.reshape((M,)*3)
