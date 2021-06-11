@@ -187,7 +187,7 @@ def solve_ac(generation,
                         0, flambda,
                         use_reciprocal_symmetry)
 
-    # reduce tolerance
+    # reduce tolerance (default = 1e-5)
     ret, info = cg(W, d, x0=x0, tol=1e-12, atol=0.0, maxiter=maxiter, callback=callback)
     print('info =', info)
     if info != 0:
