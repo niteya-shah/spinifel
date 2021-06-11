@@ -218,7 +218,7 @@ def solve_ac(generation,
         else:
             # Take corner of L-curve
             allCoord = np.log([resids, solns]).T # coordinates of the loglog L-curve
-            allCoord = np.array(sorted(allCoord , key=lambda k: [k[1], k[0]])) # sort the corner candidates in increasing order
+            allCoord = np.array(sorted(allCoord , key=lambda k: [k[0], k[1]])) # sort the corner candidates in increasing order
             nPoints = len(resids)
             firstPoint = allCoord[0]
             lineVec = allCoord[-1] - allCoord[0]
