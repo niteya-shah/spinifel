@@ -209,26 +209,19 @@ def solve_ac(generation,
         print('solns =', solns)
         print('resids =', resids)
 
-        if generation == 0:
-            # Expect non-convergence => weird results
-            # Heuristic: retain rank with the largest lambda and high solution norm
-            idx = solns >= np.mean(solns)
-            imax = np.argmax(lambdas[idx])
-            iref = np.arange(len(ranks), dtype=np.int)[idx][imax]
-        else:
-            # Take corner of L-curve
-            allCoord = np.log([resids, solns]).T # coordinates of the loglog L-curve
-            allCoord = np.array(sorted(allCoord , key=lambda k: [k[0], k[1]])) # sort the corner candidates in increasing order
-            nPoints = len(resids)
-            firstPoint = allCoord[0]
-            lineVec = allCoord[-1] - allCoord[0]
-            lineVecNorm = lineVec / np.sqrt(np.sum(lineVec**2))
-            vecFromFirst = allCoord - firstPoint
-            scalarProduct = np.sum(vecFromFirst * numpy.matlib.repmat(lineVecNorm, nPoints, 1), axis=1)
-            vecFromFirstParallel = np.outer(scalarProduct, lineVecNorm)
-            vecToLine = vecFromFirst - vecFromFirstParallel
-            distToLine = np.sqrt(np.sum(vecToLine ** 2, axis=1))
-            iref = np.argmax(distToLine)
+        # Take corner of L-curve
+        allCoord = np.log([resids, solns]).T # coordinates of the loglog L-curve
+        allCoord = np.array(sorted(allCoord , key=lambda k: [k[0], k[1]])) # sort the corner candidates in increasing order
+        nPoints = len(resids)
+        firstPoint = allCoord[0]
+        lineVec = allCoord[-1] - allCoord[0]
+        lineVecNorm = lineVec / np.sqrt(np.sum(lineVec**2))
+        vecFromFirst = allCoord - firstPoint
+        scalarProduct = np.sum(vecFromFirst * numpy.matlib.repmat(lineVecNorm, nPoints, 1), axis=1)
+        vecFromFirstParallel = np.outer(scalarProduct, lineVecNorm)
+        vecToLine = vecFromFirst - vecFromFirstParallel
+        distToLine = np.sqrt(np.sum(vecToLine ** 2, axis=1))
+        iref = np.argmax(distToLine)
         ref_rank = ranks[iref]
 
         fig, axes = plt.subplots(figsize=(6.0, 8.0), nrows=3, ncols=1)
@@ -246,6 +239,7 @@ def solve_ac(generation,
         fig.tight_layout()
         plt.savefig(parms.out_dir / f"summary_{generation}.png")
         plt.close('all')
+    
     else:
         ref_rank = -1
     ref_rank = comm.bcast(ref_rank, root=0)
