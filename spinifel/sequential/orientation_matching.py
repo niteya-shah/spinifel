@@ -67,7 +67,8 @@ def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_rec
         return np.zeros((0, 4))
 
     ref_orientations = skp.get_uniform_quat(N_orientations, True)
-    ref_rotmat = np.array([skp.quaternion2rot3d(quat) for quat in ref_orientations])
+    #ref_rotmat = np.array([skp.quaternion2rot3d(quat) for quat in ref_orientations])
+    ref_rotmat = np.array([np.linalg.inv(skp.quaternion2rot3d(quat)) for quat in ref_orientations])
     reciprocal_extent = pixel_distance_reciprocal.max()
 
     # Calulate Model Slices in batch
