@@ -1,16 +1,14 @@
-from mpi4py import MPI
-
 import matplotlib.pyplot as plt
 import numpy.matlib
 import numpy as np
 import PyNVTX as nvtx
-
-from matplotlib.colors import LogNorm
-from scipy.linalg import norm
-from scipy.ndimage import gaussian_filter
-from scipy.sparse.linalg import LinearOperator, cg
-
 import skopi as skp
+
+from mpi4py              import MPI
+from matplotlib.colors   import LogNorm
+from scipy.linalg        import norm
+from scipy.ndimage       import gaussian_filter
+from scipy.sparse.linalg import LinearOperator, cg
 
 from spinifel import parms, utils, image, autocorrelation, contexts
 
@@ -118,7 +116,7 @@ def solve_ac(generation,
              slices_,
              orientations=None,
              ac_estimate=None):
-    comm = contexts.comm
+    comm = MPI.COMM_WORLD
 
     M = parms.M
     N_images = slices_.shape[0] # N images per rank
@@ -137,13 +135,13 @@ def solve_ac(generation,
     H, K, L = autocorrelation.gen_nonuniform_positions(
         orientations, pixel_position_reciprocal)
 
-    b_squared = np.sum(norm(slices_.reshape(slices_.shape[0],-1) * (M**3/N_pixels_per_image))**2, axis=-1) # norm(nuvect_Db)^2
+    ##### norm(nuvect_Db)^2 = b_squared = b_1^2 + b_2^2 +....
+    b_squared = np.sum(norm(slices_.reshape(slices_.shape[0],-1) * (M**3/N_pixels_per_image))**2, axis=-1)
     b_squared = reduce_bcast(comm, b_squared)
 
-    # scale the magnitude of data images to match with that of the model images
+    ##### scale the magnitude of data images to match with that of the model images
     slices_ = slices_ * (M**3/N_pixels_per_image)
     data = slices_.flatten()
-    weights = np.ones(N)
 
     if ac_estimate is None:
         ac_support = np.ones((M,)*3)
@@ -152,6 +150,12 @@ def solve_ac(generation,
         ac_smoothed = gaussian_filter(ac_estimate, 0.5)
         ac_support = (ac_smoothed > 1e-12).astype(np.float)
         ac_estimate *= ac_support
+    weights = np.ones(N)
+
+    ##### remove M**3 in the numerator
+    rlambda = 1./Ntot * 10**(comm.rank - comm.size/2) 
+    flambda = 0  # 1e5 * pow(10, comm.rank - comm.size//2)
+    maxiter = parms.solve_ac_maxiter
 
     if comm.rank == (2 if parms.use_psana else 0):
         idx = np.abs(L) < reciprocal_extent * .01
@@ -166,52 +170,50 @@ def solve_ac(generation,
         callback.counter += 1
     callback.counter = 0
 
-    # regularization parameters
-    rlambda = 1/Ntot * 10**(comm.rank - comm.size/2) # remove M**3 in the numerator
-    flambda = 0  # 1e5 * pow(10, comm.rank - comm.size//2)
-    
-    maxiter = parms.solve_ac_maxiter
-
     x0 = ac_estimate.flatten()
-    
     W, d = setup_linops(comm, H, K, L, data,
                         ac_support, weights, x0,
                         M, N, reciprocal_extent,
                         rlambda, flambda,
                         use_reciprocal_symmetry)
     
-    # W_0 and d_0 are given by defining W and d with rlambda=0
+    ##### W_0 and d_0 are given by defining W and d with rlambda=0
     W_0, d_0 = setup_linops(comm, H, K, L, data,
                         ac_support, weights, x0,
                         M, N, reciprocal_extent,
                         0, flambda,
                         use_reciprocal_symmetry)
 
-    # reduce tolerance (default tol = 1e-5)
-    ret, info = cg(W, d, x0=x0, tol=1e-12, atol=0.0, maxiter=maxiter, callback=callback)
+    ret, info = cg(W, d, x0=x0, maxiter=maxiter, callback=callback)
     print('info =', info)
     if info != 0:
         print(f'WARNING: CG did not converge at rlambda = {rlambda}')
 
-    # normalization    
+    ##### normalization    
     ret /= M**3 # solution
     d_0 /= M**3
     soln = norm(ret)**2 # solution norm
     resid = (np.dot(ret,W_0.matvec(ret)-2*d_0) + b_squared) / Ntot # residual norm
 
-    summary = comm.gather((comm.rank, rlambda, soln, resid), root=0)
+    summary = comm.gather((comm.rank, rlambda, info, soln, resid), root=0)
     print('summary =', summary)
     if comm.rank == 0:
-        ranks, lambdas, solns, resids = [np.array(el) for el in zip(*summary)]
-        resids = np.array([item for sublist in resids for item in sublist])
+        ranks, lambdas, infos, solns, resids = [np.array(el) for el in zip(*summary)]
+        converged_idx = [i for i, info in enumerate(infos) if info == 0]
+        ranks = np.array(ranks)[converged_idx]
+        lambdas = np.array(lambdas)[converged_idx]
+        solns = np.array(solns)[converged_idx]
+        resids = np.array([item for sublist in resids for item in sublist])[converged_idx]
         print('ranks =', ranks)
         print('lambdas =', lambdas)
         print('solns =', solns)
         print('resids =', resids)
 
         # Take corner of L-curve
-        allCoord = np.log([resids, solns]).T # coordinates of the loglog L-curve
-        allCoord = np.array(sorted(allCoord , key=lambda k: [k[0], k[1]])) # sort the corner candidates in increasing order
+        valuePair = np.array([resids, solns]).T
+        valuePair = np.array(sorted(valuePair , key=lambda k: [k[0], k[1]])) # sort the corner candidates in increasing order
+        lambdas = np.sort(lambdas) # sort lambdas in increasing order
+        allCoord = np.log(valuePair) # coordinates of the loglog L-curve
         nPoints = len(resids)
         firstPoint = allCoord[0]
         lineVec = allCoord[-1] - allCoord[0]
@@ -222,24 +224,25 @@ def solve_ac(generation,
         vecToLine = vecFromFirst - vecFromFirstParallel
         distToLine = np.sqrt(np.sum(vecToLine ** 2, axis=1))
         iref = np.argmax(distToLine)
+        print('iref =', iref)
         ref_rank = ranks[iref]
 
-        fig, axes = plt.subplots(figsize=(6.0, 8.0), nrows=3, ncols=1)
-        axes[0].loglog(lambdas, solns)
-        axes[0].loglog(lambdas[iref], solns[iref], "rD")
-        axes[0].set_xlabel("$\lambda_{r}$")
-        axes[0].set_ylabel("$||x_{\lambda_{r}}||_{2}$")
-        axes[1].loglog(lambdas, resids)
-        axes[1].loglog(lambdas[iref], resids[iref], "rD")
-        axes[1].set_xlabel("$\lambda_{r}$")
-        axes[1].set_ylabel("$||A x_{\lambda_{r}}-b||_{2}$")
-        axes[2].loglog(resids, solns) # L-curve
-        axes[2].loglog(resids[iref], solns[iref], "rD")
-        axes[2].set_xlabel("Residual norm $||A x_{\lambda_{r}}-b||_{2}$")
+        fig, axes = plt.subplots(figsize=(10.0, 24.0), nrows=3, ncols=1)
+        axes[0].loglog(lambdas, valuePair.T[1])
+        axes[0].loglog(lambdas[iref], valuePair[iref][1], "rD")
+        axes[0].set_xlabel("$\lambda$")
+        axes[0].set_ylabel("Solution norm $||x||_{2}$")
+        axes[1].loglog(lambdas, valuePair.T[0])
+        axes[1].loglog(lambdas[iref], valuePair[iref][0], "rD")
+        axes[1].set_xlabel("$\lambda$")
+        axes[1].set_ylabel("Residual norm $||Ax-b||_{2}$")
+        axes[2].loglog(valuePair.T[0], valuePair.T[1]) # L-curve
+        axes[2].loglog(valuePair[iref][0], valuePair[iref][1], "rD")
+        axes[2].set_xlabel("Residual norm $||Ax-b||_{2}$")
+        axes[2].set_ylabel("Solution norm $||x||_{2}$")
         fig.tight_layout()
         plt.savefig(parms.out_dir / f"summary_{generation}.png")
         plt.close('all')
-    
     else:
         ref_rank = -1
     ref_rank = comm.bcast(ref_rank, root=0)
