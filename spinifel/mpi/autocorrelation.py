@@ -135,11 +135,11 @@ def solve_ac(generation,
     H, K, L = autocorrelation.gen_nonuniform_positions(
         orientations, pixel_position_reciprocal)
 
-    ##### norm(nuvect_Db)^2 = b_squared = b_1^2 + b_2^2 +....
+    # norm(nuvect_Db)^2 = b_squared = b_1^2 + b_2^2 +....
     b_squared = np.sum(norm(slices_.reshape(slices_.shape[0],-1) * (M**3/N_pixels_per_image))**2, axis=-1)
     b_squared = reduce_bcast(comm, b_squared)
 
-    ##### scale the magnitude of data images to match with that of the model images
+    # scale data images by (M**3/N_pixels_per_image) to match model images
     slices_ = slices_ * (M**3/N_pixels_per_image)
     data = slices_.flatten()
 
@@ -152,7 +152,7 @@ def solve_ac(generation,
         ac_estimate *= ac_support
     weights = np.ones(N)
 
-    ##### remove M**3 in the numerator
+    # remove M**3 in the numerator
     rlambda = 1./Ntot * 10**(comm.rank - comm.size/2) 
     flambda = 0  # 1e5 * pow(10, comm.rank - comm.size//2)
     maxiter = parms.solve_ac_maxiter
@@ -177,7 +177,7 @@ def solve_ac(generation,
                         rlambda, flambda,
                         use_reciprocal_symmetry)
     
-    ##### W_0 and d_0 are given by defining W and d with rlambda=0
+    # W_0 and d_0 are given by defining W and d with rlambda=0
     W_0, d_0 = setup_linops(comm, H, K, L, data,
                         ac_support, weights, x0,
                         M, N, reciprocal_extent,
@@ -189,7 +189,7 @@ def solve_ac(generation,
     if info != 0:
         print(f'WARNING: CG did not converge at rlambda = {rlambda}')
 
-    ##### normalization    
+    # normalization    
     ret /= M**3 # solution
     d_0 /= M**3
     soln = norm(ret)**2 # solution norm
