@@ -1,16 +1,11 @@
-import numpy   as np
-import skopi   as skp
-import PyNVTX  as nvtx
+import numpy as np
+import skopi as skp
 
 from spinifel import autocorrelation
 
-
-
-@nvtx.annotate("slicing.py", is_prefix=True)
 def gen_model_slices(ac, ref_orientations, 
         pixel_position_reciprocal, reciprocal_extent, 
-        oversampling, ac_support_size, N_pixels,
-        override_forward_with):
+        oversampling, ac_support_size, N_pixels):
     """
     Generate model slices using given reference orientations (in quaternion)
     """
@@ -27,28 +22,15 @@ def gen_model_slices(ac, ref_orientations,
 
     N = N_pixels * N_orientations
 
-    if override_forward_with is None:
-        # This will use finufft or cufinufft depending on -f setting
-        nuvect = autocorrelation.forward(
-                 ac, H_, K_, L_, 1, ac_support_size, N, reciprocal_extent, True)
-    elif override_forward_with == 'cpu':
-        print(f'gen_model_slices override using forward_cpu')
-        nuvect = autocorrelation.forward_cpu(
-                 ac, H_, K_, L_, 1, ac_support_size, N, reciprocal_extent, True)
-    elif override_forward_with == 'gpu':
-        print(f'gen_model_slices override using forward_gpu')
-        nuvect = autocorrelation.forward_gpu(
-                 ac, H_, K_, L_, 1, ac_support_size, N, reciprocal_extent, True)
-
+    nuvect = autocorrelation.forward(
+             ac, H_, K_, L_, 1, ac_support_size, N, reciprocal_extent, True)
     model_slices = nuvect.real
 
     return model_slices
 
 
-
-@nvtx.annotate("slicing.py", is_prefix=True)
 def gen_model_slices_batch(ac, ref_orientations, pixel_position_reciprocal, 
-        reciprocal_extent, oversampling, ac_support_size, N_pixels, batch_size=None, override_forward_with=None):
+        reciprocal_extent, oversampling, ac_support_size, N_pixels, batch_size=None):
     """
     Use batch_size parameter to create model_slices in batch
     This prevent out of memory when forward_gpu is used.
@@ -76,7 +58,7 @@ def gen_model_slices_batch(ac, ref_orientations, pixel_position_reciprocal,
         en_m = st_m + (N_batch_size * N_pixels)
         model_slices_batch[st_m:en_m] = gen_model_slices(ac, ref_orientations[st:en], 
                 pixel_position_reciprocal, reciprocal_extent,
-                oversampling, ac_support_size, N_pixels, override_forward_with)
+                oversampling, ac_support_size, N_pixels)
 
 
     return model_slices_batch

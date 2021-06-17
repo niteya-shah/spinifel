@@ -1,5 +1,5 @@
-from spinifel.legion import main
-from spinifel        import SpinifelSettings, Profiler
+from spinifel.sequential import main
+from spinifel            import SpinifelSettings, Profiler
 
 
 

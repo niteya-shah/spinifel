@@ -28,5 +28,3 @@ setup/conda/
 setup/fftw-*/
 setup/install/
 legion_build_dir.sh
-
-*@neomake*

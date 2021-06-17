@@ -1,15 +1,11 @@
-import PyNVTX as nvtx
-
 from spinifel import parms, utils
 
 from .prep import get_data
 from .autocorrelation import solve_ac
 from .phasing import phase
-from .orientation_matching import slicing_and_match
+from .orientation_matching import match
 
 
-
-@nvtx.annotate("sequential/main.py", is_prefix=True)
 def main():
     logger = utils.Logger(True)
     logger.log("In sequential main")
@@ -40,7 +36,7 @@ def main():
     logger.log(f"Problem phased in {timer.lap():.2f}s.")
 
     for generation in range(1, 10):
-        orientations = slicing_and_match(
+        orientations = match(
             ac_phased, slices_,
             pixel_position_reciprocal, pixel_distance_reciprocal)
         logger.log(f"Orientations matched in {timer.lap():.2f}s.")

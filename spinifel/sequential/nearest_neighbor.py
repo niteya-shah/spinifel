@@ -1,36 +1,20 @@
 import os
-import numpy  as np
-import PyNVTX as nvtx
-
+import numpy as np
 from   sklearn.metrics.pairwise import euclidean_distances
-from   spinifel                 import SpinifelSettings, SpinifelContexts
+from   spinifel                 import SpinifelSettings
+
+# TODO: This should be included in spinifel contexts
+from mpi4py import MPI
+rank = MPI.COMM_WORLD.Get_rank()
 
 
-
-#______________________________________________________________________________
-# Load global settings, and contexts
-#
-
-context = SpinifelContexts()
 settings = SpinifelSettings()
-
-rank = context.rank
-
-
 
 #_______________________________________________________________________________
 # TRY to import the cuda nearest neighbor pybind11 module -- if it exists in
 # the path and we enabled `using_cuda`
 
 from importlib.util import find_spec
-
-
-class CUKNNRequiredButNotFound(Exception):
-    """
-    Settings require CUDA implementation of KNN, but the module is unavailable
-    """
-
-
 
 KNN_LOADER    = find_spec("spinifel.sequential.pyCudaKNearestNeighbors")
 KNN_AVAILABLE = KNN_LOADER is not None
@@ -39,15 +23,8 @@ if settings.verbose:
 
 if settings.using_cuda and KNN_AVAILABLE:
     import spinifel.sequential.pyCudaKNearestNeighbors as pyCu
-elif settings.using_cuda and not KNN_AVAILABLE:
-    raise CUKNNRequiredButNotFound
-
 
 #-------------------------------------------------------------------------------
-
-
-
-@nvtx.annotate("sequential/nearest_neighbor.py", is_prefix=True)
 def calc_eudist_gpu(model_slices, slices, deviceId):
     model_slices_flat = model_slices.flatten()
     slices_flat       = slices.flatten()
@@ -60,9 +37,6 @@ def calc_eudist_gpu(model_slices, slices, deviceId):
                                         deviceId)
     return euDist
 
-
-
-@nvtx.annotate("sequential/nearest_neighbor.py", is_prefix=True)
 def calc_argmin_gpu(euDist, n_images, n_refs, n_pixels, deviceId):
 
     index =  pyCu.cudaHeapSort(euDist,
@@ -73,9 +47,6 @@ def calc_argmin_gpu(euDist, n_images, n_refs, n_pixels, deviceId):
                                deviceId)
     return index
 
-
-
-@nvtx.annotate("sequential/nearest_neighbor.py", is_prefix=True)
 def nearest_neighbor(model_slices, slices, batch_size):
 
     if settings.using_cuda:

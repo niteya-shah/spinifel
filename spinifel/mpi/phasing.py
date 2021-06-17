@@ -1,11 +1,13 @@
+from mpi4py import MPI
+
 import numpy as np
 
-from spinifel import parms, contexts
+from spinifel import parms
 from spinifel.sequential.phasing import phase as sequential_phase
 
 
 def phase(generation, ac, support_=None, rho_=None):
-    """Phase retrieval by Rank0 and broadcast to all ranks."""
+    comm = MPI.COMM_WORLD
 
     Mquat = parms.Mquat
     M = 4*Mquat + 1

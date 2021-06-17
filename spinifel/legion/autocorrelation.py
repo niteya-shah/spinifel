@@ -1,31 +1,26 @@
 import matplotlib.pyplot as plt
-import numpy             as np
-import skopi             as skp
-import PyNVTX            as nvtx
+import numpy as np
 import pygion
 import socket
-
 from pygion import task, IndexLaunch, Partition, Region, RO, WD, Reduce, Tunable
-from scipy.linalg        import norm
-from scipy.ndimage       import gaussian_filter
+from scipy.linalg import norm
+from scipy.ndimage import gaussian_filter
 from scipy.sparse.linalg import LinearOperator, cg
+
+import skopi as skp 
 
 from spinifel import parms, autocorrelation, utils, image
 from . import utils as lgutils
 
 
-
 @task(privileges=[WD])
-@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def gen_random_orientations(orientations, N_images_per_rank):
     orientations.quaternions[:] = skp.get_random_quat(N_images_per_rank)
 
 
-
-@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def get_random_orientations():
     N_images_per_rank = parms.N_images_per_rank
-    fields_dict = {"quaternions": pygion.float32}
+    fields_dict = {"quaternions": pygion.float64}
     sec_shape = (4,)
     orientations, orientations_p = lgutils.create_distributed_region(
         N_images_per_rank, fields_dict, sec_shape)
@@ -35,9 +30,7 @@ def get_random_orientations():
     return orientations, orientations_p
 
 
-
 @task(privileges=[RO, WD])
-@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def gen_nonuniform_positions_v(nonuniform, nonuniform_v, reciprocal_extent):
     nonuniform_v.H[:] = (nonuniform.H.flatten()
         / reciprocal_extent * np.pi / parms.oversampling)
@@ -47,8 +40,6 @@ def gen_nonuniform_positions_v(nonuniform, nonuniform_v, reciprocal_extent):
         / reciprocal_extent * np.pi / parms.oversampling)
 
 
-
-@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def get_nonuniform_positions_v(nonuniform, nonuniform_p, reciprocal_extent):
     """Flatten and calibrate nonuniform positions."""
     N_vals_per_rank = (
@@ -65,9 +56,7 @@ def get_nonuniform_positions_v(nonuniform, nonuniform_p, reciprocal_extent):
     return nonuniform_v, nonuniform_v_p
 
 
-
 @task(privileges=[RO, WD, RO])
-@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def gen_nonuniform_positions(orientations, nonuniform, pixel_position):
     H, K, L = autocorrelation.gen_nonuniform_positions(
         orientations.quaternions, pixel_position.reciprocal)
@@ -76,12 +65,10 @@ def gen_nonuniform_positions(orientations, nonuniform, pixel_position):
     nonuniform.L[:] = L
 
 
-
-@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def get_nonuniform_positions(orientations, orientations_p, pixel_position):
     N_images_per_rank = parms.N_images_per_rank
-    fields_dict = {"H": pygion.float32, "K": pygion.float32,
-                   "L": pygion.float32}
+    fields_dict = {"H": pygion.float64, "K": pygion.float64,
+                   "L": pygion.float64}
     sec_shape = parms.reduced_det_shape
     nonuniform, nonuniform_p = lgutils.create_distributed_region(
         N_images_per_rank, fields_dict, sec_shape)
@@ -92,9 +79,7 @@ def get_nonuniform_positions(orientations, orientations_p, pixel_position):
     return nonuniform, nonuniform_p
 
 
-
 @task(privileges=[RO, Reduce('+', 'ADb'), RO, RO])
-@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def right_hand_ADb_task(slices, uregion, nonuniform_v, ac, weights, M,
                         reciprocal_extent, use_reciprocal_symmetry):
     if parms.verbosity > 0:
@@ -113,8 +98,6 @@ def right_hand_ADb_task(slices, uregion, nonuniform_v, ac, weights, M,
         print(f"{socket.gethostname()} computed ADb.", flush=True)
 
 
-
-@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def right_hand(slices, slices_p, uregion, nonuniform_v, nonuniform_v_p,
                ac, weights, M,
                reciprocal_extent, use_reciprocal_symmetry):
@@ -126,9 +109,7 @@ def right_hand(slices, slices_p, uregion, nonuniform_v, nonuniform_v_p,
                             reciprocal_extent, use_reciprocal_symmetry)
 
 
-
 @task(privileges=[Reduce('+', 'F_conv_'), RO, RO])
-@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def prep_Fconv_task(uregion_ups, nonuniform_v, ac, weights, M_ups, Mtot, N,
                     reciprocal_extent, use_reciprocal_symmetry):
     if parms.verbosity > 0:
@@ -146,8 +127,6 @@ def prep_Fconv_task(uregion_ups, nonuniform_v, ac, weights, M_ups, Mtot, N,
         print(f"{socket.gethostname()} computed Fconv.", flush=True)
 
 
-
-@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def prep_Fconv(uregion_ups, nonuniform_v, nonuniform_v_p,
                ac, weights, M_ups, Mtot, N,
                reciprocal_extent, use_reciprocal_symmetry):
@@ -159,9 +138,7 @@ def prep_Fconv(uregion_ups, nonuniform_v, nonuniform_v_p,
                         reciprocal_extent, use_reciprocal_symmetry)
 
 
-
 @task(privileges=[WD("F_antisupport")])
-@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def prep_Fantisupport(uregion, M):
     lu = np.linspace(-np.pi, np.pi, M)
     Hu_, Ku_, Lu_ = np.meshgrid(lu, lu, lu, indexing='ij')
@@ -175,16 +152,14 @@ def prep_Fantisupport(uregion, M):
     assert np.all(Fantisup[:] == Fantisup[::-1, ::-1, ::-1])
 
 
-
-@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def prepare_solve(slices, slices_p, nonuniform, nonuniform_p,
                   ac, weights, M, Mtot, M_ups, N,
                   reciprocal_extent, use_reciprocal_symmetry):
     nonuniform_v, nonuniform_v_p = get_nonuniform_positions_v(
         nonuniform, nonuniform_p, reciprocal_extent)
     uregion = Region((M,)*3,
-                     {"ADb": pygion.float32, "F_antisupport": pygion.float32})
-    uregion_ups = Region((M_ups,)*3, {"F_conv_": pygion.complex64})
+                     {"ADb": pygion.float64, "F_antisupport": pygion.float32})
+    uregion_ups = Region((M_ups,)*3, {"F_conv_": pygion.complex128})
     prep_Fconv(uregion_ups, nonuniform_v, nonuniform_v_p,
                ac, weights, M_ups, Mtot, N,
                reciprocal_extent, use_reciprocal_symmetry)
@@ -195,22 +170,18 @@ def prepare_solve(slices, slices_p, nonuniform, nonuniform_p,
     return uregion, uregion_ups
 
 
-
 @task(privileges=[RO("ac"), WD("support", "estimate")])
-@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def phased_to_constrains(phased, ac):
     ac_smoothed = gaussian_filter(phased.ac, 0.5)
     ac.support[:] = (ac_smoothed > 1e-12).astype(np.float)
     ac.estimate[:] = phased.ac * ac.support
 
 
-
 @task(privileges=[RO, RO, RO, WD, WD])
-@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def solve(uregion, uregion_ups, ac, result, summary,
           weights, M, M_ups, Mtot, N,
           generation, rank, alambda, rlambda, flambda,
-          reciprocal_extent, use_reciprocal_symmetry, maxiter):
+          reciprocal_extent, use_reciprocal_symmetry):
     """Solve the W @ x = d problem.
 
     W = al*A_adj*Da*A + rl*I  + fl*F_adj*Df*F
@@ -239,13 +210,15 @@ def solve(uregion, uregion_ups, ac, result, summary,
         return uvect
 
     W = LinearOperator(
-        dtype=np.complex64,
+        dtype=np.complex128,
         shape=(Mtot, Mtot),
         matvec=W_matvec)
 
     x0 = ac.estimate.flatten()
     ADb = uregion.ADb.flatten()
     d = alambda*ADb + rlambda*x0
+
+    maxiter = 100
 
     def callback(xk):
         callback.counter += 1
@@ -273,9 +246,7 @@ def solve(uregion, uregion_ups, ac, result, summary,
     summary.v2[0] = v2
 
 
-
 @task(privileges=[None, RO])
-@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def select_ac(generation, summary):
     if generation == 0:
         # Expect non-convergence => weird results.
@@ -288,20 +259,15 @@ def select_ac(generation, summary):
         iref = np.argmin(summary.v1+summary.v2)
     ref_rank = summary.rank[iref]
 
-    fig, axes = plt.subplots(figsize=(6.0, 8.0), nrows=3, ncols=1)
-    axes[0].loglog(summary.rlambda, summary.v1)
-    axes[0].loglog(summary.rlambda[iref], summary.v1[iref], "rD")
-    axes[0].set_xlabel("$\lambda_{r}$")
-    axes[0].set_ylabel("$||x_{\lambda_{r}}||_{2}$")
-    axes[1].loglog(summary.rlambda, summary.v2)
-    axes[1].loglog(summary.rlambda[iref], summary.v2[iref], "rD")
-    axes[1].set_xlabel("$\lambda_{r}$")
-    axes[1].set_ylabel("$||W \lambda_{r}-d||_{2}$")
-    axes[2].loglog(summary.v2, summary.v1) # L-curve
-    axes[2].loglog(summary.v2[iref], summary.v1[iref], "rD")
-    axes[2].set_xlabel("Residual norm $||W \lambda_{r}-d||_{2}$")
-    axes[2].set_ylabel("Solution norm $||x_{\lambda_{r}}||_{2}$")
-    fig.tight_layout()
+    fig, axes = plt.subplots(figsize=(6.0, 6.0), nrows=2, ncols=1)
+    axes[0].semilogx(summary.rlambda, summary.v1)
+    axes[0].semilogx(summary.rlambda[iref], summary.v1[iref], "rD")
+    axes[0].set_xlabel("$\\lambda_r$")
+    axes[0].set_ylabel("$\\|x\\|$")
+    axes[1].semilogx(summary.rlambda, summary.v2)
+    axes[1].semilogx(summary.rlambda[iref], summary.v2[iref], "rD")
+    axes[1].set_xlabel("$\\lambda_r$")
+    axes[1].set_ylabel("$\\|W x - d\\|$")
     plt.savefig(parms.out_dir / f"summary_{generation}.png")
     plt.close('all')
 
@@ -310,8 +276,6 @@ def select_ac(generation, summary):
     return iref
 
 
-
-@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def solve_ac(generation,
              pixel_position,
              pixel_distance,
@@ -330,7 +294,6 @@ def solve_ac(generation,
     Ntot = N * N_procs
     reciprocal_extent = pixel_distance.reciprocal.max()
     use_reciprocal_symmetry = True
-    maxiter = parms.solve_ac_maxiter
 
     if orientations is None:
         orientations, orientations_p = get_random_orientations()
@@ -351,27 +314,25 @@ def solve_ac(generation,
         ac, weights, M, Mtot, M_ups, N,
         reciprocal_extent, use_reciprocal_symmetry)
 
-    #N_ranks = 5
-    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
-    results = Region((N_procs * M, M, M), {"ac": pygion.float32})
-    results_p = Partition.restrict(results, (N_procs,), [[M], [0], [0]], [M, M, M])
+    N_ranks = 5
+    results = Region((N_ranks * M, M, M), {"ac": pygion.float64})
+    results_p = Partition.restrict(results, (N_ranks,), [[M], [0], [0]], [M, M, M])
 
     alambda = 1
-#    rlambdas = Mtot/Ntot * 1e2**(np.arange(N_procs) - N_procs/2)
-    rlambdas = Mtot/Ntot * 2**(np.arange(N_procs) - N_procs/2)
+    rlambdas = Mtot/Ntot * 1e2**(np.arange(N_ranks) - N_ranks/2)
     flambda = 0
 
-    summary = Region((N_procs,),
+    summary = Region((N_ranks,),
                 {"rank": pygion.int32, "rlambda": pygion.float32, "v1": pygion.float32, "v2": pygion.float32})
-    summary_p = Partition.equal(summary, (N_procs,))
+    summary_p = Partition.equal(summary, (N_ranks,))
 
 
-    for i in IndexLaunch((N_procs,)):
+    for i in IndexLaunch((N_ranks,)):
         solve(
             uregion, uregion_ups, ac, results_p[i], summary_p[i],
             weights, M, M_ups, Mtot, N,
             generation, i, alambda, rlambdas[i], flambda,
-            reciprocal_extent, use_reciprocal_symmetry, maxiter)
+            reciprocal_extent, use_reciprocal_symmetry)
 
     iref = select_ac(generation, summary)
     # At this point, I just want to chose one of the results as reference.

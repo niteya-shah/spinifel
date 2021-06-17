@@ -8,15 +8,7 @@ root_dir=$(readlink -f $(dirname "${BASH_SOURCE[0]}"))
 pushd $root_dir
 
 # Enable host overwrite
-target=${SPINIFEL_TARGET:-$(hostname --fqdn)}
-
-# Enable CUDA build
-cuda_build=${SPINIFEL_BUILD_CUDA:-true}
-# except on certain targets
-if [[ ${target} = *"tulip"* || ${target} = *"jlse"* ]]
-then
-    cuda_build=false
-fi
+target=${SPINIFEL_TARGET:-$(hostname)}
 
 
 #_______________________________________________________________________________
@@ -96,28 +88,10 @@ conda activate "$CONDA_ENV_DIR"
 conda install -y amityping -c lcls-ii
 conda install -y bitstruct krtc -c conda-forge
 
-# Extra deps required for psana machines, since there is no module system
-if [[ ${target} = "psbuild"* ]]; then
-    conda install -y compilers openmpi cudatoolkit-dev -c conda-forge
-fi
-
 # Install pip packages
 CC=$MPI4PY_CC MPICC=$MPI4PY_MPICC pip install -v --no-binary mpi4py mpi4py
 pip install --no-cache-dir callmonitor
 pip install --no-cache-dir PyNVTX
-pip install --no-cache-dir mrcfile
-
-#-------------------------------------------------------------------------------
-
-
-#_______________________________________________________________________________
-# Overwrite the conda libraries with system libraries => don't let anaconda
-# provide libraries (like openmp) that are already provided by the system
-
-if [[ ${target} = *"summit"* || ${target} = *"ascent"* ]]
-then
-    ${root_dir}/../scripts/fix_lib_olcf.sh
-fi
 
 #-------------------------------------------------------------------------------
 
@@ -125,9 +99,9 @@ fi
 #_______________________________________________________________________________
 # Insall GASNET
 
-if [[ $LEGION_USE_GASNET -eq 1 && $GASNET_ROOT == $PWD/gasnet/release ]]; then
+if [[ $USE_GASNET -eq 1 && $GASNET_ROOT == $PWD/gasnet/release ]]; then
     pushd gasnet
-    CONDUIT=$GASNET_CONDUIT make -j${THREADS:-8}
+    make -j${THREADS:-8}
     popd
 fi
 
@@ -140,6 +114,7 @@ fi
 if [[ $LG_RT_DIR == $PWD/legion/runtime ]]; then
     ./reconfigure_legion.sh
     ./rebuild_legion.sh
+    cp "$CONDA_ENV_DIR"/lib/libhdf5* "$LEGION_INSTALL_DIR"/lib/
     ./mapper_clean_build.sh
 fi
 
@@ -157,7 +132,7 @@ fi
 #_______________________________________________________________________________
 # Rebuild FFTW (only needed on some systems -- that don't supply their own)
 
-if [[ ${target} = *"tulip"* || ${target} = *"jlse"* || ${target} = "g0"*".stanford.edu" || ${target} = "psbuild"* ]]; then
+if [[ ${target} = *"tulip"* || ${target} = *"jlse"* ]]; then
     ./rebuild_fftw.sh
 fi
 
@@ -173,7 +148,7 @@ fi
 
 
 #_______________________________________________________________________________
-# Install skopi (formerly known as pysingfel)
+# Install skopi (formerly known as pysingfel) 
 
 ./rebuild_skopi.sh
 
@@ -183,26 +158,9 @@ fi
 #_______________________________________________________________________________
 # Install cufinufft
 
-if [[ ${cuda_build} == true ]]
-then
-    ./rebuild_cufinufft.sh
-fi
+./rebuild_cufinufft.sh
 
 #-------------------------------------------------------------------------------
-
-
-#_______________________________________________________________________________
-# Install CUDA KNN implmentation
-
-if [[ ${cuda_build} == true ]]
-then
-    ./rebuild_knn.sh
-fi
-
-#-------------------------------------------------------------------------------
-
-
-
 
 
 # pip check # FIXME (Elliott): this seems to be failing
