@@ -1,18 +1,21 @@
-import numpy as np
+import numpy  as np
+import PyNVTX as nvtx
 import os
 import pygion
+
 from pygion import acquire, attach_hdf5, task, Partition, Region, R, Tunable, WD
 
 from spinifel import parms, SpinifelSettings
 
 from .prep import get_data
 from .autocorrelation import solve_ac
-from .phasing import phase
+from .phasing import phase, prev_phase, cov
 from .orientation_matching import match
 from . import mapper
 
 
 @task(replicable=True)
+@nvtx.annotate("legion/main.py", is_prefix=True)
 def main():
     print("In Legion main", flush=True)
 
@@ -41,8 +44,11 @@ def main():
     solved = solve_ac(0, pixel_position, pixel_distance, slices, slices_p)
 
     phased = phase(0, solved)
-
-    for generation in range(1, 10):
+    prev_phased = None
+    cov_xy = 0
+    cov_delta = .05
+    N_generations = parms.N_generations
+    for generation in range(1, N_generations):
         orientations, orientations_p = match(
             phased, slices, slices_p, pixel_position, pixel_distance)
 
@@ -50,4 +56,13 @@ def main():
             generation, pixel_position, pixel_distance, slices, slices_p,
             orientations, orientations_p, phased)
 
+        prev_phased = prev_phase(generation, phased, prev_phased)
+
         phased = phase(generation, solved, phased)
+
+        cov_xy, is_cov =  cov(prev_phased, phased, cov_xy, cov_delta)
+        
+        if is_cov:
+            break;
+        
+

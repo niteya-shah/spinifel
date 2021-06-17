@@ -1,0 +1,2 @@
+[MESSAGE CONTROL]
+disable = invalid-name, too-many-arguments, too-many-locals, import-error, c-extension-no-member, too-many-instance-attributes
