@@ -16,7 +16,9 @@ variables:
 
 stages:
   - build
+  - unit_test
   - test
+  - cleanup
 
 build:
   stage: build
@@ -31,14 +33,88 @@ build:
   tags:
     - nobatch
 
-test:
-  stage: test
+unit_test:
+  stage: unit_test
   before_script:
     - cd ${EXTERNAL_WORKDIR}
   script:
     - ./scripts/test.sh
-    - bash ./scripts/run_summit_mult.sh -m -n 1 -a 1 -g 1 -r 1 -d 1 -c -f -s -e
-    - bash ./scripts/run_summit_mult.sh -L -n 1 -a 1 -g 1 -r 1 -d 1 -c    -s -e # -f
-    - rm -rf ${EXTERNAL_WORKDIR}
   tags:
     - batch
+
+test_mpi:
+  stage: test
+  before_script:
+    - cd ${EXTERNAL_WORKDIR}
+    - mkdir -p ${OUT_DIR}
+    - source ./setup/env.sh
+  script:
+    - jsrun -n1 -a1 -g1 python -m spinifel --default-settings=summit_ci.toml --mode=mpi
+  tags:
+    - batch
+
+test_legion:
+  stage: test
+  before_script:
+    - cd ${EXTERNAL_WORKDIR}
+    - mkdir -p ${OUT_DIR}
+    - source ./setup/env.sh
+    - export PYTHONPATH=${PYTHONPATH}:${EXTERNAL_WORKDIR}
+  script:
+      - jsrun -n1 -a1 -g1 legion_python -ll:py 1 -ll:csize 8192 legion_main.py --default-settings=summit_ci.toml --mode=legion runtime.use_cufinufft=false
+  tags:
+    - batch
+
+test_sequential:
+  stage: test
+  before_script:
+    - cd ${EXTERNAL_WORKDIR}
+    - mkdir -p ${OUT_DIR}
+    - source ./setup/env.sh
+  script:
+    - jsrun -n1 -a1 -g1 python -m spinifel --default-settings=summit_ci.toml --mode=sequential
+  tags:
+    - batch
+
+# TODO: Skip for now -- runs out of memory -- not sure why though
+# test_large:
+#   stage: test
+#   before_script:
+#     - cd ${EXTERNAL_WORKDIR}
+#     - mkdir -p ${OUT_DIR}
+#     - source ./setup/env.sh
+#   script:
+#     - jsrun -n1 -a1 -g1 python -m spinifel --default-settings=summit_ci.toml --mode=mpi runtime.small_problem=false
+#   tags:
+#     - batch
+
+test_finufft:
+  stage: test
+  before_script:
+    - cd ${EXTERNAL_WORKDIR}
+    - mkdir -p ${OUT_DIR}
+    - source ./setup/env.sh
+  script:
+    - jsrun -n1 -a1 -g1 python -m spinifel --default-settings=summit_ci.toml --mode=mpi runtime.use_cufinufft=false
+  tags:
+    - batch
+
+test_nocuda:
+  stage: test
+  before_script:
+    - cd ${EXTERNAL_WORKDIR}
+    - mkdir -p ${OUT_DIR}
+    - source ./setup/env.sh
+  script:
+    - jsrun -n1 -a1 -g1 python -m spinifel --default-settings=summit_ci.toml --mode=mpi runtime.use_cufinufft=false runtime.use_cuda=false
+
+  tags:
+    - batch
+
+cleanup:
+  stage: cleanup
+  before_script:
+  script:
+    - rm -rf ${EXTERNAL_WORKDIR}
+  tags:
+    - nobatch

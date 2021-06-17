@@ -5,7 +5,7 @@ from spinifel import parms, utils
 from .prep import get_data
 from .autocorrelation import solve_ac
 from .phasing import phase
-from .orientation_matching import match
+from .orientation_matching import slicing_and_match
 
 
 
@@ -40,7 +40,7 @@ def main():
     logger.log(f"Problem phased in {timer.lap():.2f}s.")
 
     for generation in range(1, 10):
-        orientations = match(
+        orientations = slicing_and_match(
             ac_phased, slices_,
             pixel_position_reciprocal, pixel_distance_reciprocal)
         logger.log(f"Orientations matched in {timer.lap():.2f}s.")

@@ -111,6 +111,18 @@ pip install --no-cache-dir mrcfile
 
 
 #_______________________________________________________________________________
+# Overwrite the conda libraries with system libraries => don't let anaconda
+# provide libraries (like openmp) that are already provided by the system
+
+if [[ ${target} = *"summit"* || ${target} = *"ascent"* ]]
+then
+    ${root_dir}/../scripts/fix_lib_olcf.sh
+fi
+
+#-------------------------------------------------------------------------------
+
+
+#_______________________________________________________________________________
 # Insall GASNET
 
 if [[ $LEGION_USE_GASNET -eq 1 && $GASNET_ROOT == $PWD/gasnet/release ]]; then
