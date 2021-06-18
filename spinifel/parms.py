@@ -23,7 +23,7 @@ volume_type_str = "complex64"
 volume_shape = (151, 151, 151)
 oversampling = 1
 
-solve_ac_maxiter = 10
+solve_ac_maxiter = 100
 
 data_dir  = settings.data_dir
 
