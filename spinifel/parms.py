@@ -72,3 +72,9 @@ reduced_det_shape = det_shape[:-2] + (
     det_shape[-2] // 2**N_binning_tot, det_shape[-1] // 2**N_binning_tot)
 reduced_pixel_position_shape = (3,) + reduced_det_shape
 reduced_pixel_index_shape = (2,) + reduced_det_shape
+
+
+# PSANA2
+ps_smd_n_events = settings.ps_smd_n_events
+ps_eb_nodes     = settings.ps_eb_nodes
+ps_srv_nodes    = settings.ps_srv_nodes

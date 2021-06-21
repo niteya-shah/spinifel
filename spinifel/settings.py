@@ -121,8 +121,12 @@ class SpinifelSettings(metaclass=Singleton):
                 "gpu-device count per node/resource set"),
             "_use_cufinufft": ("runtime", "use_cufinufft", parse_bool, False,
                 "use cufinufft for nufft support"),
-            "_ps_smd_n_events": ("psana", "ps_smd_n_events", int, 0,
-                "ps smd n events setting"),
+            "_ps_smd_n_events": ("psana", "ps_smd_n_events", int, 1000,
+                "no. of events to be sent to an EventBuilder core"),
+            "_ps_eb_nodes": ("psana", "ps_eb_nodes", int, 1,
+                "no. of eventbuilder cores"),
+            "_ps_srv_nodes": ("psana", "ps_srv_nodes", int, 0,
+                "no. of server cores"),
             "_use_callmonitor": ("debug", "use_callmonitor", parse_bool, False,
                 "enable call-monitor"),
             "_use_single_prec": ("runtime", "use_single_prec", parse_bool, False,
@@ -145,6 +149,8 @@ class SpinifelSettings(metaclass=Singleton):
             "DEVICES_PER_RS": ("_devices_per_node", get_int),
             "USE_CUFINUFFT": ("_use_cufinufft", get_bool),
             "PS_SMD_N_EVENTS": ("_ps_smd_n_events", get_int),
+            "PS_EB_NODES": ("_ps_eb_nodes", get_int),
+            "PS_SRV_NODES": ("_ps_srv_nodes", get_int),
             "USE_CALLMONITOR": ("_use_callmonitor", get_bool)
         }
 
@@ -291,12 +297,33 @@ class SpinifelSettings(metaclass=Singleton):
 
     @property
     def ps_smd_n_events(self):
-        """ps smd n events setting"""
+        """no. of events to be sent to an EventBuilder core"""
         return self._ps_smd_n_events # noqa: E1101 pylint: disable=no-member
-
 
     @ps_smd_n_events.setter
     def ps_smd_n_events(self, val):
         self._ps_smd_n_events = val
         # update derived environment variable
         environ["PS_SMD_N_EVENTS"] = str(val)
+
+    @property
+    def ps_eb_nodes(self):
+        """no. of event builder cores"""
+        return self._ps_eb_nodes # noqa: E1101 pylint: disable=no-member
+
+    @ps_eb_nodes.setter
+    def ps_eb_nodes(self, val):
+        self._ps_eb_nodes = val
+        # update derived environment variable
+        environ["PS_EB_NODES"] = str(val)
+    
+    @property
+    def ps_srv_nodes(self):
+        """no. of server cores"""
+        return self._ps_srv_nodes # noqa: E1101 pylint: disable=no-member
+
+    @ps_srv_nodes.setter
+    def ps_srv_nodes(self, val):
+        self._ps_srv_nodes = val
+        # update derived environment variable
+        environ["PS_SRV_NODES"] = str(val)
