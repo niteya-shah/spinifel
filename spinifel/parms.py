@@ -44,10 +44,10 @@ data_multiplier = settings.data_multiplier
 verbosity = settings.verbosity
 
 if settings.small_problem:
-    N_images_per_rank = 100 * data_multiplier
+    N_images_per_rank = 10 * data_multiplier
     N_clipping = 0
     N_binning = 0
-    N_orientations = 500
+    N_orientations = 300
     N_batch_size = 100
     Mquat = int(oversampling * 20)  # 1/4 of uniform grid size
     N_generations = 5
