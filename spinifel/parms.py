@@ -12,7 +12,6 @@ numpy.seterr(divide='ignore', invalid='ignore')
 
 det_shape = (4, 512, 512)
 N_images_max = 10000
-N_generations = 10 
 data_field_name = "intensities"
 data_type_str = "float32"
 pixel_position_shape = (3,) + det_shape
@@ -24,7 +23,7 @@ volume_type_str = "complex64"
 volume_shape = (151, 151, 151)
 oversampling = 1
 
-solve_ac_maxiter = 10
+solve_ac_maxiter = 100
 
 data_dir  = settings.data_dir
 
@@ -46,24 +45,26 @@ verbosity = settings.verbosity
 
 if settings.small_problem:
     N_images_per_rank = 10 * data_multiplier
-    nER = 10
-    nHIO = 5
-    N_phase_loops = 5
-    N_clipping = 1
-    N_binning = 4
-    N_orientations = 1000
-    N_batch_size = 1000
+    N_clipping = 0
+    N_binning = 0
+    N_orientations = 300
+    N_batch_size = 100
     Mquat = int(oversampling * 20)  # 1/4 of uniform grid size
+    N_generations = 5
+    nER = 2
+    nHIO = 3
+    N_phase_loops = 5
 else:
     N_images_per_rank = 1000 * data_multiplier
+    N_clipping = 0
+    N_binning = 0
+    N_orientations = 3000 # model_slices
+    N_batch_size = 100
+    Mquat = int(oversampling * 20)  # 1/4 of uniform grid size
+    N_generations = 10
     nER = 50
     nHIO = 25
     N_phase_loops = 10
-    N_clipping = 0
-    N_binning = 3 
-    N_orientations = 2000 #model_slices
-    N_batch_size = 100
-    Mquat = int(oversampling * 20)  # 1/4 of uniform grid size
 
 M = 4 * Mquat + 1
 M_ups = 2*M  # Upsampled grid for AC convolution technique
