@@ -102,6 +102,7 @@ def right_hand_ADb_task(slices, uregion, nonuniform_v, ac, weights, M, N,
         print(f"{socket.gethostname()} started ADb.", flush=True)
     N_images_per_rank = parms.N_images_per_rank
     N_pixels_per_image = N / N_images_per_rank
+    print('N_pixels_per_image in right_hand =', N_pixels_per_image)
     data = (slices.data * (M**3/N_pixels_per_image)).flatten()
     nuvect_Db = data * weights
     print('nuvect_Db =', nuvect_Db)
@@ -138,6 +139,10 @@ def Db_squared_task(slices, weights, M, N):
         print(f"{socket.gethostname()} started Dbsquared.", flush=True)
     N_images_per_rank = parms.N_images_per_rank
     N_pixels_per_image = N / N_images_per_rank
+    print('weights =', weights)
+    print('N =', N)
+    print('N_images_per_rank =', N_images_per_rank)
+    print('N_pixels_per_image =', N_pixels_per_image)
     Db_squared = np.sum(norm(slices.data.reshape(slices.data.shape[0],-1) * weights * (M**3/N_pixels_per_image))**2, axis=-1)
     print("Db_squared =", Db_squared)
     return Db_squared
@@ -173,7 +178,8 @@ def prep_Fconv_task(uregion_ups, nonuniform_v, ac, weights, M_ups, M, N,
         1, M_ups,
         reciprocal_extent, use_reciprocal_symmetry
     )
-    uregion_ups.F_conv_[:] += np.fft.fftn(np.fft.ifftshift(conv_ups)) / M**3
+    #uregion_ups.F_conv_[:] += np.fft.fftn(np.fft.ifftshift(conv_ups)) / M**3
+    uregion_ups.F_conv_[:] += conv_ups
     if parms.verbosity > 0:
         print(f"{socket.gethostname()} computed Fconv.", flush=True)
 
@@ -189,6 +195,7 @@ def prep_Fconv(uregion_ups, nonuniform_v, nonuniform_v_p,
         prep_Fconv_task(uregion_ups, nonuniform_v_p[i],
                         ac, weights, M_ups, M, N,
                         reciprocal_extent, use_reciprocal_symmetry)
+    uregion_ups.F_conv_[:] = np.fft.fftn(np.fft.ifftshift(uregion_ups.F_conv_)) / M**3
 
 
 
@@ -215,8 +222,8 @@ def prepare_solve(slices, slices_p, nonuniform, nonuniform_p,
     nonuniform_v, nonuniform_v_p = get_nonuniform_positions_v(
         nonuniform, nonuniform_p, reciprocal_extent)
     uregion = Region((M,)*3,
-                     {"ADb": pygion.float32, "F_antisupport": pygion.float32})
-    uregion_ups = Region((M_ups,)*3, {"F_conv_": pygion.complex64})
+                     {"ADb": pygion.float32, "F_antisupport": pygion.float64})
+    uregion_ups = Region((M_ups,)*3, {"F_conv_": pygion.complex128})
     prep_Fconv(uregion_ups, nonuniform_v, nonuniform_v_p,
                ac, weights, M_ups, M, N,
                reciprocal_extent, use_reciprocal_symmetry)
@@ -265,9 +272,11 @@ def solve(uregion, uregion_ups, ac, result, summary,
 
         uvect_ADA = autocorrelation.core_problem_convolution(
             uvect, M, uregion_ups.F_conv_, M_ups, ac.support, use_reciprocal_symmetry)
+        print('uvect_ADA =', uvect_ADA)
         uvect_FDF = autocorrelation.fourier_reg(
             uvect, ac.support, uregion.F_antisupport, M, use_reciprocal_symmetry)
         uvect = uvect_ADA + rlambda*uvect + flambda*uvect_FDF
+        print('uvect in W_matvec =', uvect)
         return uvect
 
     def W0_matvec(uvect):
@@ -277,36 +286,50 @@ def solve(uregion, uregion_ups, ac, result, summary,
 
         uvect_ADA = autocorrelation.core_problem_convolution(
             uvect, M, uregion_ups.F_conv_, M_ups, ac.support, use_reciprocal_symmetry)
+        print('uvect_ADA in W0_matvec =', uvect_ADA)
         uvect = uvect_ADA 
+        print('uvect in W0_matvec =', uvect)
         return uvect
 
     W = LinearOperator(
-        dtype=np.complex64,
+        dtype=np.complex128,
         shape=(M**3, M**3),
         matvec=W_matvec)
 
     W0 = LinearOperator(
-        dtype=np.complex64,
+        dtype=np.complex128,
         shape=(M**3, M**3),
         matvec=W0_matvec)
 
     x0 = ac.estimate.flatten()
+    print('x0.dtype =', x0.dtype)
+    print('x0 =', x0)
     ADb = uregion.ADb.flatten()
+    print('ADb =', ADb)
     d = ADb + rlambda*x0
     d0 = ADb
+
+    print('debug W =', W)
+    print('debug d =', d)
+    print('debug W0 =', W0)
+    print('debug d0 =', d0)
 
     def callback(xk):
         callback.counter += 1
     callback.counter = 0
 
     ret, info = cg(W, d, x0=x0, maxiter=maxiter, callback=callback)
+    print('ret.dtype =', ret.dtype)
+    print('ret =', ret)
     print('info =', info)
     if info != 0:
         print(f'WARNING: CG did not converge at rlambda = {rlambda}')
 
+
     ret /= M**3
     d0 /= M**3
     soln = norm(ret)**2
+    print('soln =', soln)
     N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
     Ntot = N * N_procs # total number of pixels
     print('np.dot(ret,W0.matvec(ret)-2*d0) =', np.dot(ret,W0.matvec(ret)-2*d0))
@@ -412,7 +435,7 @@ def solve_ac(generation,
         orientations, orientations_p, pixel_position)
 
     ac = Region((M,)*3,
-                {"support": pygion.float32, "estimate": pygion.float32})
+                {"support": pygion.float64, "estimate": pygion.float64})
     if phased is None:
         pygion.fill(ac, "support", 1.)
         pygion.fill(ac, "estimate", 0.)
@@ -425,9 +448,9 @@ def solve_ac(generation,
         ac, weights, M, M_ups, N,
         reciprocal_extent, use_reciprocal_symmetry)
 
-    Db_squared = get_Db_squared(slices, slices_p, weights, M, N_pixels_per_image)
+    Db_squared = get_Db_squared(slices, slices_p, weights, M, N)
 
-    results = Region((N_procs * M, M, M), {"ac": pygion.float32})
+    results = Region((N_procs * M, M, M), {"ac": pygion.float64})
     results_p = Partition.restrict(results, (N_procs,), [[M], [0], [0]], [M, M, M])
 
 #    rlambdas = Mtot/Ntot * 1e2**(np.arange(N_procs) - N_procs/2)
@@ -444,6 +467,9 @@ def solve_ac(generation,
             weights, M, M_ups, N,
             generation, i, rlambdas[i], flambda, Db_squared,
             reciprocal_extent, use_reciprocal_symmetry, maxiter)
+
+    print('uregion.ADb =', uregion.ADb)
+
 
     iref = select_ac(generation, summary)
     # At this point, I just want to chose one of the results as reference.
