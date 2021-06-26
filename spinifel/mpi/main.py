@@ -19,12 +19,12 @@ def main():
     logger = utils.Logger(comm.rank==(2 if parms.use_psana else 0))
     logger.log("In MPI main")
     N_images_per_rank = parms.N_images_per_rank
-    N_big_data_nodes = comm.size - 2
     batch_size = min(N_images_per_rank, 100)
-    max_events = min(parms.N_images_max, N_big_data_nodes*N_images_per_rank)
+    max_events = min(parms.N_images_max, comm.size*N_images_per_rank)
     logger.log(f"comm.size: {comm.size:d}")
     logger.log(f"batch_size: {batch_size}")
     logger.log(f"max_events: {max_events}")
+    logger.log(f"chk convergence: {parms.chk_convergence}")
     timer = utils.Timer()
 
     # Setup DataSource
@@ -92,21 +92,24 @@ def main():
         np.save(parms.out_dir / f"ac-{generation}.npy", ac)
         np.save(parms.out_dir / f"rho_-{generation}.npy", rho_)
 
-         # Calculate correlation coefficient
-        if comm.rank == 0:
-            prev_cov_xy = cov_xy
-            cov_xy = np.corrcoef(prev_rho_.flatten(), rho_.flatten())[0,1]
-        else:
-            prev_cov_xy = None
-            cov_xy = None
-        logger.log(f"CC in {timer.lap():.2f}s. cc={cov_xy:.2f} delta={cov_xy-prev_cov_xy:.2f}")
-        
-        # Stop if improvement in cc is less than cov_delta
-        prev_cov_xy = comm.bcast(prev_cov_xy, root=0)
-        cov_xy = comm.bcast(cov_xy, root=0)
-        if cov_xy - prev_cov_xy < cov_delta:
-            print("Stopping criteria met!")
-            break
+
+        # Check if density converges
+        if parms.chk_convergence:
+            # Calculate correlation coefficient
+            if comm.rank == 0:
+                prev_cov_xy = cov_xy
+                cov_xy = np.corrcoef(prev_rho_.flatten(), rho_.flatten())[0,1]
+            else:
+                prev_cov_xy = None
+                cov_xy = None
+            logger.log(f"CC in {timer.lap():.2f}s. cc={cov_xy:.2f} delta={cov_xy-prev_cov_xy:.2f}")
+            
+            # Stop if improvement in cc is less than cov_delta
+            prev_cov_xy = comm.bcast(prev_cov_xy, root=0)
+            cov_xy = comm.bcast(cov_xy, root=0)
+            if cov_xy - prev_cov_xy < cov_delta:
+                print("Stopping criteria met!")
+                break
 
         rho = np.fft.ifftshift(rho_)
         print("rho =", rho)
