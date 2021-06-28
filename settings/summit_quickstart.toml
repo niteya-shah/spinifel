@@ -18,11 +18,12 @@ ps_eb_nodes = 1
 ps_srv_nodes = 0
 
 [runtime]
-data_multiplier = 1
+n_images_per_rank = 10
 small_problem = true
 using_cuda = true
 use_cufinufft = true
 use_single_prec = false
+chk_convergence = true 
 
 [gpu]
 devices_per_node = 1

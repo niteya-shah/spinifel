@@ -32,6 +32,8 @@ assert settings.data_filename, "Hdf5 filename input missing. Set DATA_FILENAME t
 
 data_path = data_dir / settings.data_filename
 
+chk_convergence = settings.chk_convergence
+
 if settings.use_psana:
     use_psana = True
     exp = 'xpptut15'
@@ -41,11 +43,10 @@ else:
 
 out_dir = settings.out_dir
 
-data_multiplier = settings.data_multiplier
 verbosity = settings.verbosity
 
+N_images_per_rank = settings.n_images_per_rank
 if settings.small_problem:
-    N_images_per_rank = 10 * data_multiplier
     nER = 10
     nHIO = 5
     N_phase_loops = 5
@@ -55,7 +56,6 @@ if settings.small_problem:
     N_batch_size = 1000
     Mquat = int(oversampling * 20)  # 1/4 of uniform grid size
 else:
-    N_images_per_rank = 1000 * data_multiplier
     nER = 50
     nHIO = 25
     N_phase_loops = 10

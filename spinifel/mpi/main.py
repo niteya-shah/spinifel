@@ -103,20 +103,24 @@ def main():
         np.save(parms.out_dir / f"ac-{generation}.npy", ac)
         np.save(parms.out_dir / f"rho_-{generation}.npy", rho_)
 
-         # Calculate correlation coefficient
-        if comm.rank == 0:
-            prev_cov_xy = cov_xy
-            cov_xy = np.corrcoef(prev_rho_.flatten(), rho_.flatten())[0,1]
-        else:
-            prev_cov_xy = None
-            cov_xy = None
-        logger.log(f"CC in {timer.lap():.2f}s. cc={cov_xy:.2f} delta={cov_xy-prev_cov_xy:.2f}")
-        
-        # Stop if improvement in cc is less than cov_delta
-        prev_cov_xy = comm.bcast(prev_cov_xy, root=0)
-        cov_xy = comm.bcast(cov_xy, root=0)
-        if cov_xy - prev_cov_xy < cov_delta:
-            break
+
+        # Check if density converges
+        if parms.chk_convergence:
+            # Calculate correlation coefficient
+            if comm.rank == 0:
+                prev_cov_xy = cov_xy
+                cov_xy = np.corrcoef(prev_rho_.flatten(), rho_.flatten())[0,1]
+            else:
+                prev_cov_xy = None
+                cov_xy = None
+            logger.log(f"CC in {timer.lap():.2f}s. cc={cov_xy:.2f} delta={cov_xy-prev_cov_xy:.2f}")
+            
+            # Stop if improvement in cc is less than cov_delta
+            prev_cov_xy = comm.bcast(prev_cov_xy, root=0)
+            cov_xy = comm.bcast(cov_xy, root=0)
+            if cov_xy - prev_cov_xy < cov_delta:
+                print("Stopping criteria met!")
+                break
 
         rho = np.fft.ifftshift(rho_)
         print("rho =", rho)
@@ -126,5 +130,5 @@ def main():
             save_mrc(parms.out_dir / f"rho-{generation}.mrc", rho)
             np.save(parms.out_dir / f"ac-{generation}.npy", ac_phased)
             np.save(parms.out_dir / f"rho-{generation}.npy", rho)
-
-    logger.log(f"Total: {timer.total():.2f}s.")
+    logger.log(f"Results saved in {parms.out_dir}")
+    logger.log(f"Successfully completed in {timer.total():.2f}s.")

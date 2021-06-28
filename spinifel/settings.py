@@ -111,8 +111,8 @@ class SpinifelSettings(metaclass=Singleton):
                 "enable PSANA"),
             "_out_dir": ("data", "out_dir", Path, Path(""),
                 "output dir"),
-            "_data_multiplier": ("runtime", "data_multiplier", int, 1,
-                "data multiplier"),
+            "_n_images_per_rank": ("runtime", "n_images_per_rank", int, 10,
+                "no. of images per rank"),
             "_small_problem": ("runtime", "small_problem", parse_bool, False,
                 "run in small problem mode"),
             "_using_cuda": ("runtime", "using_cuda", parse_bool, False,
@@ -130,7 +130,9 @@ class SpinifelSettings(metaclass=Singleton):
             "_use_callmonitor": ("debug", "use_callmonitor", parse_bool, False,
                 "enable call-monitor"),
             "_use_single_prec": ("runtime", "use_single_prec", parse_bool, False,
-                "if true, spinifel will use single-precision floating point")
+                "if true, spinifel will use single-precision floating point"),
+            "_chk_convergence": ("runtime", "chk_convergence", parse_bool, True,
+                "if false, no check if output density converges")
         }
 
         self.__init_internals()
@@ -142,7 +144,7 @@ class SpinifelSettings(metaclass=Singleton):
             "DATA_FILENAME": ("_data_filename", get_str),
             "USE_PSANA": ("_use_psana", get_bool),
             "OUT_DIR": ("_out_dir", get_path),
-            "DATA_MULTIPLIER": ("_data_multiplier", get_int),
+            "N_IMAGES_PER_RANK": ("_n_images_per_rank", get_int),
             "VERBOSITY": ("_verbose", get_int),
             "SMALL_PROBLEM": ("_small_problem", get_bool),
             "USING_CUDA": ("_using_cuda", get_bool),
@@ -151,7 +153,8 @@ class SpinifelSettings(metaclass=Singleton):
             "PS_SMD_N_EVENTS": ("_ps_smd_n_events", get_int),
             "PS_EB_NODES": ("_ps_eb_nodes", get_int),
             "PS_SRV_NODES": ("_ps_srv_nodes", get_int),
-            "USE_CALLMONITOR": ("_use_callmonitor", get_bool)
+            "USE_CALLMONITOR": ("_use_callmonitor", get_bool),
+            "CHK_CONVERGENCE": ("_chk_convergence", get_bool)
         }
 
 
@@ -237,9 +240,14 @@ class SpinifelSettings(metaclass=Singleton):
 
             for attr in self.__properties:
 
-                c, k, parser, _, _ = self.__properties[attr]
+                c, k, parser, default_val, _ = self.__properties[attr]
 
-                val = toml_settings[c][k]
+                # if property is not found in toml settings, use default
+                if k not in toml_settings[c]:
+                    val = default_val
+                else:    
+                    val = toml_settings[c][k]
+                
                 if parser == str or parser == Path:
                     val = expandvars(val)
 
