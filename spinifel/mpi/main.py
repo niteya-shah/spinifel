@@ -16,23 +16,22 @@ def main():
 
     comm = contexts.comm
 
-    logger = utils.Logger(comm.rank==(2 if parms.use_psana else 0))
-    logger.log("In MPI main")
-    N_images_per_rank = parms.N_images_per_rank
-    batch_size = min(N_images_per_rank, 100)
-    max_events = min(parms.N_images_max, comm.size*N_images_per_rank)
-    logger.log(f"comm.size: {comm.size:d}")
-    logger.log(f"batch_size: {batch_size}")
-    logger.log(f"max_events: {max_events}")
-    logger.log(f"chk convergence: {parms.chk_convergence}")
     timer = utils.Timer()
 
-    # Setup DataSource
+    # Reading input images from hdf5
+    N_images_per_rank = parms.N_images_per_rank
+    batch_size = min(N_images_per_rank, 100)
+    N_big_data_nodes = comm.size
+    max_events = min(parms.N_images_max, N_big_data_nodes*N_images_per_rank)
+    writer_rank = 0 # pick writer rank as core 0
+
+    # Reading input images using psana2
     ds = None
     if parms.use_psana:
         from psana import DataSource
-        logger.log("Using psana")
-        N_big_data_nodes = comm.size - 2
+        # BigData cores are those excluding Smd0, EventBuilder, & Server cores.
+        N_big_data_nodes = comm.size - (1 + parms.ps_eb_nodes + parms.ps_srv_nodes)
+        writer_rank = 1 + parms.ps_eb_nodes # pick writer rank as the first BigData core
         batch_size = min(N_images_per_rank, 100)
         max_events = min(parms.N_images_max, N_big_data_nodes*N_images_per_rank)
         def destination(timestamp):
@@ -42,6 +41,18 @@ def main():
         destination.last = 0
         ds = DataSource(exp=parms.exp, run=parms.runnum, dir=parms.data_dir,
                         destination=destination, max_events=max_events)
+    
+    # Setup logger after knowing the writer rank 
+    logger = utils.Logger(comm.rank==writer_rank)
+    logger.log("In MPI main")
+    if parms.use_psana:
+        logger.log("Using psana")
+    logger.log(f"comm.size : {comm.size:d}")
+    logger.log(f"#workers  : {N_big_data_nodes:d}")
+    logger.log(f"writerrank: {writer_rank}")
+    logger.log(f"batch_size: {batch_size}")
+    logger.log(f"max_events: {max_events}")
+
 
     # Load unique set of intensity slices for each rank
     (pixel_position_reciprocal,
