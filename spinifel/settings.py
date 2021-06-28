@@ -234,9 +234,14 @@ class SpinifelSettings(metaclass=Singleton):
 
             for attr in self.__properties:
 
-                c, k, parser, _, _ = self.__properties[attr]
+                c, k, parser, default_val, _ = self.__properties[attr]
 
-                val = toml_settings[c][k]
+                # if property is not found in toml settings, use default
+                if k not in toml_settings[c]:
+                    val = default_val
+                else:    
+                    val = toml_settings[c][k]
+                
                 if parser == str or parser == Path:
                     val = expandvars(val)
 
