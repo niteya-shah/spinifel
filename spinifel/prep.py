@@ -1,4 +1,4 @@
-import h5py
+import h5py, sys
 import matplotlib.pyplot as plt
 import numpy             as np
 import mrcfile
@@ -140,10 +140,12 @@ def load_pixel_index_map(pixel_index_map):
 
 @nvtx.annotate("prep.py", is_prefix=True)
 def load_slices(slices, i_start, i_end):
+    """Populate intensity slices from input file."""
     with h5py.File(parms.data_path, 'r') as h5f:
-        slices[:] = h5f['intensities'][i_start:i_end]
-
-
+        if h5f['intensities'].shape[0] > i_end:
+            slices[:] = h5f['intensities'][i_start:i_end]
+        else:
+            sys.exit(f"Error: Not enough intensity slices (max:{h5f['intensities'].shape[0]:d})")
 
 @nvtx.annotate("prep.py", is_prefix=True)
 def load_orientations(orientations, i_start, i_end):

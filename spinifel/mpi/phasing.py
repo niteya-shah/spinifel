@@ -5,8 +5,7 @@ from spinifel.sequential.phasing import phase as sequential_phase
 
 
 def phase(generation, ac, support_=None, rho_=None):
-
-    comm = contexts.comm
+    """Phase retrieval by Rank0 and broadcast to all ranks."""
 
     Mquat = parms.Mquat
     M = 4*Mquat + 1
