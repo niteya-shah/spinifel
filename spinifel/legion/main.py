@@ -96,11 +96,12 @@ def main():
         logger.log(f"Problem phased in {timer.lap():.2f}s.")
         
         # Check if density converges
-        cov_xy, is_cov =  cov(prev_phased, phased, cov_xy, cov_delta)
+        if parms.chk_convergence:
+            cov_xy, is_cov =  cov(prev_phased, phased, cov_xy, cov_delta)
         
-        if is_cov:
-            print("Stopping criteria met!")
-            break;
+            if is_cov:
+                print("Stopping criteria met!")
+                break;
 
         rho = np.fft.ifftshift(phased.rho_)
         print('rho =', rho)
