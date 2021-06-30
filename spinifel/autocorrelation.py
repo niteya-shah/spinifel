@@ -94,7 +94,7 @@ def core_problem_convolution(uvect, M, F_ugrid_conv_, M_ups, ac_support,
     ugrid_ups = np.zeros((M_ups,) * 3, dtype=uvect.dtype)
     ugrid_ups[:M, :M, :M] = ugrid
     # Convolution = Fourier multiplication
-    F_ugrid_ups = np.fft.fftn(np.fft.ifftshift(ugrid_ups)) / M**3
+    F_ugrid_ups = np.fft.fftn(np.fft.ifftshift(ugrid_ups))
     F_ugrid_conv_out_ups = F_ugrid_ups * F_ugrid_conv_
     ugrid_conv_out_ups = np.fft.fftshift(np.fft.ifftn(F_ugrid_conv_out_ups))
     # Downsample
@@ -114,7 +114,7 @@ def fourier_reg(uvect, support, F_antisupport, M, use_recip_sym):
     ugrid = uvect.reshape((M,) * 3) * support
     if use_recip_sym:
         assert np.all(np.isreal(ugrid))
-    F_ugrid = np.fft.fftn(np.fft.ifftshift(ugrid)) / M**3
+    F_ugrid = np.fft.fftn(np.fft.ifftshift(ugrid))
     F_reg = F_ugrid * np.fft.ifftshift(F_antisupport)
     reg = np.fft.fftshift(np.fft.ifftn(F_reg))
     uvect = (reg * support).flatten()
