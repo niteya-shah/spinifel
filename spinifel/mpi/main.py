@@ -99,11 +99,6 @@ def main():
         ac_phased, support_, rho_ = phase(generation, ac, support_, rho_)
         logger.log(f"Problem phased in {timer.lap():.2f}s.")
 
-        # Log ac and rho_
-        np.save(parms.out_dir / f"ac-{generation}.npy", ac)
-        np.save(parms.out_dir / f"rho_-{generation}.npy", rho_)
-
-
         # Check if density converges
         if parms.chk_convergence:
             # Calculate correlation coefficient
@@ -130,5 +125,6 @@ def main():
             save_mrc(parms.out_dir / f"rho-{generation}.mrc", rho)
             np.save(parms.out_dir / f"ac-{generation}.npy", ac_phased)
             np.save(parms.out_dir / f"rho-{generation}.npy", rho)
+    
     logger.log(f"Results saved in {parms.out_dir}")
     logger.log(f"Successfully completed in {timer.total():.2f}s.")
