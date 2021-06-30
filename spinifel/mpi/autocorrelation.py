@@ -10,7 +10,7 @@ from scipy.linalg        import norm
 from scipy.ndimage       import gaussian_filter
 from scipy.sparse.linalg import LinearOperator, cg
 
-from spinifel import parms, utils, image, autocorrelation, contexts
+from spinifel import parms, utils, image, autocorrelation #, contexts
 
 
 @nvtx.annotate("mpi/autocorrelation.py", is_prefix=True)
@@ -58,7 +58,6 @@ def setup_linops(comm, H, K, L, data,
     H_ = H.flatten() / reciprocal_extent * np.pi / parms.oversampling
     K_ = K.flatten() / reciprocal_extent * np.pi / parms.oversampling
     L_ = L.flatten() / reciprocal_extent * np.pi / parms.oversampling
-    data_ = data.flatten()
 
     lu = np.linspace(-np.pi, np.pi, M)
     Hu_, Ku_, Lu_ = np.meshgrid(lu, lu, lu, indexing='ij')
@@ -72,13 +71,16 @@ def setup_linops(comm, H, K, L, data,
     # Using upsampled convolution technique instead of ADA
     M_ups = parms.M_ups
     ugrid_conv = autocorrelation.adjoint(
-        np.ones_like(data_), H_, K_, L_, 1, M_ups,
+        np.ones_like(data), H_, K_, L_, 1, M_ups,
         reciprocal_extent, use_reciprocal_symmetry)
     ugrid_conv = reduce_bcast(comm, ugrid_conv)
     F_ugrid_conv_ = np.fft.fftn(np.fft.ifftshift(ugrid_conv)) / M**3
 
     def W_matvec(uvect):
         """Define W part of the W @ x = d problem."""
+        assert use_reciprocal_symmetry, "Complex AC are not supported."
+        assert np.all(np.isreal(uvect))
+
         uvect_ADA = autocorrelation.core_problem_convolution(
             uvect, M, F_ugrid_conv_, M_ups, ac_support, use_reciprocal_symmetry)
         if False:  # Debug/test -> make sure all cg are in sync (same lambdas)
@@ -92,20 +94,20 @@ def setup_linops(comm, H, K, L, data,
         return uvect
 
     W = LinearOperator(
-        dtype=np.complex128,
+        dtype=np.complex64,
         shape=(M**3, M**3),
         matvec=W_matvec)
 
-    nuvect_Db = (data_ * weights).astype(np.float32)
+    nuvect_Db = (data * weights).astype(np.float32)
     uvect_ADb = autocorrelation.adjoint(
         nuvect_Db, H_, K_, L_, ac_support, M,
         reciprocal_extent, use_reciprocal_symmetry
     ).flatten()
-    
+
     uvect_ADb = reduce_bcast(comm, uvect_ADb)
-    
+
     d = uvect_ADb + rlambda*x0
-  
+
     return W, d
 
 
@@ -120,16 +122,12 @@ def solve_ac(generation,
 
     M = parms.M
     N_images = slices_.shape[0] # N images per rank
-    print('N_images =', N_images)
     N = utils.prod(slices_.shape) # N images per rank x number of pixels per image = number of pixels per rank
-    print('N =', N)
     Ntot = N * comm.size # total number of pixels
-    print('Ntot =', Ntot)
     N_pixels_per_image = N / N_images # number of pixels per image
-    print('N_pixels_per_image =', N_pixels_per_image)
     reciprocal_extent = pixel_distance_reciprocal.max()
     use_reciprocal_symmetry = True
-    ref_rank = -1 
+    ref_rank = -1
 
     # Generate random orientations in SO(3)
     if orientations is None:
@@ -138,11 +136,11 @@ def solve_ac(generation,
     H, K, L = autocorrelation.gen_nonuniform_positions(
         orientations, pixel_position_reciprocal)
 
-    # norm(nuvect_Db)^2 = b_squared = b_1^2 + b_2^2 +....
-    b_squared = np.sum(norm(slices_.reshape(slices_.shape[0],-1) * (M**3/N_pixels_per_image))**2, axis=-1)
-    b_squared = reduce_bcast(comm, b_squared)
+    # norm(nuvect_Db)^2 = Db_squared = b_1^2 + b_2^2 +....
+    Db_squared = np.sum( norm( (slices_.reshape(slices_.shape[0],-1) ))**2, axis=-1)
+    Db_squared = reduce_bcast(comm, Db_squared)
 
-    # scale data images by (M**3/N_pixels_per_image) to match model images
+    # Scale the magnitude of data images to match the model images
     slices_ = slices_ * (M**3/N_pixels_per_image)
     data = slices_.flatten()
 
@@ -152,13 +150,14 @@ def solve_ac(generation,
         ac_estimate = np.zeros((M,)*3)
     else:
         ac_smoothed = gaussian_filter(ac_estimate, 0.5)
-        ac_support = (ac_smoothed > 1e-12).astype(np.float)
+        ac_support = (ac_smoothed > 1e-12).astype(np.float32)
         ac_estimate *= ac_support
+
     weights = np.ones(N)
 
-    # remove M**3 in the numerator
-    rlambda = 1./Ntot * 10**(comm.rank - comm.size/2) 
-    flambda = 0  # 1e5 * pow(10, comm.rank - comm.size//2)
+    # regularization parameters
+    rlambda = np.logspace(-10, 10, comm.size)[comm.rank]
+    flambda = 0 #1e5 * pow(10, comm.rank - comm.size//2)
     maxiter = parms.solve_ac_maxiter
 
     # Log central slice L~=0
@@ -176,12 +175,12 @@ def solve_ac(generation,
     callback.counter = 0 # counts no. of iterations of conjugate gradient
 
     x0 = ac_estimate.flatten()
-    W, d = setup_linops(comm, H, K, L, slices_,
+    W, d = setup_linops(comm, H, K, L, data,
                         ac_support, weights, x0,
                         M, N, reciprocal_extent,
                         rlambda, flambda,
                         use_reciprocal_symmetry)
-    
+
     # W_0 and d_0 are given by defining W and d with rlambda=0
     W_0, d_0 = setup_linops(comm, H, K, L, data,
                         ac_support, weights, x0,
@@ -198,9 +197,9 @@ def solve_ac(generation,
     ret /= M**3 # solution
     d_0 /= M**3
     soln = norm(ret)**2 # solution norm
-    resid = (np.dot(ret,W_0.matvec(ret)-2*d_0) + b_squared) / Ntot # residual norm
+    resid = (np.dot(ret,W_0.matvec(ret)-2*d_0) + Db_squared) / Ntot # residual norm
 
-    # Rank0 gathers rlambda, v1, v2 from all ranks
+    # Rank0 gathers rlambda, info, solution, residual from all ranks
     summary = comm.gather((comm.rank, rlambda, info, soln, resid), root=0)
     print('summary =', summary)
     if comm.rank == 0:
@@ -251,7 +250,6 @@ def solve_ac(generation,
         plt.savefig(parms.out_dir / f"summary_{generation}.png")
         plt.close('all')
 
-    # Rank0 broadcasts rank with best autocorrelation
     ref_rank = comm.bcast(ref_rank, root=0)
 
     # Set up ac volume
