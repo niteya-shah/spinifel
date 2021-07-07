@@ -31,12 +31,12 @@ profiler = Profiler()
 # Load cufiNUFFT or fiNUFFTpy depending on settings: use_cuda, use_cufinufft
 #
 
-if settings.using_cuda and settings.use_cufinufft:
-    # TODO: only manage MPI via contexts! But let's leave this here for now
-    context.init_mpi()  # Ensures that MPI has been initalized
+if settings.using_cuda:
+    # context.init_mpi()  # Ensures that MPI has been initalized
     context.init_cuda() # this must be called _after_ init_mpi
     from pycuda.gpuarray import GPUArray, to_gpu
 
+if settings.using_cuda and settings.use_cufinufft:
     if context.cufinufft_available:
         from cufinufft      import cufinufft
         from .cufinufft_ext import nufft_3d_t1_cufinufft_v1, \

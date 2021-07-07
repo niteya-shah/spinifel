@@ -27,6 +27,12 @@ if find_spec("pycuda") is not None:
     import pycuda.driver as drv
     PYCUDA_AVAILABLE = True
 
+PYGION_AVAILABLE = False
+if find_spec("pygion") is not None:
+    settings = SpinifelSettings()
+    if settings.mode == "legion":
+        import pygion
+        PYCUDA_AVAILABLE = True
 
 
 
@@ -51,6 +57,8 @@ class SpinifelContexts(metaclass=Singleton):
         self._mpi_initialized = False
         self._dev_id = 0
         self._cuda_initialized = False
+        self._pygion_id = 0
+        # self._legion_initialized = False
 
 
     def init_mpi(self):
@@ -81,11 +89,36 @@ class SpinifelContexts(metaclass=Singleton):
         self._mpi_initialized = True
 
 
+    # def init_legion(self):
+    #     """
+    #     does nothing if already initialized
+    #     initializes Legion-specific contexts
+    #     """
+
+    #     if not PYGION_AVAILABLE:
+    #         return
+
+    #     if self._legion_initialized:
+    #         return
+
+    #     self._pygion_id = pygion.c.legion_runtime_get_executing_processor(
+    #         pygion._my.ctx.runtime, pygion._my.ctx.context
+    #     ).id 
+    #     self._rank = self._pygion_id
+
+    #     settings = SpinifelSettings()
+    #     if settings.verbose:
+    #         print("Legion has been initialized")
+
+    #     self._legion_initialized = True
+
+
+
     def init_cuda(self):
         """
         does nothing if already initialized
         initializes pycuda and creates context bound to device:
-            <MPI Rank> % <Devices Per Resource Set>
+            <MPI/Legion Rank> % <Devices Per Resource Set>
         and registers context cleanup on atexit stack
         """
 
@@ -101,11 +134,11 @@ class SpinifelContexts(metaclass=Singleton):
         self._dev_id = self.rank % settings.devices_per_node
 
         dev = drv.Device(self.dev_id)
-        ctx = dev.make_context()
+        ctx = dev.retain_primary_context()
+        ctx.push()
 
         register(ctx.pop)
 
-        settings = SpinifelSettings()
         if settings.verbose:
             print(f"Rank {self.rank} assigned to device {self.dev_id}")
 
@@ -115,8 +148,15 @@ class SpinifelContexts(metaclass=Singleton):
     @property
     def rank(self):
         """
-        Get MPI Rank
+        Get MPI/Legion Rank
         """
+        settings = SpinifelSettings()
+        if settings.mode == "legion":
+            self._pygion_id = pygion.c.legion_runtime_get_executing_processor(
+                pygion._my.ctx.runtime, pygion._my.ctx.context
+            ).id 
+            return self._pygion_id
+
         return self._rank
 
 
