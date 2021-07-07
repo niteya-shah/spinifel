@@ -101,9 +101,7 @@ class SpinifelContexts(metaclass=Singleton):
         self._dev_id = self.rank % settings.devices_per_node
 
         dev = drv.Device(self.dev_id)
-        ctx = dev.make_context()
-
-        register(ctx.pop)
+        self.ctx = dev.retain_primary_context()
 
         settings = SpinifelSettings()
         if settings.verbose:

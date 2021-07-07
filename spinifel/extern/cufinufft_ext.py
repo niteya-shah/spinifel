@@ -119,7 +119,7 @@ def nufft_3d_t1_cufinufft_v1(H_, K_, L_, nuvect, sign, eps, nx, ny, nz):
 
     if settings.verbose:
         print(f"Using v1 CUDA to solve the NUFFT 3D T1 on device {dev_id}")
-    ctx = cuda.Device(dev_id).make_context()
+    context.ctx.push()
 
     # Ensure that H_, K_, and L_ have the same shape
     assert H_.shape == K_.shape == L_.shape
@@ -159,7 +159,7 @@ def nufft_3d_t1_cufinufft_v1(H_, K_, L_, nuvect, sign, eps, nx, ny, nz):
     # Copy result back to host -- if the incoming data was on host
     ugrid = result_to_cpu(ugrid_gpu, H_)
 
-    ctx.pop()
+    context.ctx.pop()
 
     return ugrid
 
@@ -180,7 +180,7 @@ def nufft_3d_t2_cufinufft_v1(H_, K_, L_, ugrid, sign, eps, N):
 
     if settings.verbose:
         print(f"Using v1 CUDA to solve the NUFFT 3D T2 on device {dev_id}")
-    ctx = cuda.Device(dev_id).make_context()
+    context.ctx.push()
 
     gpu_free, gpu_total = context.cuda_mem_info()
     logger.debug(
@@ -236,7 +236,7 @@ def nufft_3d_t2_cufinufft_v1(H_, K_, L_, ugrid, sign, eps, N):
     # Copy result back to host -- if the incoming data was on host
     nuvect = result_to_cpu(nuvect_gpu, H_)
 
-    ctx.pop()
+    context.ctx.pop()
 
     return nuvect
 
@@ -257,7 +257,7 @@ def nufft_3d_t1_cufinufft_v2(H_, K_, L_, nuvect, sign, eps, nx, ny, nz):
 
     if settings.verbose:
         print(f"Using v2 CUDA to solve the NUFFT 3D T1 on device {dev_id}")
-    ctx = cuda.Device(dev_id).make_context()
+    context.ctx.push()
 
     # Ensure that H_, K_, and L_ have the same shape
     assert H_.shape == K_.shape == L_.shape
@@ -293,7 +293,7 @@ def nufft_3d_t1_cufinufft_v2(H_, K_, L_, nuvect, sign, eps, nx, ny, nz):
     # Copy result back to host -- if the incoming data was on host
     ugrid = result_to_cpu(ugrid_gpu, H_)
 
-    ctx.pop()
+    context.ctx.pop()
 
     return ugrid
 
@@ -313,7 +313,7 @@ def nufft_3d_t2_cufinufft_v2(H_, K_, L_, ugrid, sign, eps, N):
 
     if settings.verbose:
         print(f"Using v2 CUDA to solve the NUFFT 3D T2 on device {dev_id}")
-    ctx = cuda.Device(dev_id).make_context()
+    context.ctx.push()
 
     gpu_free, gpu_total = context.cuda_mem_info()
     logger.debug(
@@ -364,6 +364,6 @@ def nufft_3d_t2_cufinufft_v2(H_, K_, L_, ugrid, sign, eps, N):
     # Copy result back to host -- if the incoming data was on host
     nuvect = result_to_cpu(nuvect_gpu, H_)
 
-    ctx.pop()
+    context.ctx.pop()
 
     return nuvect
