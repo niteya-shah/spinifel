@@ -27,12 +27,6 @@ if find_spec("pycuda") is not None:
     import pycuda.driver as drv
     PYCUDA_AVAILABLE = True
 
-PYGION_AVAILABLE = False
-if find_spec("pygion") is not None:
-    settings = SpinifelSettings()
-    if settings.mode == "legion":
-        import pygion
-        PYCUDA_AVAILABLE = True
 
 
 
@@ -121,12 +115,6 @@ class SpinifelContexts(metaclass=Singleton):
         """
         Get MPI Rank
         """
-        settings = SpinifelSettings()
-        if settings.mode == "legion":
-            return pygion.c.legion_processor_address_space(
-                pygion.c.legion_runtime_get_executing_processor(
-                    pygion._my.ctx.runtime, pygion._my.ctx.context))
-
         return self._rank
 
 
