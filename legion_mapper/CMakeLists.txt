@@ -4,6 +4,7 @@ project(legion_mappers)
 find_package(Legion REQUIRED)
 
 list(APPEND LEGION_MAPPERS_SRC
+  lifeline_mapper.cc       lifeline_mapper.h
   simple_mapper.cc         simple_mapper.h
 )
 
