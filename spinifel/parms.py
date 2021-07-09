@@ -1,5 +1,5 @@
 import matplotlib
-import numpy
+import numpy as np
 import os
 from pathlib import Path
 
@@ -8,11 +8,13 @@ from spinifel import SpinifelSettings
 settings = SpinifelSettings()
 
 matplotlib.use("Agg")
-numpy.seterr(divide='ignore', invalid='ignore')
+np.seterr(divide='ignore', invalid='ignore')
 
-det_shape = (4, 512, 512)
+#det_shape = (4, 512, 512)
+det_shape = (1, 128, 128)
+quaternion_shape = (4,)
 N_images_max = 10000
-N_generations = 10
+N_generations = 5
 data_field_name = "intensities"
 data_type_str = "float32"
 pixel_position_shape = (3,) + det_shape
@@ -21,7 +23,8 @@ pixel_index_shape = (2,) + det_shape
 pixel_index_type_str = "int32"
 orientation_type_str = "float32"
 volume_type_str = "complex64"
-volume_shape = (151, 151, 151)
+#volume_shape = (151, 151, 151)
+volume_shape = (149, 149, 149)
 oversampling = 1
 
 solve_ac_maxiter = 100
@@ -61,8 +64,8 @@ else:
     N_phase_loops = 10
     N_clipping = 0
     N_binning = 0
-    N_orientations = 3000 # model_slices
-    N_batch_size = 100
+    N_orientations = 10000 # int(8*np.pi**3*(2*(4*int(oversampling*2*20)+1))**3) # model_slices
+    N_batch_size = 1000
     Mquat = int(oversampling * 20)  # 1/4 of uniform grid size
 
 M = 4 * Mquat + 1
@@ -72,7 +75,6 @@ reduced_det_shape = det_shape[:-2] + (
     det_shape[-2] // 2**N_binning_tot, det_shape[-1] // 2**N_binning_tot)
 reduced_pixel_position_shape = (3,) + reduced_det_shape
 reduced_pixel_index_shape = (2,) + reduced_det_shape
-
 
 # PSANA2
 ps_smd_n_events = settings.ps_smd_n_events
