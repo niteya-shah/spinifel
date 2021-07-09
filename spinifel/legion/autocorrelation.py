@@ -26,7 +26,7 @@ def gen_random_orientations(orientations, N_images_per_rank):
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def get_random_orientations():
     N_images_per_rank = parms.N_images_per_rank
-    fields_dict = {"quaternions": pygion.float32}
+    fields_dict = {"quaternions": pygion.float64}
     sec_shape = (4,)
     orientations, orientations_p = lgutils.create_distributed_region(
         N_images_per_rank, fields_dict, sec_shape)
@@ -54,8 +54,8 @@ def get_nonuniform_positions_v(nonuniform, nonuniform_p, reciprocal_extent):
     """Flatten and calibrate nonuniform positions."""
     N_vals_per_rank = (
         parms.N_images_per_rank * utils.prod(parms.reduced_det_shape))
-    fields_dict = {"H": pygion.float32, "K": pygion.float32,
-                   "L": pygion.float32}
+    fields_dict = {"H": pygion.float64, "K": pygion.float64,
+                   "L": pygion.float64}
     sec_shape = ()
     nonuniform_v, nonuniform_v_p = lgutils.create_distributed_region(
         N_vals_per_rank, fields_dict, sec_shape)
@@ -81,8 +81,8 @@ def gen_nonuniform_positions(orientations, nonuniform, pixel_position):
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def get_nonuniform_positions(orientations, orientations_p, pixel_position):
     N_images_per_rank = parms.N_images_per_rank
-    fields_dict = {"H": pygion.float32, "K": pygion.float32,
-                   "L": pygion.float32}
+    fields_dict = {"H": pygion.float64, "K": pygion.float64,
+                   "L": pygion.float64}
     sec_shape = parms.reduced_det_shape
     nonuniform, nonuniform_p = lgutils.create_distributed_region(
         N_images_per_rank, fields_dict, sec_shape)
@@ -210,8 +210,8 @@ def prepare_solve(slices, slices_p, nonuniform, nonuniform_p,
     nonuniform_v, nonuniform_v_p = get_nonuniform_positions_v(
         nonuniform, nonuniform_p, reciprocal_extent)
     uregion = Region((M,)*3,
-                     {"ADb": pygion.float32, "F_antisupport": pygion.float32})
-    uregion_ups = Region((M_ups,)*3, {"F_conv_": pygion.complex64})
+                     {"ADb": pygion.float64, "F_antisupport": pygion.float64})
+    uregion_ups = Region((M_ups,)*3, {"F_conv_": pygion.complex128})
     prep_Fconv(uregion_ups, nonuniform_v, nonuniform_v_p,
                ac, weights, M_ups, M, N,
                reciprocal_extent, use_reciprocal_symmetry)
@@ -227,7 +227,7 @@ def prepare_solve(slices, slices_p, nonuniform, nonuniform_p,
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def phased_to_constrains(phased, ac):
     ac_smoothed = gaussian_filter(phased.ac, 0.5)
-    ac.support[:] = (ac_smoothed > 1e-12).astype(np.float32)
+    ac.support[:] = (ac_smoothed > 1e-12).astype(np.float64)
     ac.estimate[:] = phased.ac * ac.support
 
 
@@ -275,16 +275,16 @@ def solve(uregion, uregion_ups, ac, result, summary,
         return uvect
 
     W = LinearOperator(
-        dtype=np.complex64,
+        dtype=np.complex128,
         shape=(M**3, M**3),
         matvec=W_matvec)
 
     W0 = LinearOperator(
-        dtype=np.complex64,
+        dtype=np.complex128,
         shape=(M**3, M**3),
         matvec=W0_matvec)
 
-    x0 = ac.estimate.astype(np.float32).flatten()
+    x0 = ac.estimate.astype(np.float64).flatten()
     ADb = uregion.ADb.flatten()
     d = ADb + rlambda*x0
     d0 = ADb
@@ -334,13 +334,19 @@ def select_ac(generation, summary):
     print('summary.info =', summary.info)
     print('summary.soln =', summary.soln)
     print('summary.resid =', summary.resid) 
+
+    converged_idx = [i for i, info in enumerate(summary.info) if info == 0]
+    ranks = np.array(summary.rank)[converged_idx]
+    lambdas = np.array(summary.rlambda)[converged_idx]
+    solns = np.array(summary.soln)[converged_idx]
+    resids = np.array(summary.resid)[converged_idx]    
     
     # Take corner of L-curve
-    valuePair = np.array([summary.resid, summary.soln]).T
+    valuePair = np.array([resids, solns]).T
     valuePair = np.array(sorted(valuePair , key=lambda k: [k[0], k[1]])) # sort the corner candidates in increasing order
-    sorted_rlambdas = np.sort(summary.rlambda) # sort lambdas in increasing order
+    lambdas = np.sort(lambdas) # sort lambdas in increasing order
     allCoord = np.log(valuePair) # coordinates of the loglog L-curve
-    nPoints = len(summary.resid)
+    nPoints = len(resids)
     firstPoint = allCoord[0]
     lineVec = allCoord[-1] - allCoord[0]
     lineVecNorm = lineVec / np.sqrt(np.sum(lineVec**2))
@@ -351,16 +357,16 @@ def select_ac(generation, summary):
     distToLine = np.sqrt(np.sum(vecToLine ** 2, axis=1))
     iref = np.argmax(distToLine)
     print('iref =', iref)
-    ref_rank = summary.rank[iref]
+    ref_rank = ranks[iref]
 
     # Log L-curve plot
     fig, axes = plt.subplots(figsize=(10.0, 24.0), nrows=3, ncols=1)
-    axes[0].loglog(sorted_rlambdas, valuePair.T[1])
-    axes[0].loglog(sorted_rlambdas[iref], valuePair[iref][1], "rD")
+    axes[0].loglog(lambdas, valuePair.T[1])
+    axes[0].loglog(lambdas[iref], valuePair[iref][1], "rD")
     axes[0].set_xlabel("$\lambda$")
     axes[0].set_ylabel("Solution norm $||x||_{2}$")
-    axes[1].loglog(sorted_rlambdas, valuePair.T[0])
-    axes[1].loglog(sorted_rlambdas[iref], valuePair[iref][0], "rD")
+    axes[1].loglog(lambdas, valuePair.T[0])
+    axes[1].loglog(lambdas[iref], valuePair[iref][0], "rD")
     axes[1].set_xlabel("$\lambda$")
     axes[1].set_ylabel("Residual norm $||Ax-b||_{2}$")
     axes[2].loglog(valuePair.T[0], valuePair.T[1]) # L-curve
@@ -403,7 +409,7 @@ def solve_ac(generation,
         orientations, orientations_p, pixel_position)
 
     ac = Region((M,)*3,
-                {"support": pygion.float32, "estimate": pygion.float32})
+                {"support": pygion.float64, "estimate": pygion.float64})
     if phased is None:
         pygion.fill(ac, "support", 1.)
         pygion.fill(ac, "estimate", 0.)
@@ -418,15 +424,15 @@ def solve_ac(generation,
 
     Db_squared = get_Db_squared(slices, slices_p, weights)
 
-    results = Region((N_procs * M, M, M), {"ac": pygion.float32})
+    results = Region((N_procs * M, M, M), {"ac": pygion.float64})
     results_p = Partition.restrict(results, (N_procs,), [[M], [0], [0]], [M, M, M])
 
     #rlambdas = 100**(np.arange(N_procs) - N_procs/2)
-    rlambdas = np.logspace(-10, 10, N_procs)
+    rlambdas = np.logspace(-8, 8, N_procs)
     flambda = 0
 
     summary = Region((N_procs,),
-                {"rank": pygion.int32, "rlambda": pygion.float32, "info": pygion.int32, "soln": pygion.float32, "resid": pygion.float32})
+                {"rank": pygion.int32, "rlambda": pygion.float64, "info": pygion.int32, "soln": pygion.float64, "resid": pygion.float64})
     summary_p = Partition.equal(summary, (N_procs,))
 
     for i in IndexLaunch((N_procs,)):
