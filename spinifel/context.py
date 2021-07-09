@@ -98,7 +98,7 @@ class SpinifelContexts(metaclass=Singleton):
         drv.init()
 
         settings     = SpinifelSettings()
-        self._dev_id = self.rank % settings.devices_per_node
+        self._dev_id = self.rank % drv.Device.count()
 
         print('self.dev_id =', self.dev_id, flush=True)
         print('drv.Device.count() =', drv.Device.count(), flush=True)
