@@ -109,6 +109,7 @@ def get_slices(ds):
 
 
 @task(privileges=[WD])
+@nvtx.annotate("legion/prep.py", is_prefix=True)
 def load_orientations_prior(orientations_prior, rank, N_images_per_rank):
     if parms.verbosity > 0:
         print(f"{socket.gethostname()} loading orientations.", flush=True)
@@ -119,6 +120,7 @@ def load_orientations_prior(orientations_prior, rank, N_images_per_rank):
         print(f"{socket.gethostname()} loaded orientations.", flush=True)
 
 
+@nvtx.annotate("legion/prep.py", is_prefix=True)
 def get_orientations_prior():
     N_images_per_rank = parms.N_images_per_rank
     fields_dict = {"quaternions": getattr(pygion, parms.data_type_str)}
@@ -245,6 +247,7 @@ def get_data(ds):
     pixel_position = get_pixel_position()
     pixel_index = get_pixel_index()
     slices, slices_p = get_slices(ds)
+    orientations_prior, orientations_prior_p = get_orientations_prior()
     mean_image = compute_mean_image(slices, slices_p)
     show_image(pixel_index, slices_p[0], 0, "image_0.png")
     show_image(pixel_index, mean_image, ..., "mean_image.png")
@@ -258,4 +261,4 @@ def get_data(ds):
     show_image(pixel_index, mean_image, ..., "mean_image_binned.png")
     pixel_distance = compute_pixel_distance(pixel_position)
     export_saxs(pixel_distance, mean_image, "saxs_binned.png")
-    return (pixel_position, pixel_distance, pixel_index, slices, slices_p)
+    return (pixel_position, pixel_distance, pixel_index, slices, slices_p, orientations_prior, orientations_prior_p)
