@@ -3,7 +3,7 @@ import PyNVTX as nvtx
 import os
 import pygion
 
-from pygion import acquire, attach_hdf5, task, Partition, Region, R, Tunable, WD
+from pygion import acquire, attach_hdf5, execution_fence, task, Partition, Region, R, Tunable, WD
 
 from spinifel import parms, utils, SpinifelSettings
 from spinifel.prep import save_mrc
@@ -110,6 +110,8 @@ def main():
         save_mrc(parms.out_dir / f"rho-{generation}.mrc", rho)
         np.save(parms.out_dir / f"ac-{generation}.npy", phased.ac)
         np.save(parms.out_dir / f"rho-{generation}.npy", rho)
+
+    execution_fence(block=True)
 
     logger.log(f"Results saved in {parms.out_dir}")
     logger.log(f"Successfully completed in {timer.total():.2f}s.")
