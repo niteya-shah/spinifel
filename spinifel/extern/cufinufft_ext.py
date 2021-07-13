@@ -28,7 +28,7 @@ profiler = Profiler()
 # Load cufiNUFFT or fiNUFFTpy depending on settings: use_cuda, use_cufinufft
 #
 
-if settings.using_cuda and settings.use_cufinufft:
+if settings.use_cuda and settings.use_cufinufft:
     from . import GPUArray, to_gpu
 
     if context.cufinufft_available:
