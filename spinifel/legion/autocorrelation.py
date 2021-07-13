@@ -50,7 +50,7 @@ def gen_nonuniform_positions_v(nonuniform, nonuniform_v, reciprocal_extent):
 
 
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
-def get_nonuniform_positions_v(nonuniform, nonuniform_p, reciprocal_extent):
+def create_nonuniform_positions_v(nonuniform_p, reciprocal_extent):
     """Flatten and calibrate nonuniform positions."""
     N_vals_per_rank = (
         parms.N_images_per_rank * utils.prod(parms.reduced_det_shape))
@@ -59,11 +59,17 @@ def get_nonuniform_positions_v(nonuniform, nonuniform_p, reciprocal_extent):
     sec_shape = ()
     nonuniform_v, nonuniform_v_p = lgutils.create_distributed_region(
         N_vals_per_rank, fields_dict, sec_shape)
+    return nonuniform_v, nonuniform_v_p
+
+
+
+@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
+def fill_nonuniform_positions_v(nonuniform_p, reciprocal_extent, nonuniform_v_p):
+    """Flatten and calibrate nonuniform positions."""
     N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
     for i in IndexLaunch([N_procs]):
         gen_nonuniform_positions_v(nonuniform_p[i], nonuniform_v_p[i],
                                    reciprocal_extent)
-    return nonuniform_v, nonuniform_v_p
 
 
 
@@ -79,18 +85,23 @@ def gen_nonuniform_positions(orientations, nonuniform, pixel_position):
 
 
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
-def get_nonuniform_positions(orientations, orientations_p, pixel_position):
+def create_nonuniform_positions():
     N_images_per_rank = parms.N_images_per_rank
     fields_dict = {"H": pygion.float64, "K": pygion.float64,
                    "L": pygion.float64}
     sec_shape = parms.reduced_det_shape
     nonuniform, nonuniform_p = lgutils.create_distributed_region(
         N_images_per_rank, fields_dict, sec_shape)
+    return nonuniform, nonuniform_p
+
+
+
+@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
+def fill_nonuniform_positions(orientations_p, pixel_position, nonuniform_p):
     N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
     for i in IndexLaunch([N_procs]):
         gen_nonuniform_positions(
             orientations_p[i], nonuniform_p[i], pixel_position)
-    return nonuniform, nonuniform_p
 
 
 
@@ -118,7 +129,7 @@ def right_hand_ADb_task(slices, uregion, nonuniform_v, ac, weights, M, N,
 
 
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
-def right_hand(slices, slices_p, uregion, nonuniform_v, nonuniform_v_p,
+def right_hand(slices_p, uregion, nonuniform_v_p,
                ac, weights, M, N,
                reciprocal_extent, use_reciprocal_symmetry):
     pygion.fill(uregion, "ADb", 0.)
@@ -141,7 +152,7 @@ def Db_squared_task(slices, weights):
 
 
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
-def get_Db_squared(slices, slices_p, weights):
+def get_Db_squared(slices_p, weights):
     futures = []
     Db_squared = 0
     N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
@@ -175,7 +186,7 @@ def prep_Fconv_task(uregion_ups, nonuniform_v, ac, weights, M_ups, M, N,
 
 
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
-def prep_Fconv(uregion_ups, nonuniform_v, nonuniform_v_p,
+def prep_Fconv(uregion_ups, nonuniform_v_p,
                ac, weights, M_ups, M, N,
                reciprocal_extent, use_reciprocal_symmetry):
     pygion.fill(uregion_ups, "F_conv_", 0.)
@@ -204,22 +215,31 @@ def prep_Fantisupport(uregion, M):
 
 
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
-def prepare_solve(slices, slices_p, nonuniform, nonuniform_p,
-                  ac, weights, M, M_ups, N,
-                  reciprocal_extent, use_reciprocal_symmetry):
-    nonuniform_v, nonuniform_v_p = get_nonuniform_positions_v(
-        nonuniform, nonuniform_p, reciprocal_extent)
+def setup_prepare_solve(nonuniform, nonuniform_p,
+                  M, M_ups,
+                  reciprocal_extent):
+    nonuniform_v, nonuniform_v_p = create_nonuniform_positions_v(
+        nonuniform_p, reciprocal_extent)
     uregion = Region((M,)*3,
                      {"ADb": pygion.float64, "F_antisupport": pygion.float64})
     uregion_ups = Region((M_ups,)*3, {"F_conv_": pygion.complex128})
-    prep_Fconv(uregion_ups, nonuniform_v, nonuniform_v_p,
+    return nonuniform_v, nonuniform_v_p, uregion, uregion_ups
+
+
+
+@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
+def prepare_solve(slices_p, nonuniform_p, nonuniform_v_p, uregion, uregion_ups,
+                  ac, weights, M, M_ups, N,
+                  reciprocal_extent, use_reciprocal_symmetry):
+    fill_nonuniform_positions_v(
+        nonuniform_p, reciprocal_extent, nonuniform_v_p)
+    prep_Fconv(uregion_ups, nonuniform_v_p,
                ac, weights, M_ups, M, N,
                reciprocal_extent, use_reciprocal_symmetry)
-    right_hand(slices, slices_p, uregion, nonuniform_v, nonuniform_v_p,
+    right_hand(slices_p, uregion, nonuniform_v_p,
                ac, weights, M, N,
                reciprocal_extent, use_reciprocal_symmetry)
     prep_Fantisupport(uregion, M)
-    return uregion, uregion_ups
 
 
 
@@ -381,35 +401,61 @@ def select_ac(generation, summary):
 
     return iref
 
+@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
+def setup_solve_ac(pixel_position,
+                   pixel_distance):
+    M = parms.M
+    M_ups = parms.M_ups  # For upsampled convolution technique
+    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
+    reciprocal_extent = pixel_distance.reciprocal.max()
+
+    orientations, orientations_p = get_random_orientations()
+    nonuniform, nonuniform_p = create_nonuniform_positions()
+
+    ac = Region((M,)*3,
+                {"support": pygion.float64, "estimate": pygion.float64})
+
+    nonuniform_v, nonuniform_v_p, uregion, uregion_ups = setup_prepare_solve(
+        nonuniform, nonuniform_p, M, M_ups, reciprocal_extent)
+
+    results = Region((N_procs * M, M, M), {"ac": pygion.float64})
+    results_p = Partition.restrict(results, (N_procs,), [[M], [0], [0]], [M, M, M])
+
+    summary = Region((N_procs,),
+                {"rank": pygion.int32, "rlambda": pygion.float64, "info": pygion.int32, "soln": pygion.float64, "resid": pygion.float64})
+    summary_p = Partition.equal(summary, (N_procs,))
+
+    return (orientations, orientations_p,
+            nonuniform, nonuniform_p,
+            nonuniform_v, nonuniform_v_p,
+            ac, uregion, uregion_ups,
+            results, results_p,
+            summary, summary_p)
 
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def solve_ac(generation,
              pixel_position,
              pixel_distance,
-             slices,
-             slices_p,
-             orientations=None,
-             orientations_p=None,
+             slices, slices_p,
+             orientations_p,
+             nonuniform_p,
+             nonuniform_v_p,
+             ac, uregion, uregion_ups,
+             results_p,
+             summary, summary_p,
              phased=None):
     M = parms.M
     M_ups = parms.M_ups  # For upsampled convolution technique
     N_images_per_rank = parms.N_images_per_rank # N images per rank
     N = N_images_per_rank * utils.prod(parms.reduced_det_shape) # N images per rank x number of pixels per image = number of pixels per rank
     N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
-    N_images_tot = N_images_per_rank * N_procs
-    Ntot = N * N_procs # total number of pixels
-    N_pixels_per_image = N / N_images_per_rank # number of pixels per image
     reciprocal_extent = pixel_distance.reciprocal.max()
     use_reciprocal_symmetry = True
     maxiter = parms.solve_ac_maxiter
 
-    if orientations is None:
-        orientations, orientations_p = get_random_orientations()
-    nonuniform, nonuniform_p = get_nonuniform_positions(
-        orientations, orientations_p, pixel_position)
+    fill_nonuniform_positions(
+        orientations_p, pixel_position, nonuniform_p)
 
-    ac = Region((M,)*3,
-                {"support": pygion.float64, "estimate": pygion.float64})
     if phased is None:
         pygion.fill(ac, "support", 1.)
         pygion.fill(ac, "estimate", 0.)
@@ -417,23 +463,16 @@ def solve_ac(generation,
         phased_to_constrains(phased, ac)
     weights = 1
 
-    uregion, uregion_ups = prepare_solve(
-        slices, slices_p, nonuniform, nonuniform_p,
+    prepare_solve(
+        slices_p, nonuniform_p, nonuniform_v_p, uregion, uregion_ups,
         ac, weights, M, M_ups, N,
         reciprocal_extent, use_reciprocal_symmetry)
 
-    Db_squared = get_Db_squared(slices, slices_p, weights)
-
-    results = Region((N_procs * M, M, M), {"ac": pygion.float64})
-    results_p = Partition.restrict(results, (N_procs,), [[M], [0], [0]], [M, M, M])
+    Db_squared = get_Db_squared(slices_p, weights)
 
     #rlambdas = 100**(np.arange(N_procs) - N_procs/2)
     rlambdas = np.logspace(-8, 8, N_procs)
     flambda = 0
-
-    summary = Region((N_procs,),
-                {"rank": pygion.int32, "rlambda": pygion.float64, "info": pygion.int32, "soln": pygion.float64, "resid": pygion.float64})
-    summary_p = Partition.equal(summary, (N_procs,))
 
     for i in IndexLaunch((N_procs,)):
         solve(
