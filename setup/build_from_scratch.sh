@@ -106,6 +106,7 @@ CC=$MPI4PY_CC MPICC=$MPI4PY_MPICC pip install -v --no-binary mpi4py mpi4py
 pip install --no-cache-dir callmonitor
 pip install --no-cache-dir PyNVTX
 pip install --no-cache-dir mrcfile
+pip install --no-cache-dir cupy
 
 #-------------------------------------------------------------------------------
 
