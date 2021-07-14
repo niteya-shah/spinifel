@@ -159,6 +159,12 @@ def nufft_3d_t1_cufinufft_v1(H_, K_, L_, nuvect, sign, eps, nx, ny, nz):
     # Copy result back to host -- if the incoming data was on host
     ugrid = result_to_cpu(ugrid_gpu, H_)
 
+    del nuvect_gpu
+    del H_gpu
+    del K_gpu
+    del L_gpu
+    del ugrid_gpu
+
     context.ctx.pop()
 
     return ugrid
@@ -236,6 +242,12 @@ def nufft_3d_t2_cufinufft_v1(H_, K_, L_, ugrid, sign, eps, N):
     # Copy result back to host -- if the incoming data was on host
     nuvect = result_to_cpu(nuvect_gpu, H_)
 
+    del nuvect_gpu
+    del H_gpu
+    del K_gpu
+    del L_gpu
+    del ugrid_gpu
+
     context.ctx.pop()
 
     return nuvect
@@ -292,6 +304,12 @@ def nufft_3d_t1_cufinufft_v2(H_, K_, L_, nuvect, sign, eps, nx, ny, nz):
 
     # Copy result back to host -- if the incoming data was on host
     ugrid = result_to_cpu(ugrid_gpu, H_)
+
+    del nuvect_gpu
+    del H_gpu
+    del K_gpu
+    del L_gpu
+    del ugrid_gpu
 
     context.ctx.pop()
 
@@ -363,6 +381,12 @@ def nufft_3d_t2_cufinufft_v2(H_, K_, L_, ugrid, sign, eps, N):
 
     # Copy result back to host -- if the incoming data was on host
     nuvect = result_to_cpu(nuvect_gpu, H_)
+
+    del nuvect_gpu
+    del H_gpu
+    del K_gpu
+    del L_gpu
+    del ugrid_gpu
 
     context.ctx.pop()
 
