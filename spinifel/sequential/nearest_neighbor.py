@@ -79,7 +79,7 @@ def calc_argmin_gpu(euDist, n_images, n_refs, n_pixels, deviceId):
 def nearest_neighbor(model_slices, slices, batch_size):
 
     if settings.using_cuda:
-        deviceId = rank % settings._devices_per_node
+        deviceId = context.dev_id
         if settings.verbose:
             print(f"Using CUDA  to calculate Euclidean distance and heap sort (batch_size={batch_size})")
             print(f"Rank {rank} using deviceId {deviceId}")

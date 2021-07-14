@@ -609,6 +609,16 @@ __global__ void computeKSort(float *dKDist, int *dKIndex, int numDataImgs, int t
         }
 }
 
+#define CHECK(x) \
+  do {                                                                  \
+    if ((x) != cudaSuccess) {                                           \
+      fprintf(stderr, "%s:%d: CUDA error: %s\n", __FILE__, __LINE__, cudaGetErrorString(x)); \
+      fflush(stderr);                                                   \
+      abort();                                                          \
+    }                                                                   \
+  }                                                                     \
+  while (false)
+
 //Function used to invoke CUDA kernels.
 py::array_t<dtype> cudaComputeEuclideanDistance(py::array_t<dtype> dataImgs, py::array_t<dtype> refImgs, int numDataImgs, int numRefImgs, int totalPixels, int deviceId)
 {
@@ -619,15 +629,15 @@ py::array_t<dtype> cudaComputeEuclideanDistance(py::array_t<dtype> dataImgs, py:
 	cout<<"[CUDA] Dimension of dataImgs: "<<dataBuf.ndim<<" and refImgs: "<<refBuf.ndim<<endl;
 	cout<<"[CUDA] Size of dataImgs: "<<dataBuf.size<<" and refImgs: "<<refBuf.size<<endl;
 
-    cudaSetDevice(deviceId);
+        CHECK(cudaSetDevice(deviceId));
 
 	//Declare and allocate device variables
 	dtype *dDataImgs, *dRefImgs, *dEuDist;
-        cudaMalloc((void **)&dDataImgs, numDataImgs*totalPixels*sizeof(dtype));
-        cudaMalloc((void **)&dRefImgs, numRefImgs*totalPixels*sizeof(dtype));
-        cudaMalloc((void **)&dEuDist, numDataImgs*numRefImgs*sizeof(dtype));
-        //cudaMalloc((void **)&dKDist, numDataImgs*totalNN*sizeof(float));
-        //cudaMalloc((void **)&dKIndex, numDataImgs*totalNN*sizeof(int));
+        CHECK(cudaMalloc((void **)&dDataImgs, numDataImgs*totalPixels*sizeof(dtype)));
+        CHECK(cudaMalloc((void **)&dRefImgs, numRefImgs*totalPixels*sizeof(dtype)));
+        CHECK(cudaMalloc((void **)&dEuDist, numDataImgs*numRefImgs*sizeof(dtype)));
+        //CHECK(cudaMalloc((void **)&dKDist, numDataImgs*totalNN*sizeof(float)));
+        //CHECK(cudaMalloc((void **)&dKIndex, numDataImgs*totalNN*sizeof(int)));
 
 	//Allocate euDist 
 	py::array_t<dtype> euDist = py::array_t<dtype>(numDataImgs*numRefImgs);
@@ -647,9 +657,9 @@ py::array_t<dtype> cudaComputeEuclideanDistance(py::array_t<dtype> dataImgs, py:
 	auto start = high_resolution_clock::now();
 	//Copy host to device
 	cout<<"[CUDA] Copy data from host to device."<<endl;
-	cudaMemcpy(dDataImgs, dataPtr, numDataImgs*totalPixels*sizeof(dtype), cudaMemcpyHostToDevice);
-	cudaMemcpy(dRefImgs, refPtr, numRefImgs*totalPixels*sizeof(dtype), cudaMemcpyHostToDevice);
-	//cudaMemcpy(dEuDist, euDistPtr, numDataImgs*numRefImgs*sizeof(dtype), cudaMemcpyHostToDevice);
+	CHECK(cudaMemcpy(dDataImgs, dataPtr, numDataImgs*totalPixels*sizeof(dtype), cudaMemcpyHostToDevice));
+	CHECK(cudaMemcpy(dRefImgs, refPtr, numRefImgs*totalPixels*sizeof(dtype), cudaMemcpyHostToDevice));
+	//CHECK(cudaMemcpy(dEuDist, euDistPtr, numDataImgs*numRefImgs*sizeof(dtype), cudaMemcpyHostToDevice));
 
 	//Block and Grid Configuration
         int blockx = TILE;
@@ -660,11 +670,11 @@ py::array_t<dtype> cudaComputeEuclideanDistance(py::array_t<dtype> dataImgs, py:
 
 	//Kernel Call
         computeEuDistSharReg<<<grid, block>>>(dDataImgs,dRefImgs,dEuDist,numDataImgs,numRefImgs,totalPixels);
-        cudaDeviceSynchronize();
+        CHECK(cudaDeviceSynchronize());
 
 	//Copy device to host
 	cout<<"[CUDA] Copy data from device to host."<<endl;
-	cudaMemcpy(euDistPtr,dEuDist,numDataImgs*numRefImgs*sizeof(float),cudaMemcpyDeviceToHost);
+	CHECK(cudaMemcpy(euDistPtr,dEuDist,numDataImgs*numRefImgs*sizeof(float),cudaMemcpyDeviceToHost));
 
 	//cout<<"[CUDA] euDistPtr values from kernel:"<<endl;
 	//for(int i=0;i<100;i++) cout<<euDistPtr[i]<<"\t";
@@ -675,8 +685,8 @@ py::array_t<dtype> cudaComputeEuclideanDistance(py::array_t<dtype> dataImgs, py:
         //cout<<endl;
 
 	//Free memory
-	cudaFree(dDataImgs); cudaFree(dRefImgs); cudaFree(dEuDist);
-        //cudaFree(dKDist); cudaFree(dKIndex);	
+	CHECK(cudaFree(dDataImgs)); CHECK(cudaFree(dRefImgs)); CHECK(cudaFree(dEuDist));
+        //CHECK(cudaFree(dKDist)); CHECK(cudaFree(dKIndex));
 	return euDist;
 }
 
@@ -688,13 +698,13 @@ py::array_t<int> cudaComputeHeapSort(py::array_t<dtype> euDist, int numDataImgs,
         cout<<"[CUDA] Dimension of euDist: "<<euDistBuf.ndim<<endl;
         cout<<"[CUDA] Size of euDist: "<<euDistBuf.size<<endl;
 
-        cudaSetDevice(deviceId);
+        CHECK(cudaSetDevice(deviceId));
 
         //Declare and allocate device variables
         dtype *dEuDist, *dKDist; int *dKIndex;
-        cudaMalloc((void **)&dEuDist, numDataImgs*numRefImgs*sizeof(dtype));
-        cudaMalloc((void **)&dKDist, numDataImgs*totalNN*sizeof(dtype));
-        cudaMalloc((void **)&dKIndex, numDataImgs*totalNN*sizeof(int));
+        CHECK(cudaMalloc((void **)&dEuDist, numDataImgs*numRefImgs*sizeof(dtype)));
+        CHECK(cudaMalloc((void **)&dKDist, numDataImgs*totalNN*sizeof(dtype)));
+        CHECK(cudaMalloc((void **)&dKIndex, numDataImgs*totalNN*sizeof(int)));
 
         //Allocate euDist
         py::array_t<int> kIndex = py::array_t<int>(numDataImgs*totalNN);
@@ -707,7 +717,7 @@ py::array_t<int> cudaComputeHeapSort(py::array_t<dtype> euDist, int numDataImgs,
 	int* kIndexPtr = reinterpret_cast<int*>(kIndexBuf.ptr);
 
 	//Copy Euclidean distance to device
-	cudaMemcpy(dEuDist, euDistPtr, numDataImgs*numRefImgs*sizeof(float), cudaMemcpyHostToDevice);
+	CHECK(cudaMemcpy(dEuDist, euDistPtr, numDataImgs*numRefImgs*sizeof(float), cudaMemcpyHostToDevice));
 
 	//Block and Grid Configuration
         int blockx = 32;
@@ -717,15 +727,15 @@ py::array_t<int> cudaComputeHeapSort(py::array_t<dtype> euDist, int numDataImgs,
 
 	//Kernel Call
         computeKNeighbors<<<grid, block>>>(dEuDist,dKDist,dKIndex,numDataImgs,numRefImgs,totalNN);
-        cudaDeviceSynchronize();
+        CHECK(cudaDeviceSynchronize());
         computeKSort<<<grid, block>>>(dKDist,dKIndex,numDataImgs,totalNN);
-        cudaDeviceSynchronize();
+        CHECK(cudaDeviceSynchronize());
 
 	//Copy results from device to host
-        cudaMemcpy(kIndexPtr,dKIndex,numDataImgs*totalNN*sizeof(int),cudaMemcpyDeviceToHost);
+        CHECK(cudaMemcpy(kIndexPtr,dKIndex,numDataImgs*totalNN*sizeof(int),cudaMemcpyDeviceToHost));
 
 	//Free memory
-        cudaFree(dEuDist); cudaFree(dKDist); cudaFree(dKIndex);
+        CHECK(cudaFree(dEuDist)); CHECK(cudaFree(dKDist)); CHECK(cudaFree(dKIndex));
 
         return kIndex;
 }
