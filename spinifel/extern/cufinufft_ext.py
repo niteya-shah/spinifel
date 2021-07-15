@@ -164,7 +164,7 @@ def nufft_3d_t1_cufinufft_v1(H_, K_, L_, nuvect, sign, eps, nx, ny, nz):
     del K_gpu
     del L_gpu
     del ugrid_gpu
-
+    del plan
     context.ctx.pop()
 
     return ugrid
@@ -247,7 +247,7 @@ def nufft_3d_t2_cufinufft_v1(H_, K_, L_, ugrid, sign, eps, N):
     del K_gpu
     del L_gpu
     del ugrid_gpu
-
+    del plan
     context.ctx.pop()
 
     return nuvect
@@ -310,7 +310,7 @@ def nufft_3d_t1_cufinufft_v2(H_, K_, L_, nuvect, sign, eps, nx, ny, nz):
     del K_gpu
     del L_gpu
     del ugrid_gpu
-
+    del plan
     context.ctx.pop()
 
     return ugrid
@@ -387,7 +387,7 @@ def nufft_3d_t2_cufinufft_v2(H_, K_, L_, ugrid, sign, eps, N):
     del K_gpu
     del L_gpu
     del ugrid_gpu
-
+    del plan
     context.ctx.pop()
 
     return nuvect
