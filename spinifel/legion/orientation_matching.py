@@ -12,6 +12,7 @@ from . import utils as lgutils
 
 @task(privileges=[
     RO("ac"), RO("data"), WD("quaternions"), RO("reciprocal"), RO("reciprocal")])
+@lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
 def match_task(phased, slices, orientations, pixel_position, pixel_distance):
     if parms.verbosity > 0:
