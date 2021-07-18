@@ -1,4 +1,5 @@
 import numpy as np
+from mpi4py import MPI
 
 from spinifel import parms, contexts
 from spinifel.sequential.phasing import phase as sequential_phase
