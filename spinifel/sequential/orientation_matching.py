@@ -1,4 +1,5 @@
 import numpy  as np
+import h5py as h5
 import PyNVTX as nvtx
 import skopi  as skp
 import time
@@ -7,7 +8,7 @@ import logging
 import spinifel.sequential.nearest_neighbor as nn
 from   spinifel import parms, utils, autocorrelation, SpinifelSettings
 
-
+import time
 
 @nvtx.annotate("sequential/orientation_matching.py", is_prefix=True)
 def match(slices_, model_slices, ref_orientations, batch_size=None):
@@ -53,6 +54,7 @@ def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_rec
     :return ref_orientations: array of quaternions matched to slices_
     """
     st_init = time.monotonic()
+    t0 = time.time()
     logger = logging.getLogger(__name__)
     Mquat = parms.Mquat
     M = 4 * Mquat + 1
@@ -62,21 +64,37 @@ def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_rec
     N_slices = slices_.shape[0]
     assert slices_.shape == (N_slices,) + parms.reduced_det_shape
     N = N_pixels * N_orientations
+    t1 = time.time()
 
     if not N_slices:
         return np.zeros((0, 4))
+    t2 = time.time()
 
-    ref_orientations = skp.get_uniform_quat(N_orientations, True)
-    #ref_rotmat = np.array([skp.quaternion2rot3d(quat) for quat in ref_orientations])
+    #ref_orientations = skp.get_uniform_quat(N_orientations, True)
+    with h5.File('/gpfs/alpine/scratch/iris/chm137/spinifel_data/ref_data.h5', 'r') as f:
+        if N_orientations == 100000:
+            ref_orientations = f['orientations_100k'][:]
+        elif N_orientations == 1000000:
+            ref_orientations = f['orientations_1M'][:]
+
+    t3 = time.time()
     ref_rotmat = np.array([np.linalg.inv(skp.quaternion2rot3d(quat)) for quat in ref_orientations])
+    t4 = time.time()
     reciprocal_extent = pixel_distance_reciprocal.max()
+    t5 = time.time()
 
     # Calulate Model Slices in batch
     assert N_orientations % N_batch_size == 0, "N_orientations must be divisible by N_batch_size"
     slices_ = slices_.reshape((N_slices, N_pixels))
     model_slices_new = np.zeros((N,))
+    t8 = time.time()
     
     st_slice = time.monotonic()
+    print('t5-t4 =', t5-t4)
+    print('t4-t3 =', t4-t3)
+    print('t3-t2 =', t3-t2)
+    print('t2-t1 =', t2-t1)
+    print('t1-t0 =', t1-t0)
 
     for i in range(N_orientations//N_batch_size):
         st = i * N_batch_size
