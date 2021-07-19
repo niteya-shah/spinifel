@@ -14,15 +14,15 @@ np.seterr(divide='ignore', invalid='ignore')
 det_shape = (1, 128, 128)
 quaternion_shape = (4,)
 N_images_max = 10000
-N_generations = 5
+N_generations = 20
 data_field_name = "intensities"
-data_type_str = "float32"
+data_type_str = "float64"
 pixel_position_shape = (3,) + det_shape
-pixel_position_type_str = "float32"
+pixel_position_type_str = "float64"
 pixel_index_shape = (2,) + det_shape
 pixel_index_type_str = "int32"
-orientation_type_str = "float32"
-volume_type_str = "complex64"
+orientation_type_str = "float64"
+volume_type_str = "complex128"
 #volume_shape = (151, 151, 151)
 volume_shape = (149, 149, 149)
 oversampling = 1
@@ -60,11 +60,11 @@ if settings.small_problem:
     Mquat = int(oversampling * 20)  # 1/4 of uniform grid size
 else:
     nER = 50
-    nHIO = 25
-    N_phase_loops = 10
+    nHIO = 50
+    N_phase_loops = 5
     N_clipping = 0
     N_binning = 0
-    N_orientations = 10000 # int(8*np.pi**3*(2*(4*int(oversampling*2*20)+1))**3) # model_slices
+    N_orientations = 100000 # model_slices
     N_batch_size = 1000
     Mquat = int(oversampling * 20)  # 1/4 of uniform grid size
 
