@@ -53,8 +53,9 @@ def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_rec
     :param pixel_distance_reciprocal: pixel distance in reciprocal space
     :return ref_orientations: array of quaternions matched to slices_
     """
-    st_init = time.monotonic()
     t0 = time.time()
+    
+    st_init = time.monotonic()
     logger = logging.getLogger(__name__)
     Mquat = parms.Mquat
     M = 4 * Mquat + 1
@@ -64,10 +65,12 @@ def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_rec
     N_slices = slices_.shape[0]
     assert slices_.shape == (N_slices,) + parms.reduced_det_shape
     N = N_pixels * N_orientations
+
     t1 = time.time()
 
     if not N_slices:
         return np.zeros((0, 4))
+    
     t2 = time.time()
 
     #ref_orientations = skp.get_uniform_quat(N_orientations, True)
@@ -78,18 +81,35 @@ def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_rec
             ref_orientations = f['orientations_1M'][:]
 
     t3 = time.time()
+    
     ref_rotmat = np.array([np.linalg.inv(skp.quaternion2rot3d(quat)) for quat in ref_orientations])
+    
     t4 = time.time()
+    
     reciprocal_extent = pixel_distance_reciprocal.max()
+    
     t5 = time.time()
 
+    H, K, L = np.einsum("ijk,klmn->jilmn", ref_rotmat, pixel_position_reciprocal)
+
+    t6 = time.time()
+
+    H_ = H.flatten() / reciprocal_extent * np.pi / parms.oversampling
+    K_ = K.flatten() / reciprocal_extent * np.pi / parms.oversampling
+    L_ = L.flatten() / reciprocal_extent * np.pi / parms.oversampling
+
+    t7 = time.time()
     # Calulate Model Slices in batch
     assert N_orientations % N_batch_size == 0, "N_orientations must be divisible by N_batch_size"
     slices_ = slices_.reshape((N_slices, N_pixels))
     model_slices_new = np.zeros((N,))
+    
     t8 = time.time()
     
     st_slice = time.monotonic()
+    print('t8-t7 =', t8-t7)
+    print('t7-t6 =', t7-t6)
+    print('t6-t5 =', t6-t5)
     print('t5-t4 =', t5-t4)
     print('t4-t3 =', t4-t3)
     print('t3-t2 =', t3-t2)
@@ -97,18 +117,21 @@ def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_rec
     print('t1-t0 =', t1-t0)
 
     for i in range(N_orientations//N_batch_size):
+        print('in slicing loop')
+        t00 = time.time()
         st = i * N_batch_size
         en = st + N_batch_size
-        H, K, L = np.einsum("ijk,klmn->jilmn", ref_rotmat[st:en], pixel_position_reciprocal)
-        H_ = H.flatten() / reciprocal_extent * np.pi / parms.oversampling
-        K_ = K.flatten() / reciprocal_extent * np.pi / parms.oversampling
-        L_ = L.flatten() / reciprocal_extent * np.pi / parms.oversampling
+        t01 = time.time()
         N_batch = N_pixels * N_batch_size
         st_m = i * N_batch_size * N_pixels
         en_m = st_m + (N_batch_size * N_pixels)
+        t02 = time.time()
         model_slices_new[st_m:en_m] = autocorrelation.forward(
-                ac, H_, K_, L_, 1, M, N_batch, reciprocal_extent, True).real
-        
+                ac, H_[st_m:em_m], K_[st_m:em_m], L_[st_m:en_m], 1, M, N_batch, reciprocal_extent, True).real
+        t03 = time.time()
+        print('t03-t02 =', t03-t02)
+        print('t02-t01 =', t02-t01)
+        print('t01-t00 =', t01-t00)
     en_slice = time.monotonic()
     
     # Imaginary part ~ numerical error
