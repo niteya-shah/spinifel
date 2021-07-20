@@ -40,3 +40,4 @@ def match(phased, slices, slices_p, pixel_position, pixel_distance, orientations
         match_task(
             phased, slices_p[i], orientations_p[i],
             pixel_position, pixel_distance)
+    return orientations, orientations_p

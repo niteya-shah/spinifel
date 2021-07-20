@@ -91,7 +91,7 @@ def main():
         logger.log(f"#"*27)
 
         # Orientation matching
-        match(phased, slices, slices_p, pixel_position, pixel_distance, orientations, orientations_p)
+        orientations, orientations_p =  match(phased, slices, slices_p, pixel_position, pixel_distance, orientations, orientations_p)
         logger.log(f"Orientations matched in {timer.lap():.2f}s.")
 
         # Solve autocorrelation
