@@ -78,12 +78,6 @@ def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_rec
     
     reciprocal_extent = pixel_distance_reciprocal.max()
     
-    H, K, L = np.einsum("ijk,klmn->jilmn", ref_rotmat, pixel_position_reciprocal)
-
-    H_ = H.flatten() / reciprocal_extent * np.pi / parms.oversampling
-    K_ = K.flatten() / reciprocal_extent * np.pi / parms.oversampling
-    L_ = L.flatten() / reciprocal_extent * np.pi / parms.oversampling
-
     # Calulate Model Slices in batch
     assert N_orientations % N_batch_size == 0, "N_orientations must be divisible by N_batch_size"
     slices_ = slices_.reshape((N_slices, N_pixels))
@@ -94,11 +88,16 @@ def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_rec
     for i in range(N_orientations//N_batch_size):
         st = i * N_batch_size
         en = st + N_batch_size
+        H, K, L = np.einsum("ijk,klmn->jilmn", ref_rotmat[st:en], pixel_position_reciprocal)
+        H_ = H.flatten() / reciprocal_extent * np.pi / parms.oversampling
+        K_ = K.flatten() / reciprocal_extent * np.pi / parms.oversampling
+        L_ = L.flatten() / reciprocal_extent * np.pi / parms.oversampling
         N_batch = N_pixels * N_batch_size
         st_m = i * N_batch_size * N_pixels
         en_m = st_m + (N_batch_size * N_pixels)
         model_slices_new[st_m:en_m] = autocorrelation.forward(
-                ac, H_[st_m:em_m], K_[st_m:em_m], L_[st_m:en_m], 1, M, N_batch, reciprocal_extent, True).real
+                ac, H_, K_, L_, 1, M, N_batch, reciprocal_extent, True).real
+        
     en_slice = time.monotonic()
     
     # Imaginary part ~ numerical error
@@ -114,3 +113,4 @@ def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_rec
 
     print(f"Match tot:{en_match-st_init:.2f}s. slice={en_slice-st_slice:.2f}s. match={en_match-st_match:.2f}s. slice_oh={st_slice-st_init:.2f}s. match_oh={st_match-en_slice:.2f}s.")
     return ref_orientations[index]
+ 
