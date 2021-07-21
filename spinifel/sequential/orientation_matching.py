@@ -68,7 +68,7 @@ def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_rec
         return np.zeros((0, 4))
     
     #ref_orientations = skp.get_uniform_quat(N_orientations, True)
-    with h5.File('/gpfs/alpine/scratch/iris/chm137/spinifel_data/ref_data.h5', 'r') as f:
+    with h5.File('/gpfs/alpine/world-shared/chm137/iris/ref_data.h5', 'r') as f:
         if N_orientations == 100000:
             ref_orientations = f['orientations_100k'][:]
         elif N_orientations == 1000000:
@@ -77,6 +77,7 @@ def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_rec
     ref_rotmat = np.array([np.linalg.inv(skp.quaternion2rot3d(quat)) for quat in ref_orientations])
     
     reciprocal_extent = pixel_distance_reciprocal.max()
+    pixel_position_rp_c = np.array(pixel_position_reciprocal, copy=False, order='C')
     
     # Calulate Model Slices in batch
     assert N_orientations % N_batch_size == 0, "N_orientations must be divisible by N_batch_size"
@@ -88,7 +89,7 @@ def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_rec
     for i in range(N_orientations//N_batch_size):
         st = i * N_batch_size
         en = st + N_batch_size
-        H, K, L = np.einsum("ijk,klmn->jilmn", ref_rotmat[st:en], pixel_position_reciprocal)
+        H, K, L = np.einsum("ijk,klmn->jilmn", ref_rotmat[st:en], pixel_position_rp_c)
         H_ = H.flatten() / reciprocal_extent * np.pi / parms.oversampling
         K_ = K.flatten() / reciprocal_extent * np.pi / parms.oversampling
         L_ = L.flatten() / reciprocal_extent * np.pi / parms.oversampling
