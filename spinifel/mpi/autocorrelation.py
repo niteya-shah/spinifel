@@ -156,7 +156,7 @@ def solve_ac(generation,
     weights = np.ones(N)
 
     # regularization parameters
-    rlambda = np.logspace(-10, 10, comm.size)[comm.rank]
+    rlambda = np.logspace(-8, 8, comm.size)[comm.rank]
     flambda = 0 #1e5 * pow(10, comm.rank - comm.size//2)
     maxiter = parms.solve_ac_maxiter
 
