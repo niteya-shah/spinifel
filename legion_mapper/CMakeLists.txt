@@ -11,5 +11,12 @@ list(APPEND LEGION_MAPPERS_SRC
 add_library(legion_mappers SHARED ${LEGION_MAPPERS_SRC})
 target_link_libraries(legion_mappers Legion::Legion)
 
+add_executable(legion_python main.cc)
+target_link_libraries(legion_python Legion::Legion)
+target_link_libraries(legion_python legion_mappers)
+
 set_property(TARGET legion_mappers PROPERTY CXX_STANDARD 11)
 set_property(TARGET legion_mappers PROPERTY CXX_STANDARD_REQUIRED ON)
+
+set_property(TARGET legion_python PROPERTY CXX_STANDARD 11)
+set_property(TARGET legion_python PROPERTY CXX_STANDARD_REQUIRED ON)

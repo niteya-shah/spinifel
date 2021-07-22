@@ -11,7 +11,7 @@ from .prep import get_data
 from .autocorrelation import solve_ac
 from .phasing import phase, prev_phase, cov
 from .orientation_matching import match
-from . import mapper
+# from . import mapper
 
 
 @task(replicable=True)
