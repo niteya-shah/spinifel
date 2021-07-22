@@ -821,6 +821,7 @@ std::string LifelineMapper::taskDescription(const Legion::Task& task)
 {
   char buffer[512];
   unsigned long long* serialId = (unsigned long long*)task.mapper_data;
+  assert(serialId != NULL);
   sprintf(buffer, "<%s:%llx:%llx>", task.get_task_name(), *serialId, task.get_unique_id());
   return std::string(buffer);
 }
