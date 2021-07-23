@@ -396,9 +396,10 @@ bool LifelineMapper::maybeGetLocalTasks(MapperContext ctx)
       if(isAnalysisTask(*task)) {
         locallyStartedTaskCount++;
       }
+      std::string desc = taskDescription(*task);
       log_lifeline_mapper.debug("%s task %s should map locally, tasks_to_map_locally.size %ld",
                                 prolog(__FUNCTION__, __LINE__).c_str(),
-                                taskDescription(*task).c_str(),
+                                desc.c_str(),
                                 tasks_to_map_locally.size());
     }
     triggerSelectTasksToMap(ctx);
@@ -499,9 +500,10 @@ void LifelineMapper::handleOneStealRequest(const MapperContext ctx,
       stolenAwayTaskCount++;
       
       it = worker_ready_queue.erase(it);
+      std::string desc = taskDescription(*task);
       log_lifeline_mapper.debug("%s relocate task %s to %s %s",
                                 prolog(__FUNCTION__, __LINE__).c_str(),
-                                taskDescription(*task).c_str(),
+                                desc.c_str(),
                                 describeProcId(r.thiefProc.id).c_str(),
                                 workloadState().c_str());
     } else {
@@ -821,8 +823,8 @@ std::string LifelineMapper::taskDescription(const Legion::Task& task)
 {
   char buffer[512];
   unsigned long long* serialId = (unsigned long long*)task.mapper_data;
-  assert(serialId != NULL);
-  sprintf(buffer, "<%s:%llx:%llx>", task.get_task_name(), *serialId, task.get_unique_id());
+  unsigned long long serial = serialId != NULL ? *serialId : 0;
+  sprintf(buffer, "<%s:%llx:%llx>", task.get_task_name(), serial, task.get_unique_id());
   return std::string(buffer);
 }
 
@@ -951,9 +953,10 @@ void LifelineMapper::slice_task(const MapperContext      ctx,
     assert(local_proc.kind() == Processor::Kind::PY_PROC);
     sliceTaskCount++;
     Rect<1, coord_t> point_rect = input.domain;
+    std::string desc = taskDescription(task);
     log_lifeline_mapper.debug("%s task %s target %s %s points %lu",
                               prolog(__FUNCTION__, __LINE__).c_str(),
-                              taskDescription(task).c_str(),
+                              desc.c_str(),
                               describeProcId(task.target_proc.id).c_str(),
                               processorKindString(task.target_proc.kind()),
                               point_rect.volume());
@@ -964,9 +967,10 @@ void LifelineMapper::slice_task(const MapperContext      ctx,
     slicedPointTaskCount += point_rect.volume();
     
   } else {
+    std::string desc = taskDescription(task);
     log_lifeline_mapper.debug("%s pass %s to default mapper",
                               prolog(__FUNCTION__, __LINE__).c_str(),
-                              taskDescription(task).c_str());
+                              desc.c_str());
     this->DefaultMapper::slice_task(ctx, task, input, output);
   }
 #endif
@@ -1123,9 +1127,10 @@ bool LifelineMapper::send_stolen_tasks(MapperContext ctx,
         relocated = true;
         std::set<const Task*>::iterator findIt = relocated_tasks.find(task);
         relocated_tasks.erase(findIt);
+        std::string desc = taskDescription(*task);
         log_lifeline_mapper.debug("%s send task %s to %s",
                                   prolog(__FUNCTION__, __LINE__).c_str(),
-                                  taskDescription(*task).c_str(),
+                                  desc.c_str(),
                                   describeProcId(processor.id).c_str());
       }
     }
@@ -1186,15 +1191,17 @@ void LifelineMapper::processNewReadyTasks(const SelectMappingInput&    input,
           
         }
         mappedOrRelocated = true;
+        std::string desc = taskDescription(*task);
         log_lifeline_mapper.debug("%s select task %s for here now",
                                   prolog(__FUNCTION__, __LINE__).c_str(),
-                                  taskDescription(*task).c_str());
+                                  desc.c_str());
       } else {
         worker_ready_queue.insert(task);
         sawWorkerReadyTasks = true;
+        std::string desc = taskDescription(*task);
         log_lifeline_mapper.debug("%s move task %s to worker_ready_queue",
                                   prolog(__FUNCTION__, __LINE__).c_str(),
-                                  taskDescription(*task).c_str());
+                                  desc.c_str());
       }
     }
   }
@@ -1232,9 +1239,10 @@ void LifelineMapper::select_tasks_to_map(const MapperContext          ctx,
       it != tasks_to_map_locally.end(); ++it) {
     const Task* task = *it;
     output.map_tasks.insert(task);
+    std::string desc = taskDescription(*task);
     log_lifeline_mapper.debug("%s select local task %s for here now",
                               prolog(__FUNCTION__, __LINE__).c_str(),
-                              taskDescription(*task).c_str());
+                              desc.c_str());
   }
   tasks_to_map_locally.clear();
   
@@ -1341,9 +1349,10 @@ void LifelineMapper::report_profiling(const MapperContext      ctx,
   input.profiling_responses.get_measurement<Realm::ProfilingMeasurements::OperationTimeline>(timeline);
   Realm::ProfilingMeasurements::OperationTimeline::timestamp_t elapsedNS = timeline.end_time - timeline.start_time;
   
+  std::string desc = taskDescription(task);
   log_lifeline_mapper.info("%s report task complete %s %lld totalPendingWorkload %d locallyRunning %d",
                             prolog(__FUNCTION__, __LINE__).c_str(),
-                            taskDescription(task).c_str(),
+                            desc.c_str(),
                             elapsedNS,
                             totalPendingWorkload(),
                             locallyRunningTaskCount());
@@ -1383,18 +1392,20 @@ void LifelineMapper::map_task(const MapperContext      ctx,
     
     mappedSelfGeneratedTaskCount++;
     
+    std::string desc = taskDescription(task);
     log_lifeline_mapper.debug("%s maps self task %s %s",
                               prolog(__FUNCTION__, __LINE__).c_str(),
-                              taskDescription(task).c_str(),
+                              desc.c_str(),
                               workloadState().c_str());
   } else {
     
     mappedRelocatedTaskCount++;
     
+    std::string desc = taskDescription(task);
     log_lifeline_mapper.debug("%s maps relocated (from %s) task %s %s",
                               prolog(__FUNCTION__, __LINE__).c_str(),
                               describeProcId(task.orig_proc.id).c_str(),
-                              taskDescription(task).c_str(),
+                              desc.c_str(),
                               workloadState().c_str());
   }
   
@@ -1475,15 +1486,17 @@ void LifelineMapper::select_task_options(const MapperContext    ctx,
   output.stealable = false;
   output.map_locally = false;
 
-log_lifeline_mapper.debug("print parent task %p for task %s",task.parent_task,taskDescription(task).c_str());
+  std::string desc = taskDescription(task);
+  log_lifeline_mapper.debug("print parent task %p for task %s",task.parent_task,desc.c_str());
   
+  std::string parent_desc = taskDescription(*task.parent_task);
   log_lifeline_mapper.debug("%s %s on %s %s parent task %s",
                             prolog(__FUNCTION__, __LINE__).c_str(),
-                            taskDescription(task).c_str(),
+                            desc.c_str(),
                             processorKindString(initial_proc.kind()),
                             workloadState().c_str(),
                             task.parent_task == NULL ? "<none>" :
-                              taskDescription(*task.parent_task).c_str());
+                              parent_desc.c_str());
   
   if(sendRelocateTaskInfo) {
     Request r = { initial_proc, local_proc, 1 };
@@ -1529,9 +1542,10 @@ void LifelineMapper::premap_task(const MapperContext      ctx,
                                  PremapTaskOutput&        output)
 //------------------------------------------------------------------------
 {
+  std::string desc = taskDescription(task);
   log_lifeline_mapper.debug("%s premap_task %s",
                             prolog(__FUNCTION__, __LINE__).c_str(),
-                            taskDescription(task).c_str());
+                            desc.c_str());
   this->DefaultMapper::premap_task(ctx, task, input, output);
 }
 

@@ -31,6 +31,4 @@ ffi = pygion.ffi
 ffi.cdef(lifeline_mapper_header)
 c = ffi.dlopen(legion_mappers_so_path)
 
-assert False # make sure we don't do this
-
 c.register_lifeline_mapper()
