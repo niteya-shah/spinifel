@@ -60,7 +60,6 @@ def main():
     logger.log(f"##### Generation {generation}/{N_generations} #####")
     logger.log(f"#"*27)
 
-    #orientations, orientations_p = orientations_prior, orientations_prior_p
 
     (orientations, orientations_p,
      nonuniform, nonuniform_p,
@@ -116,12 +115,9 @@ def main():
                 break;
 
         rho = np.fft.ifftshift(phased.rho_)
-        print('rho =', rho)
 
         save_mrc(parms.out_dir / f"ac-{generation}.mrc", phased.ac)
         save_mrc(parms.out_dir / f"rho-{generation}.mrc", rho)
-        np.save(parms.out_dir / f"ac-{generation}.npy", phased.ac)
-        np.save(parms.out_dir / f"rho-{generation}.npy", rho)
 
     execution_fence(block=True)
 
