@@ -101,7 +101,7 @@ def main():
                           results_p, summary, summary_p, phased)
         logger.log(f"AC recovered in {timer.lap():.2f}s.")
 
-        #prev_phased = prev_phase(generation, phased, prev_phased)
+        prev_phased = prev_phase(generation, phased, prev_phased)
 
         phased = phase(generation, solved, phased)
         logger.log(f"Problem phased in {timer.lap():.2f}s.")
