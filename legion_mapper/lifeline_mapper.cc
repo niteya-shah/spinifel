@@ -105,7 +105,7 @@ private:
   std::random_device rd; // only used once to initialise (seed) engine
   std::mt19937 rng;
   std::uniform_int_distribution<int> uni;
-  std::map<std::pair<LogicalRegion, Memory>, PhysicalInstance> local_instances;
+  std::map<std::tuple<LogicalRegion, Memory, ReductionOpID>, PhysicalInstance> local_instances;
   typedef long long Timestamp;
 
   // these are the counters that track workload
@@ -179,7 +179,7 @@ private:
                             const SelectStealingInput &input,
                             SelectStealingOutput &output);
   Memory get_associated_sysmem(Processor proc);
-  void map_task_array(const MapperContext ctx, LogicalRegion region,
+  void map_task_array(const MapperContext ctx, const RegionRequirement &region,
                       Memory target, std::vector<PhysicalInstance> &instances);
   void report_profiling(const MapperContext ctx, const Task &task,
                         const TaskProfilingInfo &input);
@@ -873,7 +873,7 @@ void LifelineMapper::slice_task(const MapperContext ctx, const Task &task,
                                 SliceTaskOutput &output)
 //--------------------------------------------------------------------------
 {
-#if 1 // Elliott: Added to ensure tasks never go to node 0
+#if 0 // Elliott: Added to ensure tasks never go to node 0
   Processor::Kind target_kind =
       task.must_epoch_task ? local_proc.kind() : task.target_proc.kind();
   switch (target_kind) {
@@ -1248,27 +1248,31 @@ Memory LifelineMapper::get_associated_sysmem(Processor proc)
 
 //--------------------------------------------------------------------------
 void LifelineMapper::map_task_array(const MapperContext ctx,
-                                    LogicalRegion region, Memory target,
+                                    const RegionRequirement &region, Memory target,
                                     std::vector<PhysicalInstance> &instances)
 //--------------------------------------------------------------------------
 {
-  const std::pair<LogicalRegion, Memory> key(region, target);
-  std::map<std::pair<LogicalRegion, Memory>, PhysicalInstance>::const_iterator
+  const std::tuple<LogicalRegion, Memory, ReductionOpID> key(region.region, target, region.redop);
+  std::map<std::tuple<LogicalRegion, Memory, ReductionOpID>, PhysicalInstance>::const_iterator
       finder = local_instances.find(key);
   if (finder != local_instances.end()) {
     instances.push_back(finder->second);
     return;
   }
 
-  std::vector<LogicalRegion> regions(1, region);
+  std::vector<LogicalRegion> regions(1, region.region);
   LayoutConstraintSet layout_constraints;
 
   // Constrained for the target memory kind
   layout_constraints.add_constraint(MemoryConstraint(target.kind()));
+  if (region.privilege == LEGION_REDUCE) {
+    layout_constraints.add_constraint(
+        SpecializedConstraint(LEGION_AFFINE_REDUCTION_SPECIALIZE, region.redop));
+  }
 
   // Have all the field for the instance available
   std::vector<FieldID> all_fields;
-  runtime->get_field_space_fields(ctx, region.get_field_space(), all_fields);
+  runtime->get_field_space_fields(ctx, region.region.get_field_space(), all_fields);
   layout_constraints.add_constraint(
       FieldConstraint(all_fields, false /*contiguous*/, false /*inorder*/));
 
@@ -1371,7 +1375,7 @@ void LifelineMapper::map_task(const MapperContext ctx, const Task &task,
     if (task.regions[idx].privilege == NO_ACCESS)
       continue;
     Memory target_mem = get_associated_sysmem(task.target_proc);
-    map_task_array(ctx, task.regions[idx].region, target_mem,
+    map_task_array(ctx, task.regions[idx], target_mem,
                    output.chosen_instances[idx]);
   }
   runtime->acquire_instances(ctx, output.chosen_instances);
