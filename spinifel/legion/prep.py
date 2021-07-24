@@ -132,6 +132,20 @@ def get_orientations_prior():
     return orientations_prior, orientations_prior_p
 
 
+
+@task(privileges=[WD])
+@nvtx.annotate("legion/prep.py", is_prefix=True)
+def load_ref_orientations(ref_orientations, rank, N_orientations_per_rank):
+    if parms.verbosity > 0:
+        print(f"{socket.gethostname()} loading reference orientations.", flush=True)
+    i_start = rank * N_orientations_per_rank
+    i_end = i_start + N_orientations_per_rank
+    prep.load_ref_orientations(ref_orientations.quaternions, i_start, i_end)
+    if parms.verbosity > 0:
+        print(f"{socket.gethostname()} loaded reference orientations.", flush=True)
+
+
+
 @task(privileges=[RO, Reduce('+')])
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def reduce_mean_image(slices, mean_image):
@@ -238,7 +252,7 @@ def export_saxs(pixel_distance, mean_image, name):
     np.seterr(invalid='ignore')
     # Avoid warning in SAXS 0/0 division.
     # Legion seems to reset the global seterr from parms.py.
-    prep.export_saxs(pixel_distance.reciprocal, mean_image.data, name)
+    #prep.export_saxs(pixel_distance.reciprocal, mean_image.data, name)
 
 
 
