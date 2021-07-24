@@ -3,6 +3,30 @@ import PyNVTX as nvtx
 
 from pygion import task, Region, Partition, Tunable, R
 
+from spinifel import SpinifelContexts
+
+
+
+class GPUTaskWrapper(object):
+    # Note: Can't use __slots__ for this class because __qualname__
+    # conflicts with the class variable.
+    def __init__(self, thunk):
+        print(repr((thunk, thunk.__name__, thunk.__qualname__, thunk.__module__)))
+        self.thunk = thunk
+        self.__name__ = thunk.__name__
+        self.__qualname__ = thunk.__qualname__
+        self.__module__ = thunk.__module__
+    def __call__(self, *args, **kwargs):
+        context = SpinifelContexts()
+        context.ctx.push()
+        try:
+            return self.thunk(*args, **kwargs)
+        finally:
+            context.ctx.pop()
+
+def gpu_task_wrapper(thunk):
+    return GPUTaskWrapper(thunk)
+
 
 
 @task(privileges=[R])
@@ -32,3 +56,4 @@ def create_distributed_region(N_images_per_rank, fields_dict, sec_shape):
         N_images_per_rank * np.eye(len(shape_total), 1),
         shape_local)
     return region, region_p
+
