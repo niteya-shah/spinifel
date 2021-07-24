@@ -263,8 +263,8 @@ def phased_to_constrains(phased, ac):
 @task(privileges=[RO, RO, RO, WD, WD])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
-def solve(uregion, uregion_ups, ac, result, summary,
-          eights, M, M_ups, N,
+def solve(uregion, uregion_ups, ac, result, solve_summary,
+          weights, M, M_ups, N,
           generation, rank, rlambda, flambda, Db_squared,
           reciprocal_extent, use_reciprocal_symmetry, maxiter):
     """Solve the W @ x = d problem.
@@ -346,30 +346,30 @@ def solve(uregion, uregion_ups, ac, result, summary,
     image.show_volume(result.ac[:], parms.Mquat,
                       f"autocorrelation_{generation}_{rank}.png")
 
-    summary.rank[0] = rank
-    summary.rlambda[0] = rlambda
-    summary.info[0] = info
-    summary.soln[0] = soln
-    summary.resid[0] = resid
+    solve_summary.rank[0] = rank
+    solve_summary.rlambda[0] = rlambda
+    solve_summary.info[0] = info
+    solve_summary.soln[0] = soln
+    solve_summary.resid[0] = resid
 
 
 
 @task(privileges=[None, RO])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
-def select_ac(generation, summary):
-    print('len(summary.rank) =', len(summary.rank))
-    print('summary.rank =', summary.rank)
-    print('summary.rlambda =', summary.rlambda)
-    print('summary.info =', summary.info)
-    print('summary.soln =', summary.soln)
-    print('summary.resid =', summary.resid) 
+def select_ac(generation, solve_summary):
+    print('len(solve_summary.rank) =', len(solve_summary.rank))
+    print('solve_summary.rank =', solve_summary.rank)
+    print('solve_summary.rlambda =', solve_summary.rlambda)
+    print('solve_summary.info =', solve_summary.info)
+    print('solve_summary.soln =', solve_summary.soln)
+    print('solve_summary.resid =', solve_summary.resid) 
 
-    converged_idx = [i for i, info in enumerate(summary.info) if info == 0]
-    ranks = np.array(summary.rank)[converged_idx]
-    lambdas = np.array(summary.rlambda)[converged_idx]
-    solns = np.array(summary.soln)[converged_idx]
-    resids = np.array(summary.resid)[converged_idx]    
+    converged_idx = [i for i, info in enumerate(solve_summary.info) if info == 0]
+    ranks = np.array(solve_summary.rank)[converged_idx]
+    lambdas = np.array(solve_summary.rlambda)[converged_idx]
+    solns = np.array(solve_summary.soln)[converged_idx]
+    resids = np.array(solve_summary.resid)[converged_idx]    
     
     # Take corner of L-curve
     valuePair = np.array([resids, solns]).T
@@ -404,7 +404,7 @@ def select_ac(generation, summary):
     axes[2].set_xlabel("Residual norm $||Ax-b||_{2}$")
     axes[2].set_ylabel("Solution norm $||x||_{2}$")
     fig.tight_layout()
-    plt.savefig(parms.out_dir / f"summary_{generation}.png")
+    plt.savefig(parms.out_dir / f"solve_summary_{generation}.png")
     plt.close('all')
 
     print(f"Keeping result from rank {ref_rank}.", flush=True)
@@ -414,9 +414,11 @@ def select_ac(generation, summary):
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def setup_solve_ac(pixel_position,
                    pixel_distance):
+    print("setup_solve_ac")
     M = parms.M
     M_ups = parms.M_ups  # For upsampled convolution technique
     N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
+    print("N_procs =", N_procs)
     reciprocal_extent = pixel_distance.reciprocal.max()
 
     orientations, orientations_p = get_random_orientations()
@@ -431,16 +433,16 @@ def setup_solve_ac(pixel_position,
     results = Region((N_procs * M, M, M), {"ac": pygion.float64})
     results_p = Partition.restrict(results, (N_procs,), [[M], [0], [0]], [M, M, M])
 
-    summary = Region((N_procs,),
+    solve_summary = Region((N_procs,),
                 {"rank": pygion.int32, "rlambda": pygion.float64, "info": pygion.int32, "soln": pygion.float64, "resid": pygion.float64})
-    summary_p = Partition.equal(summary, (N_procs,))
+    solve_summary_p = Partition.equal(solve_summary, (N_procs,))
 
     return (orientations, orientations_p,
             nonuniform, nonuniform_p,
             nonuniform_v, nonuniform_v_p,
             ac, uregion, uregion_ups,
             results, results_p,
-            summary, summary_p)
+            solve_summary, solve_summary_p)
 
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def solve_ac(generation,
@@ -452,7 +454,7 @@ def solve_ac(generation,
              nonuniform_v_p,
              ac, uregion, uregion_ups,
              results_p,
-             summary, summary_p,
+             solve_summary, solve_summary_p,
              phased=None):
     M = parms.M
     M_ups = parms.M_ups  # For upsampled convolution technique
@@ -486,12 +488,12 @@ def solve_ac(generation,
 
     for i in IndexLaunch((N_procs,)):
         solve(
-            uregion, uregion_ups, ac, results_p[i], summary_p[i],
+            uregion, uregion_ups, ac, results_p[i], solve_summary_p[i],
             weights, M, M_ups, N,
             generation, i, rlambdas[i], flambda, Db_squared,
             reciprocal_extent, use_reciprocal_symmetry, maxiter)
 
-    iref = select_ac(generation, summary)
+    iref = select_ac(generation, solve_summary)
     # At this point, I just want to chose one of the results as reference.
     # I tried to have `results` as a partition and copy into a region,
     # but I couldn't get it to work.
