@@ -147,6 +147,8 @@ def load_slices(slices, i_start, i_end):
         else:
             sys.exit(f"Error: Not enough intensity slices (max:{h5f['intensities'].shape[0]:d})")
 
+
+
 @nvtx.annotate("prep.py", is_prefix=True)
 def load_orientations(orientations, i_start, i_end):
     with h5py.File(parms.data_path, 'r') as h5f:
@@ -172,6 +174,14 @@ def load_orientations_prior(orientations_prior, i_start, i_end):
     with h5py.File(parms.data_path, 'r') as h5f:
         orientations = h5f['orientations'][i_start:i_end]
         orientations_prior[:] = np.reshape(orientations, (orientations.shape[0], 4))
+
+
+
+@nvtx.annotate("prep.py", is_prefix=True)
+def load_ref_orientations(ref_orientations, i_start, i_end):
+    """Populate reference orientations from input file."""
+    with h5py.File('/gpfs/alpine/world-shared/chm137/iris/ref_data.h5', 'r') as h5f:
+        ref_orientations = h5f['orientations_1M'][i_start:i_end]
 
 
 
