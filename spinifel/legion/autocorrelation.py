@@ -17,6 +17,7 @@ from . import utils as lgutils
 
 
 @task(privileges=[WD])
+@lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def gen_random_orientations(orientations, N_images_per_rank):
     orientations.quaternions[:] = skp.get_random_quat(N_images_per_rank)
@@ -38,6 +39,7 @@ def get_random_orientations():
 
 
 @task(privileges=[RO, WD])
+@lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def gen_nonuniform_positions_v(nonuniform, nonuniform_v, reciprocal_extent):
     nonuniform_v.H[:] = (nonuniform.H.flatten()
@@ -74,6 +76,7 @@ def fill_nonuniform_positions_v(nonuniform_p, reciprocal_extent, nonuniform_v_p)
 
 
 @task(privileges=[RO, WD, RO])
+@lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def gen_nonuniform_positions(orientations, nonuniform, pixel_position):
     H, K, L = autocorrelation.gen_nonuniform_positions(
@@ -106,6 +109,7 @@ def fill_nonuniform_positions(orientations_p, pixel_position, nonuniform_p):
 
 
 @task(privileges=[RO, Reduce('+', 'ADb'), RO, RO])
+@lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def right_hand_ADb_task(slices, uregion, nonuniform_v, ac, weights, M, N,
                         reciprocal_extent, use_reciprocal_symmetry):
@@ -142,6 +146,7 @@ def right_hand(slices_p, uregion, nonuniform_v_p,
 
 
 @task(privileges=[RO])
+@lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def Db_squared_task(slices, weights):
     if parms.verbosity > 0:
@@ -166,6 +171,7 @@ def get_Db_squared(slices_p, weights):
 
 
 @task(privileges=[Reduce('+', 'F_conv_'), RO, RO])
+@lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def prep_Fconv_task(uregion_ups, nonuniform_v, ac, weights, M_ups, M, N,
                     reciprocal_extent, use_reciprocal_symmetry):
@@ -199,6 +205,7 @@ def prep_Fconv(uregion_ups, nonuniform_v_p,
 
 
 @task(privileges=[WD("F_antisupport")])
+@lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def prep_Fantisupport(uregion, M):
     lu = np.linspace(-np.pi, np.pi, M)
@@ -244,6 +251,7 @@ def prepare_solve(slices_p, nonuniform_p, nonuniform_v_p, uregion, uregion_ups,
 
 
 @task(privileges=[RO("ac"), WD("support", "estimate")])
+@lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def phased_to_constrains(phased, ac):
     ac_smoothed = gaussian_filter(phased.ac, 0.5)
@@ -253,6 +261,7 @@ def phased_to_constrains(phased, ac):
 
 
 @task(privileges=[RO, RO, RO, WD, WD])
+@lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def solve(uregion, uregion_ups, ac, result, summary,
           eights, M, M_ups, N,
@@ -346,6 +355,7 @@ def solve(uregion, uregion_ups, ac, result, summary,
 
 
 @task(privileges=[None, RO])
+@lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def select_ac(generation, summary):
     print('len(summary.rank) =', len(summary.rank))

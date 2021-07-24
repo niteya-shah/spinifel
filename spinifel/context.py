@@ -106,6 +106,10 @@ class SpinifelContexts(metaclass=Singleton):
         
         self.ctx = dev.retain_primary_context()
 
+        if settings.mode != "legion":
+            self.ctx.push()
+            register(self.ctx.pop)
+
         settings = SpinifelSettings()
         if settings.verbose:
             print(f"Rank {self.rank} assigned to device {self.dev_id}")
