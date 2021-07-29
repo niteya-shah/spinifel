@@ -39,7 +39,7 @@ def get_slices(comm, N_images_per_rank, ds):
     slices_ = np.zeros((N_images_per_rank,) + parms.det_shape,
                        dtype=data_type)
     if ds is None:
-        i_start = comm.rank * N_images_per_rank
+        i_start = comm.rank//6 * N_images_per_rank
         i_end = i_start + N_images_per_rank
         print(f"get_slices rank={comm.rank} st={i_start} en={i_end}")
         prep.load_slices(slices_, i_start, i_end)
@@ -119,3 +119,23 @@ def get_data(N_images_per_rank, ds):
             pixel_distance_reciprocal,
             pixel_index_map,
             slices_)
+
+
+@nvtx.annotate("mpi/prep.py", is_prefix=True)
+def get_ref_orientations(N_orientations):
+    """
+    Load reference orientations 
+    """
+    comm = contexts.comm
+ 
+    N_orientations_per_rank = int(N_orientations / 6)
+    data_type = getattr(np, parms.data_type_str)
+    ref_orientations = np.zeros((N_orientations_per_rank,) + parms.quaternion_shape,
+                       dtype=data_type)
+    i_start = (comm.rank % 6) * N_orientations_per_rank
+    i_end = i_start + N_orientations_per_rank
+    print(f"get_ref_orientations rank={comm.rank} st={i_start} en={i_end}")
+    prep.load_ref_orientations(ref_orientations, i_start, i_end)
+
+    return ref_orientations
+
