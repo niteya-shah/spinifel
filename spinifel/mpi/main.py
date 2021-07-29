@@ -4,7 +4,7 @@ from spinifel.prep import save_mrc
 import numpy as np
 import PyNVTX as nvtx
 
-from .prep import get_data
+from .prep import get_data, get_ref_orientations
 from .autocorrelation import solve_ac
 from .phasing import phase
 from .orientation_matching import match
@@ -54,12 +54,16 @@ def main():
     logger.log(f"max_events: {max_events}")
 
 
-    # Load unique set of intensity slices for each rank
+    # Load unique set of intensity slices for every n rank
     (pixel_position_reciprocal,
      pixel_distance_reciprocal,
      pixel_index_map,
      slices_) = get_data(N_images_per_rank, ds)
     logger.log(f"Loaded in {timer.lap():.2f}s.")
+
+    # Load unique set of reference orientations for each rank
+    N_orientations = parms.N_orientations
+    ref_orientations = get_ref_orientations(N_orientations) 
 
     # Generation 0: solve_ac and phase 
     N_generations = parms.N_generations
@@ -86,7 +90,7 @@ def main():
         # Orientation matching
         orientations = match(
             ac_phased, slices_,
-            pixel_position_reciprocal, pixel_distance_reciprocal)
+            pixel_position_reciprocal, pixel_distance_reciprocal, ref_orientations)
         logger.log(f"Orientations matched in {timer.lap():.2f}s.")
 
         # Solve autocorrelation
@@ -118,13 +122,10 @@ def main():
                 break
 
         rho = np.fft.ifftshift(rho_)
-        print("rho =", rho)
 
         if comm.rank == 0:
             save_mrc(parms.out_dir / f"ac-{generation}.mrc", ac_phased)
             save_mrc(parms.out_dir / f"rho-{generation}.mrc", rho)
-            np.save(parms.out_dir / f"ac-{generation}.npy", ac_phased)
-            np.save(parms.out_dir / f"rho-{generation}.npy", rho)
     
     logger.log(f"Results saved in {parms.out_dir}")
     logger.log(f"Successfully completed in {timer.total():.2f}s.")
