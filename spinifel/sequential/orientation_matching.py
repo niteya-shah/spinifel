@@ -40,12 +40,10 @@ def match(slices_, model_slices, ref_orientations, batch_size=None):
 
 
 @nvtx.annotate("sequential/orientation_matching.py", is_prefix=True)
-def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_reciprocal):
+def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_reciprocal, ref_orientations):
     """
     Determine orientations of the data images by minimizing the euclidean distance with the reference images 
     computed by randomly slicing through the autocorrelation.
-    MONA: This is a current hack to support Legion. For MPI, slicing is done separately 
-    from orientation matching.
 
     :param ac: autocorrelation of the current electron density estimate
     :param slices_: data images
@@ -62,17 +60,9 @@ def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_rec
     N_pixels = utils.prod(parms.reduced_det_shape)
     N_slices = slices_.shape[0]
     assert slices_.shape == (N_slices,) + parms.reduced_det_shape
-    N = N_pixels * N_orientations
 
     if not N_slices:
         return np.zeros((0, 4))
-    
-    #ref_orientations = skp.get_uniform_quat(N_orientations, True)
-    with h5.File('/gpfs/alpine/world-shared/chm137/iris/ref_data.h5', 'r') as f:
-        if N_orientations == 100000:
-            ref_orientations = f['orientations_100k'][:]
-        elif N_orientations == 1000000:
-            ref_orientations = f['orientations_1M'][:]
 
     ref_rotmat = np.array([np.linalg.inv(skp.quaternion2rot3d(quat)) for quat in ref_orientations])
     
@@ -80,13 +70,15 @@ def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_rec
     pixel_position_rp_c = np.array(pixel_position_reciprocal, copy=False, order='C')
     
     # Calulate Model Slices in batch
-    assert N_orientations % N_batch_size == 0, "N_orientations must be divisible by N_batch_size"
+    N_orientations_per_rank = ref_orientations.shape[0]
+    assert N_orientations_per_rank % N_batch_size == 0, "N_orientations_per_rank must be divisible by N_batch_size"
+    N = N_pixels * N_orientations_per_rank
     slices_ = slices_.reshape((N_slices, N_pixels))
     model_slices_new = np.zeros((N,))
     
     st_slice = time.monotonic()
 
-    for i in range(N_orientations//N_batch_size):
+    for i in range(N_orientations_per_rank // N_batch_size):
         st = i * N_batch_size
         en = st + N_batch_size
         H, K, L = np.einsum("ijk,klmn->jilmn", ref_rotmat[st:en], pixel_position_rp_c)
@@ -102,16 +94,15 @@ def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_rec
     en_slice = time.monotonic()
     
     # Imaginary part ~ numerical error
-    model_slices_new = model_slices_new.reshape((N_orientations, N_pixels))
+    model_slices_new = model_slices_new.reshape((N_orientations_per_rank, N_pixels))
     data_model_scaling_ratio = slices_.std() / model_slices_new.std()
     print(f"New Data/Model std ratio: {data_model_scaling_ratio}.", flush=True)
     model_slices_new *= data_model_scaling_ratio
     
     # Calculate Euclidean distance in batch to avoid running out of GPU Memory
     st_match = time.monotonic()
-    index = nn.nearest_neighbor(model_slices_new, slices_, N_batch_size)
+    index, minDist = nn.nearest_neighbor(model_slices_new, slices_, N_batch_size)
     en_match = time.monotonic()
 
     print(f"Match tot:{en_match-st_init:.2f}s. slice={en_slice-st_slice:.2f}s. match={en_match-st_match:.2f}s. slice_oh={st_slice-st_init:.2f}s. match_oh={st_match-en_slice:.2f}s.")
-    return ref_orientations[index]
- 
+    return ref_orientations[index], minDist
