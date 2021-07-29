@@ -77,11 +77,10 @@ def calc_argmin_gpu(euDist, n_images, n_refs, n_pixels, deviceId):
 
 @nvtx.annotate("sequential/nearest_neighbor.py", is_prefix=True)
 def nearest_neighbor(model_slices, slices, batch_size):
-
     if settings.use_cuda:
         deviceId = context.dev_id
         if settings.verbose:
-            print(f"Using CUDA  to calculate Euclidean distance and heap sort (batch_size={batch_size})")
+            print(f"Using CUDA to calculate Euclidean distance and heap sort (batch_size={batch_size})")
             print(f"Rank {rank} using deviceId {deviceId}")
         
         # Calculate Euclidean distance in batch to avoid running out of GPU Memory
@@ -90,18 +89,21 @@ def nearest_neighbor(model_slices, slices, batch_size):
             st = i * batch_size
             en = st + batch_size
             euDist[:, st:en] = calc_eudist_gpu(model_slices[st:en], slices, deviceId).reshape(slices.shape[0], batch_size)
-        euDist = euDist.flatten()
+        euDist_flat = euDist.flatten()
         
-        index = calc_argmin_gpu(euDist, 
+        index = calc_argmin_gpu(euDist_flat, 
                             slices.shape[0],
                             model_slices.shape[0],
                             slices.shape[1],
                             deviceId)
+        minDist = np.amin(euDist, axis=1)
     else:
         if settings.verbose:
             print("Using sklearn Euclidean Distance and numpy argmin")
-        euDist    = euclidean_distances(model_slices, slices)
-        index  = np.argmin(euDist, axis=0)
-
-    return index
+        euDist = euclidean_distances(model_slices, slices)
+        
+        index = np.argmin(euDist, axis=0)
+        minDist = np.amin(euDist, axis=0) 
+    
+    return index, minDist
 
