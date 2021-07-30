@@ -26,13 +26,15 @@ def gen_random_orientations(orientations, N_images_per_rank):
 
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def get_random_orientations():
+    N_ranks_per_node = parms.N_ranks_per_node
     N_images_per_rank = parms.N_images_per_rank
     fields_dict = {"quaternions": pygion.float64}
     sec_shape = (4,)
-    orientations, orientations_p = lgutils.create_distributed_region(
+    orientations, orientations_p = lgutils.create_distributed_region_per_node(
         N_images_per_rank, fields_dict, sec_shape)
     N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
-    for i in IndexLaunch([N_procs]):
+    N_nodes = N_procs // N_ranks_per_node
+    for i in IndexLaunch([N_nodes]):
         gen_random_orientations(orientations_p[i], N_images_per_rank)
     return orientations, orientations_p
 
@@ -317,6 +319,16 @@ def solve(uregion, uregion_ups, ac, result, solve_summary,
     ADb = uregion.ADb.flatten()
     d = ADb + rlambda*x0
     d0 = ADb
+
+    # Log central slice L~=0
+    if comm.rank == (2 if parms.use_psana else 0):
+        idx = np.abs(L) < reciprocal_extent * .01
+        plt.scatter(H[idx], K[idx], c=slices_[idx], s=1, norm=LogNorm())
+        plt.axis('equal')
+        plt.colorbar()
+        plt.savefig(parms.out_dir / f"star_{generation}.png")
+        plt.cla()
+        plt.clf()
 
     def callback(xk):
         callback.counter += 1
