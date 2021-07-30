@@ -3,8 +3,7 @@ import PyNVTX as nvtx
 
 from pygion import task, Region, Partition, Tunable, R
 
-from spinifel import SpinifelContexts
-
+from spinifel import parms, SpinifelContexts
 
 
 class GPUTaskWrapper(object):
@@ -57,3 +56,22 @@ def create_distributed_region(N_images_per_rank, fields_dict, sec_shape):
         shape_local)
     return region, region_p
 
+
+
+@nvtx.annotate("legion/utils.py", is_prefix=True)
+def create_distributed_region_per_node(N_images_per_rank, fields_dict, sec_shape):
+    N_ranks_per_node = parms.N_ranks_per_node
+    print(f"N_ranks_per_node = {N_ranks_per_node}", flush=True)
+    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
+    N_images = N_procs//N_ranks_per_node * N_images_per_rank
+    N_nodes = N_procs//N_ranks_per_node
+    print(f"N_images = {N_images}", flush=True)
+    shape_total = (N_images,) + sec_shape
+    shape_local = (N_images_per_rank,) + sec_shape
+    region = Region(shape_total, fields_dict)
+    region_p = Partition.restrict(
+        region, [N_nodes],
+        N_images_per_rank * np.eye(len(shape_total), 1),
+        shape_local)
+    print(f"finished creating a region", flush=True)
+    return region, region_p
