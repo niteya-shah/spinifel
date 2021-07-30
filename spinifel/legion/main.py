@@ -11,7 +11,7 @@ from spinifel.prep import save_mrc
 from .prep import get_data
 from .autocorrelation import setup_solve_ac, solve_ac
 from .phasing import phase, prev_phase, cov
-from .orientation_matching import match
+from .orientation_matching import setup_match, match
 from . import mapper
 
 
@@ -75,6 +75,8 @@ def main():
                       results_p, summary, summary_p)
     logger.log(f"AC recovered in {timer.lap():.2f}s.")
 
+    ref_orientations, ref_orientations_p, match_summary, match_summary_p = setup_match()
+
     phased = phase(0, solved)
     logger.log(f"Problem phased in {timer.lap():.2f}s.")
 
@@ -90,13 +92,17 @@ def main():
         logger.log(f"#"*27)
 
         # Orientation matching
-        orientations, orientations_p =  match(phased, slices, slices_p, pixel_position, pixel_distance, orientations, orientations_p)
+        matched = match(phased, slices, slices_p, 
+                        pixel_position, pixel_distance, 
+                        orientations, orientations_p, 
+                        ref_orientations, ref_orientations_p, 
+                        match_summary, match_summary_p)
         logger.log(f"Orientations matched in {timer.lap():.2f}s.")
 
         # Solve autocorrelation
         solved = solve_ac(generation, pixel_position, pixel_distance,
                           slices, slices_p,
-                          orientations_p, nonuniform_p, nonuniform_v_p,
+                          matched, nonuniform_p, nonuniform_v_p,
                           ac, uregion, uregion_ups,
                           results_p, summary, summary_p, phased)
         logger.log(f"AC recovered in {timer.lap():.2f}s.")
