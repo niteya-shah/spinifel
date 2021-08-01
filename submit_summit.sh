@@ -11,13 +11,9 @@ t_start=`date +%s`
 
 # spinifel
 source setup/env.sh
+export CUPY_CACHE_DIR=$PWD/setup/cupy
 
-#jsrun -n 1 -a 1 -c 42 -g 6 -b none -d packed legion_python -ll:py 1 -ll:pyomp 36 -ll:csize 8192 -ll:show_rsrv -lg:prof 1 -lg:prof_logfile prof_%.gz legion_main.py --default-settings=summit_legion.toml --mode=legion # Legion
-
-#jsrun -n 2 -a 1 -c 21 -g 3 -b none -d packed legion_python -ll:py 1 -ll:pyomp 18 -ll:csize 8192 -ll:show_rsrv -lg:prof 2 -lg:prof_logfile prof_%.gz legion_main.py --default-settings=summit_legion.toml --mode=legion
-
-jsrun -n 6 -a 1 -c 7 -g 1 -b rs -d packed legion_python -ll:py 1 -ll:pyomp 4 -ll:csize 8192 -ll:show_rsrv -lg:prof 6 -lg:prof_logfile prof_%.gz legion_main.py --default-settings=summit_legion.toml --mode=legion # Legion
-
+jsrun -n 6 -a 1 -c 7 -g 1 -b rs -d packed python -m spinifel --default-settings=summit_mpi.toml --mode=mpi
 
 t_end=`date +%s`
 echo PSJobCompleted TotalElapsed $((t_end-t_start)) $t_start $t_end
