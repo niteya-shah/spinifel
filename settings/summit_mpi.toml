@@ -1,0 +1,28 @@
+# This toml file contains settings for running spinifel MPI code on summit
+
+[debug]
+test = "MPI settings for Summit"
+verbose = true
+verbosity = 0
+use_callmonitor = false
+
+[data]
+in_dir = "/gpfs/alpine/world-shared/chm137/iris"
+out_dir = "/gpfs/alpine/scratch/$USER/chm137/spinifel_output"
+name = "SPI_3iyf_dp005_128x128_149mesh_50000slices.h5"
+
+[psana]
+enable = false
+ps_smd_n_events = 0
+
+[runtime]
+n_images_per_rank = 1000
+small_problem = false
+use_cuda = true
+use_cufinufft = true
+use_cupy = true
+use_single_prec = false
+chk_convergence = false
+
+[gpu]
+devices_per_node = 6
