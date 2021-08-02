@@ -16,13 +16,13 @@ def setup_match():
     print("setup_match")
     N_orientations = parms.N_orientations
     N_images_per_rank = parms.N_images_per_rank
-    N_batch_size = parms.N_batch_size
+    N_ranks_per_node = parms.N_ranks_per_node
     fields_dict = {"quaternions": getattr(pygion, parms.data_type_str)}
     sec_shape = parms.quaternion_shape
     N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
     print("N_procs =", N_procs)
-    assert N_orientations % N_procs == 0, "N_orientations must be divisible by N_procs"
-    N_orientations_per_rank = int(N_orientations / N_procs)
+    assert N_orientations % N_ranks_per_node == 0, "N_orientations must be divisible by N_ranks_per_node"
+    N_orientations_per_rank = int(N_orientations / N_ranks_per_node)
     print("N_orientations_per_rank =", N_orientations_per_rank)
     ref_orientations, ref_orientations_p = lgutils.create_distributed_region(
         N_orientations_per_rank, fields_dict, sec_shape)
