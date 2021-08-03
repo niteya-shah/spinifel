@@ -88,7 +88,6 @@ def match(phased, slices, slices_p, pixel_position, pixel_distance, orientations
         match_task(
             phased, slices_p[i], ref_orientations_p[i], match_summary_p[i],
             dist_summary_p[i], pixel_position, pixel_distance)
-        curr_index += 1
 
     for i in IndexLaunch([N_nodes]):
         select_orientations(match_summary_p_nnodes[i], dist_summary_p_nnodes[i], orientations_p[i])
