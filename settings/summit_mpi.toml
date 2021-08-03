@@ -1,4 +1,4 @@
-# This toml file contains settings for running spinifel MPI code on summit
+# This toml file contains settings for the summit CI
 
 [debug]
 test = "MPI settings for Summit"
@@ -7,7 +7,7 @@ verbosity = 0
 use_callmonitor = false
 
 [data]
-in_dir = "/gpfs/alpine/world-shared/chm137/iris"
+in_dir = "/gpfs/alpine/scratch/$USER/chm137/spinifel_data"
 out_dir = "/gpfs/alpine/scratch/$USER/chm137/spinifel_output"
 name = "SPI_3iyf_dp005_128x128_149mesh_50000slices.h5"
 
@@ -26,3 +26,4 @@ chk_convergence = false
 
 [gpu]
 devices_per_node = 6
+
