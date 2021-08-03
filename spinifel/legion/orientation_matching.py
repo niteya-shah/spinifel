@@ -40,7 +40,7 @@ def setup_match():
     for i, ref_orientations_subr in enumerate(ref_orientations_p):
         prep.load_ref_orientations(ref_orientations_subr, i, N_orientations_per_rank, point=i)
     print(f"passed setup_match", flush=True)
-    return ref_orientations, ref_orientations_p, match_summary, match_summary_p, dist_summary, dist_summary_p
+    return ref_orientations, ref_orientations_p, match_summary, match_summary_p, match_summary_p_nnodes, dist_summary, dist_summary_p, dist_summary_p_nnodes
 
 
 @task(privileges=[RO, RO, WD, RO, WD, WD, RO, RO])
@@ -75,7 +75,7 @@ def select_orientations(match_summary, dist_summary, orientations_selected):
 
 
 @nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
-def match(phased, slices, slices_p, pixel_position, pixel_distance, orientations, orientations_p, ref_orientations, ref_orientations_p, match_summary, match_summary_p, dist_summary, dist_summary_p):
+def match(phased, slices, slices_p, pixel_position, pixel_distance, orientations, orientations_p, ref_orientations, ref_orientations_p, match_summary, match_summary_p, match_summary_p_nnodes, dist_summary, dist_summary_p, dist_summary_p_nnodes):
     # The reference orientations don't have to match exactly between ranks.
     # Each rank aligns its own slices.
     # We can call the sequential function on each rank, provided that the
