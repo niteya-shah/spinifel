@@ -49,6 +49,7 @@ out_dir = settings.out_dir
 verbosity = settings.verbosity
 
 N_images_per_rank = settings.n_images_per_rank
+N_ranks_per_node = 6 ## TO-DO
 if settings.small_problem:
     nER = 10
     nHIO = 5
@@ -64,7 +65,7 @@ else:
     N_phase_loops = 5
     N_clipping = 0
     N_binning = 0
-    N_orientations = 100000 # model_slices
+    N_orientations = 1200000 # model_slices
     N_batch_size = 1000
     Mquat = int(oversampling * 20)  # 1/4 of uniform grid size
 
