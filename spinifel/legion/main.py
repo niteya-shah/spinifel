@@ -75,7 +75,9 @@ def main():
                       results_p, summary, summary_p)
     logger.log(f"AC recovered in {timer.lap():.2f}s.")
 
-    ref_orientations, ref_orientations_p, match_summary, match_summary_p, dist_summary, dist_summary_p = setup_match()
+    (ref_orientations, ref_orientations_p, 
+     match_summary, match_summary_p, match_summary_p_nnodes, 
+     dist_summary, dist_summary_p, dist_summary_p_nnodes) = setup_match()
 
     phased = phase(0, solved)
     logger.log(f"Problem phased in {timer.lap():.2f}s.")
@@ -96,8 +98,8 @@ def main():
                         pixel_position, pixel_distance, 
                         orientations, orientations_p, 
                         ref_orientations, ref_orientations_p, 
-                        match_summary, match_summary_p,
-                        dist_summary, dist_summary_p)
+                        match_summary, match_summary_p, match_summary_p_nnodes,
+                        dist_summary, dist_summary_pi, dist_summary_p_nnodes)
         logger.log(f"Orientations matched in {timer.lap():.2f}s.")
 
         # Solve autocorrelation
