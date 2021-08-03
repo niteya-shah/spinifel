@@ -40,13 +40,13 @@ def setup_match():
     for i, ref_orientations_subr in enumerate(ref_orientations_p):
         prep.load_ref_orientations(ref_orientations_subr, i, N_orientations_per_rank, point=i)
     print(f"passed setup_match", flush=True)
-    return ref_orientations, ref_orientations_p, match_summary, match_summary_p, dist_summary, dist_summary_p
+    return ref_orientations, ref_orientations_p, match_summary, match_summary_p, dist_summary, dist_summary_p, match_summary_p_nnodes, dist_summary_p_nnodes
 
 
-@task(privileges=[RO, RO, WD, RO, WD, WD, RO, RO])
+@task(privileges=[RO, RO, RO, WD, WD, RO, RO])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
-def match_task(phased, slices, orientations, ref_orientations, match_summary, dist_summary, pixel_position, pixel_distance):
+def match_task(phased, slices, ref_orientations, match_summary, dist_summary, pixel_position, pixel_distance):
     if parms.verbosity > 0:
         print(f"{socket.gethostname()} starts Orientation Matching.", flush=True)
         print(f"{socket.gethostname()}:", end=" ", flush=False)
@@ -57,7 +57,6 @@ def match_task(phased, slices, orientations, ref_orientations, match_summary, di
     match_summary.quaternions[:] = orientations_matched_local
     dist_summary.minDist[:] = minDist_local
     print(f"passed match_task", flush=True)
-
 
 @task(privileges=[RO, RO, WD])
 @lgutils.gpu_task_wrapper
@@ -71,11 +70,10 @@ def select_orientations(match_summary, dist_summary, orientations_selected):
     for i in range(len(index)):
         orientations_selected.quaternions[:] = match_summary.quaternions[i,index,:]
     print(f"passed select_orientations", flush=True)
-    return orientations_selected
 
 
 @nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
-def match(phased, slices, slices_p, pixel_position, pixel_distance, orientations, orientations_p, ref_orientations, ref_orientations_p, match_summary, match_summary_p, dist_summary, dist_summary_p):
+def match(phased, slices, slices_p, pixel_position, pixel_distance, orientations, orientations_p, ref_orientations, ref_orientations_p, match_summary, match_summary_p, dist_summary, dist_summary_p, match_summary_p_nnodes, dist_summary_p_nnodes):
     # The reference orientations don't have to match exactly between ranks.
     # Each rank aligns its own slices.
     # We can call the sequential function on each rank, provided that the
@@ -86,16 +84,14 @@ def match(phased, slices, slices_p, pixel_position, pixel_distance, orientations
     N_nodes = N_procs // N_ranks_per_node
     curr_index = 0
     for i in IndexLaunch([N_procs]):
-        # Ideally, the location (point) should be deduced from the
-        # location of the slices.
-        j = curr_index // N_ranks_per_node
         print(f"i = {i}", flush=True)
-        print(f"j = {j}", flush=True)
         match_task(
-            phased, slices_p[i], orientations_p[j], ref_orientations_p[i], match_summary_p[i],
-            pixel_position, pixel_distance, i)
+            phased, slices_p[i], ref_orientations_p[i], match_summary_p[i],
+            dist_summary_p[i], pixel_position, pixel_distance)
         curr_index += 1
+
     for i in IndexLaunch([N_nodes]):
-        orientations_p[i] = select_orientations(match_summary_p_nnodes[i], dist_summary_p_nnodes[i], orientations_p[i])
+        select_orientations(match_summary_p_nnodes[i], dist_summary_p_nnodes[i], orientations_p[i])
+
     print(f"passed match", flush=True)
     return orientations, orientations_p
