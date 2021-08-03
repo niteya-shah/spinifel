@@ -30,6 +30,8 @@ def setup_match():
         N_images_per_rank, fields_dict, sec_shape)
     dist_summary = Region((N_procs * N_images_per_rank), {"minDist": pygion.float64})
     dist_summary_p = Partition.equal(dist_summary, (N_procs,))
+    shape_total = (N_nodes * N_images_per_rank,) + sec_shape
+    shape_local = (N_images_per_rank,) + sec_shape
     match_summary_p_nnodes = Partition.restrict(
         match_summary, [N_nodes],
         N_images_per_rank * np.eye(len(shape_total), 1),
