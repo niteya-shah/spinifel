@@ -85,15 +85,15 @@ def match(phased, slices, slices_p, pixel_position, pixel_distance, orientations
     N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
     N_nodes = N_procs // N_ranks_per_node
     curr_index = 0
-    for i in IndexLaunch([N_procs]):
+    for i, dist_summart_subr in enumerate(dist_summary_p):
         # Ideally, the location (point) should be deduced from the
         # location of the slices.
         j = curr_index // N_ranks_per_node
         print(f"i = {i}", flush=True)
         print(f"j = {j}", flush=True)
         match_task(
-            phased, slices_p[i], orientations_p[j], ref_orientations_p[i], match_summary_p[i],
-            pixel_position, pixel_distance, i)
+            phased, slices_p[i], orientations_p[j], ref_orientations_p[i], match_summary_p[i], dist_summary_p[i],
+            pixel_position, pixel_distance)
         curr_index += 1
     for i in IndexLaunch([N_nodes]):
         orientations_p[i] = select_orientations(match_summary_p_nnodes[i], dist_summary_p_nnodes[i], orientations_p[i])
