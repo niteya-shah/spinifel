@@ -30,9 +30,10 @@ def setup_match():
         N_images_per_rank, fields_dict, sec_shape)
     dist_summary = Region((N_procs * N_images_per_rank), {"minDist": pygion.float64})
     dist_summary_p = Partition.equal(dist_summary, (N_procs,))
-    shape_total = (N_nodes * N_images_per_rank,) + sec_shape
-    shape_local = (N_images_per_rank,) + sec_shape
+    shape_total = (N_procs * N_images_per_rank,) + sec_shape
+
     local_procs = N_procs // N_nodes
+    shape_local = (local_procs * N_images_per_rank,) + sec_shape
     match_summary_p_nnodes = Partition.restrict(
         match_summary, [N_nodes],
         local_procs*N_images_per_rank * np.eye(len(shape_total), 1),
@@ -77,9 +78,11 @@ def select_orientations(match_summary, dist_summary, orientations_selected):
     print(f"minDists shape = {minDists.shape}", flush=True)
     index = np.argmin(minDists, axis=0) 
     print(f"index.shape = {index.shape}", flush=True)
-    orientations_matched = np.swapaxes(match_summary.quaternions, 0, 1)
+    orientations_matched = np.reshape(match_summary.quaternions, (N_ranks_per_node, N_images_per_rank, 4), order='C')
+    print(f"orientations_matched = {orientations_matched.shape}")
     for i in range(len(index)):
-        orientations_selected.quaternions[:] = match_summary.quaternions[i,index,:]
+        val = index[i]
+        orientations_selected.quaternions[i,:] = orientations_matched[val,i,:]
     print(f"passed select_orientations", flush=True)
 
 
