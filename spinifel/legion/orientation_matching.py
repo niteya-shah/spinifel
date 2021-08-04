@@ -14,7 +14,7 @@ def setup_match():
     print(f"setup_match", flush=True)
     N_orientations = parms.N_orientations
     N_images_per_rank = parms.N_images_per_rank
-    N_ranks_per_node =  parms.N_ranks_per_node
+    N_ranks_per_node = parms.N_ranks_per_node
     fields_dict = {"quaternions": getattr(pygion, parms.data_type_str)}
     sec_shape = parms.quaternion_shape
     N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
@@ -32,9 +32,10 @@ def setup_match():
     dist_summary_p = Partition.equal(dist_summary, (N_procs,))
     shape_total = (N_nodes * N_images_per_rank,) + sec_shape
     shape_local = (N_images_per_rank,) + sec_shape
+    local_procs = N_procs // N_nodes
     match_summary_p_nnodes = Partition.restrict(
         match_summary, [N_nodes],
-        N_images_per_rank * np.eye(len(shape_total), 1),
+        local_procs*N_images_per_rank * np.eye(len(shape_total), 1),
         shape_local)
     dist_summary_p_nnodes = Partition.equal(dist_summary, (N_nodes,))
     for i, ref_orientations_subr in enumerate(ref_orientations_p):
@@ -47,6 +48,7 @@ def setup_match():
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
 def match_task(phased, slices, ref_orientations, match_summary, dist_summary, pixel_position, pixel_distance):
+    print(f"in match_task, match_summary.quaternions.shape = {match_summary.quaternions.shape}", flush=True)
     if parms.verbosity > 0:
         print(f"{socket.gethostname()} starts Orientation Matching.", flush=True)
         print(f"{socket.gethostname()}:", end=" ", flush=False)
@@ -54,18 +56,27 @@ def match_task(phased, slices, ref_orientations, match_summary, dist_summary, pi
         phased.ac, slices.data, pixel_position.reciprocal, pixel_distance.reciprocal, ref_orientations.quaternions)
     if parms.verbosity > 0:
         print(f"{socket.gethostname()} finished Orientation Matching.", flush=True)
+    print(f"orientations_matched_local.shape = {orientations_matched_local.shape}", flush=True)
+    print(f"minDist_local.shape = {minDist_local.shape}", flush=True)
     match_summary.quaternions[:] = orientations_matched_local
     dist_summary.minDist[:] = minDist_local
+    print(f"match_summary.quaternions[:].shape = {match_summary.quaternions[:].shape}", flush=True)
+    print(f"dist_summary.minDist[:].shape = {dist_summary.minDist[:].shape}", flush=True)
     print(f"passed match_task", flush=True)
+
 
 @task(privileges=[RO, RO, WD])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
 def select_orientations(match_summary, dist_summary, orientations_selected):
-    print(f"match_summary.quaternions = {match_summary.quaternions}", flush=True)
-    print(f"dist_summary.minDist = {dist_summary.minDist}", flush=True)
-    index = np.argmin(dist_summary.minDist)
-    print(f"index = {index}", flush=True)
+    N_images_per_rank = parms.N_images_per_rank
+    N_ranks_per_node = parms.N_ranks_per_node
+    print(f"match_summary.quaternions.shape = {match_summary.quaternions.shape}", flush=True)
+    print(f"dist_summary.minDist.shape = {dist_summary.minDist.shape}", flush=True)
+    minDists = np.reshape(dist_summary.minDist, (N_ranks_per_node, N_images_per_rank), order='C')
+    print(f"minDists shape = {minDists.shape}", flush=True)
+    index = np.argmin(minDists, axis=0) 
+    print(f"index.shape = {index.shape}", flush=True)
     orientations_matched = np.swapaxes(match_summary.quaternions, 0, 1)
     for i in range(len(index)):
         orientations_selected.quaternions[:] = match_summary.quaternions[i,index,:]
