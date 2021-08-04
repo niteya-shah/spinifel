@@ -119,11 +119,19 @@ def solve_ac(generation,
              orientations=None,
              ac_estimate=None):
     comm = MPI.COMM_WORLD
+    size = comm.Get_size()
+    rank = comm.Get_rank()
 
+    color = rank // 6
+
+    newcomm = comm.Split(color)
+    newcomm_rank = newcomm.rank
+    newcomm_size = newcomm.size
+   
     M = parms.M
     N_images = slices_.shape[0] # N images per rank
     N = utils.prod(slices_.shape) # N images per rank x number of pixels per image = number of pixels per rank
-    Ntot = N * comm.size # total number of pixels
+    Ntot = N * size # total number of pixels
     N_pixels_per_image = N / N_images # number of pixels per image
     reciprocal_extent = pixel_distance_reciprocal.max()
     use_reciprocal_symmetry = True
@@ -131,7 +139,14 @@ def solve_ac(generation,
 
     # Generate random orientations in SO(3)
     if orientations is None:
-        orientations = skp.get_random_quat(N_images)
+        if newcomm_rank % 6 == 0:
+            orientations = skp.get_random_quat(N_images)
+        else:
+            orientations = None
+        orientations = newcomm.bcast(orientations, root=0)
+
+    newcomm.Free()
+
     # Calculate hkl based on orientations
     H, K, L = autocorrelation.gen_nonuniform_positions(
         orientations, pixel_position_reciprocal)
@@ -156,12 +171,12 @@ def solve_ac(generation,
     weights = np.ones(N)
 
     # regularization parameters
-    rlambda = np.logspace(-8, 8, comm.size)[comm.rank]
-    flambda = 0 #1e5 * pow(10, comm.rank - comm.size//2)
+    rlambda = 10**(rank - size/2)
+    flambda = 0 #1e5 * pow(10, rank - size//2)
     maxiter = parms.solve_ac_maxiter
 
     # Log central slice L~=0
-    if comm.rank == (2 if parms.use_psana else 0):
+    if rank == (2 if parms.use_psana else 0):
         idx = np.abs(L) < reciprocal_extent * .01
         plt.scatter(H[idx], K[idx], c=slices_[idx], s=1, norm=LogNorm())
         plt.axis('equal')
@@ -200,9 +215,9 @@ def solve_ac(generation,
     resid = (np.dot(ret,W_0.matvec(ret)-2*d_0) + Db_squared) / Ntot # residual norm
 
     # Rank0 gathers rlambda, info, solution, residual from all ranks
-    summary = comm.gather((comm.rank, rlambda, info, soln, resid), root=0)
+    summary = comm.gather((rank, rlambda, info, soln, resid), root=0)
     print('summary =', summary)
-    if comm.rank == 0:
+    if rank == 0:
         ranks, lambdas, infos, solns, resids = [np.array(el) for el in zip(*summary)]
         converged_idx = [i for i, info in enumerate(infos) if info == 0]
         ranks = np.array(ranks)[converged_idx]
@@ -257,14 +272,14 @@ def solve_ac(generation,
     if use_reciprocal_symmetry:
         assert np.all(np.isreal(ac))
     ac = np.ascontiguousarray(ac.real).astype(np.float32)
-    print(f"Rank {comm.rank} got AC in {callback.counter} iterations.", flush=True)
+    print(f"Rank {rank} got AC in {callback.counter} iterations.", flush=True)
 
     # Log autocorrelation volume
-    image.show_volume(ac, parms.Mquat, f"autocorrelation_{generation}_{comm.rank}.png")
+    image.show_volume(ac, parms.Mquat, f"autocorrelation_{generation}_{rank}.png")
 
     # Rank[ref_rank] broadcasts its autocorrelation
     comm.Bcast(ac, root=ref_rank)
-    if comm.rank == 0:
+    if rank == 0:
         print(f"Keeping result from rank {ref_rank}.")
 
     return ac
