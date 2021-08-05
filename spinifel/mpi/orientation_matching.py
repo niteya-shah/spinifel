@@ -6,7 +6,7 @@ from spinifel.sequential.orientation_matching import slicing_and_match as sequen
 
 
 @nvtx.annotate("mpi/orientation_matching.py", is_prefix=True)
-def match(ac, slices_, pixel_position_reciprocal, pixel_distance_reciprocal, ref_orientations):
+def match(ac, slices_, pixel_position_reciprocal, pixel_distance_reciprocal, ref_orientations, H_=None, K_=None, L_=None):
     # The reference orientations don't have to match exactly between ranks.
     # Each rank aligns its own slices.
     # We can call the sequential function on each rank, provided that the
@@ -24,8 +24,8 @@ def match(ac, slices_, pixel_position_reciprocal, pixel_distance_reciprocal, ref
     N_orientations = parms.N_orientations
     N_images_per_rank = parms.N_images_per_rank
 
-    orientations_matched_local, minDist_local = sequential_match(
-        ac, slices_, pixel_position_reciprocal, pixel_distance_reciprocal, ref_orientations)
+    orientations_matched_local, minDist_local, H_, K_, L_ = sequential_match(
+        ac, slices_, pixel_position_reciprocal, pixel_distance_reciprocal, ref_orientations, H_, K_, L_)
     
     match_summary = newcomm.gather((newcomm_rank, orientations_matched_local, minDist_local), root=0)
 
@@ -45,4 +45,4 @@ def match(ac, slices_, pixel_position_reciprocal, pixel_distance_reciprocal, ref
     print('orientations_selected.shape =', orientations_selected.shape)    
 
     newcomm.Free()
-    return orientations_selected
+    return orientations_selected, H_, K_, L_
