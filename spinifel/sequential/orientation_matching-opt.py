@@ -62,8 +62,6 @@ def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_rec
 
     if not N_slices:
         return np.zeros((0, 4))
-
-    ref_rotmat = np.array([np.linalg.inv(skp.quaternion2rot3d(quat)) for quat in ref_orientations])
     
     reciprocal_extent = pixel_distance_reciprocal.max()
     pixel_position_rp_c = np.array(pixel_position_reciprocal, copy=False, order='C')
@@ -78,6 +76,8 @@ def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_rec
     N_batch = N_pixels * N_batch_size
 
     if H_ is None or K_ is None or L_ is None:
+        ref_rotmat = np.array([np.linalg.inv(skp.quaternion2rot3d(quat)) for quat in ref_orientations])
+
         H_ = np.zeros((N_orientations_per_rank // N_batch_size, N_batch))
         K_ = np.zeros((N_orientations_per_rank // N_batch_size, N_batch))
         L_ = np.zeros((N_orientations_per_rank // N_batch_size, N_batch))
