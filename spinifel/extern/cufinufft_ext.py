@@ -28,7 +28,7 @@ profiler = Profiler()
 # Load cufiNUFFT or fiNUFFTpy depending on settings: use_cuda, use_cufinufft
 #
 
-if settings.use_cuda and settings.use_cufinufft:
+if settings.using_cuda and settings.use_cufinufft:
     import pycuda.driver as cuda
     from . import GPUArray, to_gpu
 
@@ -119,6 +119,7 @@ def nufft_3d_t1_cufinufft_v1(H_, K_, L_, nuvect, sign, eps, nx, ny, nz):
 
     if settings.verbose:
         print(f"Using v1 CUDA to solve the NUFFT 3D T1 on device {dev_id}")
+    context.ctx.push()
 
     # Ensure that H_, K_, and L_ have the same shape
     assert H_.shape == K_.shape == L_.shape
@@ -158,6 +159,14 @@ def nufft_3d_t1_cufinufft_v1(H_, K_, L_, nuvect, sign, eps, nx, ny, nz):
     # Copy result back to host -- if the incoming data was on host
     ugrid = result_to_cpu(ugrid_gpu, H_)
 
+    del nuvect_gpu
+    del H_gpu
+    del K_gpu
+    del L_gpu
+    del ugrid_gpu
+    del plan
+    context.ctx.pop()
+
     return ugrid
 
 
@@ -177,6 +186,7 @@ def nufft_3d_t2_cufinufft_v1(H_, K_, L_, ugrid, sign, eps, N):
 
     if settings.verbose:
         print(f"Using v1 CUDA to solve the NUFFT 3D T2 on device {dev_id}")
+    context.ctx.push()
 
     gpu_free, gpu_total = context.cuda_mem_info()
     logger.debug(
@@ -232,6 +242,14 @@ def nufft_3d_t2_cufinufft_v1(H_, K_, L_, ugrid, sign, eps, N):
     # Copy result back to host -- if the incoming data was on host
     nuvect = result_to_cpu(nuvect_gpu, H_)
 
+    del nuvect_gpu
+    del H_gpu
+    del K_gpu
+    del L_gpu
+    del ugrid_gpu
+    del plan
+    context.ctx.pop()
+
     return nuvect
 
 
@@ -251,6 +269,7 @@ def nufft_3d_t1_cufinufft_v2(H_, K_, L_, nuvect, sign, eps, nx, ny, nz):
 
     if settings.verbose:
         print(f"Using v2 CUDA to solve the NUFFT 3D T1 on device {dev_id}")
+    context.ctx.push()
 
     # Ensure that H_, K_, and L_ have the same shape
     assert H_.shape == K_.shape == L_.shape
@@ -286,6 +305,14 @@ def nufft_3d_t1_cufinufft_v2(H_, K_, L_, nuvect, sign, eps, nx, ny, nz):
     # Copy result back to host -- if the incoming data was on host
     ugrid = result_to_cpu(ugrid_gpu, H_)
 
+    del nuvect_gpu
+    del H_gpu
+    del K_gpu
+    del L_gpu
+    del ugrid_gpu
+    del plan
+    context.ctx.pop()
+
     return ugrid
 
 
@@ -304,6 +331,7 @@ def nufft_3d_t2_cufinufft_v2(H_, K_, L_, ugrid, sign, eps, N):
 
     if settings.verbose:
         print(f"Using v2 CUDA to solve the NUFFT 3D T2 on device {dev_id}")
+    context.ctx.push()
 
     gpu_free, gpu_total = context.cuda_mem_info()
     logger.debug(
@@ -354,4 +382,13 @@ def nufft_3d_t2_cufinufft_v2(H_, K_, L_, ugrid, sign, eps, N):
     # Copy result back to host -- if the incoming data was on host
     nuvect = result_to_cpu(nuvect_gpu, H_)
 
+    del nuvect_gpu
+    del H_gpu
+    del K_gpu
+    del L_gpu
+    del ugrid_gpu
+    del plan
+    context.ctx.pop()
+
     return nuvect
+
