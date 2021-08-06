@@ -60,13 +60,14 @@ def main():
     logger.log(f"##### Generation {generation}/{N_generations} #####")
     logger.log(f"#"*27)
 
-
     (orientations, orientations_p,
      nonuniform, nonuniform_p,
      nonuniform_v, nonuniform_v_p,
      ac, uregion, uregion_ups,
      results, results_p,
      summary, summary_p) = setup_solve_ac(pixel_position, pixel_distance)
+
+    #orientations, orientations_p = orientations_prior, orientations_prior_p
 
     solved = solve_ac(0, pixel_position, pixel_distance,
                       slices, slices_p,
@@ -75,8 +76,8 @@ def main():
                       results_p, summary, summary_p)
     logger.log(f"AC recovered in {timer.lap():.2f}s.")
 
-    (ref_orientations, ref_orientations_p, match_summary, match_summary_p, dist_summary, dist_summary_p,
-     match_summary_p_nnodes, dist_summary_p_nnodes) = setup_match()
+    (ref_orientations, ref_orientations_p, nonuniform_batch, nonuniform_batch_p, match_summary, match_summary_p, dist_summary, dist_summary_p,
+     match_summary_p_nnodes, dist_summary_p_nnodes) = setup_match(pixel_position, pixel_distance)
 
     phased = phase(0, solved)
     logger.log(f"Problem phased in {timer.lap():.2f}s.")
@@ -97,8 +98,9 @@ def main():
                         pixel_position, pixel_distance, 
                         orientations, orientations_p, 
                         ref_orientations, ref_orientations_p, 
+                        nonuniform_batch, nonuniform_batch_p,
                         match_summary, match_summary_p,
-                                             dist_summary, dist_summary_p, match_summary_p_nnodes, dist_summary_p_nnodes)
+                        dist_summary, dist_summary_p, match_summary_p_nnodes, dist_summary_p_nnodes)
         logger.log(f"Orientations matched in {timer.lap():.2f}s.")
 
         # Solve autocorrelation
