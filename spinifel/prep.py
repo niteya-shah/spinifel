@@ -172,7 +172,7 @@ def compute_pixel_distance(pixel_position_reciprocal):
 @nvtx.annotate("prep.py", is_prefix=True)
 def load_orientations_prior(orientations_prior, i_start, i_end):
     with h5py.File(parms.data_path, 'r') as h5f:
-        orientations[:] = h5f['orientations'][i_start:i_end]
+        orientations = h5f['orientations'][i_start:i_end]
         orientations_prior[:] = np.reshape(orientations, (orientations.shape[0], 4))
 
 
