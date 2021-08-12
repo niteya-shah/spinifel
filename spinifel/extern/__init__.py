@@ -31,7 +31,7 @@ profiler = Profiler()
 # Load cufiNUFFT or fiNUFFTpy depending on settings: use_cuda, use_cufinufft
 #
 
-if settings.using_cuda and settings.use_cufinufft:
+if settings.use_cuda and settings.use_cufinufft:
     # TODO: only manage MPI via contexts! But let's leave this here for now
     context.init_mpi()  # Ensures that MPI has been initalized
     context.init_cuda() # this must be called _after_ init_mpi
@@ -62,7 +62,7 @@ else:
 # Alias the nufft functions to their cpu/gpu implementations
 #
 
-if settings.using_cuda and settings.use_cufinufft:
+if settings.use_cuda and settings.use_cufinufft:
     print("Orientation Matching: USING_CUDA")
 
     if context.cufinufft_available:
