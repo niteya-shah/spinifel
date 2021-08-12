@@ -1,7 +1,23 @@
+from functools import wraps
 import numpy  as np
 import PyNVTX as nvtx
 
 from pygion import task, Region, Partition, Tunable, R
+
+from spinifel import SpinifelContexts
+
+
+
+def gpu_task_wrapper(thunk):
+    @wraps(thunk)
+    def wrapper(*args, **kwargs):
+        context = SpinifelContexts()
+        context.ctx.push()
+        try:
+            return thunk(*args, **kwargs)
+        finally:
+            context.ctx.pop()
+    return wrapper
 
 
 
