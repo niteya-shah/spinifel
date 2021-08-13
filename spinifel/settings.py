@@ -121,6 +121,8 @@ class SpinifelSettings(metaclass=Singleton):
                 "gpu-device count per node/resource set"),
             "_use_cufinufft": ("runtime", "use_cufinufft", parse_bool, False,
                 "use cufinufft for nufft support"),
+            "_use_cupy": ("runtime", "use_cupy", parse_bool, False,
+                "use cupy wherever possible"),
             "_ps_smd_n_events": ("psana", "ps_smd_n_events", int, 1000,
                 "no. of events to be sent to an EventBuilder core"),
             "_ps_eb_nodes": ("psana", "ps_eb_nodes", int, 1,
@@ -150,6 +152,7 @@ class SpinifelSettings(metaclass=Singleton):
             "USE_CUDA": ("_use_cuda", get_bool),
             "DEVICES_PER_RS": ("_devices_per_node", get_int),
             "USE_CUFINUFFT": ("_use_cufinufft", get_bool),
+            "USE_CUPY": ("_use_cupy", get_bool),
             "PS_SMD_N_EVENTS": ("_ps_smd_n_events", get_int),
             "PS_EB_NODES": ("_ps_eb_nodes", get_int),
             "PS_SRV_NODES": ("_ps_srv_nodes", get_int),
@@ -335,3 +338,4 @@ class SpinifelSettings(metaclass=Singleton):
         self._ps_srv_nodes = val
         # update derived environment variable
         environ["PS_SRV_NODES"] = str(val)
+

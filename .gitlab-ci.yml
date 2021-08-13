@@ -8,6 +8,7 @@ variables:
   DATA_DIR: /gpfs/wolf/chm137/proj-shared/spinifel_data
   DATA_FILENAME: 2CEX-10k-2.h5
   OUT_DIR: /gpfs/wolf/chm137/proj-shared/ci/${CI_PIPELINE_ID}/spinifel_output
+  CUPY_CACHE_DIR: /gpfs/wolf/chm137/proj-shared/ci/${CI_PIPELINE_ID}/cupy_cache
 
   # for pytest
   test_data_dir: /gpfs/wolf/chm137/proj-shared/spinifel_data/testdata
@@ -106,7 +107,7 @@ test_nocuda:
     - mkdir -p ${OUT_DIR}
     - source ./setup/env.sh
   script:
-    - jsrun -n1 -a1 -g1 python -m spinifel --default-settings=summit_ci.toml --mode=mpi runtime.use_cufinufft=false runtime.use_cuda=false
+    - jsrun -n1 -a1 -g1 python -m spinifel --default-settings=summit_ci.toml --mode=mpi runtime.use_cufinufft=false runtime.use_cuda=false runtime.use_cupy=false
 
   tags:
     - batch

@@ -20,6 +20,7 @@ n_images_per_rank = 10
 small_problem = true
 use_cuda = true
 use_cufinufft = true
+use_cupy = true
 use_single_prec = false
 
 [gpu]
