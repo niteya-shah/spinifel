@@ -106,7 +106,7 @@ test_nocuda:
     - mkdir -p ${OUT_DIR}
     - source ./setup/env.sh
   script:
-    - jsrun -n1 -a1 -g1 python -m spinifel --default-settings=summit_ci.toml --mode=mpi runtime.use_cufinufft=false runtime.use_cuda=false
+    - jsrun -n1 -a1 -g1 python -m spinifel --default-settings=summit_ci.toml --mode=mpi runtime.use_cufinufft=false runtime.use_cuda=false runtime.use_cupy=false
 
   tags:
     - batch
