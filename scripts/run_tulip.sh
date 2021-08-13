@@ -31,9 +31,11 @@ source "$root_dir"/setup/env.sh
 
 export PYTHONPATH="$PYTHONPATH:$root_dir"
 
-export DATA_DIR=$HOME/spinifel_data_h5
+# export DATA_DIR=$HOME/spinifel_data_h5
+export DATA_DIR=${DATA_DIR:-/gpfs/alpine/scratch/$USER/chm137/spinifel_data/spinifel_input}
 
-export OUT_DIR=$HOME/spinifel_output
+# export OUT_DIR=$HOME/spinifel_output
+export OUT_DIR=${OUT_DIR:-/gpfs/alpine/scratch/$USER/chm137/spinifel_data/spinifel_output}
 mkdir -p $OUT_DIR
 rm -rf $OUT_DIR/*
 
