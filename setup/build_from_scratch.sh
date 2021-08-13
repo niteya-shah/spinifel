@@ -106,7 +106,16 @@ CC=$MPI4PY_CC MPICC=$MPI4PY_MPICC pip install -v --no-binary mpi4py mpi4py
 pip install --no-cache-dir callmonitor
 pip install --no-cache-dir PyNVTX
 pip install --no-cache-dir mrcfile
-pip install --no-cache-dir cupy
+(
+    if [[ $(hostname --fqdn) = *".spock."* ]]; then
+        export CUPY_INSTALL_USE_HIP=1
+        export ROCM_HOME=$ROCM_PATH
+        export HCC_AMDGPU_TARGET=gfx908
+        pip install --no-cache-dir --pre cupy
+    else
+        pip install --no-cache-dir cupy
+    fi
+)
 
 #-------------------------------------------------------------------------------
 
