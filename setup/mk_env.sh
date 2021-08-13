@@ -150,6 +150,25 @@ export USE_OPENMP=${USE_OPENMP:-1}
 export USE_GASNET=${USE_GASNET:-1}
 export CONDUIT=${CONDUIT:-ibv}
 EOF
+elif [[ $(hostname --fqdn) = *".spock."* ]]; then
+    cat >> env.sh <<EOF
+module load wget
+module load PrgEnv-gnu
+module load rocm
+module load cray-fftw
+
+export CC=gcc
+export CXX=g++
+
+# compilers for mpi4py
+export MPI4PY_CC=gcc
+export MPI4PY_MPICC=CC
+
+export USE_CUDA=${USE_CUDA:-0}
+export USE_OPENMP=${USE_OPENMP:-1}
+export USE_GASNET=${USE_GASNET:-0}
+export CONDUIT=${CONDUIT:-ibv}
+EOF
 else
     echo "I don't know how to build it on this machine..."
     exit 1
