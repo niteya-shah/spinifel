@@ -126,7 +126,8 @@ fi
 #_______________________________________________________________________________
 # Insall GASNET
 
-if [[ $LEGION_USE_GASNET -eq 1 && $GASNET_ROOT == $PWD/gasnet/release ]]; then
+if [[ $LEGION_USE_GASNET -eq 1 && $GASNET_ROOT == ${root_dir}/gasnet/release ]]
+then
     pushd gasnet
     CONDUIT=$GASNET_CONDUIT make -j${THREADS:-8}
     popd
@@ -138,7 +139,8 @@ fi
 #_______________________________________________________________________________
 # Install Legion
 
-if [[ $LG_RT_DIR == $PWD/legion/runtime ]]; then
+if [[ $LG_RT_DIR == ${root_dir}/legion/runtime ]]
+then
     ./reconfigure_legion.sh
     ./rebuild_legion.sh
     ./mapper_clean_build.sh
