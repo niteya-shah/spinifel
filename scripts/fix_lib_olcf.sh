@@ -9,23 +9,25 @@ fix_lib () {
         blacklist=(ssl crypto krb5 stdc++)
         fn=$(basename -- $1)
 
+        safe=true
         for bl in ${blacklist[@]}
         do
             if [[ $fn == *${bl}* ]]
             then
-                return 1
+                safe=false
+                break
             fi
         done
 
-        if [[ -e $fn ]]
+        if [[ -e $fn ]] && [[ $safe == true ]]
         then
             echo "Overwriting: $fn with $1" >> fix_lib.log
             mv $fn fix_lib_moveasie/
+        else
+            echo "Skipping: $fn due to blacklist" >> fix_lib.log
         fi
 
         ln -sf $1
-
-        return 0
     }
 
     mkdir -p fix_lib_moveasie
