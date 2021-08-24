@@ -94,7 +94,26 @@ export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
 # becomes a problem elsewhere
 export GASNET_CONDUIT=ibv
 EOF
-elif [[ ${target} = *"summit"* || ${target} = *"ascent"* ]]; then
+elif [[ ${target} = *"summit"* ]]; then
+    cat >> env.sh <<EOF
+module load gcc/7.5.0
+module load fftw/3.3.9
+module load cuda/10.2.89
+module load gsl
+export CC=gcc
+export CXX=g++
+
+# compilers for mpi4py
+export MPI4PY_CC=\$OMPI_CC
+export MPI4PY_MPICC=mpicc
+
+export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
+export GASNET_CONDUIT=ibv
+
+# for Numba
+export CUDA_HOME=\$OLCF_CUDA_ROOT
+EOF
+elif [[ ${target} = *"ascent"* ]]; then
     cat >> env.sh <<EOF
 module load gcc/7.4.0
 module load fftw/3.3.8
