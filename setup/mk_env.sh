@@ -96,13 +96,10 @@ export GASNET_CONDUIT=ibv
 EOF
 elif [[ ${target} = *"summit"* ]]; then
     cat >> env.sh <<EOF
-module load gcc/7.5.0
-module load fftw/3.3.9
-module load cuda/10.2.89
-module load gsl
+module load gcc fftw cuda gsl
+
 export CC=gcc
 export CXX=g++
-
 # compilers for mpi4py
 export MPI4PY_CC=\$OMPI_CC
 export MPI4PY_MPICC=mpicc
