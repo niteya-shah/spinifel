@@ -1,0 +1,25 @@
+# This toml file contains place holder values, used to test the settings parser
+
+[debug]
+test = "loaded from toml file"
+verbose = true
+verbosity = 0
+use_callmonitor = false
+
+[data]
+in_dir = "spinifel_data"
+out_dir = "spinifel_output"
+name = "data_file"
+
+[psana]
+enable = false
+ps_smd_n_events = 0
+
+[runtime]
+data_multiplier = 1
+small_problem = false
+using_cuda = false
+use_cufinufft = false
+
+[gpu]
+devices_per_node = 0
