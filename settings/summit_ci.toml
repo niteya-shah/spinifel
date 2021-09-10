@@ -16,10 +16,11 @@ enable = false
 ps_smd_n_events = 0
 
 [runtime]
-data_multiplier = 1
+n_images_per_rank = 10
 small_problem = true
-using_cuda = true
+use_cuda = true
 use_cufinufft = true
+use_cupy = true
 use_single_prec = false
 
 [gpu]

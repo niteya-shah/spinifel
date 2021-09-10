@@ -94,15 +94,28 @@ export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
 # becomes a problem elsewhere
 export GASNET_CONDUIT=ibv
 EOF
-elif [[ ${target} = *"summit"* || ${target} = *"ascent"* ]]; then
+elif [[ ${target} = *"summit"* ]]; then
     cat >> env.sh <<EOF
-module load gcc/7.4.0
-module load fftw/3.3.8
-module load cuda/10.2.89
-module load gsl
+module load gcc fftw cuda gsl
+
 export CC=gcc
 export CXX=g++
+# compilers for mpi4py
+export MPI4PY_CC=\$OMPI_CC
+export MPI4PY_MPICC=mpicc
 
+export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
+export GASNET_CONDUIT=ibv
+
+# for Numba
+export CUDA_HOME=\$OLCF_CUDA_ROOT
+EOF
+elif [[ ${target} = *"ascent"* ]]; then
+    cat >> env.sh <<EOF
+module load gcc fftw cuda gsl
+
+export CC=gcc
+export CXX=g++
 # compilers for mpi4py
 export MPI4PY_CC=\$OMPI_CC
 export MPI4PY_MPICC=mpicc
@@ -172,22 +185,22 @@ else
 fi
 
 cat >> env.sh <<EOF
-export GASNET_ROOT="${GASNET_ROOT:-$PWD/gasnet/release}"
+export GASNET_ROOT="${GASNET_ROOT:-${root_dir}/gasnet/release}"
 
-export LG_RT_DIR="${LG_RT_DIR:-$PWD/legion/runtime}"
+export LG_RT_DIR="${LG_RT_DIR:-${root_dir}/legion/runtime}"
 export LEGION_DEBUG=0
 
 export PYVER=3.8
 
-export LEGION_INSTALL_DIR="$PWD/install"
+export LEGION_INSTALL_DIR="${root_dir}/install"
 pathappend \$LEGION_INSTALL_DIR/bin
 ldpathappend \$LEGION_INSTALL_DIR/lib
 pythonpathappend \$LEGION_INSTALL_DIR/lib/python\$PYVER/site-packages
 
-export CONDA_ROOT="$PWD/conda"
+export CONDA_ROOT="${root_dir}/conda"
 export CONDA_ENV_DIR="\$CONDA_ROOT/envs/myenv"
 
-export LCLS2_DIR="$PWD/lcls2"
+export LCLS2_DIR="${root_dir}/lcls2"
 
 # settings for finufft
 if [[ -z \${FFTW_INC+x} ]]; then
@@ -202,7 +215,7 @@ else
 fi
 
 #cufinufft library dir
-export CUFINUFFT_DIR="$PWD/cufinufft/lib"
+export CUFINUFFT_DIR="${root_dir}/cufinufft/lib"
 ldpathappend \$CUFINUFFT_DIR
 
 pathappend \$LCLS2_DIR/install/bin

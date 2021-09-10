@@ -20,7 +20,7 @@ rank = context.rank
 
 #_______________________________________________________________________________
 # TRY to import the cuda nearest neighbor pybind11 module -- if it exists in
-# the path and we enabled `using_cuda`
+# the path and we enabled `use_cuda`
 
 from importlib.util import find_spec
 
@@ -37,9 +37,9 @@ KNN_AVAILABLE = KNN_LOADER is not None
 if settings.verbose:
     print(f"pyCudaKNearestNeighbors is available: {KNN_AVAILABLE}")
 
-if settings.using_cuda and KNN_AVAILABLE:
+if settings.use_cuda and KNN_AVAILABLE:
     import spinifel.sequential.pyCudaKNearestNeighbors as pyCu
-elif settings.using_cuda and not KNN_AVAILABLE:
+elif settings.use_cuda and not KNN_AVAILABLE:
     raise CUKNNRequiredButNotFound
 
 
@@ -78,7 +78,7 @@ def calc_argmin_gpu(euDist, n_images, n_refs, n_pixels, deviceId):
 @nvtx.annotate("sequential/nearest_neighbor.py", is_prefix=True)
 def nearest_neighbor(model_slices, slices, batch_size):
 
-    if settings.using_cuda:
+    if settings.use_cuda:
         deviceId = rank % settings._devices_per_node
         if settings.verbose:
             print(f"Using CUDA  to calculate Euclidean distance and heap sort (batch_size={batch_size})")

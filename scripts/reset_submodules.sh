@@ -23,6 +23,8 @@ update_submodules () {
 
         pushd $git_path
         git checkout $git_hash
+        git reset HEAD --hard
+        git clean -fdx
         popd
     done
 }

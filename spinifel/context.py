@@ -98,12 +98,14 @@ class SpinifelContexts(metaclass=Singleton):
         drv.init()
 
         settings     = SpinifelSettings()
-        self._dev_id = self.rank % settings.devices_per_node
+        self._dev_id = self.rank % drv.Device.count()
 
         dev = drv.Device(self.dev_id)
-        ctx = dev.make_context()
+        self.ctx = dev.retain_primary_context()
 
-        register(ctx.pop)
+        if settings.mode != "legion":
+            self.ctx.push()
+            register(self.ctx.pop)
 
         settings = SpinifelSettings()
         if settings.verbose:

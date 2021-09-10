@@ -8,6 +8,7 @@ variables:
   DATA_DIR: /gpfs/wolf/chm137/proj-shared/spinifel_data
   DATA_FILENAME: 2CEX-10k-2.h5
   OUT_DIR: /gpfs/wolf/chm137/proj-shared/ci/${CI_PIPELINE_ID}/spinifel_output
+  CUPY_CACHE_DIR: /gpfs/wolf/chm137/proj-shared/ci/${CI_PIPELINE_ID}/cupy_cache
 
   # for pytest
   test_data_dir: /gpfs/wolf/chm137/proj-shared/spinifel_data/testdata
@@ -61,7 +62,7 @@ test_legion:
     - source ./setup/env.sh
     - export PYTHONPATH=${PYTHONPATH}:${EXTERNAL_WORKDIR}
   script:
-      - jsrun -n1 -a1 -g1 legion_python -ll:py 1 -ll:csize 8192 legion_main.py --default-settings=summit_ci.toml --mode=legion runtime.use_cufinufft=false
+      - jsrun -n1 -a1 -g1 legion_python -ll:py 1 -ll:csize 8192 legion_main.py --default-settings=summit_ci.toml --mode=legion
   tags:
     - batch
 
@@ -106,7 +107,7 @@ test_nocuda:
     - mkdir -p ${OUT_DIR}
     - source ./setup/env.sh
   script:
-    - jsrun -n1 -a1 -g1 python -m spinifel --default-settings=summit_ci.toml --mode=mpi runtime.use_cufinufft=false runtime.use_cuda=false
+    - jsrun -n1 -a1 -g1 python -m spinifel --default-settings=summit_ci.toml --mode=mpi runtime.use_cufinufft=false runtime.use_cuda=false runtime.use_cupy=false
 
   tags:
     - batch
