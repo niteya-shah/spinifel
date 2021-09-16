@@ -10,7 +10,7 @@ settings = SpinifelSettings()
 matplotlib.use("Agg")
 numpy.seterr(divide='ignore', invalid='ignore')
 
-det_shape = (4, 512, 512)
+det_shape = (1, 128, 128)
 N_images_max = 10000
 N_generations = 10
 data_field_name = "intensities"
@@ -21,7 +21,7 @@ pixel_index_shape = (2,) + det_shape
 pixel_index_type_str = "int32"
 orientation_type_str = "float32"
 volume_type_str = "complex64"
-volume_shape = (151, 151, 151)
+volume_shape = (149, 149, 149)
 oversampling = 1
 
 solve_ac_maxiter = 100
@@ -61,18 +61,17 @@ else:
     N_phase_loops = 10
     N_clipping = 0
     N_binning = 0
-    N_orientations = 3000 # model_slices
+    N_orientations = 200000 # model_slices
     N_batch_size = 100
     Mquat = int(oversampling * 20)  # 1/4 of uniform grid size
 
-M = 4 * Mquat + 1
+M = 4*Mquat + 1
 M_ups = 2*M  # Upsampled grid for AC convolution technique
 N_binning_tot = N_clipping + N_binning
 reduced_det_shape = det_shape[:-2] + (
     det_shape[-2] // 2**N_binning_tot, det_shape[-1] // 2**N_binning_tot)
 reduced_pixel_position_shape = (3,) + reduced_det_shape
 reduced_pixel_index_shape = (2,) + reduced_det_shape
-
 
 # PSANA2
 ps_smd_n_events = settings.ps_smd_n_events
