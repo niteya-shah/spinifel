@@ -53,7 +53,6 @@ def main():
     logger.log(f"batch_size: {batch_size}")
     logger.log(f"max_events: {max_events}")
 
-
     # Load unique set of intensity slices for each rank
     (pixel_position_reciprocal,
      pixel_distance_reciprocal,
@@ -61,7 +60,7 @@ def main():
      slices_) = get_data(N_images_per_rank, ds)
     logger.log(f"Loaded in {timer.lap():.2f}s.")
 
-    # Generation 0: solve_ac and phase 
+    # Generation 0: solve_ac and phase
     N_generations = parms.N_generations
     generation = 0
     logger.log(f"#"*27)
@@ -99,11 +98,6 @@ def main():
         ac_phased, support_, rho_ = phase(generation, ac, support_, rho_)
         logger.log(f"Problem phased in {timer.lap():.2f}s.")
 
-        # Log ac and rho_
-        np.save(parms.out_dir / f"ac-{generation}.npy", ac)
-        np.save(parms.out_dir / f"rho_-{generation}.npy", rho_)
-
-
         # Check if density converges
         if parms.chk_convergence:
             # Calculate correlation coefficient
@@ -123,12 +117,10 @@ def main():
                 break
 
         rho = np.fft.ifftshift(rho_)
-        print("rho =", rho)
 
         if comm.rank == 0:
             save_mrc(parms.out_dir / f"ac-{generation}.mrc", ac_phased)
             save_mrc(parms.out_dir / f"rho-{generation}.mrc", rho)
-            np.save(parms.out_dir / f"ac-{generation}.npy", ac_phased)
-            np.save(parms.out_dir / f"rho-{generation}.npy", rho)
+
     logger.log(f"Results saved in {parms.out_dir}")
     logger.log(f"Successfully completed in {timer.total():.2f}s.")
