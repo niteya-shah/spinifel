@@ -170,26 +170,21 @@ class SpinifelSettings(metaclass=Singleton):
 
         self.mode = self.__args.mode[0]
 
-        self.legacy = False
-        if self.mode == "legacy":
-            self.legacy = True
+        if (self.__args.settings is None) \
+        and (self.__args.default_settings is None):
+            raise CannotProcessSettingsFile
 
-        if not self.legacy:
-            if (self.__args.settings is None) \
-            and (self.__args.default_settings is None):
-                raise CannotProcessSettingsFile
+        if (self.__args.settings is not None) \
+        and (self.__args.default_settings is not None):
+            raise CannotProcessSettingsFile
 
-            if (self.__args.settings is not None) \
-            and (self.__args.default_settings is not None):
-                raise CannotProcessSettingsFile
-
-            if self.__args.default_settings is not None:
-                self.__toml = join(
-                    dirname(abspath(__file__)), "..", "settings",
-                    self.__args.default_settings[0]
-                )
-            else:
-                self.__toml = self.__args.settings[0]
+        if self.__args.default_settings is not None:
+            self.__toml = join(
+                dirname(abspath(__file__)), "..", "settings",
+                self.__args.default_settings[0]
+            )
+        else:
+            self.__toml = self.__args.settings[0]
 
         self.refresh()
 
@@ -229,32 +224,31 @@ class SpinifelSettings(metaclass=Singleton):
         Refresh internal state using environment variables
         """
 
-        if not self.legacy:
-            toml_settings = load(self.__toml)
+        toml_settings = load(self.__toml)
 
-            for param in self.__params:
+        for param in self.__params:
 
-                if not ("." in param and "=" in param):
-                    raise MalformedSettingsException
+            if not ("." in param and "=" in param):
+                raise MalformedSettingsException
 
-                setting, val = param.split("=")
-                c, k         = setting.split(".")
-                toml_settings[c][k] = val
+            setting, val = param.split("=")
+            c, k         = setting.split(".")
+            toml_settings[c][k] = val
 
-            for attr in self.__properties:
+        for attr in self.__properties:
 
-                c, k, parser, default_val, _ = self.__properties[attr]
+            c, k, parser, default_val, _ = self.__properties[attr]
 
-                # if property is not found in toml settings, use default
-                if k not in toml_settings[c]:
-                    val = default_val
-                else:    
-                    val = toml_settings[c][k]
-                
-                if parser == str or parser == Path:
-                    val = expandvars(val)
+            # if property is not found in toml settings, use default
+            if k not in toml_settings[c]:
+                val = default_val
+            else:    
+                val = toml_settings[c][k]
+            
+            if parser == str or parser == Path:
+                val = expandvars(val)
 
-                setattr(self, attr, parser(val))
+            setattr(self, attr, parser(val))
 
         for key in self.__environ:
 
