@@ -170,6 +170,7 @@ elif [[ $(hostname --fqdn) = *".spock."* ]]; then
     cat >> env.sh <<EOF
 module load wget
 module load PrgEnv-gnu
+module load gcc/9.3.0 # CuPy fails to build with GCC 10: https://github.com/cupy/cupy/issues/5768
 module load rocm
 module load cray-fftw
 
