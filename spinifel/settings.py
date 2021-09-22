@@ -160,13 +160,12 @@ class SpinifelSettings(metaclass=Singleton):
             "CHK_CONVERGENCE": ("_chk_convergence", get_bool)
         }
 
+        p = ArgumentParser()
+        p.add_argument("--settings", type=str, nargs=1, default=None)
+        p.add_argument("--default-settings", type=str, nargs=1, default=None)
+        p.add_argument("--mode", type=str, nargs=1, required=True)
 
-        parser = ArgumentParser()
-        parser.add_argument("--settings", type=str, nargs=1, default=None)
-        parser.add_argument("--default-settings", type=str, nargs=1, default=None)
-        parser.add_argument("--mode", type=str, nargs=1, required=True)
-
-        self.__args, self.__params = parser.parse_known_args()
+        self.__args, self.__params = p.parse_known_args()
 
         self.mode = self.__args.mode[0]
 
@@ -276,6 +275,26 @@ class SpinifelSettings(metaclass=Singleton):
         return str_repr
 
 
+    def show_toml(self):
+        propnames = [name for (name, value) in getmembers(self)]
+        str_repr  = "SpinifelSettings Toml Spec:\n"
+        categories = dict()
+        for prop in propnames:
+            if self.isprop(prop):
+                c, k, _, _, _ = self.__properties["_" + prop]
+                if c not in categories:
+                    categories[c] = dict()
+                categories[c][k] = prop
+
+        for c in categories:
+            str_repr += f"\n[{c}]\n"
+            for k in categories[c]:
+                _, _, _, _, doc = self.__properties["_" + prop]
+                str_repr += f"{k} = {getattr(self, prop)} "
+                str_repr += f" # {doc} ({categories[c][k]})\n"
+        return str_repr
+
+
     def isprop(self, attr):
         """
         Checks if attribute has been decorated using the `@property` decorator
@@ -305,16 +324,19 @@ class SpinifelSettings(metaclass=Singleton):
         """no. of events to be sent to an EventBuilder core"""
         return self._ps_smd_n_events # noqa: E1101 pylint: disable=no-member
 
+
     @ps_smd_n_events.setter
     def ps_smd_n_events(self, val):
         self._ps_smd_n_events = val
         # update derived environment variable
         environ["PS_SMD_N_EVENTS"] = str(val)
 
+
     @property
     def ps_eb_nodes(self):
         """no. of event builder cores"""
         return self._ps_eb_nodes # noqa: E1101 pylint: disable=no-member
+
 
     @ps_eb_nodes.setter
     def ps_eb_nodes(self, val):
@@ -322,10 +344,12 @@ class SpinifelSettings(metaclass=Singleton):
         # update derived environment variable
         environ["PS_EB_NODES"] = str(val)
     
+
     @property
     def ps_srv_nodes(self):
         """no. of server cores"""
         return self._ps_srv_nodes # noqa: E1101 pylint: disable=no-member
+
 
     @ps_srv_nodes.setter
     def ps_srv_nodes(self, val):

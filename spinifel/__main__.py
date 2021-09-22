@@ -25,5 +25,7 @@ if __name__ == "__main__":
     elif settings.mode == "legion":
         from .legion import main
         main()
+    elif settings.mode == "toml":
+        print(settings.show_toml())
     else:
         print(f"Didin't do anything, because settings.mode={settings.mode}")
