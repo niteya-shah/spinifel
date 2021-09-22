@@ -265,7 +265,7 @@ class SpinifelSettings(metaclass=Singleton):
 
 
     def __str__(self):
-        propnames = [name for (name, value) in getmembers(self)]
+        propnames = (name for (name, value) in getmembers(self))
         str_repr  = "SpinifelSettings:\n"
         for prop in propnames:
             if self.isprop(prop):
@@ -275,8 +275,8 @@ class SpinifelSettings(metaclass=Singleton):
         return str_repr
 
 
-    def show_toml(self):
-        propnames = [name for (name, value) in getmembers(self)]
+    def as_toml(self):
+        propnames = (name for (name, value) in getmembers(self))
         str_repr  = "SpinifelSettings Toml Spec:\n"
         categories = dict()
         for prop in propnames:
@@ -289,6 +289,7 @@ class SpinifelSettings(metaclass=Singleton):
         for c in categories:
             str_repr += f"\n[{c}]\n"
             for k in categories[c]:
+                prop = categories[c][k]
                 _, _, _, _, doc = self.__properties["_" + prop]
                 str_repr += f"{k} = {getattr(self, prop)} "
                 str_repr += f" # {doc} ({categories[c][k]})\n"
