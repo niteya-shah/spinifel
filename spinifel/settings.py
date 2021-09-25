@@ -282,7 +282,7 @@ class SpinifelSettings(metaclass=Singleton):
             ),
             "_det_shape": (
                 "detector", "shape",
-                parse_strvec_int, (1, 128, 128),
+                parse_strvec_int, (4, 512, 512),
                 "detector shape"
             ),
             "_N_images_max": (
@@ -337,7 +337,7 @@ class SpinifelSettings(metaclass=Singleton):
             ),
             "_volume_shape": (
                 "algorithm", "volume_shape",
-                parse_strvec_int, (149, 149, 149),
+                parse_strvec_int, (151, 151, 151),
                 "shape of volume array"
             ),
             "_oversampling": (
