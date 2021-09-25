@@ -65,7 +65,7 @@ def get_slices(N_images, ds):
 @nvtx.annotate("sequential/prep.py", is_prefix=True)
 def get_data(N_images, ds):
     """
-    Return pre-processed data for running M-TIP.    
+    Return pre-processed data for running M-TIP.
 
     :param N_images: number of data images
     :param ds: data source
