@@ -653,7 +653,7 @@ class SpinifelSettings(metaclass=Singleton):
         """
         pixel_position_shape_0 + det_shape
         """
-        return self._pixel_position_shape_1 + self._det_shape
+        return self._pixel_position_shape_0 + self._det_shape
 
 
     @property
