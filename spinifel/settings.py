@@ -215,11 +215,6 @@ class SpinifelSettings(metaclass=Singleton):
                 int, 10,
                 "no. of images per rank"
             ),
-            "_small_problem": (
-                "runtime", "small_problem",
-                parse_bool, False,
-                "run in small problem mode"
-            ),
             "_use_cuda": (
                 "runtime", "use_cuda",
                 parse_bool, False,
@@ -398,7 +393,6 @@ class SpinifelSettings(metaclass=Singleton):
             "OUT_DIR": ("_out_dir", get_path),
             "N_IMAGES_PER_RANK": ("_N_images_per_rank", get_int),
             "VERBOSITY": ("_verbose", get_int),
-            "SMALL_PROBLEM": ("_small_problem", get_bool),
             "USE_CUDA": ("_use_cuda", get_bool),
             "DEVICES_PER_RS": ("_devices_per_node", get_int),
             "USE_CUFINUFFT": ("_use_cufinufft", get_bool),

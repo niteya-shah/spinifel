@@ -20,7 +20,6 @@ ps_smd_n_events = 0
 
 [runtime]
 N_images_per_rank = 1000
-small_problem = false
 use_cuda = true
 use_cufinufft = true
 use_cupy = true
