@@ -16,7 +16,7 @@ enable = false
 ps_smd_n_events = 0
 
 [runtime]
-n_images_per_rank = 10
+N_images_per_rank = 10
 small_problem = false
 use_cuda = false
 use_cufinufft = false

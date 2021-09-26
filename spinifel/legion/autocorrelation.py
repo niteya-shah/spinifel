@@ -10,7 +10,7 @@ from scipy.linalg        import norm
 from scipy.ndimage       import gaussian_filter
 from scipy.sparse.linalg import LinearOperator, cg
 
-from spinifel import parms, autocorrelation, utils, image
+from spinifel import settings, autocorrelation, utils, image
 from . import utils as lgutils
 
 
@@ -25,7 +25,7 @@ def gen_random_orientations(orientations, N_images_per_rank):
 
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def get_random_orientations():
-    N_images_per_rank = parms.N_images_per_rank
+    N_images_per_rank = settings.N_images_per_rank
     fields_dict = {"quaternions": pygion.float32}
     sec_shape = (4,)
     orientations, orientations_p = lgutils.create_distributed_region(
@@ -42,11 +42,11 @@ def get_random_orientations():
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def gen_nonuniform_positions_v(nonuniform, nonuniform_v, reciprocal_extent):
     nonuniform_v.H[:] = (nonuniform.H.flatten()
-        / reciprocal_extent * np.pi / parms.oversampling)
+        / reciprocal_extent * np.pi / settings.oversampling)
     nonuniform_v.K[:] = (nonuniform.K.flatten()
-        / reciprocal_extent * np.pi / parms.oversampling)
+        / reciprocal_extent * np.pi / settings.oversampling)
     nonuniform_v.L[:] = (nonuniform.L.flatten()
-        / reciprocal_extent * np.pi / parms.oversampling)
+        / reciprocal_extent * np.pi / settings.oversampling)
 
 
 
@@ -54,7 +54,7 @@ def gen_nonuniform_positions_v(nonuniform, nonuniform_v, reciprocal_extent):
 def get_nonuniform_positions_v(nonuniform, nonuniform_p, reciprocal_extent):
     """Flatten and calibrate nonuniform positions."""
     N_vals_per_rank = (
-        parms.N_images_per_rank * utils.prod(parms.reduced_det_shape))
+        settings.N_images_per_rank * utils.prod(settings.reduced_det_shape))
     fields_dict = {"H": pygion.float64, "K": pygion.float64,
                    "L": pygion.float64}
     sec_shape = ()
@@ -82,10 +82,10 @@ def gen_nonuniform_positions(orientations, nonuniform, pixel_position):
 
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def get_nonuniform_positions(orientations, orientations_p, pixel_position):
-    N_images_per_rank = parms.N_images_per_rank
+    N_images_per_rank = settings.N_images_per_rank
     fields_dict = {"H": pygion.float32, "K": pygion.float32,
                    "L": pygion.float32}
-    sec_shape = parms.reduced_det_shape
+    sec_shape = settings.reduced_det_shape
     nonuniform, nonuniform_p = lgutils.create_distributed_region(
         N_images_per_rank, fields_dict, sec_shape)
     N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
@@ -101,7 +101,7 @@ def get_nonuniform_positions(orientations, orientations_p, pixel_position):
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def right_hand_ADb_task(slices, uregion, nonuniform_v, ac, weights, M,
                         reciprocal_extent, use_reciprocal_symmetry):
-    if parms.verbosity > 0:
+    if settings.verbosity > 0:
         print(f"{socket.gethostname()} started ADb.", flush=True)
     data = slices.data.flatten()
     nuvect_Db = data * weights
@@ -113,7 +113,7 @@ def right_hand_ADb_task(slices, uregion, nonuniform_v, ac, weights, M,
         ac.support, M,
         reciprocal_extent, use_reciprocal_symmetry
     )
-    if parms.verbosity > 0:
+    if settings.verbosity > 0:
         print(f"{socket.gethostname()} computed ADb.", flush=True)
 
 
@@ -136,7 +136,7 @@ def right_hand(slices, slices_p, uregion, nonuniform_v, nonuniform_v_p,
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def prep_Fconv_task(uregion_ups, nonuniform_v, ac, weights, M_ups, Mtot, N,
                     reciprocal_extent, use_reciprocal_symmetry):
-    if parms.verbosity > 0:
+    if settings.verbosity > 0:
         print(f"{socket.gethostname()} started Fconv.", flush=True)
     conv_ups = autocorrelation.adjoint(
         np.ones(N),
@@ -147,7 +147,7 @@ def prep_Fconv_task(uregion_ups, nonuniform_v, ac, weights, M_ups, Mtot, N,
         reciprocal_extent, use_reciprocal_symmetry
     )
     uregion_ups.F_conv_[:] += np.fft.fftn(np.fft.ifftshift(conv_ups)) / Mtot
-    if parms.verbosity > 0:
+    if settings.verbosity > 0:
         print(f"{socket.gethostname()} computed Fconv.", flush=True)
 
 
@@ -172,7 +172,7 @@ def prep_Fantisupport(uregion, M):
     lu = np.linspace(-np.pi, np.pi, M)
     Hu_, Ku_, Lu_ = np.meshgrid(lu, lu, lu, indexing='ij')
     Qu_ = np.sqrt(Hu_**2 + Ku_**2 + Lu_**2)
-    uregion.F_antisupport[:] = Qu_ > np.pi / parms.oversampling
+    uregion.F_antisupport[:] = Qu_ > np.pi / settings.oversampling
 
     Fantisup = uregion.F_antisupport
     assert np.all(Fantisup[:] == Fantisup[::-1, :, :])
@@ -266,10 +266,10 @@ def solve(uregion, uregion_ups, ac, result, summary,
     result.ac[:] = ac_res.real
     it_number = callback.counter
 
-    if parms.verbosity > 0:
+    if settings.verbosity > 0:
         print(f"{socket.gethostname()} - ", end='')
     print(f"Rank {rank} recovered AC in {it_number} iterations.", flush=True)
-    image.show_volume(result.ac[:], parms.Mquat,
+    image.show_volume(result.ac[:], settings.Mquat,
                       f"autocorrelation_{generation}_{rank}.png")
 
     v1 = norm(ret)
@@ -311,7 +311,7 @@ def select_ac(generation, summary):
     axes[2].set_xlabel("Residual norm $||W \lambda_{r}-d||_{2}$")
     axes[2].set_ylabel("Solution norm $||x_{\lambda_{r}}||_{2}$")
     fig.tight_layout()
-    plt.savefig(parms.out_dir / f"summary_{generation}.png")
+    plt.savefig(settings.out_dir / f"summary_{generation}.png")
     plt.close('all')
 
     print(f"Keeping result from rank {ref_rank}.", flush=True)
@@ -329,17 +329,17 @@ def solve_ac(generation,
              orientations=None,
              orientations_p=None,
              phased=None):
-    M = parms.M
-    M_ups = parms.M_ups  # For upsampled convolution technique
+    M = settings.M
+    M_ups = settings.M_ups  # For upsampled convolution technique
     Mtot = M**3
-    N_images_per_rank = parms.N_images_per_rank
-    N = N_images_per_rank * utils.prod(parms.reduced_det_shape)
+    N_images_per_rank = settings.N_images_per_rank
+    N = N_images_per_rank * utils.prod(settings.reduced_det_shape)
     N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
     N_images_tot = N_images_per_rank * N_procs
     Ntot = N * N_procs
     reciprocal_extent = pixel_distance.reciprocal.max()
     use_reciprocal_symmetry = True
-    maxiter = parms.solve_ac_maxiter
+    maxiter = settings.solve_ac_maxiter
 
     if orientations is None:
         orientations, orientations_p = get_random_orientations()

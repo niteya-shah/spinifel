@@ -1,6 +1,6 @@
 import PyNVTX as nvtx
 
-from spinifel import parms, utils
+from spinifel import settings, utils
 
 from .prep import get_data
 from .autocorrelation import solve_ac
@@ -14,17 +14,18 @@ def main():
     logger = utils.Logger(True)
     logger.log("In sequential main")
 
-    N_images = parms.N_images_per_rank
-    det_shape = parms.det_shape
+    N_images = settings.N_images_per_rank
+    det_shape = settings.det_shape
 
     timer = utils.Timer()
 
     ds = None
-    if parms.use_psana:
+    if settings.use_psana:
         from psana import DataSource
         logger.log("Using psana")
-        ds = DataSource(exp=parms.exp, run=parms.runnum, dir=parms.data_dir,
-                        batch_size=50, max_events=parms.N_images_max)
+        ds = DataSource(exp=settings.exp, run=settings.runnum,
+                        dir=settings.data_dir, batch_size=50,
+                        max_events=settings.N_images_max)
 
     (pixel_position_reciprocal,
      pixel_distance_reciprocal,

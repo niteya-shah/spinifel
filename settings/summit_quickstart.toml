@@ -18,7 +18,7 @@ ps_eb_nodes = 1
 ps_srv_nodes = 0
 
 [runtime]
-n_images_per_rank = 10
+N_images_per_rank = 10
 small_problem = true
 use_cuda = true
 use_cufinufft = true

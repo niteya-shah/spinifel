@@ -1,13 +1,13 @@
 import numpy as np
 
-from spinifel import parms, contexts
+from spinifel import settings, contexts
 from spinifel.sequential.phasing import phase as sequential_phase
 
 
 def phase(generation, ac, support_=None, rho_=None):
     """Phase retrieval by Rank0 and broadcast to all ranks."""
 
-    Mquat = parms.Mquat
+    Mquat = settings.Mquat
     M = 4*Mquat + 1
     Mtot = M**3
 

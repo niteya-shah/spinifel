@@ -45,7 +45,7 @@ out_dir = settings.out_dir
 
 verbosity = settings.verbosity
 
-N_images_per_rank = settings.n_images_per_rank
+N_images_per_rank = settings.N_images_per_rank
 # if settings.small_problem:
 #     nER = 10
 #     nHIO = 5

@@ -2,9 +2,9 @@ import os
 import numpy  as np
 import PyNVTX as nvtx
 
-from spinifel import SpinifelSettings, parms, image
+from spinifel import SpinifelSettings, settings, image
 
-settings = SpinifelSettings()
+# settings = SpinifelSettings()
 
 xp = np
 if settings.use_cupy:
@@ -225,7 +225,7 @@ def phase(generation, ac, support_=None, rho_=None):
     :return rho_: updated density estimate
     """
 
-    Mquat = parms.Mquat
+    Mquat = settings.Mquat
     M = 4*Mquat + 1
     Mtot = M**3
 
@@ -257,10 +257,10 @@ def phase(generation, ac, support_=None, rho_=None):
     
     rho_max = xp.infty
 
-    nER = parms.nER
-    nHIO = parms.nHIO
+    nER = settings.nER
+    nHIO = settings.nHIO
 
-    for i in range(parms.N_phase_loops):
+    for i in range(settings.N_phase_loops):
         ER_loop(nER, rho_, amplitudes_, amp_mask_, support_, rho_max)
         HIO_loop(nHIO, 0.9, rho_, amplitudes_, amp_mask_, support_, rho_max)
         ER_loop(nER, rho_, amplitudes_, amp_mask_, support_, rho_max)

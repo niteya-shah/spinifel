@@ -5,7 +5,7 @@ import pygion
 
 from pygion import acquire, attach_hdf5, task, Partition, Region, R, Tunable, WD
 
-from spinifel import parms, SpinifelSettings
+from spinifel import settings, SpinifelSettings
 
 from .prep import get_data
 from .autocorrelation import solve_ac
@@ -21,20 +21,21 @@ def main():
 
     total_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
 
-    N_images_per_rank = parms.N_images_per_rank
+    N_images_per_rank = settings.N_images_per_rank
     batch_size = min(N_images_per_rank, 100)
-    max_events = min(parms.N_images_max, total_procs*N_images_per_rank)
+    max_events = min(settings.N_images_max, total_procs*N_images_per_rank)
 
     ds = None
-    if parms.use_psana:
+    if settings.use_psana:
         # For now, we use one smd chunk per node just to keep things simple.
         # os.environ['PS_SMD_N_EVENTS'] = str(N_images_per_rank)
         settings                 = SpinifelSettings()
         settings.ps_smd_n_events = N_images_per_rank
 
         from psana import DataSource
-        ds = DataSource(exp=parms.exp, run=parms.runnum, dir=parms.data_dir,
-                        batch_size=batch_size, max_events=max_events)
+        ds = DataSource(exp=settings.exp, run=settings.runnum,
+                        dir=settings.data_dir, batch_size=batch_size,
+                        max_events=max_events)
 
     (pixel_position,
      pixel_distance,
@@ -47,7 +48,7 @@ def main():
     prev_phased = None
     cov_xy = 0
     cov_delta = .05
-    N_generations = parms.N_generations
+    N_generations = settings.N_generations
     for generation in range(1, N_generations):
         orientations, orientations_p = match(
             phased, slices, slices_p, pixel_position, pixel_distance)

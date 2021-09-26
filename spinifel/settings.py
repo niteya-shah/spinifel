@@ -210,8 +210,8 @@ class SpinifelSettings(metaclass=Singleton):
                 Path, Path(""),
                 "output dir"
             ),
-            "_n_images_per_rank": (
-                "runtime", "n_images_per_rank",
+            "_N_images_per_rank": (
+                "runtime", "N_images_per_rank",
                 int, 10,
                 "no. of images per rank"
             ),
@@ -396,7 +396,7 @@ class SpinifelSettings(metaclass=Singleton):
             "DATA_FILENAME": ("_data_filename", get_str),
             "USE_PSANA": ("_use_psana", get_bool),
             "OUT_DIR": ("_out_dir", get_path),
-            "N_IMAGES_PER_RANK": ("_n_images_per_rank", get_int),
+            "N_IMAGES_PER_RANK": ("_N_images_per_rank", get_int),
             "VERBOSITY": ("_verbose", get_int),
             "SMALL_PROBLEM": ("_small_problem", get_bool),
             "USE_CUDA": ("_use_cuda", get_bool),
@@ -559,7 +559,7 @@ class SpinifelSettings(metaclass=Singleton):
                     val = str(val).lower()
                 if p in (parse_strvec_int, parse_strvec_float,
                          parse_strvec_bool):
-                    val = "\"[" + str(val).lower()[1:-1] + "]\""
+                    val = "[" + str(val).lower()[1:-1] + "]"
 
                 str_repr += f"{k} = {val} "
                 str_repr += f" # {doc} ({categories[c][k]})\n"
