@@ -5,7 +5,7 @@ import PyNVTX            as nvtx
 from matplotlib        import cm
 from matplotlib.colors import LogNorm, SymLogNorm
 
-from spinifel import parms
+from spinifel import settings
 
 
 
@@ -21,7 +21,7 @@ def show_image(pixel_index_map, image, filename):
     # plot image data
     plt.imshow(buffer, norm=LogNorm())
     plt.colorbar()
-    # plt.savefig(parms.out_dir / filename)
+    # plt.savefig(settings.out_dir / filename)
     plt.cla()
     plt.clf()
 
@@ -48,5 +48,5 @@ def show_volume(ac, Mquat, filename):
     fig.colorbar(cm.ScalarMappable(norm=norm),
                  ax=axes.ravel().tolist(), fraction=0.04, pad=0.04)
 
-    plt.savefig(parms.out_dir / filename)
+    plt.savefig(settings.out_dir / filename)
     plt.close('all')

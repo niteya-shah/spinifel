@@ -6,7 +6,7 @@ import PyNVTX            as nvtx
 
 from matplotlib.colors import LogNorm
 
-from spinifel import parms
+from spinifel import settings
 
 
 @nvtx.annotate("prep.py", is_prefix=True)
@@ -26,7 +26,7 @@ def get_saxs(pixel_distance_reciprocal, mean_image):
 def export_saxs(pixel_distance_reciprocal, mean_image, filename):
     saxs_qs, saxs = get_saxs(pixel_distance_reciprocal, mean_image)
     plt.semilogy(saxs_qs, saxs)
-    plt.savefig(parms.out_dir / filename)
+    plt.savefig(settings.out_dir / filename)
     plt.cla()
     plt.clf()
 
@@ -114,17 +114,17 @@ def clipping_index(arr, n):
 
 
 binning_sum = lambda arr: bin2nx2n_sum(
-    clipping(arr, parms.N_clipping), parms.N_binning)
+    clipping(arr, settings.N_clipping), settings.N_binning)
 binning_mean = lambda arr: bin2nx2n_mean(
-    clipping(arr, parms.N_clipping), parms.N_binning)
+    clipping(arr, settings.N_clipping), settings.N_binning)
 binning_index = lambda arr: bin2nx2n_index(
-    clipping_index(arr, parms.N_clipping), parms.N_binning)
+    clipping_index(arr, settings.N_clipping), settings.N_binning)
 
 
 
 @nvtx.annotate("prep.py", is_prefix=True)
 def load_pixel_position_reciprocal(pixel_position_reciprocal):
-    with h5py.File(parms.data_path, 'r') as h5f:
+    with h5py.File(settings.data_path, 'r') as h5f:
         pixel_position_reciprocal[:] = np.moveaxis(
             h5f['pixel_position_reciprocal'][:], -1, 0)
 
@@ -132,7 +132,7 @@ def load_pixel_position_reciprocal(pixel_position_reciprocal):
 
 @nvtx.annotate("prep.py", is_prefix=True)
 def load_pixel_index_map(pixel_index_map):
-    with h5py.File(parms.data_path, 'r') as h5f:
+    with h5py.File(settings.data_path, 'r') as h5f:
         pixel_index_map[:] = np.moveaxis(
             h5f['pixel_index_map'][:], -1, 0)
 
@@ -141,7 +141,7 @@ def load_pixel_index_map(pixel_index_map):
 @nvtx.annotate("prep.py", is_prefix=True)
 def load_slices(slices, i_start, i_end):
     """Populate intensity slices from input file."""
-    with h5py.File(parms.data_path, 'r') as h5f:
+    with h5py.File(settings.data_path, 'r') as h5f:
         if h5f['intensities'].shape[0] > i_end:
             slices[:] = h5f['intensities'][i_start:i_end]
         else:
@@ -149,14 +149,14 @@ def load_slices(slices, i_start, i_end):
 
 @nvtx.annotate("prep.py", is_prefix=True)
 def load_orientations(orientations, i_start, i_end):
-    with h5py.File(parms.data_path, 'r') as h5f:
+    with h5py.File(settings.data_path, 'r') as h5f:
         orientations[:] = h5f['orientations'][i_start:i_end]
 
 
 
 @nvtx.annotate("prep.py", is_prefix=True)
 def load_volume(volume):
-    with h5py.File(parms.data_path, 'r') as h5f:
+    with h5py.File(settings.data_path, 'r') as h5f:
         volume[:] = h5f['volume']
 
 
@@ -169,7 +169,7 @@ def compute_pixel_distance(pixel_position_reciprocal):
 
 @nvtx.annotate("prep.py", is_prefix=True)
 def load_orientations_prior(orientations_prior, i_start, i_end):
-    with h5py.File(parms.data_path, 'r') as h5f:
+    with h5py.File(settings.data_path, 'r') as h5f:
         orientations = h5f['orientations'][i_start:i_end]
         orientations_prior[:] = np.reshape(orientations, (orientations.shape[0], 4))
 

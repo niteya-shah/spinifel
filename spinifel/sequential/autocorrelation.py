@@ -8,7 +8,7 @@ from scipy.sparse.linalg import LinearOperator, cg
 
 import skopi as skp
 
-from spinifel import parms, utils, image, autocorrelation
+from spinifel import settings, utils, image, autocorrelation
 
 
 
@@ -33,21 +33,21 @@ def setup_linops(H, K, L, data,
         b the data
         x0 the initial guess (ac_estimate)
     """
-    H_ = H.flatten() / reciprocal_extent * np.pi / parms.oversampling
-    K_ = K.flatten() / reciprocal_extent * np.pi / parms.oversampling
-    L_ = L.flatten() / reciprocal_extent * np.pi / parms.oversampling
+    H_ = H.flatten() / reciprocal_extent * np.pi / settings.oversampling
+    K_ = K.flatten() / reciprocal_extent * np.pi / settings.oversampling
+    L_ = L.flatten() / reciprocal_extent * np.pi / settings.oversampling
 
     lu = np.linspace(-np.pi, np.pi, M)
     Hu_, Ku_, Lu_ = np.meshgrid(lu, lu, lu, indexing='ij')
     Qu_ = np.sqrt(Hu_**2 + Ku_**2 + Lu_**2)
-    F_antisupport = Qu_ > np.pi / parms.oversampling
+    F_antisupport = Qu_ > np.pi / settings.oversampling
     assert np.all(F_antisupport == F_antisupport[::-1, :, :])
     assert np.all(F_antisupport == F_antisupport[:, ::-1, :])
     assert np.all(F_antisupport == F_antisupport[:, :, ::-1])
     assert np.all(F_antisupport == F_antisupport[::-1, ::-1, ::-1])
 
     # Using upsampled convolution technique instead of ADA
-    M_ups = parms.M_ups
+    M_ups = settings.M_ups
     ugrid_conv = autocorrelation.adjoint(
         np.ones_like(data), H_, K_, L_, 1, M_ups,
         reciprocal_extent, use_reciprocal_symmetry)
@@ -90,7 +90,7 @@ def solve_ac(generation,
              slices_,
              orientations=None,
              ac_estimate=None):
-    M = parms.M
+    M = settings.M
     N_images = slices_.shape[0]
     N = utils.prod(slices_.shape)
     reciprocal_extent = pixel_distance_reciprocal.max()
@@ -116,13 +116,13 @@ def solve_ac(generation,
     rlambda = 1/N / 1000
     flambda = 1e3
 
-    maxiter = parms.solve_ac_maxiter
+    maxiter = settings.solve_ac_maxiter
 
     idx = np.abs(L) < reciprocal_extent * .01
     plt.scatter(H[idx], K[idx], c=slices_[idx], s=1, norm=LogNorm())
     plt.axis('equal')
     plt.colorbar()
-    plt.savefig(parms.out_dir / f"star_{generation}.png")
+    plt.savefig(settings.out_dir / f"star_{generation}.png")
     plt.cla()
     plt.clf()
 
@@ -144,6 +144,6 @@ def solve_ac(generation,
     it_number = callback.counter
 
     print(f"Recovered AC in {it_number} iterations.", flush=True)
-    image.show_volume(ac, parms.Mquat, f"autocorrelation_{generation}.png")
+    image.show_volume(ac, settings.Mquat, f"autocorrelation_{generation}.png")
 
     return ac

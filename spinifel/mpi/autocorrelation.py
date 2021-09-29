@@ -10,7 +10,7 @@ from scipy.linalg        import norm
 from scipy.ndimage       import gaussian_filter
 from scipy.sparse.linalg import LinearOperator, cg
 
-from spinifel import parms, utils, image, autocorrelation, contexts
+from spinifel import settings, utils, image, autocorrelation, contexts
 
 
 @nvtx.annotate("mpi/autocorrelation.py", is_prefix=True)
@@ -55,22 +55,22 @@ def setup_linops(comm, H, K, L, data,
         b the data
         x0 the initial guess (ac_estimate)
     """
-    H_ = H.flatten() / reciprocal_extent * np.pi / parms.oversampling
-    K_ = K.flatten() / reciprocal_extent * np.pi / parms.oversampling
-    L_ = L.flatten() / reciprocal_extent * np.pi / parms.oversampling
+    H_ = H.flatten() / reciprocal_extent * np.pi / settings.oversampling
+    K_ = K.flatten() / reciprocal_extent * np.pi / settings.oversampling
+    L_ = L.flatten() / reciprocal_extent * np.pi / settings.oversampling
     data_ = data.flatten()
 
     lu = np.linspace(-np.pi, np.pi, M)
     Hu_, Ku_, Lu_ = np.meshgrid(lu, lu, lu, indexing='ij')
     Qu_ = np.sqrt(Hu_**2 + Ku_**2 + Lu_**2)
-    F_antisupport = Qu_ > np.pi / parms.oversampling
+    F_antisupport = Qu_ > np.pi / settings.oversampling
     assert np.all(F_antisupport == F_antisupport[::-1, :, :])
     assert np.all(F_antisupport == F_antisupport[:, ::-1, :])
     assert np.all(F_antisupport == F_antisupport[:, :, ::-1])
     assert np.all(F_antisupport == F_antisupport[::-1, ::-1, ::-1])
 
     # Using upsampled convolution technique instead of ADA
-    M_ups = parms.M_ups
+    M_ups = settings.M_ups
     ugrid_conv = autocorrelation.adjoint(
         np.ones_like(data_), H_, K_, L_, 1, M_ups,
         reciprocal_extent, use_reciprocal_symmetry)
@@ -118,7 +118,7 @@ def solve_ac(generation,
              ac_estimate=None):
     comm = MPI.COMM_WORLD
 
-    M = parms.M
+    M = settings.M
     N_images = slices_.shape[0] # N images per rank
     print('N_images =', N_images)
     N = utils.prod(slices_.shape) # N images per rank x number of pixels per image = number of pixels per rank
@@ -159,15 +159,15 @@ def solve_ac(generation,
     # remove M**3 in the numerator
     rlambda = 1./Ntot * 10**(comm.rank - comm.size/2) 
     flambda = 0  # 1e5 * pow(10, comm.rank - comm.size//2)
-    maxiter = parms.solve_ac_maxiter
+    maxiter = settings.solve_ac_maxiter
 
     # Log central slice L~=0
-    if comm.rank == (2 if parms.use_psana else 0):
+    if comm.rank == (2 if settings.use_psana else 0):
         idx = np.abs(L) < reciprocal_extent * .01
         plt.scatter(H[idx], K[idx], c=slices_[idx], s=1, norm=LogNorm())
         plt.axis('equal')
         plt.colorbar()
-        plt.savefig(parms.out_dir / f"star_{generation}.png")
+        plt.savefig(settings.out_dir / f"star_{generation}.png")
         plt.cla()
         plt.clf()
 
@@ -248,7 +248,7 @@ def solve_ac(generation,
         axes[2].set_xlabel("Residual norm $||Ax-b||_{2}$")
         axes[2].set_ylabel("Solution norm $||x||_{2}$")
         fig.tight_layout()
-        plt.savefig(parms.out_dir / f"summary_{generation}.png")
+        plt.savefig(settings.out_dir / f"summary_{generation}.png")
         plt.close('all')
 
     # Rank0 broadcasts rank with best autocorrelation
@@ -262,7 +262,7 @@ def solve_ac(generation,
     print(f"Rank {comm.rank} got AC in {callback.counter} iterations.", flush=True)
 
     # Log autocorrelation volume
-    image.show_volume(ac, parms.Mquat, f"autocorrelation_{generation}_{comm.rank}.png")
+    image.show_volume(ac, settings.Mquat, f"autocorrelation_{generation}_{comm.rank}.png")
 
     # Rank[ref_rank] broadcasts its autocorrelation
     comm.Bcast(ac, root=ref_rank)

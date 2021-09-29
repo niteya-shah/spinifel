@@ -1,4 +1,4 @@
-from spinifel import parms, utils, contexts
+from spinifel import settings, utils, contexts
 from spinifel.prep import save_mrc
 
 import numpy as np
@@ -19,33 +19,34 @@ def main():
     timer = utils.Timer()
 
     # Reading input images from hdf5
-    N_images_per_rank = parms.N_images_per_rank
+    N_images_per_rank = settings.N_images_per_rank
     batch_size = min(N_images_per_rank, 100)
     N_big_data_nodes = comm.size
-    max_events = min(parms.N_images_max, N_big_data_nodes*N_images_per_rank)
+    max_events = min(settings.N_images_max, N_big_data_nodes*N_images_per_rank)
     writer_rank = 0 # pick writer rank as core 0
 
     # Reading input images using psana2
     ds = None
-    if parms.use_psana:
+    if settings.use_psana:
         from psana import DataSource
         # BigData cores are those excluding Smd0, EventBuilder, & Server cores.
-        N_big_data_nodes = comm.size - (1 + parms.ps_eb_nodes + parms.ps_srv_nodes)
-        writer_rank = 1 + parms.ps_eb_nodes # pick writer rank as the first BigData core
+        N_big_data_nodes = comm.size - (1 + settings.ps_eb_nodes + settings.ps_srv_nodes)
+        writer_rank = 1 + settings.ps_eb_nodes # pick writer rank as the first BigData core
         batch_size = min(N_images_per_rank, 100)
-        max_events = min(parms.N_images_max, N_big_data_nodes*N_images_per_rank)
+        max_events = min(settings.N_images_max, N_big_data_nodes*N_images_per_rank)
         def destination(timestamp):
             # Return big data node destination, numbered from 1, round-robin
             destination.last = destination.last % N_big_data_nodes + 1
             return destination.last
         destination.last = 0
-        ds = DataSource(exp=parms.exp, run=parms.runnum, dir=parms.data_dir,
-                        destination=destination, max_events=max_events)
+        ds = DataSource(exp=settings.exp, run=settings.runnum,
+                        dir=settings.data_dir, destination=destination,
+                        max_events=max_events)
     
     # Setup logger after knowing the writer rank 
     logger = utils.Logger(comm.rank==writer_rank)
     logger.log("In MPI main")
-    if parms.use_psana:
+    if settings.use_psana:
         logger.log("Using psana")
     logger.log(f"comm.size : {comm.size:d}")
     logger.log(f"#workers  : {N_big_data_nodes:d}")
@@ -61,7 +62,7 @@ def main():
     logger.log(f"Loaded in {timer.lap():.2f}s.")
 
     # Generation 0: solve_ac and phase
-    N_generations = parms.N_generations
+    N_generations = settings.N_generations
     generation = 0
     logger.log(f"#"*27)
     logger.log(f"##### Generation {generation}/{N_generations} #####")
@@ -99,7 +100,7 @@ def main():
         logger.log(f"Problem phased in {timer.lap():.2f}s.")
 
         # Check if density converges
-        if parms.chk_convergence:
+        if settings.chk_convergence:
             # Calculate correlation coefficient
             if comm.rank == 0:
                 prev_cov_xy = cov_xy
@@ -119,8 +120,8 @@ def main():
         rho = np.fft.ifftshift(rho_)
 
         if comm.rank == 0:
-            save_mrc(parms.out_dir / f"ac-{generation}.mrc", ac_phased)
-            save_mrc(parms.out_dir / f"rho-{generation}.mrc", rho)
+            save_mrc(settings.out_dir / f"ac-{generation}.mrc", ac_phased)
+            save_mrc(settings.out_dir / f"rho-{generation}.mrc", rho)
 
-    logger.log(f"Results saved in {parms.out_dir}")
+    logger.log(f"Results saved in {settings.out_dir}")
     logger.log(f"Successfully completed in {timer.total():.2f}s.")
