@@ -157,7 +157,8 @@ def solve_ac(generation,
     weights = np.ones(N)
 
     # remove M**3 in the numerator
-    rlambda = 1./Ntot * 10**(comm.rank - comm.size/2) 
+    # rlambda = 1./Ntot * 10**(comm.rank - comm.size/2) 
+    rlambda = np.logspace(-8, 8, comm.size)[comm.rank]
     flambda = 0  # 1e5 * pow(10, comm.rank - comm.size//2)
     maxiter = settings.solve_ac_maxiter
 
