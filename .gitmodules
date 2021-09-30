@@ -19,3 +19,6 @@
 [submodule "setup/skopi"]
 	path = setup/skopi
 	url = https://github.com/chuckie82/skopi.git
+[submodule "setup/ucx"]
+	path = setup/ucx
+	url = https://github.com/openucx/ucx.git
