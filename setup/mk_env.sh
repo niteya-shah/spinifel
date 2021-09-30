@@ -51,7 +51,7 @@ _module_loaded () {
 EOF
 
 # Enable host overwrite
-target=${SPINIFEL_TARGET:-$(hostname --fqdn)}
+target=${SPINIFEL_TARGET:-${NERSC_HOST:-$(hostname --fqdn)}}
 
 # Setup environment.
 if [[ ${target} = "cori"* ]]; then
@@ -93,6 +93,25 @@ export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
 # NOTE: not sure if this is the best choice -- investigate further if this
 # becomes a problem elsewhere
 export GASNET_CONDUIT=ibv
+EOF
+elif [[ ${target} = "perlmutter" ]]; then
+    cat >> env.sh <<EOF
+# as of September 2021, the default environment comes with PrgEnv-gnu and cudak
+module load cray-fftw
+
+export CC=cc
+export CXX=CC
+export CRAYPE_LINK_TYPE=dynamic # allow dynamic linking
+
+# compilers for mpi4py
+export MPI4PY_CC="$(which cc)"
+export MPI4PY_MPICC="$(which cc) --shared"
+
+# Make sure Cray-FFTW get loaded first to avoid Conda's MKL
+export LD_PRELOAD="\$FFTW_DIR/libfftw3.so"
+
+export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
+export GASNET_CONDUIT=ucx
 EOF
 elif [[ ${target} = *"summit"* ]]; then
     cat >> env.sh <<EOF
