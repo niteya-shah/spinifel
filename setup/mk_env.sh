@@ -96,7 +96,8 @@ export GASNET_CONDUIT=ibv
 EOF
 elif [[ ${target} = "perlmutter" ]]; then
     cat >> env.sh <<EOF
-# as of September 2021, the default environment comes with PrgEnv-gnu and cudak
+module load PrgEnv-gnu
+module load gcc/9 # GCC 10 not supported by CUDA
 module load cray-fftw
 
 export CC=cc
