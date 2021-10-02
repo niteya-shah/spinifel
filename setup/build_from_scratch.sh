@@ -128,6 +128,8 @@ fi
 if [[ $GASNET_CONDUIT = "ucx" ]]
 then
     ./rebuild_ucx.sh
+    export GASNET_EXTRA_CONFIGURE_ARGS="--with-ucx-home=$LEGION_INSTALL_DIR --with-mpi-cc=$CC"
+    export CROSS_CONFIGURE=
 fi
 
 #-------------------------------------------------------------------------------

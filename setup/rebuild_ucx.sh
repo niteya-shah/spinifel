@@ -12,7 +12,7 @@ unset CC
 unset CXX
 
 ./autogen.sh
-./contrib/configure-release --prefix=$LEGION_INSTALL_DIR
+./contrib/configure-release --prefix="$LEGION_INSTALL_DIR"
 make -j${THREADS:-8}
 make install
 
