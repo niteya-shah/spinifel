@@ -9,7 +9,7 @@
 import numpy     as np
 import skopi     as skp
 import PyNVTX    as nvtx
-from   spinifel  import SpinifelSettings, SpinifelContexts, Profiler
+from   spinifel  import SpinifelSettings, SpinifelContexts, Profiler, settings
 from   .extern   import nufft_3d_t1, nufft_3d_t2
 
 
@@ -20,6 +20,13 @@ from   .extern   import nufft_3d_t1, nufft_3d_t2
 settings = SpinifelSettings()
 context  = SpinifelContexts()
 profiler = Profiler()
+
+
+xp = np
+if settings.use_cupy:
+    if settings.verbose:
+        print(f"Using CuPy for FFTs.")
+        import cupy as xp
 
 
 
@@ -89,22 +96,33 @@ def core_problem_convolution(uvect, M, F_ugrid_conv_, M_ups, ac_support,
                              use_reciprocal_symmetry):
     if use_reciprocal_symmetry:
         assert np.all(np.isreal(uvect))
+       
+    if settings.use_cupy:
+        if settings.verbose:
+            uvect = xp.asarray(uvect)
+            ac_support = xp.asarray(ac_support)
+            F_ugrid_conv_ = xp.asarray(F_ugrid_conv_)
     # Upsample
     ugrid = uvect.reshape((M,) * 3) * ac_support
-    ugrid_ups = np.zeros((M_ups,) * 3, dtype=uvect.dtype)
+    ugrid_ups = xp.zeros((M_ups,) * 3, dtype=uvect.dtype)            
     ugrid_ups[:M, :M, :M] = ugrid
     # Convolution = Fourier multiplication
-    F_ugrid_ups = np.fft.fftn(np.fft.ifftshift(ugrid_ups)) / M**3
+    F_ugrid_ups = xp.fft.fftn(xp.fft.ifftshift(ugrid_ups)) / M**3
     F_ugrid_conv_out_ups = F_ugrid_ups * F_ugrid_conv_
-    ugrid_conv_out_ups = np.fft.fftshift(np.fft.ifftn(F_ugrid_conv_out_ups))
+    ugrid_conv_out_ups = xp.fft.fftshift(xp.fft.ifftn(F_ugrid_conv_out_ups))
     # Downsample
     ugrid_conv_out = ugrid_conv_out_ups[:M, :M, :M]
+
     ugrid_conv_out *= ac_support
     if use_reciprocal_symmetry:
         # Both ugrid_conv and ugrid are real, so their convolution
         # should be real, but numerical errors accumulate in the
         # imaginary part.
         ugrid_conv_out = ugrid_conv_out.real
+
+    if settings.use_cupy:
+        if settings.verbose:
+            ugrid_conv_out = xp.asnumpy(ugrid_conv_out)
     return ugrid_conv_out.flatten()
 
 
@@ -114,12 +132,23 @@ def fourier_reg(uvect, support, F_antisupport, M, use_recip_sym):
     ugrid = uvect.reshape((M,) * 3) * support
     if use_recip_sym:
         assert np.all(np.isreal(ugrid))
-    F_ugrid = np.fft.fftn(np.fft.ifftshift(ugrid)) / M**3
-    F_reg = F_ugrid * np.fft.ifftshift(F_antisupport)
-    reg = np.fft.fftshift(np.fft.ifftn(F_reg))
+
+    if settings.use_cupy:
+        if settings.verbose:
+            uvect = xp.asarray(uvect)
+            support = xp.asarray(support)
+            F_antisupport = xp.asarray(F_antisupport)
+
+    F_ugrid = xp.fft.fftn(xp.fft.ifftshift(ugrid)) / M**3
+    F_reg = F_ugrid * xp.fft.ifftshift(F_antisupport)
+    reg = xp.fft.fftshift(xp.fft.ifftn(F_reg))
     uvect = (reg * support).flatten()
     if use_recip_sym:
         uvect = uvect.real
+
+    if settings.use_cupy:
+        if settings.verbose:
+            uvect = xp.asnumpy(uvect)
     return uvect
 
 

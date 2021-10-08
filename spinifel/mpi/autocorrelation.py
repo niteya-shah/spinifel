@@ -12,7 +12,7 @@ from scipy.sparse.linalg import LinearOperator, cg
 
 from spinifel import parms, utils, image, autocorrelation, contexts
 
-
+        
 @nvtx.annotate("mpi/autocorrelation.py", is_prefix=True)
 def reduce_bcast(comm, vect):
     vect = np.ascontiguousarray(vect)
@@ -86,6 +86,7 @@ def setup_linops(comm, H, K, L, data,
                  comm, uvect, H_, K_, L_, ac_support, weights, M, N,
                  reciprocal_extent, use_reciprocal_symmetry)
             assert np.allclose(uvect_ADA, uvect_ADA_old)
+    
         uvect_FDF = autocorrelation.fourier_reg(
             uvect, ac_support, F_antisupport, M, use_reciprocal_symmetry)
         uvect = uvect_ADA + rlambda*uvect + flambda*uvect_FDF
@@ -157,7 +158,8 @@ def solve_ac(generation,
     weights = np.ones(N)
 
     # remove M**3 in the numerator
-    rlambda = 1./Ntot * 10**(comm.rank - comm.size/2) 
+    # rlambda = 1./Ntot * 10**(comm.rank - comm.size/2) 
+    rlambda = np.logspace(-8, 8, comm.size)[comm.rank]
     flambda = 0  # 1e5 * pow(10, comm.rank - comm.size//2)
     maxiter = parms.solve_ac_maxiter
 
