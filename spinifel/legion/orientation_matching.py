@@ -3,7 +3,7 @@ import socket
 import PyNVTX as nvtx
 from pygion import task, RO, WD, IndexLaunch, Tunable
 
-from spinifel import parms
+from spinifel import settings
 from spinifel.sequential.orientation_matching import slicing_and_match as sequential_match
 
 from . import utils as lgutils
@@ -15,12 +15,12 @@ from . import utils as lgutils
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
 def match_task(phased, slices, orientations, pixel_position, pixel_distance):
-    if parms.verbosity > 0:
+    if settings.verbosity > 0:
         print(f"{socket.gethostname()} starts Orientation Matching.", flush=True)
         print(f"{socket.gethostname()}:", end=" ", flush=False)
     orientations.quaternions[:] = sequential_match(
         phased.ac, slices.data, pixel_position.reciprocal, pixel_distance.reciprocal)
-    if parms.verbosity > 0:
+    if settings.verbosity > 0:
         print(f"{socket.gethostname()} finished Orientation Matching.", flush=True)
 
 
@@ -32,7 +32,7 @@ def match(phased, slices, slices_p, pixel_position, pixel_distance):
     # We can call the sequential function on each rank, provided that the
     # cost of generating the model_slices isn't prohibitive.
     orientations, orientations_p = lgutils.create_distributed_region(
-        parms.N_images_per_rank, {"quaternions": pygion.float32}, (4,))
+        settings.N_images_per_rank, {"quaternions": pygion.float32}, (4,))
 
     N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
     for i in IndexLaunch([N_procs]):

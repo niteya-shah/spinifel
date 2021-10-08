@@ -33,6 +33,15 @@ class CannotProcessSettingsFile(Exception):
     """
 
 
+
+class NotAVector(Exception):
+    """
+    Raise this error whenever trying to parse a vector representation that is
+    malformed in any way.
+    """
+
+
+
 def get_str(x):
     """
     Return string representation of the environment variable `x`
@@ -79,10 +88,79 @@ def parse_bool(x):
     Parse string, integer, or boolean representation of a boolean
     """
 
+    # Toml already parses some inputs, so the input might already have the
+    # correct format
+    if isinstance(x, bool):
+        return x
+
+
     if isinstance(x, str):
         return str2bool(x)
 
     return bool(x)
+
+
+
+def parse_strvec(x, elt_parser):
+    """
+    Parse a string representation of a vector. All elements use the same parser
+    `elt_parser`. The element parser is only invoked if `x` is a well-formed
+    string representation of a vecotr. Vector elements are delimited by commas.
+    """
+
+    # Toml already parses some inputs, so the input might already have the
+    # correct format
+    if isinstance(x, list):
+        return tuple(x)
+
+    if isinstance(x, tuple):
+        return x
+
+    if not isinstance(x, str):
+        raise NotAVector
+
+    if x[0] != "[":
+        raise NotAVector
+
+    if x[-1] != "]":
+        raise NotAVector
+
+    if x.count("[") != 1:
+        raise NotAVector
+
+    if x.count("]") != 1:
+        raise NotAVector
+
+    return tuple(
+        [elt_parser(y.strip()) for y in x[1:-1].split(",") if len(y) > 0]
+    )
+
+
+
+def parse_strvec_int(x):
+    """
+    Narrowing of parse_strvec:
+    parse_strvec_int = parse_strvec(___, int)
+    """
+    return parse_strvec(x, int)
+
+
+
+def parse_strvec_float(x):
+    """
+    Narrowing of parse_strvec:
+    parse_strvec_int = parse_strvec(___, float)
+    """
+    return parse_strvec(x, float)
+
+
+
+def parse_strvec_bool(x):
+    """
+    Narrowing of parse_strvec:
+    parse_strvec_int = parse_strvec(___, parse_bool)
+    """
+    return parse_strvec(x, parse_bool)
 
 
 
@@ -97,44 +175,211 @@ class SpinifelSettings(metaclass=Singleton):
     def __init__(self):
 
         self.__properties = {
-            "_test": ("debug", "test", str, "",
-                "test field used for debugging"),
-            "_verbose": ("debug", "verbose", parse_bool, False,
-                "is verbosity > 0"),
-            "_verbosity": ("debug", "verbosity", int, 0,
-                "reporting verbosity"),
-            "_data_dir": ("data", "in_dir", Path, Path(""),
-                "data dir"),
-            "_data_filename": ("data", "name", str, "",
-                "data file name"),
-            "_use_psana": ("psana", "enable", parse_bool, False,
-                "enable PSANA"),
-            "_out_dir": ("data", "out_dir", Path, Path(""),
-                "output dir"),
-            "_n_images_per_rank": ("runtime", "n_images_per_rank", int, 10,
-                "no. of images per rank"),
-            "_small_problem": ("runtime", "small_problem", parse_bool, False,
-                "run in small problem mode"),
-            "_use_cuda": ("runtime", "use_cuda", parse_bool, False,
-                "use cuda wherever possible"),
-            "_devices_per_node": ("gpu", "devices_per_node", int, 0,
-                "gpu-device count per node/resource set"),
-            "_use_cufinufft": ("runtime", "use_cufinufft", parse_bool, False,
-                "use cufinufft for nufft support"),
-            "_use_cupy": ("runtime", "use_cupy", parse_bool, False,
-                "use cupy wherever possible"),
-            "_ps_smd_n_events": ("psana", "ps_smd_n_events", int, 1000,
-                "no. of events to be sent to an EventBuilder core"),
-            "_ps_eb_nodes": ("psana", "ps_eb_nodes", int, 1,
-                "no. of eventbuilder cores"),
-            "_ps_srv_nodes": ("psana", "ps_srv_nodes", int, 0,
-                "no. of server cores"),
-            "_use_callmonitor": ("debug", "use_callmonitor", parse_bool, False,
-                "enable call-monitor"),
-            "_use_single_prec": ("runtime", "use_single_prec", parse_bool, False,
-                "if true, spinifel will use single-precision floating point"),
-            "_chk_convergence": ("runtime", "chk_convergence", parse_bool, True,
-                "if false, no check if output density converges")
+            "_test": (
+                "debug", "test",
+                str, "",
+                "test field used for debugging"
+            ),
+            "_verbose": (
+                "debug", "verbose",
+                parse_bool, False,
+                "is verbosity > 0"
+            ),
+            "_verbosity": (
+                "debug", "verbosity",
+                int, 0,
+                "reporting verbosity"
+            ),
+            "_data_dir": (
+                "data", "in_dir",
+                Path, Path(""),
+                "data dir"
+            ),
+            "_data_filename": (
+                "data", "name",
+                str, "",
+                "data file name"
+            ),
+            "_use_psana": (
+                "psana", "enable",
+                parse_bool, False,
+                "enable PSANA"
+            ),
+            "_out_dir": (
+                "data", "out_dir",
+                Path, Path(""),
+                "output dir"
+            ),
+            "_N_images_per_rank": (
+                "runtime", "N_images_per_rank",
+                int, 10,
+                "no. of images per rank"
+            ),
+            "_use_cuda": (
+                "runtime", "use_cuda",
+                parse_bool, False,
+                "use cuda wherever possible"
+            ),
+            "_devices_per_node": (
+                "gpu", "devices_per_node",
+                int, 0,
+                "gpu-device count per node/resource set"
+            ),
+            "_use_cufinufft": (
+                "runtime", "use_cufinufft",
+                parse_bool, False,
+                "use cufinufft for nufft support"
+            ),
+            "_use_cupy": (
+                "runtime", "use_cupy",
+                parse_bool, False,
+                "use cupy wherever possible"
+            ),
+            "_ps_smd_n_events": (
+                "psana", "ps_smd_n_events",
+                int, 1000,
+                "no. of events to be sent to an EventBuilder core"
+            ),
+            "_ps_eb_nodes": (
+                "psana", "ps_eb_nodes",
+                int, 1,
+                "no. of eventbuilder cores"
+            ),
+            "_ps_srv_nodes": (
+                "psana", "ps_srv_nodes",
+                int, 0,
+                "no. of server cores"
+            ),
+            "_ps_exp": (
+                "psana", "exp",
+                str, "xpptut1",
+                "PSANA experiment name"
+            ),
+            "_ps_runnum": (
+                "psana", "runnum",
+                int, 1,
+                "PSANA experiment number"
+            ),
+            "_use_callmonitor": (
+                "debug", "use_callmonitor",
+                parse_bool, False,
+                "enable call-monitor"
+            ),
+            "_use_single_prec": (
+                "runtime", "use_single_prec",
+                parse_bool, False,
+                "if true, spinifel will use single-precision floating point"
+            ),
+            "_chk_convergence": (
+                "runtime", "chk_convergence",
+                parse_bool, True,
+                "if false, no check if output density converges"
+            ),
+            "_det_shape": (
+                "detector", "shape",
+                parse_strvec_int, (4, 512, 512),
+                "detector shape"
+            ),
+            "_N_images_max": (
+                "algorithm", "N_images_max",
+                int, 10000,
+                "max images"
+            ),
+            "_N_generations": (
+                "algorithm", "N_generations",
+                int, 10,
+                "max generations"
+            ),
+            "_data_field_name": (
+                "detector", "data_field_name",
+                str, "intensities",
+                "name of data field in the detector output files"
+            ),
+            "_data_type_str": (
+               "detector", "data_type_str",
+                str, "float32",
+                "type string (numpy) for the detector output"
+            ),
+            "_pixel_position_shape_0": (
+                "algorithm", "pixel_position_shape_0",
+                parse_strvec_int, (3,),
+                "pixel_position_shape = pixel_position_shape_0 + det_shape"
+            ),
+            "_pixel_position_type_str":(
+                "algorithm", "pixel_position_type_str",
+                str, "float32",
+                "type string (numpy) for the pixel_position array"
+            ),
+            "_pixel_index_shape_0": (
+                "algorithm", "pixel_index_shape_0",
+                parse_strvec_int, (2,),
+                "pixel_index_shape = pixel_index_shape_0 + det_shape"
+            ),
+            "_pixel_index_type_str": (
+                "algorithm", "pixel_index_type_str",
+                str, "int32",
+                "type string (numpy) for the pixel_index array"
+            ),
+            "_orientation_type_str": (
+                "algorithm", "orientation_type_str",
+                str, "float32",
+                "type string (numpy) for the orientation array"
+            ),
+            "_volume_type_str": (
+                "algorithm", "volume_type_str",
+                str, "complex64",
+                "type string (numpy) for the volume array"
+            ),
+            "_volume_shape": (
+                "algorithm", "volume_shape",
+                parse_strvec_int, (151, 151, 151),
+                "shape of volume array"
+            ),
+            "_oversampling": (
+                "algorithm", "oversampling",
+                int, 1,
+                "oversampling count"
+            ),
+            "_solve_ac_maxiter": (
+                "algorithm", "solve_ac_maxiter",
+                int, 100,
+                "max number of itterations in the autocorrelation solver"
+            ),
+            "_nER": (
+                "algorithm", "nER",
+                int, 10,
+                "nER parameter for solver"
+            ),
+            "_nHIO": (
+                "algorithm", "nHIO",
+                int, 5,
+                "nHIO parameter for solver"
+            ),
+            "_N_phase_loops": (
+                "algorithm", "N_phase_loops",
+                int, 5,
+                "N_phase_loops parameter for solver"
+            ),
+            "_N_clipping": (
+                "algorithm", "N_clipping",
+                int, 1,
+                "N_clipping parameter for solver"
+            ),
+            "_N_binning": (
+                "algorithm", "N_binning",
+                int, 4,
+                "N_binning parameter for solver"
+            ),
+            "_N_orientations": (
+                "algorithm", "N_orientations",
+                int, 1000,
+                "N_orientations parameter for solver"
+            ),
+            "_N_batch_size": (
+                "algorithm", "N_batch_size",
+                int, 1000,
+                "N_batch_size parameter for solver"
+            )
         }
 
         self.__init_internals()
@@ -146,9 +391,8 @@ class SpinifelSettings(metaclass=Singleton):
             "DATA_FILENAME": ("_data_filename", get_str),
             "USE_PSANA": ("_use_psana", get_bool),
             "OUT_DIR": ("_out_dir", get_path),
-            "N_IMAGES_PER_RANK": ("_n_images_per_rank", get_int),
+            "N_IMAGES_PER_RANK": ("_N_images_per_rank", get_int),
             "VERBOSITY": ("_verbose", get_int),
-            "SMALL_PROBLEM": ("_small_problem", get_bool),
             "USE_CUDA": ("_use_cuda", get_bool),
             "DEVICES_PER_RS": ("_devices_per_node", get_int),
             "USE_CUFINUFFT": ("_use_cufinufft", get_bool),
@@ -160,36 +404,30 @@ class SpinifelSettings(metaclass=Singleton):
             "CHK_CONVERGENCE": ("_chk_convergence", get_bool)
         }
 
+        p = ArgumentParser()
+        p.add_argument("--settings", type=str, nargs=1, default=None)
+        p.add_argument("--default-settings", type=str, nargs=1, default=None)
+        p.add_argument("--mode", type=str, nargs=1, required=True)
 
-        parser = ArgumentParser()
-        parser.add_argument("--settings", type=str, nargs=1, default=None)
-        parser.add_argument("--default-settings", type=str, nargs=1, default=None)
-        parser.add_argument("--mode", type=str, nargs=1, required=True)
-
-        self.__args, self.__params = parser.parse_known_args()
+        self.__args, self.__params = p.parse_known_args()
 
         self.mode = self.__args.mode[0]
 
-        self.legacy = False
-        if self.mode == "legacy":
-            self.legacy = True
+        if (self.__args.settings is None) \
+        and (self.__args.default_settings is None):
+            raise CannotProcessSettingsFile
 
-        if not self.legacy:
-            if (self.__args.settings is None) \
-            and (self.__args.default_settings is None):
-                raise CannotProcessSettingsFile
+        if (self.__args.settings is not None) \
+        and (self.__args.default_settings is not None):
+            raise CannotProcessSettingsFile
 
-            if (self.__args.settings is not None) \
-            and (self.__args.default_settings is not None):
-                raise CannotProcessSettingsFile
-
-            if self.__args.default_settings is not None:
-                self.__toml = join(
-                    dirname(abspath(__file__)), "..", "settings",
-                    self.__args.default_settings[0]
-                )
-            else:
-                self.__toml = self.__args.settings[0]
+        if self.__args.default_settings is not None:
+            self.__toml = join(
+                dirname(abspath(__file__)), "..", "settings",
+                self.__args.default_settings[0]
+            )
+        else:
+            self.__toml = self.__args.settings[0]
 
         self.refresh()
 
@@ -229,32 +467,34 @@ class SpinifelSettings(metaclass=Singleton):
         Refresh internal state using environment variables
         """
 
-        if not self.legacy:
-            toml_settings = load(self.__toml)
+        toml_settings = load(self.__toml)
 
-            for param in self.__params:
+        for param in self.__params:
 
-                if not ("." in param and "=" in param):
-                    raise MalformedSettingsException
+            if not ("." in param and "=" in param):
+                raise MalformedSettingsException
 
-                setting, val = param.split("=")
-                c, k         = setting.split(".")
-                toml_settings[c][k] = val
+            setting, val = param.split("=")
+            c, k         = setting.split(".")
+            toml_settings[c][k] = val
 
-            for attr in self.__properties:
+        for attr in self.__properties:
 
-                c, k, parser, default_val, _ = self.__properties[attr]
+            c, k, parser, default_val, _ = self.__properties[attr]
 
-                # if property is not found in toml settings, use default
+            # if property is not found in toml settings, use default
+            if c not in toml_settings:
+                val = default_val
+            else:
                 if k not in toml_settings[c]:
                     val = default_val
-                else:    
+                else:
                     val = toml_settings[c][k]
-                
-                if parser == str or parser == Path:
-                    val = expandvars(val)
 
-                setattr(self, attr, parser(val))
+            if parser == str or parser == Path:
+                val = expandvars(val)
+
+            setattr(self, attr, parser(val))
 
         for key in self.__environ:
 
@@ -272,13 +512,51 @@ class SpinifelSettings(metaclass=Singleton):
 
 
     def __str__(self):
-        propnames = [name for (name, value) in getmembers(self)]
+        propnames = (name for (name, value) in getmembers(self))
         str_repr  = "SpinifelSettings:\n"
         for prop in propnames:
             if self.isprop(prop):
-                c, k, _, _, doc = self.__properties["_" + prop]
-                str_repr += f"  + {prop}={getattr(self, prop)}\n"
-                str_repr += f"    source: {c}.{k}, description: {doc}\n"
+                str_repr += f"  + {prop} = {getattr(self, prop)}\n"
+
+                if "_" + prop in self.__properties.keys():
+                    c, k, _, _, doc = self.__properties["_" + prop]
+                    str_repr += f"    source: {c}.{k}\n"
+                    str_repr += f"    description: {doc}\n"
+                else:
+                    str_repr += f"    (derived data)\n"
+
+        return str_repr
+
+
+    def as_toml(self):
+        propnames = (x[1:] for x in self.__properties.keys())
+        str_repr  = "SpinifelSettings Toml Spec:\n"
+        categories = dict()
+        for prop in propnames:
+            # if self.isprop(prop):
+            c, k, _, _, _ = self.__properties["_" + prop]
+            if c not in categories:
+                categories[c] = dict()
+            categories[c][k] = prop
+
+        for c in categories:
+            str_repr += f"\n[{c}]\n"
+            for k in categories[c]:
+                prop = categories[c][k]
+                _, _, p, _, doc = self.__properties["_" + prop]
+                val = getattr(self, prop)
+
+                # reformat special parsed data types
+                if (p == str) or (p == Path):
+                    val = "\"" + str(val) + "\""
+                if p == parse_bool:
+                    val = str(val).lower()
+                if p in (parse_strvec_int, parse_strvec_float,
+                         parse_strvec_bool):
+                    val = "[" + str(val).lower()[1:-1] + "]"
+
+                str_repr += f"{k} = {val} "
+                str_repr += f" # {doc} ({categories[c][k]})\n"
         return str_repr
 
 
@@ -291,14 +569,18 @@ class SpinifelSettings(metaclass=Singleton):
 
     @property
     def verbose(self):
-        """is verbosity > 0"""
+        """
+        is verbosity > 0
+        """
         return (self._verbose or      # noqa: E1101 pylint: disable=no-member
                 self._verbosity > 0)  # noqa: E1101 pylint: disable=no-member
 
 
     @property
     def verbosity(self):
-        """reporting verbosity"""
+        """
+        reporting verbosity
+        """
         if self._verbosity == 0:  # noqa: E1101  pylint: disable=no-member
             if self._verbose:     # noqa: E1101 pylint: disable=no-member
                 return 1
@@ -307,9 +589,21 @@ class SpinifelSettings(metaclass=Singleton):
 
 
     @property
+    def data_path(self):
+        """
+        path of data file:
+        data_path = self.data_dir / self.data_filename
+        """
+        return self._data_dir / self._data_filename
+
+
+    @property
     def ps_smd_n_events(self):
-        """no. of events to be sent to an EventBuilder core"""
+        """
+        no. of events to be sent to an EventBuilder core
+        """
         return self._ps_smd_n_events # noqa: E1101 pylint: disable=no-member
+
 
     @ps_smd_n_events.setter
     def ps_smd_n_events(self, val):
@@ -317,21 +611,29 @@ class SpinifelSettings(metaclass=Singleton):
         # update derived environment variable
         environ["PS_SMD_N_EVENTS"] = str(val)
 
+
     @property
     def ps_eb_nodes(self):
-        """no. of event builder cores"""
+        """
+        no. of event builder cores
+        """
         return self._ps_eb_nodes # noqa: E1101 pylint: disable=no-member
+
 
     @ps_eb_nodes.setter
     def ps_eb_nodes(self, val):
         self._ps_eb_nodes = val
         # update derived environment variable
         environ["PS_EB_NODES"] = str(val)
-    
+
+
     @property
     def ps_srv_nodes(self):
-        """no. of server cores"""
+        """
+        no. of server cores
+        """
         return self._ps_srv_nodes # noqa: E1101 pylint: disable=no-member
+
 
     @ps_srv_nodes.setter
     def ps_srv_nodes(self, val):
@@ -339,3 +641,65 @@ class SpinifelSettings(metaclass=Singleton):
         # update derived environment variable
         environ["PS_SRV_NODES"] = str(val)
 
+
+    @property
+    def pixel_position_shape(self):
+        """
+        pixel_position_shape_0 + det_shape
+        """
+        return self._pixel_position_shape_0 + self._det_shape
+
+
+    @property
+    def pixel_index_shape(self):
+        """
+        pixel_index_shape_0 + det_shape
+        """
+        return self._pixel_index_shape_0 + self._det_shape
+
+
+    @property
+    def Mquat(self):
+        """
+        int(self._oversampling * 20)  # 1/4 of uniform grid size
+        """
+        return int(self._oversampling * 20)
+
+
+    @property
+    def M(self):
+        """
+        4*Mquat + 1
+        """
+        return 4*self.Mquat + 1
+
+
+    @property
+    def M_ups(self):
+        """
+        Upsampled grid for AC convolution technique
+        """
+        return 2*self.M
+
+
+    @property
+    def N_binning_tot(self):
+        return self.N_clipping + self.N_binning
+
+
+    @property
+    def reduced_det_shape(self):
+        return self.det_shape[:-2] + (
+            self.det_shape[-2] // 2**self.N_binning_tot,
+            self.det_shape[-1] // 2**self.N_binning_tot
+        )
+
+
+    @property
+    def reduced_pixel_position_shape(self):
+        return  self.pixel_position_shape_0 + self.reduced_det_shape
+
+
+    @property
+    def reduced_pixel_index_shape(self):
+        return self.pixel_index_shape_0 + self.reduced_det_shape

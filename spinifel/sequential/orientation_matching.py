@@ -5,7 +5,7 @@ import time
 import logging
 
 import spinifel.sequential.nearest_neighbor as nn
-from   spinifel import parms, utils, autocorrelation, SpinifelSettings
+from   spinifel import settings, utils, autocorrelation
 
 
 
@@ -27,7 +27,7 @@ def match(slices_, model_slices, ref_orientations, batch_size=None):
     
     N_slices = slices_.shape[0]
     # TODO move this up to main level
-    #assert slices_.shape == (N_slices,) + parms.reduced_det_shape
+    #assert slices_.shape == (N_slices,) + settings.reduced_det_shape
 
     if not N_slices:
         return np.zeros((0, 4))
@@ -54,13 +54,13 @@ def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_rec
     """
     st_init = time.monotonic()
     logger = logging.getLogger(__name__)
-    Mquat = parms.Mquat
+    Mquat = settings.Mquat
     M = 4 * Mquat + 1
-    N_orientations = parms.N_orientations
-    N_batch_size = parms.N_batch_size
-    N_pixels = utils.prod(parms.reduced_det_shape)
+    N_orientations = settings.N_orientations
+    N_batch_size = settings.N_batch_size
+    N_pixels = utils.prod(settings.reduced_det_shape)
     N_slices = slices_.shape[0]
-    assert slices_.shape == (N_slices,) + parms.reduced_det_shape
+    assert slices_.shape == (N_slices,) + settings.reduced_det_shape
     N = N_pixels * N_orientations
 
     if not N_slices:
@@ -82,9 +82,9 @@ def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_rec
         st = i * N_batch_size
         en = st + N_batch_size
         H, K, L = np.einsum("ijk,klmn->jilmn", ref_rotmat[st:en], pixel_position_reciprocal)
-        H_ = H.flatten() / reciprocal_extent * np.pi / parms.oversampling
-        K_ = K.flatten() / reciprocal_extent * np.pi / parms.oversampling
-        L_ = L.flatten() / reciprocal_extent * np.pi / parms.oversampling
+        H_ = H.flatten() / reciprocal_extent * np.pi / settings.oversampling
+        K_ = K.flatten() / reciprocal_extent * np.pi / settings.oversampling
+        L_ = L.flatten() / reciprocal_extent * np.pi / settings.oversampling
         N_batch = N_pixels * N_batch_size
         st_m = i * N_batch_size * N_pixels
         en_m = st_m + (N_batch_size * N_pixels)

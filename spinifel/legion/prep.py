@@ -6,14 +6,14 @@ import pygion
 import socket
 from pygion import task, Tunable, Partition, Region, WD, RO, Reduce, IndexLaunch
 
-from spinifel import parms, prep, image
+from spinifel import settings, prep, image
 
 from . import utils as lgutils
 
 
 
 psana = None
-if parms.use_psana:
+if settings.use_psana:
     import psana
     from psana.psexp.legion_node import smd_chunks, smd_batches, batch_events
 
@@ -28,8 +28,8 @@ def load_pixel_position(pixel_position):
 
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def get_pixel_position():
-    pixel_position_type = getattr(pygion, parms.pixel_position_type_str)
-    pixel_position = Region(parms.pixel_position_shape,
+    pixel_position_type = getattr(pygion, settings.pixel_position_type_str)
+    pixel_position = Region(settings.pixel_position_shape,
                             {'reciprocal': pixel_position_type})
     load_pixel_position(pixel_position)
     return pixel_position
@@ -45,8 +45,8 @@ def load_pixel_index(pixel_index):
 
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def get_pixel_index():
-    pixel_index_type = getattr(pygion, parms.pixel_index_type_str)
-    pixel_index = Region(parms.pixel_index_shape,
+    pixel_index_type = getattr(pygion, settings.pixel_index_type_str)
+    pixel_index = Region(settings.pixel_index_shape,
                          {'map': pixel_index_type})
     load_pixel_index(pixel_index)
     return pixel_index
@@ -66,7 +66,7 @@ def load_slices_psana(slices, rank, N_images_per_rank, smd_chunk, run):
                 raise RuntimeError(
                     f"Rank {rank} received too many events.")
             i += 1
-    if parms.verbosity > 0:
+    if settings.verbosity > 0:
         print(f"{socket.gethostname()} loaded slices.", flush=True)
 
 
@@ -74,21 +74,21 @@ def load_slices_psana(slices, rank, N_images_per_rank, smd_chunk, run):
 @task(privileges=[WD])
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def load_slices_hdf5(slices, rank, N_images_per_rank):
-    if parms.verbosity > 0:
+    if settings.verbosity > 0:
         print(f"{socket.gethostname()} loading slices.", flush=True)
     i_start = rank * N_images_per_rank
     i_end = i_start + N_images_per_rank
     prep.load_slices(slices.data, i_start, i_end)
-    if parms.verbosity > 0:
+    if settings.verbosity > 0:
         print(f"{socket.gethostname()} loaded slices.", flush=True)
 
 
 
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def get_slices(ds):
-    N_images_per_rank = parms.N_images_per_rank
-    fields_dict = {"data": getattr(pygion, parms.data_type_str)}
-    sec_shape = parms.det_shape
+    N_images_per_rank = settings.N_images_per_rank
+    fields_dict = {"data": getattr(pygion, settings.data_type_str)}
+    sec_shape = settings.det_shape
     slices, slices_p = lgutils.create_distributed_region(
         N_images_per_rank, fields_dict, sec_shape)
     if ds is not None:
@@ -110,19 +110,19 @@ def get_slices(ds):
 
 @task(privileges=[WD])
 def load_orientations_prior(orientations_prior, rank, N_images_per_rank):
-    if parms.verbosity > 0:
+    if settings.verbosity > 0:
         print(f"{socket.gethostname()} loading orientations.", flush=True)
     i_start = rank * N_images_per_rank
     i_end = i_start + N_images_per_rank
     prep.load_orientations_prior(orientations_prior.quaternions, i_start, i_end)
-    if parms.verbosity > 0:
+    if settings.verbosity > 0:
         print(f"{socket.gethostname()} loaded orientations.", flush=True)
 
 
 def get_orientations_prior():
-    N_images_per_rank = parms.N_images_per_rank
-    fields_dict = {"quaternions": getattr(pygion, parms.data_type_str)}
-    sec_shape = parms.quaternion_shape
+    N_images_per_rank = settings.N_images_per_rank
+    fields_dict = {"quaternions": getattr(pygion, settings.data_type_str)}
+    sec_shape = settings.quaternion_shape
     orientations_prior, orientations_prior_p = lgutils.create_distributed_region(
         N_images_per_rank, fields_dict, sec_shape)
     for i, orientations_prior_subr in enumerate(orientations_prior_p):
@@ -159,7 +159,7 @@ def calculate_pixel_distance(pixel_position, pixel_distance):
 
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def compute_pixel_distance(pixel_position):
-    pixel_position_type = getattr(pygion, parms.pixel_position_type_str)
+    pixel_position_type = getattr(pygion, settings.pixel_position_type_str)
     pixel_distance = Region(lgutils.get_region_shape(pixel_position)[1:],
                             {'reciprocal': pixel_position_type})
     calculate_pixel_distance(pixel_position, pixel_distance)
@@ -177,8 +177,8 @@ def apply_pixel_position_binning(old_pixel_position, new_pixel_position):
 
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def bin_pixel_position(old_pixel_position):
-    pixel_position_type = getattr(pygion, parms.pixel_position_type_str)
-    new_pixel_position = Region(parms.reduced_pixel_position_shape,
+    pixel_position_type = getattr(pygion, settings.pixel_position_type_str)
+    new_pixel_position = Region(settings.reduced_pixel_position_shape,
                                 {'reciprocal': pixel_position_type})
     apply_pixel_position_binning(old_pixel_position, new_pixel_position)
     return new_pixel_position
@@ -195,8 +195,8 @@ def apply_pixel_index_binning(old_pixel_index, new_pixel_index):
 
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def bin_pixel_index(old_pixel_index):
-    pixel_index_type = getattr(pygion, parms.pixel_index_type_str)
-    new_pixel_index = Region(parms.reduced_pixel_index_shape,
+    pixel_index_type = getattr(pygion, settings.pixel_index_type_str)
+    new_pixel_index = Region(settings.reduced_pixel_index_shape,
                              {'map': pixel_index_type})
     apply_pixel_index_binning(old_pixel_index, new_pixel_index)
     return new_pixel_index
@@ -212,9 +212,9 @@ def apply_slices_binning(old_slices, new_slices):
 
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def bin_slices(old_slices, old_slices_p):
-    N_images_per_rank = parms.N_images_per_rank
-    fields_dict = {"data": getattr(pygion, parms.data_type_str)}
-    sec_shape = parms.reduced_det_shape
+    N_images_per_rank = settings.N_images_per_rank
+    fields_dict = {"data": getattr(pygion, settings.data_type_str)}
+    sec_shape = settings.reduced_det_shape
     new_slices, new_slices_p = lgutils.create_distributed_region(
         N_images_per_rank, fields_dict, sec_shape)
     for old_slices_subr, new_slices_subr in zip(old_slices_p, new_slices_p):

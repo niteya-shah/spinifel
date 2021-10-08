@@ -5,14 +5,14 @@ import PyNVTX as nvtx
 from matplotlib.colors import LogNorm
 from mpi4py import MPI
 
-from spinifel import parms, prep, image, contexts
+from spinifel import settings, prep, image, contexts
 
 
 @nvtx.annotate("mpi/prep.py", is_prefix=True)
 def get_pixel_position_reciprocal(comm):
     """Rank0 broadcast pixel reciprocal positions from input file."""
-    pixel_position_type = getattr(np, parms.pixel_position_type_str)
-    pixel_position_reciprocal = np.zeros(parms.pixel_position_shape,
+    pixel_position_type = getattr(np, settings.pixel_position_type_str)
+    pixel_position_reciprocal = np.zeros(settings.pixel_position_shape,
                                          dtype=pixel_position_type)
     if comm.rank == 0:
         prep.load_pixel_position_reciprocal(pixel_position_reciprocal)
@@ -23,8 +23,8 @@ def get_pixel_position_reciprocal(comm):
 @nvtx.annotate("mpi/prep.py", is_prefix=True)
 def get_pixel_index_map(comm):
     """Rank0 broadcast pixel index map from input file."""
-    pixel_index_type = getattr(np, parms.pixel_index_type_str)
-    pixel_index_map = np.zeros(parms.pixel_index_shape,
+    pixel_index_type = getattr(np, settings.pixel_index_type_str)
+    pixel_index_map = np.zeros(settings.pixel_index_shape,
                                dtype=pixel_index_type)
     if comm.rank == 0:
         prep.load_pixel_index_map(pixel_index_map)
@@ -35,8 +35,8 @@ def get_pixel_index_map(comm):
 @nvtx.annotate("mpi/prep.py", is_prefix=True)
 def get_slices(comm, N_images_per_rank, ds):
     """Each rank loads intensity slices from input file (or psana)."""
-    data_type = getattr(np, parms.data_type_str)
-    slices_ = np.zeros((N_images_per_rank,) + parms.det_shape,
+    data_type = getattr(np, settings.data_type_str)
+    slices_ = np.zeros((N_images_per_rank,) + settings.det_shape,
                        dtype=data_type)
     if ds is None:
         i_start = comm.rank * N_images_per_rank
@@ -91,7 +91,7 @@ def get_data(N_images_per_rank, ds):
     
     # Log mean image and saxs before binning
     mean_image = compute_mean_image(comm, slices_)
-    if rank == (2 if parms.use_psana else 0):
+    if rank == (2 if settings.use_psana else 0):
         image.show_image(pixel_index_map, slices_[0], "image_0.png")
     if rank == 0:
         pixel_distance_reciprocal = prep.compute_pixel_distance(
@@ -108,7 +108,7 @@ def get_data(N_images_per_rank, ds):
 
     # Log mean image and saxs after binning
     mean_image = compute_mean_image(comm, slices_)
-    if rank == (2 if parms.use_psana else 0):
+    if rank == (2 if settings.use_psana else 0):
         image.show_image(pixel_index_map, slices_[0], "image_binned_0.png")
     if rank == 0:
         image.show_image(pixel_index_map, mean_image, "mean_image_binned.png")

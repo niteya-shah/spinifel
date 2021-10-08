@@ -8,7 +8,7 @@ root_dir=$(readlink -f $(dirname "${BASH_SOURCE[0]}"))
 pushd $root_dir
 
 # Enable host overwrite
-target=${SPINIFEL_TARGET:-$(hostname --fqdn)}
+target=${SPINIFEL_TARGET:-${NERSC_HOST:-$(hostname --fqdn)}}
 
 # Enable CUDA build
 cuda_build=${SPINIFEL_BUILD_CUDA:-true}
@@ -122,9 +122,21 @@ fi
 
 #-------------------------------------------------------------------------------
 
+#_______________________________________________________________________________
+# Install UCX
+
+if [[ $GASNET_CONDUIT = "ucx" ]]
+then
+    ./rebuild_ucx.sh
+    export GASNET_EXTRA_CONFIGURE_ARGS="--with-ucx-home=$LEGION_INSTALL_DIR --with-mpi-cc=$CC"
+    export CROSS_CONFIGURE=
+fi
+
+#-------------------------------------------------------------------------------
+
 
 #_______________________________________________________________________________
-# Insall GASNET
+# Install GASNET
 
 if [[ $LEGION_USE_GASNET -eq 1 && $GASNET_ROOT == ${root_dir}/gasnet/release ]]
 then

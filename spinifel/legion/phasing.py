@@ -3,7 +3,7 @@ import PyNVTX as nvtx
 import pygion
 from pygion import task, Region, RO, RW, WD
 
-from spinifel import parms
+from spinifel import settings
 from spinifel.sequential.phasing import phase as sequential_phase
 from . import utils as lgutils
 
@@ -18,7 +18,7 @@ def prev_phase(generation, phased, prev_phased=None):
     assert phased is not None
     if generation == 1:
         assert prev_phased is None
-        prev_phased = Region((parms.M,)*3, {
+        prev_phased = Region((settings.M,)*3, {
             "prev_rho_": pygion.float32,})
         prev_phase_task(prev_phased, phased)
     else:
@@ -49,11 +49,11 @@ def cov(prev_phased, phased, cov_xy, cov_delta):
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/phasing.py", is_prefix=True)
 def phase_gen0_task(solved, phased):
-    if parms.verbosity > 0:
+    if settings.verbosity > 0:
         print("Starting phasing", flush=True)
     phased.ac[:] , phased.support_[:], phased.rho_[:] = sequential_phase(
             0, solved.ac, None, None)
-    if parms.verbosity > 0:
+    if settings.verbosity > 0:
         print("Finishing phasing", flush=True)
 
 
@@ -62,11 +62,11 @@ def phase_gen0_task(solved, phased):
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/phasing.py", is_prefix=True)
 def phase_task(solved, phased, generation):
-    if parms.verbosity > 0:
+    if settings.verbosity > 0:
         print("Starting phasing", flush=True)
     phased.ac[:] , phased.support_[:], phased.rho_[:] = sequential_phase(
             generation, solved.ac, phased.support_, phased.rho_)
-    if parms.verbosity > 0:
+    if settings.verbosity > 0:
         print("Finishing phasing", flush=True)
 
 
@@ -75,7 +75,7 @@ def phase_task(solved, phased, generation):
 def phase(generation, solved, phased=None):
     if generation == 0:
         assert phased is None
-        phased = Region((parms.M,)*3, {
+        phased = Region((settings.M,)*3, {
             "ac": pygion.float32, "support_": pygion.float32,
             "rho_": pygion.float32})
         phase_gen0_task(solved, phased)

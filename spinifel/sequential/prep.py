@@ -5,7 +5,7 @@ import PyNVTX            as nvtx
 
 from matplotlib.colors import LogNorm
 
-from spinifel import parms, prep, image
+from spinifel import settings, prep, image
 
 
 
@@ -14,8 +14,8 @@ def get_pixel_position_reciprocal():
     """
     Return pixel positions in reciprocal space.
     """
-    pixel_position_type = getattr(np, parms.pixel_position_type_str)
-    pixel_position_reciprocal = np.zeros(parms.pixel_position_shape,
+    pixel_position_type = getattr(np, settings.pixel_position_type_str)
+    pixel_position_reciprocal = np.zeros(settings.pixel_position_shape,
                                          dtype=pixel_position_type)
     prep.load_pixel_position_reciprocal(pixel_position_reciprocal)
     return pixel_position_reciprocal
@@ -27,8 +27,8 @@ def get_pixel_index_map():
     """
     Return pixel coordinates indexes from psana geometry.
     """
-    pixel_index_type = getattr(np, parms.pixel_index_type_str)
-    pixel_index_map = np.zeros(parms.pixel_index_shape,
+    pixel_index_type = getattr(np, settings.pixel_index_type_str)
+    pixel_index_map = np.zeros(settings.pixel_index_shape,
                                dtype=pixel_index_type)
     prep.load_pixel_index_map(pixel_index_map)
     return pixel_index_map
@@ -44,8 +44,8 @@ def get_slices(N_images, ds):
     :param ds: data source
     :return slices_: data images
     """
-    data_type = getattr(np, parms.data_type_str)
-    slices_ = np.zeros((N_images,) + parms.det_shape,
+    data_type = getattr(np, settings.data_type_str)
+    slices_ = np.zeros((N_images,) + settings.det_shape,
                        dtype=data_type)
     if ds is None:
         prep.load_slices(slices_, 0, N_images)
@@ -65,7 +65,7 @@ def get_slices(N_images, ds):
 @nvtx.annotate("sequential/prep.py", is_prefix=True)
 def get_data(N_images, ds):
     """
-    Return pre-processed data for running M-TIP.    
+    Return pre-processed data for running M-TIP.
 
     :param N_images: number of data images
     :param ds: data source
