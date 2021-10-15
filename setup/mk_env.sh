@@ -51,7 +51,7 @@ _module_loaded () {
 EOF
 
 # Enable host overwrite
-target=${SPINIFEL_TARGET:-${NERSC_HOST:-$(hostname --fqdn)}}
+target=${SPINIFEL_TARGET:-$(hostname --fqdn)}}
 
 # Setup environment.
 if [[ ${target} = "cori"* ]]; then

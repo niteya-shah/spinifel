@@ -6,7 +6,7 @@ root_dir="$(dirname "${BASH_SOURCE[0]}")"
 source "$root_dir"/env.sh
 
 # Enable host overwrite
-target=${SPINIFEL_TARGET:-${NERSC_HOST:-$(hostname --fqdn)}}
+target=${SPINIFEL_TARGET:-$(hostname --fqdn)}}
 
 pushd "$root_dir"/cufinufft
 
