@@ -338,17 +338,17 @@ class SpinifelSettings(metaclass=Singleton):
             "_oversampling": (
                 "algorithm", "oversampling",
                 int, 1,
-                "oversampling count"
+                "oversampling rate"
             ),
             "_solve_ac_maxiter": (
                 "algorithm", "solve_ac_maxiter",
                 int, 100,
-                "max number of iterations in the autocorrelation solver"
+                "max number of iterations in the CG solver"
             ),
             "_beta": (
                 "algorithm", "beta",
                 float, 0.9,
-                "negative feedback for HIO"
+                "negative feedback in HIO"
             ),
             "_cutoff": (
                 "algorithm", "cutoff",
@@ -358,37 +358,37 @@ class SpinifelSettings(metaclass=Singleton):
             "_nER": (
                 "algorithm", "nER",
                 int, 10,
-                "nER parameter for solver"
+                "number of iterations in ER"
             ),
             "_nHIO": (
                 "algorithm", "nHIO",
                 int, 5,
-                "nHIO parameter for solver"
+                "number of iterations in HIO"
             ),
             "_N_phase_loops": (
                 "algorithm", "N_phase_loops",
                 int, 5,
-                "N_phase_loops parameter for solver"
+                "number of loops for phasing"
             ),
             "_N_clipping": (
                 "algorithm", "N_clipping",
                 int, 1,
-                "N_clipping parameter for solver"
+                "N_clipping parameter for dataset preprocessing"
             ),
             "_N_binning": (
                 "algorithm", "N_binning",
                 int, 4,
-                "N_binning parameter for solver"
+                "N_binning parameter for dataset preprocessing"
             ),
             "_N_orientations": (
                 "algorithm", "N_orientations",
                 int, 1000,
-                "N_orientations parameter for solver"
+                "N_orientations parameter for orientation matching"
             ),
             "_N_batch_size": (
                 "algorithm", "N_batch_size",
                 int, 1000,
-                "N_batch_size parameter for solver"
+                "N_batch_size parameter for slicing in batches"
             )
         }
 
