@@ -343,7 +343,17 @@ class SpinifelSettings(metaclass=Singleton):
             "_solve_ac_maxiter": (
                 "algorithm", "solve_ac_maxiter",
                 int, 100,
-                "max number of itterations in the autocorrelation solver"
+                "max number of iterations in the autocorrelation solver"
+            ),
+            "_beta": (
+                "algorithm", "beta",
+                float, 0.9,
+                "negative feedback for HIO"
+            ),
+            "_cutoff": (
+                "algorithm", "cutoff",
+                float, 5e-2,
+                "cutoff in shrinkwrap"
             ),
             "_nER": (
                 "algorithm", "nER",
