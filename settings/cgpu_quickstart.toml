@@ -31,6 +31,8 @@ devices_per_node = 1
 [algorithm]
 nER = 51
 nHIO = 25
+beta = 0.9
+cutoff = 5e-2
 N_phase_loops = 10
 N_clipping = 0
 N_binning = 0
