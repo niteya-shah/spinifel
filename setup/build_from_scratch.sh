@@ -29,6 +29,9 @@ mkdir -p install/include
 mkdir -p install/lib
 mkdir -p install/share
 
+# clear pip cache
+rm -rf ~/.cache/pip
+
 #-------------------------------------------------------------------------------
 
 

@@ -93,6 +93,7 @@ export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
 # NOTE: not sure if this is the best choice -- investigate further if this
 # becomes a problem elsewhere
 export GASNET_CONDUIT=ibv
+export CROSS_CONFIGURE=
 EOF
 elif [[ ${target} = "perlmutter" ]]; then
     cat >> env.sh <<EOF
