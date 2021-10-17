@@ -143,8 +143,6 @@ def solve_ac(generation,
     b_squared = np.sum(norm(slices_.reshape(slices_.shape[0],-1) * (M**3/N_pixels_per_image))**2, axis=-1)
     b_squared = reduce_bcast(comm, b_squared)
 
-    # scale data images by (M**3/N_pixels_per_image) to match model images
-    slices_ = slices_ * (M**3/N_pixels_per_image)
     data = slices_.flatten()
 
     # Set up ac
