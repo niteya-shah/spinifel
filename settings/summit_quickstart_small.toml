@@ -8,7 +8,7 @@ use_callmonitor = false
 
 [data]
 in_dir = "/gpfs/alpine/proj-shared/chm137/data/spi"
-out_dir = "/gpfs/alpine/proj-shared/chm137/${USER}/spinifel_output"
+out_dir = "/gpfs/alpine/proj-shared/chm137/${LOGNAME}/spinifel_output"
 name = "2CEX-10k-2.h5"
 
 [psana]
