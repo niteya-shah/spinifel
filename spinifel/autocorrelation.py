@@ -26,7 +26,7 @@ xp = np
 if settings.use_cupy:
     if settings.verbose:
         print(f"Using CuPy for FFTs.")
-        import cupy as xp
+    import cupy as xp
 
 
 
@@ -98,10 +98,9 @@ def core_problem_convolution(uvect, M, F_ugrid_conv_, M_ups, ac_support,
         assert np.all(np.isreal(uvect))
        
     if settings.use_cupy:
-        if settings.verbose:
-            uvect = xp.asarray(uvect)
-            ac_support = xp.asarray(ac_support)
-            F_ugrid_conv_ = xp.asarray(F_ugrid_conv_)
+        uvect = xp.asarray(uvect)
+        ac_support = xp.asarray(ac_support)
+        F_ugrid_conv_ = xp.asarray(F_ugrid_conv_)
     # Upsample
     ugrid = uvect.reshape((M,) * 3) * ac_support
     ugrid_ups = xp.zeros((M_ups,) * 3, dtype=uvect.dtype)            
@@ -121,8 +120,7 @@ def core_problem_convolution(uvect, M, F_ugrid_conv_, M_ups, ac_support,
         ugrid_conv_out = ugrid_conv_out.real
 
     if settings.use_cupy:
-        if settings.verbose:
-            ugrid_conv_out = xp.asnumpy(ugrid_conv_out)
+        ugrid_conv_out = xp.asnumpy(ugrid_conv_out)
     return ugrid_conv_out.flatten()
 
 
@@ -134,10 +132,9 @@ def fourier_reg(uvect, support, F_antisupport, M, use_recip_sym):
         assert np.all(np.isreal(ugrid))
 
     if settings.use_cupy:
-        if settings.verbose:
-            uvect = xp.asarray(uvect)
-            support = xp.asarray(support)
-            F_antisupport = xp.asarray(F_antisupport)
+        uvect = xp.asarray(uvect)
+        support = xp.asarray(support)
+        F_antisupport = xp.asarray(F_antisupport)
 
     F_ugrid = xp.fft.fftn(xp.fft.ifftshift(ugrid)) / M**3
     F_reg = F_ugrid * xp.fft.ifftshift(F_antisupport)
@@ -147,8 +144,7 @@ def fourier_reg(uvect, support, F_antisupport, M, use_recip_sym):
         uvect = uvect.real
 
     if settings.use_cupy:
-        if settings.verbose:
-            uvect = xp.asnumpy(uvect)
+        uvect = xp.asnumpy(uvect)
     return uvect
 
 
