@@ -57,11 +57,6 @@ def setup_linops(H, K, L, data,
         """Define W part of the W @ x = d problem."""
         uvect_ADA = autocorrelation.core_problem_convolution(
             uvect, M, F_ugrid_conv_, M_ups, ac_support, use_reciprocal_symmetry)
-        if False:  # Debug/test
-            uvect_ADA_old = autocorrelation.core_problem(
-                 uvect, H_, K_, L_, ac_support, weights, M, N,
-                 reciprocal_extent, use_reciprocal_symmetry)
-            assert np.allclose(uvect_ADA, uvect_ADA_old)
         uvect_FDF = autocorrelation.fourier_reg(
             uvect, ac_support, F_antisupport, M, use_reciprocal_symmetry)
         uvect = uvect_ADA + rlambda*uvect + flambda*uvect_FDF
