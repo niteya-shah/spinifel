@@ -45,6 +45,20 @@ elif settings.use_cuda and not KNN_AVAILABLE:
 
 #-------------------------------------------------------------------------------
 
+@nvtx.annotate("sequential/nearest_neighbor.py", is_prefix=True)
+def generate_weights(pixel_position_reciprocal, order=0):
+    """
+    Generate weights: 1/(pixel_position_reciprocal)^order,
+    to counteract the decay of the SAXS pattern.
+    :param pixel_position_reciprocal: reciprocal space position of each pixel
+    :param order: power, uniform weights if zero
+    :return weights: resolution-based weight of each pixel
+    """
+    s_magnitudes = np.linalg.norm(pixel_position_reciprocal, axis=0) * 1e-10 # convert to Angstrom
+    weights = 1.0 / (s_magnitudes ** order)
+    weights /= np.sum(weights)
+    
+    return weights
 
 
 @nvtx.annotate("sequential/nearest_neighbor.py", is_prefix=True)
