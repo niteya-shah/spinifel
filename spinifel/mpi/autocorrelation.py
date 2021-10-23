@@ -221,6 +221,7 @@ def solve_ac(generation,
         lambdas = np.sort(lambdas) # sort lambdas in increasing order
         allCoord = np.log(valuePair) # coordinates of the loglog L-curve
         nPoints = len(resids)
+        if nPoints == 0: print('WARNING: no converged solution')
         firstPoint = allCoord[0]
         lineVec = allCoord[-1] - allCoord[0]
         lineVecNorm = lineVec / np.sqrt(np.sum(lineVec**2))
