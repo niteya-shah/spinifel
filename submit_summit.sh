@@ -11,7 +11,8 @@ t_start=`date +%s`
 
 # spinifel
 source setup/env.sh
-export CUPY_CACHE_DIR=$PWD/setup/cupy
+export CUPY_CACHE_DIR=/tmp # used to be $PWD/setup/cupy
+export MPLCONFIGDIR=/tmp # writable directory for matplotlib
 
 jsrun -n 6 -a 1 -c 7 -g 1 -b rs -d packed python -m spinifel --default-settings=summit_mpi.toml --mode=mpi
 
