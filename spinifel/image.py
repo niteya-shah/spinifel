@@ -21,7 +21,7 @@ def show_image(pixel_index_map, image, filename):
     # plot image data
     plt.imshow(buffer, norm=LogNorm())
     plt.colorbar()
-    # plt.savefig(settings.out_dir / filename)
+    plt.savefig(settings.out_dir / filename)
     plt.cla()
     plt.clf()
 
