@@ -4,12 +4,11 @@
 #include <iostream>
 #include <sstream>
 #include <chrono>
-#include <cuda.h>
-#include <cuda_runtime.h>
-#include <cuda_runtime_api.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
 #include <pybind11/stl.h>
+
+#include "cuda_hip_wrapper.h"
 
 using namespace std;
 using namespace std::chrono;
