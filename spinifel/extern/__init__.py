@@ -33,7 +33,8 @@ profiler = Profiler()
 
 if settings.use_cuda and settings.use_cufinufft:
     # TODO: only manage MPI via contexts! But let's leave this here for now
-    context.init_mpi()  # Ensures that MPI has been initalized
+    if settings.mode == "mpi":
+        context.init_mpi()  # Ensures that MPI has been initalized
     context.init_cuda() # this must be called _after_ init_mpi
     from pycuda.gpuarray import GPUArray, to_gpu
 
