@@ -64,5 +64,7 @@ def main():
         
         if is_cov:
             break;
-        
 
+        rho = np.fft.ifftshift(phased.rho_)
+        save_mrc(settings.out_dir / f"ac-{generation}.mrc", phased.ac)
+        save_mrc(settings.out_dir / f"rho-{generation}.mrc", rho)
