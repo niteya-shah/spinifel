@@ -67,8 +67,8 @@ echo "NRSS_PER_NODE: $NRSS_PER_NODE"
 # fi
 
 
-# export RUN_MODE=legion
-# echo "RUN_MODE: $RUN_MODE"
+RUN_MODE=legion
+echo "RUN_MODE: $RUN_MODE"
 
 #for MPI
 #export SPINIFEL_PYTHON="python"
