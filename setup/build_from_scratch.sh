@@ -91,7 +91,12 @@ PACKAGE_LIST=(
     prometheus_client
 )
 
-conda create -y -p "$CONDA_ENV_DIR" "${PACKAGE_LIST[@]}" -c defaults -c anaconda
+
+if [[ ${target} = "psbuild"* ]]; then
+    conda create -y -p "$CONDA_ENV_DIR" "${PACKAGE_LIST[@]}" -c conda-forge
+else
+   conda create -y -p "$CONDA_ENV_DIR" "${PACKAGE_LIST[@]}" -c defaults -c anaconda
+fi
 
 conda activate "$CONDA_ENV_DIR"
 
@@ -101,14 +106,23 @@ conda install -y bitstruct krtc -c conda-forge
 
 # Extra deps required for psana machines, since there is no module system
 if [[ ${target} = "psbuild"* ]]; then
-    conda install -y compilers openmpi cudatoolkit-dev -c conda-forge
+    conda install -y compilers openmpi cudatoolkit=11.4 cudatoolkit-dev=11.4 cmake make -c conda-forge
+fi
+
+
+if [[ ${target} = "psbuild"* ]]; then
+    conda install -y cupy mrcfile -c conda-forge
+    pip install -v --no-binary mpi4py mpi4py
+else
+    CC=$MPI4PY_CC MPICC=$MPI4PY_MPICC pip install -v --no-binary mpi4py mpi4py
+    pip install --no-cache-dir mrcfile
+    pip install --no-cache-dir cupy
+
 fi
 
 # Install pip packages
-CC=$MPI4PY_CC MPICC=$MPI4PY_MPICC pip install -v --no-binary mpi4py mpi4py
 pip install --no-cache-dir callmonitor
 pip install --no-cache-dir PyNVTX
-pip install --no-cache-dir mrcfile
 (
     if [[ $(hostname --fqdn) = *".spock."* ]]; then
         export CUPY_INSTALL_USE_HIP=1

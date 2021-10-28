@@ -192,11 +192,11 @@ export GASNET_CONDUIT=ibv
 EOF
 elif [[ ${target} = "psbuild"* ]]; then # psana machines
     cat >> env.sh <<EOF
-export CC=gcc
-export CXX=g++
+#export CC=gcc
+#export CXX=g++
 # compilers for mpi4py
-export MPI4PY_CC=gcc
-export MPI4PY_MPICC=mpicc
+#export MPI4PY_CC=gcc
+#export MPI4PY_MPICC=mpicc
 
 export LEGION_USE_GASNET=${LEGION_USE_GASNET:-0}
 EOF
