@@ -34,5 +34,10 @@ nHIO = 25
 N_phase_loops = 10
 N_clipping = 0
 N_binning = 0
-N_orientations = 3000  # model_slices
+#N_orientations = 3000  # model_slices
+N_orientations = 200000  # model_slices
 N_batch_size = 100
+volume_shape=[149,149,149]
+
+[detector]
+shape=[1,128,128]
