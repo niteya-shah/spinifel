@@ -6,6 +6,7 @@ import pygion
 from pygion import acquire, attach_hdf5, task, Partition, Region, R, Tunable, WD
 
 from spinifel import settings
+from spinifel.prep import save_mrc
 
 from .prep import get_data
 from .autocorrelation import solve_ac
