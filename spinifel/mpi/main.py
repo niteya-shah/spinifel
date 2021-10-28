@@ -58,8 +58,11 @@ def main():
     (pixel_position_reciprocal,
      pixel_distance_reciprocal,
      pixel_index_map,
-     slices_) = get_data(N_images_per_rank, ds)
+     slices_,
+     orientations_prior) = get_data(N_images_per_rank, ds)
     logger.log(f"Loaded in {timer.lap():.2f}s.")
+
+    orientations = orientations_prior
 
     # Generation 0: solve_ac and phase
     N_generations = settings.N_generations
@@ -68,11 +71,17 @@ def main():
     logger.log(f"##### Generation {generation}/{N_generations} #####")
     logger.log(f"#"*27)
     ac = solve_ac(
-        generation, pixel_position_reciprocal, pixel_distance_reciprocal, slices_)
+        generation, pixel_position_reciprocal, pixel_distance_reciprocal, slices_) #, orientations)
     logger.log(f"AC recovered in {timer.lap():.2f}s.")
 
     ac_phased, support_, rho_ = phase(generation, ac)
     logger.log(f"Problem phased in {timer.lap():.2f}s.")
+
+    rho = np.fft.ifftshift(rho_)
+
+    if comm.rank == 0:
+        save_mrc(settings.out_dir / f"ac-{generation}.mrc", ac_phased)
+        save_mrc(settings.out_dir / f"rho-{generation}.mrc", rho)
 
     # Use improvement of cc(prev_rho, cur_rho) to dertemine if we should
     # terminate the loop
@@ -84,10 +93,10 @@ def main():
         logger.log(f"##### Generation {generation}/{N_generations} #####")
         logger.log(f"#"*27)
         # Orientation matching
-        orientations = match(
-            ac_phased, slices_,
-            pixel_position_reciprocal, pixel_distance_reciprocal)
-        logger.log(f"Orientations matched in {timer.lap():.2f}s.")
+        #orientations = match(
+        #    ac_phased, slices_,
+        #    pixel_position_reciprocal, pixel_distance_reciprocal)
+        #logger.log(f"Orientations matched in {timer.lap():.2f}s.")
 
         # Solve autocorrelation
         ac = solve_ac(
