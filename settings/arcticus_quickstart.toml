@@ -1,0 +1,43 @@
+# This toml file contains settings for the arcticus quicktart
+
+[debug]
+test = "Quickstart settings for Arcticus"
+verbose = true
+verbosity = 0
+use_callmonitor = false
+
+[data]
+in_dir = "/gpfs/jlse-fs0/users/ac.eslaught/spinifel_data_h5"
+out_dir = "/gpfs/jlse-fs0/users/${LOGNAME}/spinifel_output"
+name = "2CEX-10k-2.h5"
+
+[detector]
+shape = [4, 512, 512]
+
+[psana]
+enable = false
+ps_smd_n_events = 10000
+ps_eb_nodes = 1
+ps_srv_nodes = 0
+
+[runtime]
+N_images_per_rank = 10
+use_cuda = false
+use_cufinufft = false
+use_cupy = false
+use_single_prec = false
+chk_convergence = true
+
+[gpu]
+devices_per_node = 1
+
+[algorithm]
+nER = 51
+nHIO = 25
+beta = 0.9
+cutoff = 5e-2
+N_phase_loops = 10
+N_clipping = 0
+N_binning = 0
+N_orientations = 3000  # model_slices
+N_batch_size = 100
