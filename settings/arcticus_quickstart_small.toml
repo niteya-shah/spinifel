@@ -24,7 +24,7 @@ ps_srv_nodes = 0
 N_images_per_rank = 10
 use_cuda = false
 use_cufinufft = false
-use_cupy = false
+use_cupy = true
 use_single_prec = false
 chk_convergence = true 
 
