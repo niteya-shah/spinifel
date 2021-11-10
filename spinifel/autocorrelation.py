@@ -26,7 +26,8 @@ xp = np
 if settings.use_cupy:
     if settings.verbose:
         print(f"Using CuPy for FFTs.")
-    import cupy as xp
+    # import cupy as xp
+    import dpnp as xp
 
 
 

@@ -10,8 +10,11 @@ xp = np
 if settings.use_cupy:
     if settings.verbose:
         print(f"Using CuPy for FFTs.")
-    import cupy as xp
-    from cupyx.scipy.ndimage import gaussian_filter
+    # import cupy as xp
+    # from cupyx.scipy.ndimage import gaussian_filter
+    import dpnp as xp
+    # don't know where to get this for GPU right now
+    from scipy.ndimage import gaussian_filter
 else:
     if settings.verbose:
         print(f"Using NumPy for FFTs.")

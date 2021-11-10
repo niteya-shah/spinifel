@@ -86,6 +86,7 @@ dependencies:
   - amityping  # lcls-ii
   - bitstruct  # conda-forge
   - krtc  # conda-forge
+  - dpnp # intel, cupy replacement
 EOF
 
 conda env create -p "$CONDA_ENV_DIR" -f ${CONDA_ENV_CONFIG}.yml
