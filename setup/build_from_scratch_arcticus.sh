@@ -72,7 +72,7 @@ dependencies:
   - pybind11  # FINUFFT
   - numba  # skopi
   - scikit-learn  # skopi
-  - tqdm # convenience
+  - tqdm  # convenience
   - setuptools=46.4.0  # temp need specific version
   - cython
   - mongodb
@@ -97,8 +97,11 @@ if [[ ${target} = "psbuild"* ]]; then
     conda install -y compilers openmpi cudatoolkit-dev -c conda-forge
 fi
 
+# Remove Conda version of intel mpi since we use Aurora MPICH in Arcticus
+conda remove -y --force impi_rt -c intel
+
 # Install pip packages
-CC=$MPI4PY_CC MPICC=$MPI4PY_MPICC pip install -v --no-binary mpi4py mpi4py
+CC=$MPI4PY_CC MPICC=$MPI4PY_MPICC pip install -v --no-cache-dir --no-binary mpi4py mpi4py
 pip install --no-cache-dir callmonitor
 pip install --no-cache-dir PyNVTX
 pip install --no-cache-dir mrcfile
