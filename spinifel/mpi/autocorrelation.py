@@ -42,16 +42,14 @@ def setup_linops(comm, H, K, L, data,
                  use_reciprocal_symmetry):
     """Define W and d parts of the W @ x = d problem.
 
-    W = A_adj*Da*A + rl*I  + fl*F_adj*Df*F
-    d = A_adj*Da*b + rl*x0 + 0
+    W = A_adj*Da*A + rl*I
+    d = A_adj*Da*b + rl*x0
 
     Where:
         A represents the NUFFT operator
         A_adj its adjoint
         I the identity
-        F the FFT operator
-        F_adj its atjoint
-        Da, Df weights
+        D weights
         b the data
         x0 the initial guess (ac_estimate)
     """
@@ -75,7 +73,7 @@ def setup_linops(comm, H, K, L, data,
         np.ones_like(data_), H_, K_, L_, 1, M_ups,
         reciprocal_extent, use_reciprocal_symmetry)
     ugrid_conv = reduce_bcast(comm, ugrid_conv)
-    F_ugrid_conv_ = np.fft.fftn(np.fft.ifftshift(ugrid_conv)) / M**3
+    F_ugrid_conv_ = np.fft.fftn(np.fft.ifftshift(ugrid_conv)) #/ M**3
 
     def W_matvec(uvect):
         """Define W part of the W @ x = d problem."""
@@ -97,7 +95,7 @@ def setup_linops(comm, H, K, L, data,
         shape=(M**3, M**3),
         matvec=W_matvec)
 
-    nuvect_Db = (data_ * weights).astype(np.float32)
+    nuvect_Db = (data_ * weights).astype(np.float64)
     uvect_ADb = autocorrelation.adjoint(
         nuvect_Db, H_, K_, L_, ac_support, M,
         reciprocal_extent, use_reciprocal_symmetry
@@ -126,8 +124,6 @@ def solve_ac(generation,
     print('N =', N)
     Ntot = N * comm.size # total number of pixels
     print('Ntot =', Ntot)
-    N_pixels_per_image = N / N_images # number of pixels per image
-    print('N_pixels_per_image =', N_pixels_per_image)
     reciprocal_extent = pixel_distance_reciprocal.max()
     use_reciprocal_symmetry = True
     ref_rank = -1 
@@ -140,7 +136,7 @@ def solve_ac(generation,
         orientations, pixel_position_reciprocal)
 
     # norm(nuvect_Db)^2 = b_squared = b_1^2 + b_2^2 +....
-    b_squared = np.sum(norm(slices_.reshape(slices_.shape[0],-1) * (M**3/N_pixels_per_image))**2, axis=-1)
+    b_squared = np.sum( norm( slices_.reshape(slices_.shape[0],-1) , axis=-1) **2)
     b_squared = reduce_bcast(comm, b_squared)
 
     data = slices_.flatten()
@@ -151,12 +147,11 @@ def solve_ac(generation,
         ac_estimate = np.zeros((M,)*3)
     else:
         ac_smoothed = gaussian_filter(ac_estimate, 0.5)
-        ac_support = (ac_smoothed > 1e-12).astype(np.float)
+        ac_support = (ac_smoothed > 1e-12).astype(np.float64)
         ac_estimate *= ac_support
     weights = np.ones(N)
 
-    # remove M**3 in the numerator
-    # rlambda = 1./Ntot * 10**(comm.rank - comm.size/2) 
+    # Use scalable heuristic for regularization lambda
     rlambda = np.logspace(-8, 8, comm.size)[comm.rank]
     flambda = 0  # 1e5 * pow(10, comm.rank - comm.size//2)
     maxiter = settings.solve_ac_maxiter
@@ -194,13 +189,10 @@ def solve_ac(generation,
     if info != 0:
         print(f'WARNING: CG did not converge at rlambda = {rlambda}')
 
-    # normalization    
-    ret /= M**3 # solution
-    d_0 /= M**3
     soln = norm(ret)**2 # solution norm
-    resid = (np.dot(ret,W_0.matvec(ret)-2*d_0) + b_squared) / Ntot # residual norm
+    resid = (np.dot(ret,W_0.matvec(ret)-2*d_0) + b_squared) # residual norm
 
-    # Rank0 gathers rlambda, v1, v2 from all ranks
+    # Rank0 gathers rlambda, solution norm, residual norm from all ranks
     summary = comm.gather((comm.rank, rlambda, info, soln, resid), root=0)
     print('summary =', summary)
     if comm.rank == 0:
@@ -215,51 +207,64 @@ def solve_ac(generation,
         print('solns =', solns)
         print('resids =', resids)
 
-        # Take corner of L-curve
-        valuePair = np.array([resids, solns]).T
-        valuePair = np.array(sorted(valuePair , key=lambda k: [k[0], k[1]])) # sort the corner candidates in increasing order
-        lambdas = np.sort(lambdas) # sort lambdas in increasing order
-        allCoord = np.log(valuePair) # coordinates of the loglog L-curve
-        nPoints = len(resids)
-        if nPoints == 0: print('WARNING: no converged solution')
-        firstPoint = allCoord[0]
-        lineVec = allCoord[-1] - allCoord[0]
-        lineVecNorm = lineVec / np.sqrt(np.sum(lineVec**2))
-        vecFromFirst = allCoord - firstPoint
-        scalarProduct = np.sum(vecFromFirst * numpy.matlib.repmat(lineVecNorm, nPoints, 1), axis=1)
-        vecFromFirstParallel = np.outer(scalarProduct, lineVecNorm)
-        vecToLine = vecFromFirst - vecFromFirstParallel
-        distToLine = np.sqrt(np.sum(vecToLine ** 2, axis=1))
-        iref = np.argmax(distToLine)
-        print('iref =', iref)
+        if generation == 0:
+            # Expect non-convergence => weird results
+            # Heuristic: retain rank with highest rlambda and high solution norm
+            idx = solns >= np.mean(solns)
+            imax = np.argmax(lambdas[idx])
+            iref = np.arange(len(ranks), dtype=int)[idx][imax]
+        else:
+            # Heuristic: L-curve criterion
+            # Take corner of L-curve
+            valuePair = np.array([resids, solns]).T
+            valuePair = np.array(sorted(valuePair , key=lambda k: [k[0], k[1]])) # sort the corner candidates in increasing order
+            lambdas = np.sort(lambdas) # sort lambdas in increasing order
+            allCoord = np.log(valuePair) # coordinates of the loglog L-curve
+            nPoints = len(resids)
+            if nPoints == 0: print('WARNING: no converged solution')
+            firstPoint = allCoord[0]
+            lineVec = allCoord[-1] - allCoord[0]
+            lineVecNorm = lineVec / np.sqrt(np.sum(lineVec**2))
+            vecFromFirst = allCoord - firstPoint
+            scalarProduct = np.sum(vecFromFirst * numpy.matlib.repmat(lineVecNorm, nPoints, 1), axis=1)
+            vecFromFirstParallel = np.outer(scalarProduct, lineVecNorm)
+            vecToLine = vecFromFirst - vecFromFirstParallel
+            distToLine = np.sqrt(np.sum(vecToLine ** 2, axis=1))
+            iref = np.argmax(distToLine)
+            print('iref =', iref)
+            ref_rank = ranks[iref]
+
+            # Log L-curve plot
+            fig, axes = plt.subplots(figsize=(10.0, 24.0), nrows=3, ncols=1)
+            axes[0].loglog(lambdas, valuePair.T[1])
+            axes[0].loglog(lambdas[iref], valuePair[iref][1], "rD")
+            axes[0].set_xlabel("$\lambda$")
+            axes[0].set_ylabel("Solution norm $||x||_{2}$")
+            axes[1].loglog(lambdas, valuePair.T[0])
+            axes[1].loglog(lambdas[iref], valuePair[iref][0], "rD")
+            axes[1].set_xlabel("$\lambda$")
+            axes[1].set_ylabel("Residual norm $||Ax-b||_{2}$")
+            axes[2].loglog(valuePair.T[0], valuePair.T[1]) # L-curve
+            axes[2].loglog(valuePair[iref][0], valuePair[iref][1], "rD")
+            axes[2].set_xlabel("Residual norm $||Ax-b||_{2}$")
+            axes[2].set_ylabel("Solution norm $||x||_{2}$")
+            fig.tight_layout()
+            plt.savefig(settings.out_dir / f"summary_{generation}.png")
+            plt.close('all')
+
         ref_rank = ranks[iref]
 
-        # Log L-curve plot
-        fig, axes = plt.subplots(figsize=(10.0, 24.0), nrows=3, ncols=1)
-        axes[0].loglog(lambdas, valuePair.T[1])
-        axes[0].loglog(lambdas[iref], valuePair[iref][1], "rD")
-        axes[0].set_xlabel("$\lambda$")
-        axes[0].set_ylabel("Solution norm $||x||_{2}$")
-        axes[1].loglog(lambdas, valuePair.T[0])
-        axes[1].loglog(lambdas[iref], valuePair[iref][0], "rD")
-        axes[1].set_xlabel("$\lambda$")
-        axes[1].set_ylabel("Residual norm $||Ax-b||_{2}$")
-        axes[2].loglog(valuePair.T[0], valuePair.T[1]) # L-curve
-        axes[2].loglog(valuePair[iref][0], valuePair[iref][1], "rD")
-        axes[2].set_xlabel("Residual norm $||Ax-b||_{2}$")
-        axes[2].set_ylabel("Solution norm $||x||_{2}$")
-        fig.tight_layout()
-        plt.savefig(settings.out_dir / f"summary_{generation}.png")
-        plt.close('all')
+    else:
+        ref_rank = -1
 
     # Rank0 broadcasts rank with best autocorrelation
     ref_rank = comm.bcast(ref_rank, root=0)
 
     # Set up ac volume
-    ac = (ret*M**3).reshape((M,)*3)
+    ac = ret.reshape((M,)*3)
     if use_reciprocal_symmetry:
         assert np.all(np.isreal(ac))
-    ac = np.ascontiguousarray(ac.real).astype(np.float32)
+    ac = np.ascontiguousarray(ac.real).astype(np.float64)
     print(f"Rank {comm.rank} got AC in {callback.counter} iterations.", flush=True)
 
     # Log autocorrelation volume
