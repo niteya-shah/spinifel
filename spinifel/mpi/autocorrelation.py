@@ -56,7 +56,6 @@ def setup_linops(comm, H, K, L, data,
     H_ = H.flatten() / reciprocal_extent * np.pi / settings.oversampling
     K_ = K.flatten() / reciprocal_extent * np.pi / settings.oversampling
     L_ = L.flatten() / reciprocal_extent * np.pi / settings.oversampling
-    data_ = data.flatten()
 
     lu = np.linspace(-np.pi, np.pi, M)
     Hu_, Ku_, Lu_ = np.meshgrid(lu, lu, lu, indexing='ij')
@@ -70,7 +69,7 @@ def setup_linops(comm, H, K, L, data,
     # Using upsampled convolution technique instead of ADA
     M_ups = settings.M_ups
     ugrid_conv = autocorrelation.adjoint(
-        np.ones_like(data_), H_, K_, L_, 1, M_ups,
+        np.ones_like(data), H_, K_, L_, 1, M_ups,
         reciprocal_extent, use_reciprocal_symmetry)
     ugrid_conv = reduce_bcast(comm, ugrid_conv)
     F_ugrid_conv_ = np.fft.fftn(np.fft.ifftshift(ugrid_conv)) #/ M**3
@@ -96,7 +95,7 @@ def setup_linops(comm, H, K, L, data,
         shape=(M**3, M**3),
         matvec=W_matvec)
 
-    nuvect_Db = (data_ * weights).astype(np.float64)
+    nuvect_Db = (data * weights).astype(np.float64)
     uvect_ADb = autocorrelation.adjoint(
         nuvect_Db, H_, K_, L_, ac_support, M,
         reciprocal_extent, use_reciprocal_symmetry
