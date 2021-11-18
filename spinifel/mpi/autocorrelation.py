@@ -83,8 +83,9 @@ def setup_linops(comm, H, K, L, data,
             uvect_ADA_old = core_problem(
                  comm, uvect, H_, K_, L_, ac_support, weights, M, N,
                  reciprocal_extent, use_reciprocal_symmetry)
-            assert np.allclose(uvect_ADA, uvect_ADA_old)
-    
+            print('np.linalg.norm(uvect_ADA) =', np.linalg.norm(uvect_ADA))
+            print('np.linalg.norm(uvect_ADA_old) =', np.linalg.norm(uvect_ADA_old))
+            print('np.linalg.norm(uvect_ADA) / np.linalg.norm(uvect_ADA_old) =', np.linalg.norm(uvect_ADA) / np.linalg.norm(uvect_ADA_old))     #assert np.allclose(uvect_ADA, uvect_ADA_old)            
         uvect_FDF = autocorrelation.fourier_reg(
             uvect, ac_support, F_antisupport, M, use_reciprocal_symmetry)
         uvect = uvect_ADA + rlambda*uvect + flambda*uvect_FDF
@@ -136,7 +137,7 @@ def solve_ac(generation,
         orientations, pixel_position_reciprocal)
 
     # norm(nuvect_Db)^2 = b_squared = b_1^2 + b_2^2 +....
-    b_squared = np.sum( norm( slices_.reshape(slices_.shape[0],-1) , axis=-1) **2)
+    b_squared = np.sum( np.linalg.norm( slices_.reshape(slices_.shape[0],-1) , axis=-1) **2)
     b_squared = reduce_bcast(comm, b_squared)
 
     data = slices_.flatten()
@@ -152,7 +153,7 @@ def solve_ac(generation,
     weights = np.ones(N)
 
     # Use scalable heuristic for regularization lambda
-    rlambda = np.logspace(-8, 8, comm.size)[comm.rank]
+    rlambda = np.logspace(-10, 10, comm.size)[comm.rank]
     flambda = 0  # 1e5 * pow(10, comm.rank - comm.size//2)
     maxiter = settings.solve_ac_maxiter
 
@@ -189,8 +190,21 @@ def solve_ac(generation,
     if info != 0:
         print(f'WARNING: CG did not converge at rlambda = {rlambda}')
 
-    soln = norm(ret)**2 # solution norm
-    resid = (np.dot(ret,W_0.matvec(ret)-2*d_0) + b_squared) # residual norm
+    soln = np.linalg.norm(ret)**2 # solution norm
+    resid = np.dot(ret.real,W_0.matvec(ret.real)-2*d_0) + b_squared # residual norm
+    print('np.linalg.norm(W_0x) =', np.linalg.norm(W_0.matvec(ret.real)))
+    print('np.linalg.norm(d_0) =', np.linalg.norm(d_0))
+    print('np.linalg.norm(W_0x-d_0) =', np.linalg.norm(W_0.matvec(ret.real)-d_0)) # should be zero up to roundoff error 
+    print('dot(x,W_0x-2d_0) =', np.dot(ret.real,W_0.matvec(ret.real)-2*d_0))
+    print('b_squared =', b_squared)
+    print('soln =', soln)
+    print('resid =', resid)
+    H_ = H.flatten() / reciprocal_extent * np.pi / settings.oversampling
+    K_ = K.flatten() / reciprocal_extent * np.pi / settings.oversampling
+    L_ = L.flatten() / reciprocal_extent * np.pi / settings.oversampling
+    forward_x = autocorrelation.forward(ret.reshape((M,)*3), H_, K_, L_, 1, settings.M, H_.shape[0], reciprocal_extent, True).real
+    resid_prime = np.linalg.norm(forward_x-data)**2
+    print('resid_prime =', resid_prime)
 
     # Rank0 gathers rlambda, solution norm, residual norm from all ranks
     summary = comm.gather((comm.rank, rlambda, info, soln, resid), root=0)
