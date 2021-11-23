@@ -94,9 +94,6 @@ def core_problem(uvect, H_, K_, L_, ac_support, weights, M, N,
 @nvtx.annotate("autocorrelation.py", is_prefix=True)
 def core_problem_convolution(uvect, M, F_ugrid_conv_, M_ups, ac_support,
                              use_reciprocal_symmetry):
-    if use_reciprocal_symmetry:
-        assert np.all(np.isreal(uvect))
-       
     if settings.use_cupy:
         uvect = xp.asarray(uvect)
         ac_support = xp.asarray(ac_support)
