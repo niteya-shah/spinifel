@@ -35,21 +35,20 @@ if settings.use_cupy:
 def forward(ugrid, H_, K_, L_, support, M, N, recip_extent, use_recip_sym):
     """Apply the forward, NUFFT2- problem"""
 
-    # Check if recip symmetry is met
-    if use_recip_sym:
-        assert np.all(np.isreal(ugrid))
-
     # Ensure that H_, K_, and L_ have the same shape
     assert H_.shape == K_.shape == L_.shape
-
 
     # Apply Support
     ugrid *= support  # /!\ overwrite
 
+    # Apply recip symmetry
+    if use_recip_sym:
+        ugrid = np.fft.fftshift(np.fft.ifftn(np.fft.fftn(np.fft.ifftshift(ugrid.reshape((M,)*3))).real)).real
+
     # Solve NUFFT2-
     nuvect = nufft_3d_t2(H_, K_, L_, ugrid, -1, 1e-12, N)
 
-    return nuvect #/ M**3
+    return nuvect / M**3
 
 
 
@@ -69,9 +68,10 @@ def adjoint(nuvect, H_, K_, L_, support, M, recip_extent, use_recip_sym):
 
     # Apply recip symmetry
     if use_recip_sym:
+        #ugrid = np.fft.fftshift(np.fft.ifftn(np.fft.fftn(np.fft.ifftshift(ugrid.reshape((M,)*3))).real)).real
         ugrid = ugrid.real
 
-    return ugrid
+    return ugrid / M**3
 
 
 
@@ -98,23 +98,28 @@ def core_problem_convolution(uvect, M, F_ugrid_conv_, M_ups, ac_support,
         uvect = xp.asarray(uvect)
         ac_support = xp.asarray(ac_support)
         F_ugrid_conv_ = xp.asarray(F_ugrid_conv_)
+    
     # Upsample
-    ugrid = uvect.reshape((M,) * 3) * ac_support
+    uvect = np.fft.fftshift(np.fft.ifftn(np.fft.fftn(np.fft.ifftshift(uvect.reshape((M,)*3))).real)).real
+    ugrid = uvect * ac_support
     ugrid_ups = xp.zeros((M_ups,) * 3, dtype=uvect.dtype)            
     ugrid_ups[:M, :M, :M] = ugrid
+    
     # Convolution = Fourier multiplication
-    F_ugrid_ups = xp.fft.fftn(xp.fft.ifftshift(ugrid_ups)) #/ M**3
+    F_ugrid_ups = xp.fft.fftn(xp.fft.ifftshift(ugrid_ups)) / M**3 * (M_ups/M)**3
     F_ugrid_conv_out_ups = F_ugrid_ups * F_ugrid_conv_
     ugrid_conv_out_ups = xp.fft.fftshift(xp.fft.ifftn(F_ugrid_conv_out_ups))
+    
     # Downsample
     ugrid_conv_out = ugrid_conv_out_ups[:M, :M, :M]
-
     ugrid_conv_out *= ac_support
+
+    # Apply recip symmetry
     if use_reciprocal_symmetry:
         # Both ugrid_conv and ugrid are real, so their convolution
         # should be real, but numerical errors accumulate in the
         # imaginary part.
-        ugrid_conv_out = ugrid_conv_out.real
+        ugrid_conv_out = np.fft.fftshift(np.fft.ifftn(np.fft.fftn(np.fft.ifftshift(ugrid_conv_out.reshape((M,)*3))).real)).real
 
     if settings.use_cupy:
         ugrid_conv_out = xp.asnumpy(ugrid_conv_out)
@@ -151,9 +156,6 @@ def gen_nonuniform_positions(orientations, pixel_position_reciprocal):
     # Generate q points (h,k,l) from the given rotations and pixel positions 
 
     if orientations.shape[0] > 0:
-        #rotmat = np.array([skp.quaternion2rot3d(quat) for quat in orientations])
-        # TODO: we may not need to transpose the orientations if 
-        # they were generated randomly.
         rotmat = np.array([np.linalg.inv(skp.quaternion2rot3d(quat)) for quat in orientations])
     else:
         rotmat = np.zeros((0, 3, 3))
