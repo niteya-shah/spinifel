@@ -5,7 +5,8 @@ import PyNVTX as nvtx
 import skopi as skp
 
 from mpi4py              import MPI
-from matplotlib.colors   import LogNorm
+from matplotlib          import cm
+from matplotlib.colors   import LogNorm, SymLogNorm
 from scipy.linalg        import norm
 from scipy.ndimage       import gaussian_filter
 from scipy.sparse.linalg import LinearOperator, cg
@@ -56,7 +57,7 @@ def setup_linops(comm, H, K, L, data,
     H_ = H.flatten() / reciprocal_extent * np.pi / settings.oversampling
     K_ = K.flatten() / reciprocal_extent * np.pi / settings.oversampling
     L_ = L.flatten() / reciprocal_extent * np.pi / settings.oversampling
-
+    
     lu = np.linspace(-np.pi, np.pi, M)
     Hu_, Ku_, Lu_ = np.meshgrid(lu, lu, lu, indexing='ij')
     Qu_ = np.sqrt(Hu_**2 + Ku_**2 + Lu_**2)
@@ -82,9 +83,7 @@ def setup_linops(comm, H, K, L, data,
             uvect_ADA_old = core_problem(
                  comm, uvect, H_, K_, L_, ac_support, weights, M, N,
                  reciprocal_extent, use_reciprocal_symmetry)
-            print('np.linalg.norm(uvect_ADA) =', np.linalg.norm(uvect_ADA))
-            print('np.linalg.norm(uvect_ADA_old) =', np.linalg.norm(uvect_ADA_old))
-            print('np.linalg.norm(uvect_ADA) / np.linalg.norm(uvect_ADA_old) =', np.linalg.norm(uvect_ADA) / np.linalg.norm(uvect_ADA_old))     #assert np.allclose(uvect_ADA, uvect_ADA_old)            
+            assert np.allclose(uvect_ADA, uvect_ADA_old)            
         uvect_FDF = autocorrelation.fourier_reg(
             uvect, ac_support, F_antisupport, M, use_reciprocal_symmetry)
         uvect = uvect_ADA + rlambda*uvect + flambda*uvect_FDF
@@ -120,10 +119,8 @@ def solve_ac(generation,
     M = settings.M
     N_images = slices_.shape[0] # N images per rank
     print('N_images =', N_images)
-    N = utils.prod(slices_.shape) # N images per rank x number of pixels per image = number of pixels per rank
+    N = int(utils.prod(slices_.shape)) # N images per rank x number of pixels per image = number of pixels per rank
     print('N =', N)
-    Ntot = N * comm.size # total number of pixels
-    print('Ntot =', Ntot)
     reciprocal_extent = pixel_distance_reciprocal.max()
     use_reciprocal_symmetry = True
     ref_rank = -1 
@@ -140,38 +137,45 @@ def solve_ac(generation,
     b_squared = reduce_bcast(comm, b_squared)
 
     data = slices_.flatten()
-
+    
     # Set up ac
     if ac_estimate is None:
         ac_support = np.ones((M,)*3)
+        ac_support = np.fft.fftshift(np.fft.ifftn(np.fft.fftn(np.fft.ifftshift(ac_support)).real)).real
         ac_estimate = np.zeros((M,)*3)
+        ac_estimate = np.fft.fftshift(np.fft.ifftn(np.fft.fftn(np.fft.ifftshift(ac_estimate)).real)).real
     else:
         ac_smoothed = gaussian_filter(ac_estimate, 0.5)
         ac_support = (ac_smoothed > 1e-12).astype(np.float64)
+        ac_support = np.fft.fftshift(np.fft.ifftn(np.fft.fftn(np.fft.ifftshift(ac_support)).real)).real
+        ac_estimate = np.fft.fftshift(np.fft.ifftn(np.fft.fftn(np.fft.ifftshift(ac_estimate)).real)).real
         ac_estimate *= ac_support
-    weights = np.ones(N)
 
+    weights = np.ones(N)
+    
     # Use scalable heuristic for regularization lambda
-    rlambda = np.logspace(-10, 10, comm.size)[comm.rank]
-    flambda = 0  # 1e5 * pow(10, comm.rank - comm.size//2)
+    rlambda = np.logspace(-8, 8, comm.size)[comm.rank]
+    flambda = 0
     maxiter = settings.solve_ac_maxiter
 
+    maxiter = 100
     # Log central slice L~=0
-    if comm.rank == (2 if settings.use_psana else 0):
-        idx = np.abs(L) < reciprocal_extent * .01
-        plt.scatter(H[idx], K[idx], c=slices_[idx], s=1, norm=LogNorm())
-        plt.axis('equal')
-        plt.colorbar()
-        plt.savefig(settings.out_dir / f"star_{generation}.png")
-        plt.cla()
-        plt.clf()
+    #if comm.rank == (2 if settings.use_psana else 0):
+    #    idx = np.abs(L) < reciprocal_extent * .01
+    #    plt.scatter(H[idx], K[idx], c=slices_[idx], s=1, norm=LogNorm())
+    #    plt.axis('equal')
+    #    plt.colorbar()
+    #    plt.savefig(settings.out_dir / f"star_{generation}.png")
+    #    plt.cla()
+    #    plt.clf()
 
     def callback(xk):
         callback.counter += 1
     callback.counter = 0 # counts no. of iterations of conjugate gradient
 
     x0 = ac_estimate.flatten()
-    W, d = setup_linops(comm, H, K, L, slices_,
+
+    W, d = setup_linops(comm, H, K, L, data,
                         ac_support, weights, x0,
                         M, N, reciprocal_extent,
                         rlambda, flambda,
@@ -185,25 +189,14 @@ def solve_ac(generation,
                         use_reciprocal_symmetry)
 
     ret, info = cg(W, d, x0=x0, maxiter=maxiter, callback=callback)
-    print('info =', info)
+
     if info != 0:
         print(f'WARNING: CG did not converge at rlambda = {rlambda}')
 
-    soln = np.linalg.norm(ret)**2 # solution norm
-    resid = np.dot(ret.real,W_0.matvec(ret.real)-2*d_0) + b_squared # residual norm
-    print('np.linalg.norm(W_0x) =', np.linalg.norm(W_0.matvec(ret.real)))
-    print('np.linalg.norm(d_0) =', np.linalg.norm(d_0))
-    print('np.linalg.norm(W_0x-d_0) =', np.linalg.norm(W_0.matvec(ret.real)-d_0)) # should be zero up to roundoff error 
-    print('dot(x,W_0x-2d_0) =', np.dot(ret.real,W_0.matvec(ret.real)-2*d_0))
-    print('b_squared =', b_squared)
-    print('soln =', soln)
-    print('resid =', resid)
-    H_ = H.flatten() / reciprocal_extent * np.pi / settings.oversampling
-    K_ = K.flatten() / reciprocal_extent * np.pi / settings.oversampling
-    L_ = L.flatten() / reciprocal_extent * np.pi / settings.oversampling
-    forward_x = autocorrelation.forward(ret.reshape((M,)*3), H_, K_, L_, 1, settings.M, H_.shape[0], reciprocal_extent, True).real
-    resid_prime = np.linalg.norm(forward_x-data)**2
-    print('resid_prime =', resid_prime)
+    soln = np.linalg.norm(ret-ac_estimate.flatten())**2 # solution norm
+    soln = soln.real
+    resid = np.dot(ret,W_0.matvec(ret)-2*d_0) + b_squared # residual norm
+    resid = resid.real
 
     # Rank0 gathers rlambda, solution norm, residual norm from all ranks
     summary = comm.gather((comm.rank, rlambda, info, soln, resid), root=0)
@@ -226,6 +219,7 @@ def solve_ac(generation,
             idx = solns >= np.mean(solns)
             imax = np.argmax(lambdas[idx])
             iref = np.arange(len(ranks), dtype=int)[idx][imax]
+            print('iref =', iref)
         else:
             # Heuristic: L-curve criterion
             # Take corner of L-curve
@@ -275,8 +269,6 @@ def solve_ac(generation,
 
     # Set up ac volume
     ac = ret.reshape((M,)*3)
-    if use_reciprocal_symmetry:
-        assert np.all(np.isreal(ac))
     ac = np.ascontiguousarray(ac.real).astype(np.float64)
     print(f"Rank {comm.rank} got AC in {callback.counter} iterations.", flush=True)
 
