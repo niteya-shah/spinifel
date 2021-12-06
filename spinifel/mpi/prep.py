@@ -132,5 +132,5 @@ def get_data(N_images_per_rank, ds):
     return (pixel_position_reciprocal,
             pixel_distance_reciprocal,
             pixel_index_map,
-            slices_,
-            orientations_prior)
+            slices_) #,
+            #orientations_prior)
