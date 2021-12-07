@@ -33,6 +33,19 @@ def get_pixel_index_map(comm):
 
 
 @nvtx.annotate("mpi/prep.py", is_prefix=True)
+def get_orientations_prior(comm, N_images_per_rank):
+    """Each rank loads correct orientations for data images from input file."""
+    data_type = getattr(np, settings.data_type_str)
+    orientations_prior = np.zeros((N_images_per_rank,4),
+                       dtype=data_type)
+    i_start = comm.rank * N_images_per_rank
+    i_end = i_start + N_images_per_rank
+    print(f"get_orientations_prior rank={comm.rank} st={i_start} en={i_end}")
+    prep.load_orientations_prior(orientations_prior, i_start, i_end)
+    return orientations_prior
+
+
+@nvtx.annotate("mpi/prep.py", is_prefix=True)
 def get_slices(comm, N_images_per_rank, ds):
     """Each rank loads intensity slices from input file (or psana)."""
     data_type = getattr(np, settings.data_type_str)
@@ -88,7 +101,7 @@ def get_data(N_images_per_rank, ds):
     pixel_index_map = get_pixel_index_map(comm)
     slices_ = get_slices(comm, N_images_per_rank, ds)
     N_images_local = slices_.shape[0]
-    
+
     # Log mean image and saxs before binning
     mean_image = compute_mean_image(comm, slices_)
     if rank == (2 if settings.use_psana else 0):

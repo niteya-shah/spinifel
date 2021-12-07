@@ -74,6 +74,14 @@ def main():
     ac_phased, support_, rho_ = phase(generation, ac)
     logger.log(f"Problem phased in {timer.lap():.2f}s.")
 
+    if comm.rank == 0:
+        # Save electron density and intensity
+        rho = np.fft.ifftshift(rho_)
+        intensity = np.fft.ifftshift(np.abs(np.fft.fftshift(ac_phased)**2))
+        save_mrc(settings.out_dir / f"ac-{generation}.mrc", ac_phased)
+        save_mrc(settings.out_dir / f"intensity-{generation}.mrc", intensity)
+        save_mrc(settings.out_dir / f"rho-{generation}.mrc", rho)
+
     # Use improvement of cc(prev_rho, cur_rho) to dertemine if we should
     # terminate the loop
     cov_xy = 0
@@ -117,10 +125,12 @@ def main():
                 print("Stopping criteria met!")
                 break
 
-        rho = np.fft.ifftshift(rho_)
-
         if comm.rank == 0:
+            # Save electron density and intensity
+            rho = np.fft.ifftshift(rho_)
+            intensity = np.fft.ifftshift(np.abs(np.fft.fftshift(ac_phased)**2))
             save_mrc(settings.out_dir / f"ac-{generation}.mrc", ac_phased)
+            save_mrc(settings.out_dir / f"intensity-{generation}.mrc", intensity)
             save_mrc(settings.out_dir / f"rho-{generation}.mrc", rho)
 
     logger.log(f"Results saved in {settings.out_dir}")
