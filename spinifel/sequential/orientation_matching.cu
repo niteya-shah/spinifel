@@ -19,7 +19,7 @@ const int TILE = 16;
 const int imgPerThread = 6;
 
 //CUDA kernel used to computed Euclidean distance across data images and reference images.
-__global__ void computeEuDistSharReg(float *dataImgs, float *refImgs, float *euDist, int numDataImgs, int numRefImgs, long int totalPixels)
+__global__ void computeEuDistSharReg(float *refImgs, float *dataImgs, float *euDist, int numRefImgs, int numDataImgs, long int totalPixels)
 {
         int txId = threadIdx.x;
         int tyId = threadIdx.y;
@@ -609,7 +609,7 @@ __global__ void computeKSort(float *dKDist, int *dKIndex, int numDataImgs, int t
 }
 
 //Function used to invoke CUDA kernels.
-py::array_t<dtype> cudaComputeEuclideanDistance(py::array_t<dtype> dataImgs, py::array_t<dtype> refImgs, int numDataImgs, int numRefImgs, int totalPixels, int deviceId)
+py::array_t<dtype> cudaComputeEuclideanDistance(py::array_t<dtype> refImgs, py::array_t<dtype> dataImgs, int numRefImgs, int numDataImgs, int totalPixels, int deviceId)
 {
 	//cout<<"[CUDA] In CUDA Euclidean distance function."<<endl;
 	//cout<<"[CUDA] Using deviceId: " << deviceId <<endl;
@@ -618,7 +618,7 @@ py::array_t<dtype> cudaComputeEuclideanDistance(py::array_t<dtype> dataImgs, py:
 	//cout<<"[CUDA] Dimension of dataImgs: "<<dataBuf.ndim<<" and refImgs: "<<refBuf.ndim<<endl;
 	//cout<<"[CUDA] Size of dataImgs: "<<dataBuf.size<<" and refImgs: "<<refBuf.size<<endl;
 
-    cudaSetDevice(deviceId);
+    	cudaSetDevice(deviceId);
 
 	//Declare and allocate device variables
 	dtype *dDataImgs, *dRefImgs, *dEuDist;
@@ -658,7 +658,7 @@ py::array_t<dtype> cudaComputeEuclideanDistance(py::array_t<dtype> dataImgs, py:
         dim3 grid((numRefImgs + xImgPerBlock - 1) / xImgPerBlock, (numDataImgs + yImgPerBlock - 1) / yImgPerBlock);
 
 	//Kernel Call
-        computeEuDistSharReg<<<grid, block>>>(dDataImgs,dRefImgs,dEuDist,numDataImgs,numRefImgs,totalPixels);
+        computeEuDistSharReg<<<grid, block>>>(dRefImgs,dDataImgs,dEuDist,numRefImgs,numDataImgs,totalPixels);
         cudaDeviceSynchronize();
 
 	//Copy device to host

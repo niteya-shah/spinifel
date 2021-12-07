@@ -66,10 +66,10 @@ def calc_eudist_gpu(model_slices, slices, deviceId):
     model_slices_flat = model_slices.flatten()
     slices_flat       = slices.flatten()
 
-    euDist = pyCu.cudaEuclideanDistance(slices_flat,
-                                        model_slices_flat,
-                                        slices.shape[0],
+    euDist = pyCu.cudaEuclideanDistance(model_slices_flat,
+                                        slices_flat,
                                         model_slices.shape[0],
+                                        slices.shape[0],
                                         slices.shape[1],
                                         deviceId)
     return euDist
