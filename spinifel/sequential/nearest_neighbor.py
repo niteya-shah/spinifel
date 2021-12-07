@@ -31,14 +31,22 @@ class CUKNNRequiredButNotFound(Exception):
     """
 
 
+if settings.use_single_prec:
+    knn_string = "spinifel.sequential.pyCudaKNearestNeighbors_SP"
+else:
+    knn_string = "spinifel.sequential.pyCudaKNearestNeighbors_DP"
 
-KNN_LOADER    = find_spec("spinifel.sequential.pyCudaKNearestNeighbors")
+KNN_LOADER    = find_spec(knn_string)
 KNN_AVAILABLE = KNN_LOADER is not None
+
 if settings.verbose:
     print(f"pyCudaKNearestNeighbors is available: {KNN_AVAILABLE}")
 
 if settings.use_cuda and KNN_AVAILABLE:
-    import spinifel.sequential.pyCudaKNearestNeighbors as pyCu
+    if settings.use_single_prec:
+        import spinifel.sequential.pyCudaKNearestNeighbors_SP as pyCu
+    else:
+        import spinifel.sequential.pyCudaKNearestNeighbors_DP as pyCu
 elif settings.use_cuda and not KNN_AVAILABLE:
     raise CUKNNRequiredButNotFound
 
