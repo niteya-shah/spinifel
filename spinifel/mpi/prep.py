@@ -101,7 +101,6 @@ def get_data(N_images_per_rank, ds):
     pixel_index_map = get_pixel_index_map(comm)
     slices_ = get_slices(comm, N_images_per_rank, ds)
     N_images_local = slices_.shape[0]
-    orientations_prior = get_orientations_prior(comm, N_images_per_rank)
 
     # Log mean image and saxs before binning
     mean_image = compute_mean_image(comm, slices_)
@@ -132,5 +131,4 @@ def get_data(N_images_per_rank, ds):
     return (pixel_position_reciprocal,
             pixel_distance_reciprocal,
             pixel_index_map,
-            slices_) #,
-            #orientations_prior)
+            slices_)
