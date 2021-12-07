@@ -61,8 +61,6 @@ def main():
      slices_) = get_data(N_images_per_rank, ds)
     logger.log(f"Loaded in {timer.lap():.2f}s.")
 
-    #orientations = orientations_prior
-
     # Generation 0: solve_ac and phase
     N_generations = settings.N_generations
     generation = 0
