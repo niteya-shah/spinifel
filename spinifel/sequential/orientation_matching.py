@@ -67,7 +67,6 @@ def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_rec
         return np.zeros((0, 4))
 
     ref_orientations = skp.get_uniform_quat(N_orientations, True)
-    #ref_rotmat = np.array([skp.quaternion2rot3d(quat) for quat in ref_orientations])
     ref_rotmat = np.array([np.linalg.inv(skp.quaternion2rot3d(quat)) for quat in ref_orientations])
     reciprocal_extent = pixel_distance_reciprocal.max()
 
@@ -96,7 +95,7 @@ def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_rec
     # Imaginary part ~ numerical error
     model_slices_new = model_slices_new.reshape((N_orientations, N_pixels))
     data_model_scaling_ratio = slices_.std() / model_slices_new.std()
-    print(f"New Data/Model std ratio: {data_model_scaling_ratio}.", flush=True)
+    print(f"Data/Model std ratio: {data_model_scaling_ratio}.", flush=True)
     model_slices_new *= data_model_scaling_ratio
     
     # Calculate Euclidean distance in batch to avoid running out of GPU Memory
