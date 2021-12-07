@@ -39,7 +39,7 @@ def core_problem(comm, uvect, H_, K_, L_, ac_support, weights, M, N,
 def setup_linops(comm, H, K, L, data,
                  ac_support, weights, x0,
                  M, N, reciprocal_extent,
-                 rlambda, flambda,
+                 rlambda,
                  use_reciprocal_symmetry):
     """Define W and d parts of the W @ x = d problem.
 
@@ -84,9 +84,7 @@ def setup_linops(comm, H, K, L, data,
                  comm, uvect, H_, K_, L_, ac_support, weights, M, N,
                  reciprocal_extent, use_reciprocal_symmetry)
             assert np.allclose(uvect_ADA, uvect_ADA_old)            
-        uvect_FDF = autocorrelation.fourier_reg(
-            uvect, ac_support, F_antisupport, M, use_reciprocal_symmetry)
-        uvect = uvect_ADA + rlambda*uvect + flambda*uvect_FDF
+        uvect = uvect_ADA + rlambda*uvect
         return uvect
 
     W = LinearOperator(
@@ -155,19 +153,18 @@ def solve_ac(generation,
     
     # Use scalable heuristic for regularization lambda
     rlambda = np.logspace(-8, 8, comm.size)[comm.rank]
-    flambda = 0
+    
     maxiter = settings.solve_ac_maxiter
 
-    maxiter = 100
     # Log central slice L~=0
-    #if comm.rank == (2 if settings.use_psana else 0):
-    #    idx = np.abs(L) < reciprocal_extent * .01
-    #    plt.scatter(H[idx], K[idx], c=slices_[idx], s=1, norm=LogNorm())
-    #    plt.axis('equal')
-    #    plt.colorbar()
-    #    plt.savefig(settings.out_dir / f"star_{generation}.png")
-    #    plt.cla()
-    #    plt.clf()
+    if comm.rank == (2 if settings.use_psana else 0):
+        idx = np.abs(L) < reciprocal_extent * .01
+        plt.scatter(H[idx], K[idx], c=slices_[idx], s=1, norm=LogNorm())
+        plt.axis('equal')
+        plt.colorbar()
+        plt.savefig(settings.out_dir / f"star_{generation}.png")
+        plt.cla()
+        plt.clf()
 
     def callback(xk):
         callback.counter += 1
@@ -178,14 +175,14 @@ def solve_ac(generation,
     W, d = setup_linops(comm, H, K, L, data,
                         ac_support, weights, x0,
                         M, N, reciprocal_extent,
-                        rlambda, flambda,
+                        rlambda,
                         use_reciprocal_symmetry)
     
     # W_0 and d_0 are given by defining W and d with rlambda=0
     W_0, d_0 = setup_linops(comm, H, K, L, data,
                         ac_support, weights, x0,
                         M, N, reciprocal_extent,
-                        0, flambda,
+                        0,
                         use_reciprocal_symmetry)
 
     ret, info = cg(W, d, x0=x0, maxiter=maxiter, callback=callback)
@@ -193,10 +190,8 @@ def solve_ac(generation,
     if info != 0:
         print(f'WARNING: CG did not converge at rlambda = {rlambda}')
 
-    soln = np.linalg.norm(ret-ac_estimate.flatten())**2 # solution norm
-    soln = soln.real
-    resid = np.dot(ret,W_0.matvec(ret)-2*d_0) + b_squared # residual norm
-    resid = resid.real
+    soln = (np.linalg.norm(ret-ac_estimate.flatten())**2).real # solution norm
+    resid = (np.dot(ret,W_0.matvec(ret)-2*d_0) + b_squared).real # residual norm
 
     # Rank0 gathers rlambda, solution norm, residual norm from all ranks
     summary = comm.gather((comm.rank, rlambda, info, soln, resid), root=0)
