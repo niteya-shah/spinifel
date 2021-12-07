@@ -58,15 +58,6 @@ def setup_linops(comm, H, K, L, data,
     K_ = K.flatten() / reciprocal_extent * np.pi / settings.oversampling
     L_ = L.flatten() / reciprocal_extent * np.pi / settings.oversampling
     
-    lu = np.linspace(-np.pi, np.pi, M)
-    Hu_, Ku_, Lu_ = np.meshgrid(lu, lu, lu, indexing='ij')
-    Qu_ = np.sqrt(Hu_**2 + Ku_**2 + Lu_**2)
-    F_antisupport = Qu_ > np.pi / settings.oversampling
-    assert np.all(F_antisupport == F_antisupport[::-1, :, :])
-    assert np.all(F_antisupport == F_antisupport[:, ::-1, :])
-    assert np.all(F_antisupport == F_antisupport[:, :, ::-1])
-    assert np.all(F_antisupport == F_antisupport[::-1, ::-1, ::-1])
-
     # Using upsampled convolution technique instead of ADA
     M_ups = settings.M_ups
     ugrid_conv = autocorrelation.adjoint(
