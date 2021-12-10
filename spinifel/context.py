@@ -21,11 +21,11 @@ if find_spec("mpi4py") is not None:
     from mpi4py import MPI
     MPI4PY_AVAILABLE = True
 
-PYCUDA_AVAILABLE = False
-if find_spec("pycuda") is not None:
-    # import pycuda
-    import pycuda.driver as drv
-    PYCUDA_AVAILABLE = True
+# PYCUDA_AVAILABLE = False
+# if find_spec("pycuda") is not None:
+#     # import pycuda
+#     import pycuda.driver as drv
+#     PYCUDA_AVAILABLE = True
 
 
 
@@ -89,23 +89,23 @@ class SpinifelContexts(metaclass=Singleton):
         and registers context cleanup on atexit stack
         """
 
-        if not PYCUDA_AVAILABLE:
-            return
+        # if not PYCUDA_AVAILABLE:
+        #     return
 
         if self._cuda_initialized:
             return
 
-        drv.init()
+        # drv.init()
 
         settings     = SpinifelSettings()
-        self._dev_id = self.rank % drv.Device.count()
+        self._dev_id = 0 # self.rank % drv.Device.count()
 
-        dev = drv.Device(self.dev_id)
-        self.ctx = dev.retain_primary_context()
+        # dev = drv.Device(self.dev_id)
+        # self.ctx = dev.retain_primary_context()
 
-        if settings.mode != "legion":
-            self.ctx.push()
-            register(self.ctx.pop)
+        # if settings.mode != "legion":
+        #     self.ctx.push()
+        #     register(self.ctx.pop)
 
         settings = SpinifelSettings()
         if settings.verbose:
@@ -143,8 +143,8 @@ class SpinifelContexts(metaclass=Singleton):
         Get CUDA memory info
         Returns gpu_free, gpu_total
         """
-        if self._cuda_initialized and PYCUDA_AVAILABLE:
-            return drv.mem_get_info()
+        # if self._cuda_initialized and PYCUDA_AVAILABLE:
+        #     return drv.mem_get_info()
         return -1, -1
 
 
