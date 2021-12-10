@@ -16,10 +16,16 @@ elif [[ ${target} = "perlmutter"* ]]; then
     make -j${THREADS:-8} site=nersc_cgpu lib
 elif [[ ${target} = *"summit"* || ${target} = *"ascent"* ]]; then
     make -j${THREADS:-8} site=olcf_summit lib
+elif [[ ${target} = *"spock"* ]]; then
+    make -j${THREADS:-8} site=olcf_spock lib
 else
     echo "Cannot build cuFINUFFT for this architecture"
     exit
 fi
-pip install --no-cache-dir pycuda
+if [[ ${target} = *"spock"* ]]; then
+    echo "Skipping PyCUDA installation on Spock"
+else
+    pip install --no-cache-dir pycuda
+fi
 LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CUFINUFFT_DIR pip install --no-cache-dir .
 popd
