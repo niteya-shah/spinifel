@@ -15,7 +15,7 @@ EOF
 
 make -j${THREADS:-8} lib
 pushd python
-LDFLAGS="$FINUFFT_LDFLAGS" CFLAGS="$FINUFFT_CFLAGS" pip install --no-deps .
+LDFLAGS="$FINUFFT_LDFLAGS" CFLAGS="$FINUFFT_CFLAGS" pip install --no-deps --use-feature=in-tree-build .
 popd
 
 popd
