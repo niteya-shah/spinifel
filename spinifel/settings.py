@@ -389,6 +389,11 @@ class SpinifelSettings(metaclass=Singleton):
                 "algorithm", "N_batch_size",
                 int, 1000,
                 "N_batch_size parameter for slicing in batches"
+            ),
+            "_load_generation": (
+                "algorithm", "load_generation",
+                int, 0,
+                "start from output of this generation"
             )
         }
 
@@ -418,10 +423,14 @@ class SpinifelSettings(metaclass=Singleton):
         p.add_argument("--settings", type=str, nargs=1, default=None)
         p.add_argument("--default-settings", type=str, nargs=1, default=None)
         p.add_argument("--mode", type=str, nargs=1, required=True)
+        p.add_argument("-t","--tag-generation", type=str, default=None)
+        p.add_argument("-g","--load-generation", type=int, default=0)
 
         self.__args, self.__params = p.parse_known_args()
 
         self.mode = self.__args.mode[0]
+        self.tag_gen = self.__args.tag_generation
+        self.load_gen = self.__args.load_generation
 
         if (self.__args.settings is None) \
         and (self.__args.default_settings is None):
