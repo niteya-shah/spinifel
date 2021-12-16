@@ -14,6 +14,6 @@ LIBS+=$FINUFFT_LDFLAGS
 EOF
 
 make -j${THREADS:-8} lib
-LDFLAGS="$FINUFFT_LDFLAGS" CFLAGS="$FINUFFT_CFLAGS" pip install --no-deps .
+LDFLAGS="$FINUFFT_LDFLAGS" CFLAGS="$FINUFFT_CFLAGS" pip install --no-deps ./python
 
 popd
