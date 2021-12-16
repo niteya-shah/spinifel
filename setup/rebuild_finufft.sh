@@ -9,6 +9,7 @@ pushd "$root_dir"/finufft
 
 cat > make.inc <<EOF
 CFLAGS+=$FINUFFT_CFLAGS
+CXXFLAGS+=$FINUFFT_CFLAGS
 LIBS+=$FINUFFT_LDFLAGS
 EOF
 
