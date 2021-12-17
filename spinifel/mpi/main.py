@@ -5,7 +5,7 @@ import numpy as np
 import PyNVTX as nvtx
 
 from .prep import get_data
-from .autocorrelation import solve_ac
+from .autocorrelation import solve_ac, solve_ac_cmtip
 from .phasing import phase
 from .orientation_matching import match
 
@@ -13,6 +13,8 @@ from .orientation_matching import match
 
 @nvtx.annotate("mpi/main.py", is_prefix=True)
 def main():
+    np.random.seed(0)
+    use_cmtip = 0
 
     comm = contexts.comm
 
@@ -80,8 +82,13 @@ def main():
         logger.log(f"#"*27)
         logger.log(f"##### Generation {curr_gen}/{N_generations} #####")
         logger.log(f"#"*27)
-        ac = solve_ac(
-            curr_gen, pixel_position_reciprocal, pixel_distance_reciprocal, slices_)
+        if use_cmtip:
+            ac = solve_ac_cmtip(
+                curr_gen, pixel_position_reciprocal, pixel_distance_reciprocal, slices_)
+        else:
+            ac = solve_ac(
+                curr_gen, pixel_position_reciprocal, pixel_distance_reciprocal, slices_)
+
         logger.log(f"AC recovered in {timer.lap():.2f}s.")
 
         ac_phased, support_, rho_ = phase(curr_gen, ac)
@@ -121,9 +128,14 @@ def main():
 
 
         # Solve autocorrelation
-        ac = solve_ac(
-            generation, pixel_position_reciprocal, pixel_distance_reciprocal,
-            slices_, orientations, ac_phased)
+        if use_cmtip:
+            ac = solve_ac_cmtip(
+                generation, pixel_position_reciprocal, pixel_distance_reciprocal,
+                slices_, orientations, ac_phased)
+        else:
+            ac = solve_ac(
+                generation, pixel_position_reciprocal, pixel_distance_reciprocal,
+                slices_, orientations, ac_phased)
         logger.log(f"AC recovered in {timer.lap():.2f}s.")
         
         if comm.rank == 0:
