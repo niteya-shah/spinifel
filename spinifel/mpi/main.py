@@ -110,15 +110,51 @@ def main():
             pixel_position_reciprocal, pixel_distance_reciprocal)
         logger.log(f"Orientations matched in {timer.lap():.2f}s.")
 
+        if comm.rank == 0:
+            myRes = {'ac_phased': ac_phased, 
+                     'slices_': slices_,
+                     'pixel_position_reciprocal': pixel_position_reciprocal,
+                     'pixel_distance_reciprocal': pixel_distance_reciprocal,
+                     'orientations': orientations 
+                    }
+            checkpoint.save_checkpoint(myRes, settings.out_dir, generation, tag="match")
+
+
         # Solve autocorrelation
         ac = solve_ac(
             generation, pixel_position_reciprocal, pixel_distance_reciprocal,
             slices_, orientations, ac_phased)
         logger.log(f"AC recovered in {timer.lap():.2f}s.")
+        
+        if comm.rank == 0:
+            myRes = { 
+                     'pixel_position_reciprocal': pixel_position_reciprocal,
+                     'pixel_distance_reciprocal': pixel_distance_reciprocal,
+                     'slices_': slices_,
+                     'orientations': orientations,
+                     'ac_phased': ac_phased,
+                     'ac': ac
+                    }
+            checkpoint.save_checkpoint(myRes, settings.out_dir, generation, tag="solve_ac")
 
-        if comm.rank == 0: prev_rho_ = rho_[:]
+
+        if comm.rank == 0: 
+            prev_rho_ = rho_[:]
+            prev_support_ = support_[:]
         ac_phased, support_, rho_ = phase(generation, ac, support_, rho_)
         logger.log(f"Problem phased in {timer.lap():.2f}s.")
+
+        if comm.rank == 0:
+            myRes = { 
+                     'ac': ac,
+                     'prev_support_':prev_support_,
+                     'prev_rho_': prev_rho_,
+                     'ac_phased': ac_phased,
+                     'support_': support_,
+                     'rho_': rho_
+                    }
+            checkpoint.save_checkpoint(myRes, settings.out_dir, generation, tag="phase")
+
 
         # Check if density converges
         if settings.chk_convergence:
