@@ -46,10 +46,10 @@ def center_of_mass(rho_, hkl_, M):
     :param M: cubic length of electron density volume
     :return vect: vector center of mass in units of pixels
     """
-    rho_ = np.abs(rho_)
+    rho_ = xp.abs(rho_)
     num = (rho_ * hkl_).sum(axis=(1, 2, 3))
     den = rho_.sum()
-    return np.round(num/den * M/2)
+    return xp.round(num/den * M/2)
 
 
 
@@ -62,17 +62,17 @@ def recenter(rho_, support_, M):
     :param support_: object's support
     :param M: cubic length of electron density volume
     """
-    ls = np.linspace(-1, 1, M+1)
+    ls = xp.linspace(-1, 1, M+1)
     ls = (ls[:-1] + ls[1:])/2
 
-    hkl_list = np.meshgrid(ls, ls, ls, indexing='ij')
-    hkl_ = np.stack([np.fft.ifftshift(coord) for coord in hkl_list])
+    hkl_list = xp.meshgrid(ls, ls, ls, indexing='ij')
+    hkl_ = xp.stack([xp.fft.ifftshift(coord) for coord in hkl_list])
     vect = center_of_mass(rho_, hkl_, M)
 
     for i in range(3):
         shift = int(vect[i])
-        rho_[:] = np.roll(rho_, -shift, i)
-        support_[:] = np.roll(support_, -shift, i)
+        rho_[:] = xp.roll(rho_, -shift, i)
+        support_[:] = xp.roll(support_, -shift, i)
 
 
 
@@ -91,10 +91,8 @@ def create_support_(ac_, M, Mquat, generation):
     square_support = xp.zeros((M, M, M), dtype=xp.bool_)
     square_support[sl, sl, sl] = 1
     square_support_ = xp.fft.ifftshift(square_support)
-    #image.show_volume(square_support, Mquat, f"square_support_{generation}.png")
 
     thresh_support_ = ac_ > 1e-2 * ac_.max()
-    #image.show_volume(np.fft.fftshift(thresh_support_), Mquat, f"thresh_support_{generation}.png")
 
     return xp.logical_and(square_support_, thresh_support_)
 
@@ -287,5 +285,77 @@ def phase(generation, ac, support_=None, rho_=None):
     #image.show_volume(ac_phased, Mquat, f"autocorrelation_phased_{generation}.png")
 
     ac_phased = ac_phased.astype(np.float32)
+
+    return ac_phased, support_, rho_
+
+def phase_cmtip(generation, ac, support_=None, rho_=None):
+    """
+    Solve phase retrieval from the autocorrelation of the current electron density estimate
+    by performing cycles of ER/HIO/shrinkwrap combination.
+    Note that this function currently is composed of three components:
+    (1) convert ac to amplitude,
+    (2) perform phase retrieval,
+    (3) convert rho_ to ac_phased.
+    We might revisit it to break it down to three modules.
+
+    :param generation: current iteration of M-TIP loop
+    :param ac: autocorrelation of the current electron density estimate
+    :param support_: initial object support
+    :param rho_: initial electron density estimate
+    :return ac_phased: updated autocorrelation estimate
+    :return support_: updated support estimate
+    :return rho_: updated density estimate
+    """
+
+    Mquat = int((ac.shape[0]-1)/4) ##
+    M = ac.shape[0] ##
+    Mtot = M**3
+
+    ac = xp.array(ac)
+    ac_filt = gaussian_filter(xp.maximum(ac.real, 0), mode='constant',
+                              sigma=1, truncate=2)
+    ac_filt_ = xp.fft.ifftshift(ac_filt)
+
+    intensities_ = xp.abs(xp.fft.fftn(ac_filt_))
+
+    amplitudes_ = xp.sqrt(intensities_)
+
+    amp_mask_ = xp.ones((M, M, M), dtype=xp.bool_)
+    amp_mask_[0, 0, 0] = 0  # Mask out central peak
+
+    if support_ is None:
+        support_ = create_support_(ac_filt_, M, Mquat, generation)
+    support_ = xp.array(support_)
+
+    if rho_ is None:
+        rho_ = support_ * xp.random.rand(*support_.shape)
+    rho_ = xp.array(rho_)
+    
+    rho_max = xp.infty
+
+    nER = settings.nER
+    nHIO = settings.nHIO
+
+    for i in range(settings.N_phase_loops):
+        ER_loop(nER, rho_, amplitudes_, amp_mask_, support_, rho_max)
+        HIO_loop(nHIO, settings.beta, rho_, amplitudes_, amp_mask_, support_, rho_max)
+        ER_loop(nER, rho_, amplitudes_, amp_mask_, support_, rho_max)
+        shrink_wrap(settings.cutoff, 1, rho_, support_)
+    ER_loop(nER, rho_, amplitudes_, amp_mask_, support_, rho_max)
+
+    if settings.use_cupy:
+        if settings.verbose:
+            print(f"Converting CuPy arrays to NumPy arrays.")    
+        rho_ = xp.asnumpy(rho_)
+        amplitudes_ = xp.asnumpy(amplitudes_)
+        amp_mask_ = xp.asnumpy(amp_mask_)
+        support_ = xp.asnumpy(support_)
+
+    recenter(rho_, support_, M)
+
+    intensities_phased_ = xp.abs(xp.fft.fftn(rho_))**2
+
+    ac_phased_ = xp.abs(xp.fft.ifftn(intensities_phased_))
+    ac_phased = xp.fft.fftshift(ac_phased_)
 
     return ac_phased, support_, rho_

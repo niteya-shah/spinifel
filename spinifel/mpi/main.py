@@ -6,7 +6,7 @@ import PyNVTX as nvtx
 
 from .prep import get_data
 from .autocorrelation import solve_ac, solve_ac_cmtip
-from .phasing import phase
+from .phasing import phase, phase_cmtip
 from .orientation_matching import match
 
 
@@ -14,7 +14,7 @@ from .orientation_matching import match
 @nvtx.annotate("mpi/main.py", is_prefix=True)
 def main():
     np.random.seed(0)
-    use_cmtip = 0
+    use_cmtip = 1
 
     comm = contexts.comm
 
@@ -91,7 +91,10 @@ def main():
 
         logger.log(f"AC recovered in {timer.lap():.2f}s.")
 
-        ac_phased, support_, rho_ = phase(curr_gen, ac)
+        if use_cmtip:
+            ac_phased, support_, rho_ = phase_cmtip(curr_gen, ac)
+        else:
+            ac_phased, support_, rho_ = phase(curr_gen, ac)
         logger.log(f"Problem phased in {timer.lap():.2f}s.")
 
         if comm.rank == 0:
@@ -107,7 +110,7 @@ def main():
     cov_xy = 0
     cov_delta = .05
 
-    for generation in range(curr_gen, N_generations):
+    for generation in range(curr_gen+1, N_generations):
         logger.log(f"#"*27)
         logger.log(f"##### Generation {generation}/{N_generations} #####")
         logger.log(f"#"*27)
@@ -153,7 +156,10 @@ def main():
         if comm.rank == 0: 
             prev_rho_ = rho_[:]
             prev_support_ = support_[:]
-        ac_phased, support_, rho_ = phase(generation, ac, support_, rho_)
+        if use_cmtip:
+            ac_phased, support_, rho_ = phase_cmtip(generation, ac, support_, rho_)
+        else:
+            ac_phased, support_, rho_ = phase(generation, ac, support_, rho_)
         logger.log(f"Problem phased in {timer.lap():.2f}s.")
 
         if comm.rank == 0:
