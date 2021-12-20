@@ -445,7 +445,7 @@ def solve_ac_cmtip(generation,
     if info != 0:
         print(f'WARNING: CG did not converge at rlambda = {rlambda}')
 
-    ##soln = (np.linalg.norm(ret-ac_estimate.flatten())**2).real # solution norm
+    ##soln = (np.linalg.norm(ret)**2).real # solution norm
     ##resid = (np.dot(ret,W_0.matvec(ret)-2*d_0) + b_squared).real # residual norm
 
     # Rank0 gathers rlambda, solution norm, residual norm from all ranks
