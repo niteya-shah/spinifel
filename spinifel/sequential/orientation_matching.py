@@ -87,21 +87,24 @@ def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_rec
         N_batch = N_pixels * N_batch_size
         st_m = i * N_batch_size * N_pixels
         en_m = st_m + (N_batch_size * N_pixels)
-        model_slices_new[st_m:en_m] = autocorrelation.forward(
-                ac, H_, K_, L_, 1, M, N_batch, reciprocal_extent, True).real
-        
+        #model_slices_new[st_m:en_m] = autocorrelation.forward(
+        #        ac, H_, K_, L_, 1, M, N_batch, reciprocal_extent, True).real
+        model_slices_new[st_m:en_m] = autocorrelation.forward_cmtip(
+                ac, H_, K_, L_, 1, True).real
     en_slice = time.monotonic()
     
+    model_slices = model_slices_new.copy()
+
     # Imaginary part ~ numerical error
     model_slices_new = model_slices_new.reshape((N_orientations, N_pixels))
     data_model_scaling_ratio = slices_.std() / model_slices_new.std()
     print(f"Data/Model std ratio: {data_model_scaling_ratio}.", flush=True)
-    model_slices_new *= data_model_scaling_ratio
-    
+    model_slices_new *= data_model_scaling_ratio    
+
     # Calculate Euclidean distance in batch to avoid running out of GPU Memory
     st_match = time.monotonic()
     index = nn.nearest_neighbor(model_slices_new, slices_, N_batch_size)
     en_match = time.monotonic()
 
     print(f"Match tot:{en_match-st_init:.2f}s. slice={en_slice-st_slice:.2f}s. match={en_match-st_match:.2f}s. slice_oh={st_slice-st_init:.2f}s. match_oh={st_match-en_slice:.2f}s.")
-    return ref_orientations[index]
+    return ref_orientations[index], model_slices*data_model_scaling_ratio

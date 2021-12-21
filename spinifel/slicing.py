@@ -28,9 +28,12 @@ def gen_model_slices(ac, ref_orientations,
     N = N_pixels * N_orientations
 
     if override_forward_with is None:
+        print(f"***** {override_forward_with}", flush=True)
         # This will use finufft or cufinufft depending on -f setting
         nuvect = autocorrelation.forward(
                  ac, H_, K_, L_, 1, ac_support_size, N, reciprocal_extent, True)
+        #nuvect = autocorrelation.forward_cmtip(
+        #         ac, H_, K_, L_, 1, True)
     elif override_forward_with == 'cpu':
         print(f'gen_model_slices override using forward_cpu')
         nuvect = autocorrelation.forward_cpu(

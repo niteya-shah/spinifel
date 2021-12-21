@@ -70,7 +70,8 @@ def setup_linops(comm, H, K, L, data,
         """Define W part of the W @ x = d problem."""
         uvect_ADA = autocorrelation.core_problem_convolution(
             uvect, M, F_ugrid_conv_, M_ups, ac_support, use_reciprocal_symmetry)
-        if False:  # Debug/test -> make sure all cg are in sync (same lambdas)
+        if True:  # Debug/test -> make sure all cg are in sync (same lambdas)
+            print("*** check toeplitz", flush=True)
             uvect_ADA_old = core_problem(
                  comm, uvect, H_, K_, L_, ac_support, weights, M, N,
                  reciprocal_extent, use_reciprocal_symmetry)

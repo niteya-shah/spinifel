@@ -8,7 +8,7 @@ use_callmonitor = false
 
 [data]
 in_dir = "${CFS}/m2859/data/3iyf/clean"
-out_dir = "${SCRATCH}/spinifel_output/cmtip_phase"
+out_dir = "${SCRATCH}/spinifel_output/temp"
 name = "3iyf_dp005_128x128pixels_500k.h5"
 
 [detector]
@@ -22,7 +22,7 @@ ps_srv_nodes = 0
 
 [runtime]
 N_images_per_rank = 1200
-use_cuda = true
+use_cuda = false
 use_cufinufft = false
 use_cupy = false
 use_single_prec = false
@@ -32,9 +32,9 @@ chk_convergence = false
 devices_per_node = 1
 
 [algorithm]
-N_generations = 20
+N_generations = 12
 nER = 50
-nHIO = 25
+nHIO = 100
 beta = 0.3
 cutoff = 0.05
 N_phase_loops = 10

@@ -15,6 +15,7 @@ from .orientation_matching import match
 def main():
     np.random.seed(0)
     use_cmtip = 1
+    use_orientations = 1
 
     comm = contexts.comm
 
@@ -63,6 +64,9 @@ def main():
      slices_) = get_data(N_images_per_rank, ds)
     logger.log(f"Loaded in {timer.lap():.2f}s.")
 
+    print(f"EXTENT: {np.linalg.norm(pixel_position_reciprocal, axis=0).max()}, {pixel_distance_reciprocal.max()}",flush=True)
+
+
     # Generation 0: solve_ac and phase
     N_generations = settings.N_generations
 
@@ -82,12 +86,36 @@ def main():
         logger.log(f"#"*27)
         logger.log(f"##### Generation {curr_gen}/{N_generations} #####")
         logger.log(f"#"*27)
+
+        orientations=None
+        if use_orientations:
+            import h5py
+            data_type = getattr(np, settings.data_type_str)
+            orientations_prior = np.zeros((N_images_per_rank,4),
+                           dtype=data_type)
+            i_start = comm.rank * N_images_per_rank
+            i_end = i_start + N_images_per_rank
+            with h5py.File(settings.data_path, 'r') as h5f:
+                orientations = h5f['orientations'][i_start:i_end]
+                orientations_prior[:] = np.reshape(orientations, (orientations.shape[0], 4))
+            orientations = orientations_prior
+
         if use_cmtip:
             ac = solve_ac_cmtip(
-                curr_gen, pixel_position_reciprocal, pixel_distance_reciprocal, slices_)
+                curr_gen, pixel_position_reciprocal, pixel_distance_reciprocal, slices_, orientations)
         else:
             ac = solve_ac(
-                curr_gen, pixel_position_reciprocal, pixel_distance_reciprocal, slices_)
+                curr_gen, pixel_position_reciprocal, pixel_distance_reciprocal, slices_, orientations)
+        if comm.rank == 0:
+            myRes = { 
+                     'pixel_position_reciprocal': pixel_position_reciprocal,
+                     'pixel_distance_reciprocal': pixel_distance_reciprocal,
+                     'slices_': slices_,
+                     'orientations': orientations,
+                     'ac': ac
+                    }
+            checkpoint.save_checkpoint(myRes, settings.out_dir, curr_gen, tag="solve_ac")
+
 
         logger.log(f"AC recovered in {timer.lap():.2f}s.")
 
@@ -105,6 +133,14 @@ def main():
             save_mrc(settings.out_dir / f"intensity-{curr_gen}.mrc", intensity)
             save_mrc(settings.out_dir / f"rho-{curr_gen}.mrc", rho)
 
+            myRes = {'ac_phased': ac_phased, 
+                     'support_': support_,
+                     'rho_': rho_,
+                     'orientations': orientations
+                    }
+            checkpoint.save_checkpoint(myRes, settings.out_dir, curr_gen)
+
+
     # Use improvement of cc(prev_rho, cur_rho) to dertemine if we should
     # terminate the loop
     cov_xy = 0
@@ -115,7 +151,7 @@ def main():
         logger.log(f"##### Generation {generation}/{N_generations} #####")
         logger.log(f"#"*27)
         # Orientation matching
-        orientations = match(
+        orientations, model_slices = match(
             ac_phased, slices_,
             pixel_position_reciprocal, pixel_distance_reciprocal)
         logger.log(f"Orientations matched in {timer.lap():.2f}s.")
@@ -125,7 +161,8 @@ def main():
                      'slices_': slices_,
                      'pixel_position_reciprocal': pixel_position_reciprocal,
                      'pixel_distance_reciprocal': pixel_distance_reciprocal,
-                     'orientations': orientations 
+                     'orientations': orientations,
+                     'model_slices': model_slices 
                     }
             checkpoint.save_checkpoint(myRes, settings.out_dir, generation, tag="match")
 
