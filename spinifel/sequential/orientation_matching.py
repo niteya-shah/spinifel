@@ -87,10 +87,10 @@ def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_rec
         N_batch = N_pixels * N_batch_size
         st_m = i * N_batch_size * N_pixels
         en_m = st_m + (N_batch_size * N_pixels)
-        #model_slices_new[st_m:en_m] = autocorrelation.forward(
-        #        ac, H_, K_, L_, 1, M, N_batch, reciprocal_extent, True).real
-        model_slices_new[st_m:en_m] = autocorrelation.forward_cmtip(
-                ac, H_, K_, L_, 1, True).real
+        model_slices_new[st_m:en_m] = autocorrelation.forward(
+                ac, H_, K_, L_, 1, M, N_batch, reciprocal_extent, True).real
+        #model_slices_new[st_m:en_m] = autocorrelation.forward_cmtip(
+        #        ac, H_, K_, L_, 1, True).real
     en_slice = time.monotonic()
     
     model_slices = model_slices_new.copy()
