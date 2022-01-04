@@ -15,7 +15,7 @@ from .orientation_matching import match
 def main():
     np.random.seed(0)
     use_cmtip = 1
-    use_orientations = 1
+    use_orientations = 0
 
     comm = contexts.comm
 
@@ -71,7 +71,7 @@ def main():
     N_generations = settings.N_generations
 
     if settings.load_gen > 0: # Load input from previous generation
-        curr_gen = settings.load_gen + 1
+        curr_gen = settings.load_gen 
         print(f"Loading checkpoint: {checkpoint.generate_checkpoint_name(settings.out_dir, settings.load_gen, settings.tag_gen)}", flush=True)
         myRes = checkpoint.load_checkpoint(settings.out_dir, 
                                            settings.load_gen, 
@@ -100,12 +100,12 @@ def main():
                 orientations_prior[:] = np.reshape(orientations, (orientations.shape[0], 4))
             orientations = orientations_prior
 
-        if use_cmtip:
-            ac = solve_ac_cmtip(
-                curr_gen, pixel_position_reciprocal, pixel_distance_reciprocal, slices_, orientations)
-        else:
-            ac = solve_ac(
-                curr_gen, pixel_position_reciprocal, pixel_distance_reciprocal, slices_, orientations)
+        #if use_cmtip:
+        #    ac = solve_ac_cmtip(
+        #        curr_gen, pixel_position_reciprocal, pixel_distance_reciprocal, slices_, orientations)
+        #else:
+        ac = solve_ac(
+            curr_gen, pixel_position_reciprocal, pixel_distance_reciprocal, slices_, orientations)
         if comm.rank == 0:
             myRes = { 
                      'pixel_position_reciprocal': pixel_position_reciprocal,
@@ -168,14 +168,14 @@ def main():
 
 
         # Solve autocorrelation
-        if use_cmtip:
-            ac = solve_ac_cmtip(
-                generation, pixel_position_reciprocal, pixel_distance_reciprocal,
-                slices_, orientations, ac_phased)
-        else:
-            ac = solve_ac(
-                generation, pixel_position_reciprocal, pixel_distance_reciprocal,
-                slices_, orientations, ac_phased)
+        #if use_cmtip:
+        #    ac = solve_ac_cmtip(
+        #        generation, pixel_position_reciprocal, pixel_distance_reciprocal,
+        #        slices_, orientations, ac_phased)
+        #else:
+        ac = solve_ac(
+            generation, pixel_position_reciprocal, pixel_distance_reciprocal,
+            slices_, orientations, ac_phased)
         logger.log(f"AC recovered in {timer.lap():.2f}s.")
         
         if comm.rank == 0:

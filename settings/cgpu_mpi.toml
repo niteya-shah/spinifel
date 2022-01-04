@@ -8,7 +8,7 @@ use_callmonitor = false
 
 [data]
 in_dir = "${CFS}/m2859/data/3iyf/clean"
-out_dir = "${SCRATCH}/spinifel_output/temp"
+out_dir = "${SCRATCH}/spinifel_output/mask8_m12000"
 name = "3iyf_dp005_128x128pixels_500k.h5"
 
 [detector]
@@ -21,7 +21,7 @@ ps_eb_nodes = 1
 ps_srv_nodes = 0
 
 [runtime]
-N_images_per_rank = 1200
+N_images_per_rank = 1000
 use_cuda = false
 use_cufinufft = false
 use_cupy = false
@@ -40,5 +40,5 @@ cutoff = 0.05
 N_phase_loops = 10
 N_clipping = 0
 N_binning = 0
-N_orientations = 15000  # model_slices
+N_orientations = 12000  # model_slices
 N_batch_size = 100

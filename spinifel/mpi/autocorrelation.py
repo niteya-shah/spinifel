@@ -70,7 +70,7 @@ def setup_linops(comm, H, K, L, data,
         """Define W part of the W @ x = d problem."""
         uvect_ADA = autocorrelation.core_problem_convolution(
             uvect, M, F_ugrid_conv_, M_ups, ac_support, use_reciprocal_symmetry)
-        if True:  # Debug/test -> make sure all cg are in sync (same lambdas)
+        if False:  # Debug/test -> make sure all cg are in sync (same lambdas)
             print("*** check toeplitz", flush=True)
             uvect_ADA_old = core_problem(
                  comm, uvect, H_, K_, L_, ac_support, weights, M, N,
@@ -232,7 +232,7 @@ def solve_ac(generation,
     weights = np.ones(N)
     
     # Use scalable heuristic for regularization lambda
-    rlambda = np.logspace(-8, 8, comm.size)[comm.rank]
+    rlambda = np.logspace(-20, 20, comm.size)[comm.rank]
     
     maxiter = settings.solve_ac_maxiter
 
@@ -270,8 +270,42 @@ def solve_ac(generation,
     if info != 0:
         print(f'WARNING: CG did not converge at rlambda = {rlambda}')
 
-    soln = (np.linalg.norm(ret-ac_estimate.flatten())**2).real # solution norm
-    resid = (np.dot(ret,W_0.matvec(ret)-2*d_0) + b_squared).real # residual norm
+    if generation == 0:
+        # calculate data/model std ratio
+        ac = ret.reshape((M,)*3)
+        ac = np.ascontiguousarray(ac.real).astype(np.float64)
+
+        N_orientations = settings.N_orientations
+        N_batch_size = settings.N_batch_size
+        N_pixels = utils.prod(settings.reduced_det_shape)
+        N_slices = slices_.shape[0]
+        N = N_pixels * N_orientations
+
+        model_slices = np.zeros((N,))
+        ref_orientations = skp.get_uniform_quat(N_orientations, True)
+        ref_rotmat = np.array([np.linalg.inv(skp.quaternion2rot3d(quat)) for quat in ref_orientations])
+
+        for i in range(N_orientations//N_batch_size):
+            st = i * N_batch_size
+            en = st + N_batch_size
+            H, K, L = np.einsum("ijk,klmn->jilmn", ref_rotmat[st:en], pixel_position_reciprocal)
+            H_ = H.flatten() / reciprocal_extent * np.pi / settings.oversampling
+            K_ = K.flatten() / reciprocal_extent * np.pi / settings.oversampling
+            L_ = L.flatten() / reciprocal_extent * np.pi / settings.oversampling
+            N_batch = N_pixels * N_batch_size
+            st_m = i * N_batch_size * N_pixels
+            en_m = st_m + (N_batch_size * N_pixels)
+            model_slices[st_m:en_m] = autocorrelation.forward(
+                    ac, H_, K_, L_, 1, M, N_batch, reciprocal_extent, True).real
+
+        model_slices = model_slices.reshape((N_orientations, N_pixels)) 
+        data_model_scaling_ratio = slices_.std() / model_slices.std()
+        print(f"Data/Model std ratio: {data_model_scaling_ratio}.", flush=True)
+        soln = data_model_scaling_ratio
+        resid = None
+    else:
+        soln = np.linalg.norm(ret) # solution norm
+        resid = (np.dot(ret,W_0.matvec(ret)-2*d_0) + b_squared).real # residual norm
 
     # Rank0 gathers rlambda, solution norm, residual norm from all ranks
     summary = comm.gather((comm.rank, rlambda, info, soln, resid), root=0)
@@ -282,18 +316,22 @@ def solve_ac(generation,
         ranks = np.array(ranks)[converged_idx]
         lambdas = np.array(lambdas)[converged_idx]
         solns = np.array(solns)[converged_idx]
-        resids = np.array([item for sublist in resids for item in sublist])[converged_idx]
+        if generation > 0:
+            resids = np.array([item for sublist in resids for item in sublist])[converged_idx]
+            print('resids =', resids)
         print('ranks =', ranks)
         print('lambdas =', lambdas)
         print('solns =', solns)
-        print('resids =', resids)
 
         if generation == 0:
             # Expect non-convergence => weird results
             # Heuristic: retain rank with highest rlambda and high solution norm
-            idx = solns >= np.mean(solns)
-            imax = np.argmax(lambdas[idx])
-            iref = np.arange(len(ranks), dtype=int)[idx][imax]
+            idx = np.argmin(np.abs(solns-1))
+            iref = ranks[idx]
+            print(f"idx:{idx}",flush=True)
+            #idx = solns >= np.mean(solns)
+            #imax = np.argmax(lambdas[idx])
+            #iref = np.arange(len(ranks), dtype=int)[idx][imax]
             print('iref =', iref)
         else:
             # Heuristic: L-curve criterion
@@ -326,7 +364,7 @@ def solve_ac(generation,
             axes[1].loglog(lambdas[iref], valuePair[iref][0], "rD")
             axes[1].set_xlabel("$\lambda$")
             axes[1].set_ylabel("Residual norm $||Ax-b||_{2}$")
-            axes[2].loglog(valuePair.T[0], valuePair.T[1]) # L-curve
+            axes[2].loglog(valuePair.T[0], valuePair.T[1], 'x') # L-curve
             axes[2].loglog(valuePair[iref][0], valuePair[iref][1], "rD")
             axes[2].set_xlabel("Residual norm $||Ax-b||_{2}$")
             axes[2].set_ylabel("Solution norm $||x||_{2}$")
@@ -470,6 +508,7 @@ def solve_ac_cmtip(generation,
             idx = v1s >= np.mean(v1s)
             imax = np.argmax(lambdas[idx])
             iref = np.arange(len(ranks), dtype=int)[idx][imax]
+            #iref = 0 ## FIXME
             print('iref =', iref)
         else:
             # Take corner of L-curve: min(v1+v2)

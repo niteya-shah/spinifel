@@ -3,6 +3,7 @@ import PyNVTX as nvtx
 import skopi  as skp
 import time
 import logging
+import numpy.matlib
 
 import spinifel.sequential.nearest_neighbor as nn
 from   spinifel import settings, utils, autocorrelation
@@ -35,8 +36,6 @@ def match(slices_, model_slices, ref_orientations, batch_size=None):
     index = nn.nearest_neighbor(model_slices, slices_, batch_size)
 
     return ref_orientations[index]
-
-
 
 @nvtx.annotate("sequential/orientation_matching.py", is_prefix=True)
 def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_reciprocal):

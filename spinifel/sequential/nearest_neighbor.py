@@ -1,6 +1,7 @@
 import os
 import numpy  as np
 import PyNVTX as nvtx
+import numpy.matlib
 
 from   sklearn.metrics.pairwise import euclidean_distances
 from   spinifel                 import SpinifelSettings, SpinifelContexts
@@ -87,6 +88,43 @@ def calc_argmin_gpu(euDist, n_images, n_refs, n_pixels, deviceId):
                                deviceId)
     return index
 
+# Donut mask
+# Returns a donut mask with inner radius r and outer radius R in NxM image
+# Good = 1
+# Background = 0
+def donutMask(N,M,R,r,centreRow=0,centreCol=0):
+    """
+    Calculate a donut mask.
+    N,M - The height and width of the image
+    R   - Maximum radius from center
+    r   - Minimum radius from center
+    centreRow  - center in y
+    centreCol  - center in x
+    """
+    if centreRow == 0:
+        centerY = N/2.-0.5
+    if centreCol == 0:
+        centerX = M/2.-0.5
+    mask = np.zeros((N,M))
+    radialDistRow = np.zeros((N,M))
+    radialDistCol = np.zeros((N,M))
+    myN = np.zeros((N,M))
+    myM = np.zeros((N,M))
+    for i in range(N):
+        xDist = i-centerY
+        xDistSq = xDist**2
+        for j in range(M):
+            yDist = j-centerX
+            yDistSq = yDist**2
+            rSq = xDistSq+yDistSq
+            if rSq < R**2 and rSq >= r**2:
+                mask[i,j] = 1
+                radialDistRow[i,j] = xDist
+                radialDistCol[i,j] = yDist
+                myN[i,j] = i
+                myM[i,j] = j
+    return mask, radialDistRow, radialDistCol, myN, myM
+
 
 
 @nvtx.annotate("sequential/nearest_neighbor.py", is_prefix=True)
@@ -114,7 +152,16 @@ def nearest_neighbor(model_slices, slices, batch_size):
     else:
         if settings.verbose:
             print("Using sklearn Euclidean Distance and numpy argmin")
-        euDist    = euclidean_distances(model_slices, slices)
+        euDist = np.zeros((model_slices.shape[0], slices.shape[0]), dtype=slices.dtype)
+        mask,_,_,_,_ = donutMask(128,128,64,8) # FIXME: don't hardcode
+        mask = mask.flatten()
+        mask_models = numpy.matlib.repmat(mask, batch_size, 1)
+        mask_slices = numpy.matlib.repmat(mask, slices.shape[0], 1)
+        for i in range(model_slices.shape[0]//batch_size):
+            st = i * batch_size
+            en = st + batch_size
+            euDist[st:en] = euclidean_distances(mask_models*model_slices[st:en], mask_slices*slices) #FIXME: use batch_size
+        print("**** euDist: ", euDist.shape)
         index  = np.argmin(euDist, axis=0)
 
     return index

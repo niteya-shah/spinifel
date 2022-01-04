@@ -50,35 +50,35 @@ def forward(ugrid, H_, K_, L_, support, M, N, recip_extent, use_recip_sym):
 
     return nuvect / M**3
 
-def forward_cmtip(ugrid, H_, K_, L_, support, use_recip_sym):
-    """
-    Compute the forward NUFFT: from a uniform to nonuniform set of points.
+#def forward_cmtip(ugrid, H_, K_, L_, support, use_recip_sym):
+#    """
+#    Compute the forward NUFFT: from a uniform to nonuniform set of points.
     
-    :param ugrid: 3d array with grid sampling
-    :param H_: H dimension of reciprocal space position to evaluate
-    :param K_: K dimension of reciprocal space position to evaluate
-    :param L_: L dimension of reciprocal space position to evaluate
-    :param support: 3d object support array
-    :param use_recip_sym: if True, discard imaginary component # name seems misleading
-    :return nuvect: Fourier transform of uvect sampled at nonuniform (H_, K_, L_)
-    """
+#    :param ugrid: 3d array with grid sampling
+#    :param H_: H dimension of reciprocal space position to evaluate
+#    :param K_: K dimension of reciprocal space position to evaluate
+#    :param L_: L dimension of reciprocal space position to evaluate
+#    :param support: 3d object support array
+#    :param use_recip_sym: if True, discard imaginary component # name seems misleading
+#    :return nuvect: Fourier transform of uvect sampled at nonuniform (H_, K_, L_)
+#    """
     
-    # make sure that points lie within permissible finufft domain
-    assert np.max(np.abs(np.array([H_, K_, L_]))) < 3*np.pi
+#    # make sure that points lie within permissible finufft domain
+#    assert np.max(np.abs(np.array([H_, K_, L_]))) < 3*np.pi
 
-    # Check if recip symmetry is met
-    if use_recip_sym:
-        assert np.all(np.isreal(ugrid))
+#    # Check if recip symmetry is met
+#    if use_recip_sym:
+#        assert np.all(np.isreal(ugrid))
 
-    # Apply support if given, overwriting input array
-    if support is not None:
-        ugrid *= support 
+#    # Apply support if given, overwriting input array
+#    if support is not None:
+#        ugrid *= support 
         
-    # Allocate space in memory and solve NUFFT
-    #nuvect = np.zeros(H_.shape, dtype=np.complex64)
-    nuvect = nufft_3d_t2(H_, K_, L_, ugrid, -1, 1e-12, H_.shape)
+#    # Allocate space in memory and solve NUFFT
+#    #nuvect = np.zeros(H_.shape, dtype=np.complex64)
+#    nuvect = nufft_3d_t2(H_, K_, L_, ugrid, -1, 1e-12, H_.shape)
     
-    return nuvect 
+#    return nuvect 
 
 @profiler.intercept
 @nvtx.annotate("autocorrelation.py", is_prefix=True)
