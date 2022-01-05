@@ -39,7 +39,6 @@ def core_problem(comm, uvect, H_, K_, L_, ac_support, weights, M, N,
 def setup_linops(comm, H, K, L, data,
                  ac_support, weights, x0,
                  M, N, reciprocal_extent,
-                 rlambda,
                  use_reciprocal_symmetry):
     """Define W and d parts of the W @ x = d problem.
 
@@ -57,12 +56,94 @@ def setup_linops(comm, H, K, L, data,
     H_ = H.flatten() / reciprocal_extent * np.pi / settings.oversampling
     K_ = K.flatten() / reciprocal_extent * np.pi / settings.oversampling
     L_ = L.flatten() / reciprocal_extent * np.pi / settings.oversampling
+    print('BEFORE: H_.shape =', H_.shape)
+    print('BEFORE: K_.shape =', K_.shape)
+    print('BEFORE: L_.shape =', L_.shape)
+    print('np.min(H_) =', np.min(H_))
+    print('np.max(H_) =', np.max(H_))
+    q_ = np.sqrt(H_**2+K_**2+L_**2)
+    print('q_ =', q_)
+
+    lu = np.linspace(-np.pi, np.pi, M)
+    Hu_, Ku_, Lu_ = np.meshgrid(lu, lu, lu, indexing='ij')
+    Qu_ = np.sqrt(Hu_**2+Ku_**2+Lu_**2)
+    print('Qu_.shape', Qu_.shape)
+
+    F_antisupport = Qu_ > np.pi / settings.oversampling
+    assert np.all(F_antisupport == F_antisupport[::-1, :, :])
+    assert np.all(F_antisupport == F_antisupport[:, ::-1, :])
+    assert np.all(F_antisupport == F_antisupport[:, :, ::-1])
+    assert np.all(F_antisupport == F_antisupport[::-1, ::-1, ::-1])
+
+    ### 1-1) expand q regions to the H, K, L arrays
+    ### take care of the corners;
+    ### if there's a beamstep, add an extra < inequality for the missing center
+    q_fake = np.where(Qu_[:,:,:]>np.pi/settings.oversampling)
+    print('q_fake =', q_fake)
+    Hf_ = 2*np.pi*q_fake[0]/M-np.pi
+    Kf_ = 2*np.pi*q_fake[1]/M-np.pi
+    Lf_ = 2*np.pi*q_fake[2]/M-np.pi
+    print('Hf_.shape =', Hf_.shape)
+    print('Kf_.shape =', Kf_.shape)
+    print('Lf_.shape =', Lf_.shape)
+    print('np.min(Hf_) =', np.min(Hf_))
+    print('np.max(Hf_) =', np.max(Hf_))
+
+    ### original copy of H_, K_, L_
+    H_temp, K_temp, L_temp = H_, K_, L_
+
+    ### 1-2) append Hf, Kf, Lf to H, K, L
+    H_ = np.append(H_, Hf_)
+    K_ = np.append(K_, Kf_)
+    L_ = np.append(L_, Lf_)
+    print('AFTER: H_.shape =', H_.shape)
+    print('AFTER: K_.shape =', K_.shape)
+    print('AFTER: L_.shape =', L_.shape)
+
+    ugrid = x0.reshape((M,)*3) # initial guess of the autocorrelation or the autocorrelation from the previous generation
+    print('np.linalg.norm(ugrid) =', np.linalg.norm(ugrid))
+
+    ### 2) fill in the expanded regions with data sliced from old autocorrelation
+    dataf = autocorrelation.forward(ugrid, Hf_, Kf_, Lf_, 1, M, Hf_.shape[0], reciprocal_extent, use_reciprocal_symmetry)
+    print('dataf.shape =', dataf.shape)
     
-    # Using upsampled convolution technique instead of ADA
+    ### original copy of data
+    data_temp = data
+    print('BEFORE: data.shape =', data.shape)
+    
+    ### append dataf to data
+    data = np.append(data, dataf)
+    print('AFTER: data.shape =', data.shape)
+    
+    ### 3) apply different weights to different regions
+    qf_ = np.sqrt(Hf_**2+Kf_**2+Lf_**2)
+    print('qf_.shape =', qf_.shape)
+    ### weight the old data to have uniform weighted density, i.e., set the first N points to something like 1/(N_images/(2*|q|)) and set the rest of the weights to 1
+    N_images = settings.N_images_per_rank
+    print('N_images =', N_images)
+    weights /= (N_images/(2*np.abs(q_)))
+    print('weights =', weights)
+    print('np.max(weights) =', np.max(weights))
+    weightsf = np.zeros(Hf_.shape[0]) # <- turn off weightsf
+    weightsf = np.ones(Hf_.shape[0]) # <- turn on weightsf
+    print('weightsf =', weightsf)
+    scaling_factor = np.linalg.norm(weights)/np.linalg.norm(weightsf)
+    print('scaling_factor =', scaling_factor)
+    weights /= scaling_factor
+    print('weights =', weights)
+
+    ones_temp = np.ones_like(data_temp)
+    onesf = np.ones_like(dataf)
+    print('ones_temp.shape =', ones_temp.shape)
+    print('onesf.shape =', onesf.shape)
+    nuvect_ones = np.append(ones_temp * weights, onesf * weightsf)
+    print('nuvect_ones.shape =', nuvect_ones.shape)
+
+    ### compute type-1 NUFFT (nonuniform to uniform grid) with the nonuniform data replaced with 1's
     M_ups = settings.M_ups
     ugrid_conv = autocorrelation.adjoint(
-        np.ones_like(data), H_, K_, L_, 1, M_ups,
-        reciprocal_extent, use_reciprocal_symmetry)
+            nuvect_ones, H_, K_, L_, 1, M_ups, 
+            reciprocal_extent, use_reciprocal_symmetry)
     ugrid_conv = reduce_bcast(comm, ugrid_conv)
     F_ugrid_conv_ = np.fft.fftn(np.fft.ifftshift(ugrid_conv)) #/ M**3
 
@@ -71,11 +152,15 @@ def setup_linops(comm, H, K, L, data,
         uvect_ADA = autocorrelation.core_problem_convolution(
             uvect, M, F_ugrid_conv_, M_ups, ac_support, use_reciprocal_symmetry)
         if False:  # Debug/test -> make sure all cg are in sync (same lambdas)
+            print('# Debug/test')
             uvect_ADA_old = core_problem(
                  comm, uvect, H_, K_, L_, ac_support, weights, M, N,
                  reciprocal_extent, use_reciprocal_symmetry)
-            assert np.allclose(uvect_ADA, uvect_ADA_old)            
-        uvect = uvect_ADA + rlambda*uvect
+            print('np.linalg.norm(uvect_ADA) =', np.linalg.norm(uvect_ADA))
+            print('np.linalg.norm(uvect_ADA_old) =', np.linalg.norm(uvect_ADA_old))
+            print('np.linalg.norm(uvect_ADA) / np.linalg.norm(uvect_ADA_old) =', np.linalg.norm(uvect_ADA) / np.linalg.norm(uvect_ADA_old))
+            #assert np.allclose(uvect_ADA, uvect_ADA_old)            
+        uvect = uvect_ADA
         return uvect
 
     W = LinearOperator(
@@ -83,7 +168,9 @@ def setup_linops(comm, H, K, L, data,
         shape=(M**3, M**3),
         matvec=W_matvec)
 
-    nuvect_Db = (data * weights).astype(np.float64)
+    nuvect_Db = np.append(data_temp * weights, dataf * weightsf).astype(np.float64)
+    print('nuvect_Db.shape =', nuvect_Db.shape)
+
     uvect_ADb = autocorrelation.adjoint(
         nuvect_Db, H_, K_, L_, ac_support, M,
         reciprocal_extent, use_reciprocal_symmetry
@@ -91,7 +178,11 @@ def setup_linops(comm, H, K, L, data,
     
     uvect_ADb = reduce_bcast(comm, uvect_ADb)
     
-    d = uvect_ADb + rlambda*x0
+    d = uvect_ADb
+
+    ### 4) reduce H, K, L and data arrays back to their original sizes
+    H_, K_, L_ = H_temp, K_temp, L_temp
+    data = data_temp
   
     return W, d
 
@@ -112,7 +203,6 @@ def solve_ac(generation,
     print('N =', N)
     reciprocal_extent = pixel_distance_reciprocal.max()
     use_reciprocal_symmetry = True
-    ref_rank = -1 
 
     # Generate random orientations in SO(3)
     if orientations is None:
@@ -120,10 +210,6 @@ def solve_ac(generation,
     # Calculate hkl based on orientations
     H, K, L = autocorrelation.gen_nonuniform_positions(
         orientations, pixel_position_reciprocal)
-
-    # norm(nuvect_Db)^2 = b_squared = b_1^2 + b_2^2 +....
-    b_squared = np.sum( np.linalg.norm( slices_.reshape(slices_.shape[0],-1) , axis=-1) **2)
-    b_squared = reduce_bcast(comm, b_squared)
 
     data = slices_.flatten()
     
@@ -141,9 +227,6 @@ def solve_ac(generation,
         ac_estimate *= ac_support
 
     weights = np.ones(N)
-    
-    # Use scalable heuristic for regularization lambda
-    rlambda = np.logspace(-8, 8, comm.size)[comm.rank]
     
     maxiter = settings.solve_ac_maxiter
 
@@ -166,104 +249,21 @@ def solve_ac(generation,
     W, d = setup_linops(comm, H, K, L, data,
                         ac_support, weights, x0,
                         M, N, reciprocal_extent,
-                        rlambda,
                         use_reciprocal_symmetry)
     
-    # W_0 and d_0 are given by defining W and d with rlambda=0
-    W_0, d_0 = setup_linops(comm, H, K, L, data,
-                        ac_support, weights, x0,
-                        M, N, reciprocal_extent,
-                        0,
-                        use_reciprocal_symmetry)
-
     ret, info = cg(W, d, x0=x0, maxiter=maxiter, callback=callback)
-
+    print('ret =', ret)
+    print('info =', info)
     if info != 0:
-        print(f'WARNING: CG did not converge at rlambda = {rlambda}')
-
-    soln = (np.linalg.norm(ret-ac_estimate.flatten())**2).real # solution norm
-    resid = (np.dot(ret,W_0.matvec(ret)-2*d_0) + b_squared).real # residual norm
-
-    # Rank0 gathers rlambda, solution norm, residual norm from all ranks
-    summary = comm.gather((comm.rank, rlambda, info, soln, resid), root=0)
-    print('summary =', summary)
-    if comm.rank == 0:
-        ranks, lambdas, infos, solns, resids = [np.array(el) for el in zip(*summary)]
-        converged_idx = [i for i, info in enumerate(infos) if info == 0]
-        ranks = np.array(ranks)[converged_idx]
-        lambdas = np.array(lambdas)[converged_idx]
-        solns = np.array(solns)[converged_idx]
-        resids = np.array([item for sublist in resids for item in sublist])[converged_idx]
-        print('ranks =', ranks)
-        print('lambdas =', lambdas)
-        print('solns =', solns)
-        print('resids =', resids)
-
-        if generation == 0:
-            # Expect non-convergence => weird results
-            # Heuristic: retain rank with highest rlambda and high solution norm
-            idx = solns >= np.mean(solns)
-            imax = np.argmax(lambdas[idx])
-            iref = np.arange(len(ranks), dtype=int)[idx][imax]
-            print('iref =', iref)
-        else:
-            # Heuristic: L-curve criterion
-            # Take corner of L-curve
-            valuePair = np.array([resids, solns]).T
-            valuePair = np.array(sorted(valuePair , key=lambda k: [k[0], k[1]])) # sort the corner candidates in increasing order
-            lambdas = np.sort(lambdas) # sort lambdas in increasing order
-            allCoord = np.log(valuePair) # coordinates of the loglog L-curve
-            nPoints = len(resids)
-            if nPoints == 0: print('WARNING: no converged solution')
-            firstPoint = allCoord[0]
-            lineVec = allCoord[-1] - allCoord[0]
-            lineVecNorm = lineVec / np.sqrt(np.sum(lineVec**2))
-            vecFromFirst = allCoord - firstPoint
-            scalarProduct = np.sum(vecFromFirst * numpy.matlib.repmat(lineVecNorm, nPoints, 1), axis=1)
-            vecFromFirstParallel = np.outer(scalarProduct, lineVecNorm)
-            vecToLine = vecFromFirst - vecFromFirstParallel
-            distToLine = np.sqrt(np.sum(vecToLine ** 2, axis=1))
-            iref = np.argmax(distToLine)
-            print('iref =', iref)
-            ref_rank = ranks[iref]
-
-            # Log L-curve plot
-            fig, axes = plt.subplots(figsize=(10.0, 24.0), nrows=3, ncols=1)
-            axes[0].loglog(lambdas, valuePair.T[1])
-            axes[0].loglog(lambdas[iref], valuePair[iref][1], "rD")
-            axes[0].set_xlabel("$\lambda$")
-            axes[0].set_ylabel("Solution norm $||x||_{2}$")
-            axes[1].loglog(lambdas, valuePair.T[0])
-            axes[1].loglog(lambdas[iref], valuePair[iref][0], "rD")
-            axes[1].set_xlabel("$\lambda$")
-            axes[1].set_ylabel("Residual norm $||Ax-b||_{2}$")
-            axes[2].loglog(valuePair.T[0], valuePair.T[1]) # L-curve
-            axes[2].loglog(valuePair[iref][0], valuePair[iref][1], "rD")
-            axes[2].set_xlabel("Residual norm $||Ax-b||_{2}$")
-            axes[2].set_ylabel("Solution norm $||x||_{2}$")
-            fig.tight_layout()
-            plt.savefig(settings.out_dir / f"summary_{generation}.png")
-            plt.close('all')
-
-        ref_rank = ranks[iref]
-
-    else:
-        ref_rank = -1
-
-    # Rank0 broadcasts rank with best autocorrelation
-    ref_rank = comm.bcast(ref_rank, root=0)
+        print(f'WARNING: CG did not converge!')
 
     # Set up ac volume
     ac = ret.reshape((M,)*3)
     ac = np.ascontiguousarray(ac.real).astype(np.float64)
     print(f"Rank {comm.rank} got AC in {callback.counter} iterations.", flush=True)
+    print('np.linalg.norm(ac) =', np.linalg.norm(ac))
 
     # Log autocorrelation volume
     image.show_volume(ac, settings.Mquat, f"autocorrelation_{generation}_{comm.rank}.png")
-
-    # Rank[ref_rank] broadcasts its autocorrelation
-    comm.Bcast(ac, root=ref_rank)
-    if comm.rank == 0:
-        print(f"Keeping result from rank {ref_rank}.")
 
     return ac
