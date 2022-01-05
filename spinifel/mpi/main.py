@@ -1,4 +1,4 @@
-from spinifel import settings, utils, contexts
+from spinifel import settings, utils, contexts, checkpoint
 from spinifel.prep import save_mrc
 
 import numpy as np
@@ -58,45 +58,61 @@ def main():
     (pixel_position_reciprocal,
      pixel_distance_reciprocal,
      pixel_index_map,
-     slices_) = get_data(N_images_per_rank, ds)
+     slices_,
+     orientations_prior) = get_data(N_images_per_rank, ds)
     logger.log(f"Loaded in {timer.lap():.2f}s.")
+
+    #print(f"load ground-truth orientations")
+    #orientations = orientations_prior
 
     # Generation 0: solve_ac and phase
     N_generations = settings.N_generations
-    generation = 0
-    logger.log(f"#"*27)
-    logger.log(f"##### Generation {generation}/{N_generations} #####")
-    logger.log(f"#"*27)
-    ac = solve_ac(
-        generation, pixel_position_reciprocal, pixel_distance_reciprocal, slices_)
-    logger.log(f"AC recovered in {timer.lap():.2f}s.")
 
-    ac_phased, support_, rho_ = phase(generation, ac)
-    logger.log(f"Problem phased in {timer.lap():.2f}s.")
+    if settings.load_gen > 0: # Load input from previous generation
+        curr_gen = settings.load_gen + 1
+        print(f"Loading checkpoint: {checkpoint.generate_checkpoint_name(settings.out_dir, settings.load_gen, settings.tag_gen)}", flush=True)
+        myRes = checkpoint.load_checkpoint(settings.out_dir, 
+                                           settings.load_gen, 
+                                           settings.tag_gen)
+        # Unpack dictionary
+        ac_phased = myRes['ac_phased']
+        support_ = myRes['support_']
+        rho_ = myRes['rho_']
+        orientations = myRes['orientations']
+    else:
+        curr_gen = 0
+        logger.log(f"#"*27)
+        logger.log(f"##### Generation {curr_gen}/{N_generations} #####")
+        logger.log(f"#"*27)
+        ac = solve_ac(
+            curr_gen, pixel_position_reciprocal, pixel_distance_reciprocal, slices_) #, orientations)
+        logger.log(f"AC recovered in {timer.lap():.2f}s.")
 
-    if comm.rank == 0:
-        # Save electron density and intensity
-        rho = np.fft.ifftshift(rho_)
-        intensity = np.fft.ifftshift(np.abs(np.fft.fftshift(ac_phased)**2))
-        save_mrc(settings.out_dir / f"ac-{generation}.mrc", ac_phased)
-        save_mrc(settings.out_dir / f"intensity-{generation}.mrc", intensity)
-        save_mrc(settings.out_dir / f"rho-{generation}.mrc", rho)
+        ac_phased, support_, rho_ = phase(curr_gen, ac)
+        logger.log(f"Problem phased in {timer.lap():.2f}s.")
+
+        if comm.rank == 0:
+            # Save electron density and intensity
+            rho = np.fft.ifftshift(rho_)
+            intensity = np.fft.ifftshift(np.abs(np.fft.fftshift(ac_phased)**2))
+            save_mrc(settings.out_dir / f"ac-{curr_gen}.mrc", ac_phased)
+            save_mrc(settings.out_dir / f"intensity-{curr_gen}.mrc", intensity)
+            save_mrc(settings.out_dir / f"rho-{curr_gen}.mrc", rho)
 
     # Use improvement of cc(prev_rho, cur_rho) to dertemine if we should
     # terminate the loop
     cov_xy = 0
     cov_delta = .05
 
-    for generation in range(1, N_generations):
+    for generation in range(curr_gen, N_generations):
         logger.log(f"#"*27)
         logger.log(f"##### Generation {generation}/{N_generations} #####")
         logger.log(f"#"*27)
         # Orientation matching
         orientations = match(
             ac_phased, slices_,
-            pixel_position_reciprocal, pixel_distance_reciprocal)
+            pixel_position_reciprocal, pixel_distance_reciprocal, order=-2)
         logger.log(f"Orientations matched in {timer.lap():.2f}s.")
-
         # Solve autocorrelation
         ac = solve_ac(
             generation, pixel_position_reciprocal, pixel_distance_reciprocal,
@@ -132,6 +148,14 @@ def main():
             save_mrc(settings.out_dir / f"ac-{generation}.mrc", ac_phased)
             save_mrc(settings.out_dir / f"intensity-{generation}.mrc", intensity)
             save_mrc(settings.out_dir / f"rho-{generation}.mrc", rho)
+
+            # Save output
+            myRes = {'ac_phased': ac_phased, 
+                     'support_': support_,
+                     'rho_': rho_,
+                     'orientations': orientations
+                    }
+            checkpoint.save_checkpoint(myRes, settings.out_dir, generation)
 
     logger.log(f"Results saved in {settings.out_dir}")
     logger.log(f"Successfully completed in {timer.total():.2f}s.")

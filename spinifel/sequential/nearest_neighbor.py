@@ -55,6 +55,9 @@ def generate_weights(pixel_position_reciprocal, order=0):
     :return weights: resolution-based weight of each pixel
     """
     s_magnitudes = np.linalg.norm(pixel_position_reciprocal, axis=0) * 1e-10 # convert to Angstrom
+    for i in s_magnitudes**order:
+        if i.any() == 0:
+            print("WARNING: singularity")
     weights = 1.0 / (s_magnitudes ** order)
     weights /= np.sum(weights)
     
@@ -79,7 +82,7 @@ def calc_eudist_gpu(model_slices, slices, deviceId):
 @nvtx.annotate("sequential/nearest_neighbor.py", is_prefix=True)
 def calc_argmin_gpu(euDist, n_images, n_refs, n_pixels, deviceId):
 
-    index =  pyCu.cudaHeapSort(euDist,
+    index = pyCu.cudaHeapSort(euDist,
                                n_images,
                                n_refs,
                                n_pixels,
@@ -90,7 +93,7 @@ def calc_argmin_gpu(euDist, n_images, n_refs, n_pixels, deviceId):
 
 
 @nvtx.annotate("sequential/nearest_neighbor.py", is_prefix=True)
-def nearest_neighbor(model_slices, slices, batch_size):
+def nearest_neighbor(model_slices, slices, batch_sizei, pixel_position_reciprocal, order):
 
     if settings.use_cuda:
         deviceId = rank % settings._devices_per_node
@@ -103,9 +106,13 @@ def nearest_neighbor(model_slices, slices, batch_size):
         for i in range(model_slices.shape[0]//batch_size):
             st = i * batch_size
             en = st + batch_size
-            euDist[:, st:en] = calc_eudist_gpu(model_slices[st:en], slices, deviceId).reshape(slices.shape[0], batch_size)
+            if order == 0:
+                euDist[:, st:en] = calc_eudist_gpu(model_slices[st:en], slices, deviceId).reshape(slices.shape[0], batch_size)
+            else:
+                weights = generate_weights(pixel_position_reciprocal, order=order)
+                weights = weights.flatten()
+                euDist[:, st:en] = calc_eudist_gpu(model_slices[st:en]*weights, slices*weights, deviceId).reshape(slices.shape[0], batch_size)
         euDist = euDist.flatten()
-        
         index = calc_argmin_gpu(euDist, 
                             slices.shape[0],
                             model_slices.shape[0],
@@ -114,8 +121,13 @@ def nearest_neighbor(model_slices, slices, batch_size):
     else:
         if settings.verbose:
             print("Using sklearn Euclidean Distance and numpy argmin")
-        euDist    = euclidean_distances(model_slices, slices)
-        index  = np.argmin(euDist, axis=0)
-
+        if order == 0:
+            euDist = euclidean_distances(model_slices, slices)
+            index = np.argmin(euDist, axis=0)
+        else:
+            weights = generate_weights(pixel_position_reciprocal, order=order)
+            weights = weights.flatten()
+            euDist = euclidean_distances(model_slices*weights, slices*weights)
+            index = np.argmin(euDist, axis=0)
     return index
 
