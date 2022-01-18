@@ -96,7 +96,7 @@ def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_rec
     model_slices_new = model_slices_new.reshape((N_orientations, N_pixels))
     data_model_scaling_ratio = slices_.std() / model_slices_new.std()
     print(f"Data/Model std ratio: {data_model_scaling_ratio}.", flush=True)
-    model_slices_new *= data_model_scaling_ratio
+    #model_slices_new *= data_model_scaling_ratio # changed
     
     # Calculate Euclidean distance in batch to avoid running out of GPU Memory
     st_match = time.monotonic()
