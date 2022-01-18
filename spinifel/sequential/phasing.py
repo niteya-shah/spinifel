@@ -91,10 +91,10 @@ def create_support_(ac_, M, Mquat, generation):
     square_support = xp.zeros((M, M, M), dtype=xp.bool_)
     square_support[sl, sl, sl] = 1
     square_support_ = xp.fft.ifftshift(square_support)
-    #image.show_volume(square_support, Mquat, f"square_support_{generation}.png")
+    image.show_volume(square_support, Mquat, f"square_support_{generation}.png")
 
     thresh_support_ = ac_ > 1e-2 * ac_.max()
-    #image.show_volume(np.fft.fftshift(thresh_support_), Mquat, f"thresh_support_{generation}.png")
+    image.show_volume(np.fft.fftshift(thresh_support_), Mquat, f"thresh_support_{generation}.png")
 
     return xp.logical_and(square_support_, thresh_support_)
 
@@ -197,10 +197,18 @@ def shrink_wrap(cutoff, sigma, rho_, support_):
     :param rho_: electron density estimate
     :param support_: object support
     """
-    rho_abs_ = xp.absolute(rho_)
+    print('cutoff =', cutoff)
+    #rho_abs_ = xp.absolute(rho_)
+    avg = np.mean(rho_)
+    sign = np.sign(avg)
+    if sign == 1:
+        rho_abs_ = rho_
+    else:
+        rho_abs_ = -rho_
     # By using 'wrap', we don't need to fftshift it back and forth
     rho_gauss_ = gaussian_filter(
         rho_abs_, mode='wrap', sigma=sigma, truncate=2)
+    print('rho_abs_.max() =', rho_abs_.max())
     support_[:] = rho_gauss_ > rho_abs_.max() * cutoff
 
 
@@ -232,27 +240,37 @@ def phase(generation, ac, support_=None, rho_=None):
     ac = xp.array(ac)
     ac_filt = gaussian_filter(xp.maximum(ac.real, 0), mode='constant',
                               sigma=1, truncate=2)
-    #image.show_volume(ac_filt, Mquat, f"autocorrelation_filtered_{generation}.png")
+    image.show_volume(ac_filt, Mquat, f"autocorrelation_filtered_{generation}.png")
     ac_filt_ = xp.fft.ifftshift(ac_filt)
 
     intensities_ = xp.abs(xp.fft.fftn(ac_filt_))
-    #image.show_volume(xp.fft.fftshift(intensities_), Mquat, f"intensities_{generation}.png")
+    image.show_volume(xp.fft.fftshift(intensities_), Mquat, f"intensities_{generation}.png")
 
     amplitudes_ = xp.sqrt(intensities_)
-    #image.show_volume(xp.fft.fftshift(amplitudes_), Mquat, f"amplitudes_{generation}.png")
+    image.show_volume(xp.fft.fftshift(amplitudes_), Mquat, f"amplitudes_{generation}.png")
 
     amp_mask_ = xp.ones((M, M, M), dtype=xp.bool_)
-    amp_mask_[0, 0, 0] = 0  # Mask out central peak
+    # Mask out central peak
+    amp_mask_[0, 0, 0] = 0
+    amp_mask = xp.fft.fftshift(amp_mask_)
+    # Mask out corners
+    lc = np.linspace(-M/2+1, M/2, M)
+    Hc_, Kc_, Lc_ = np.meshgrid(lc, lc, lc, indexing='ij')
+    Qc_ = np.sqrt(Hc_**2+Kc_**2+Lc_**2)
+    corners = np.where(Qc_[:,:,:]>(M+1)/2)
+    amp_mask[corners] = 0
+    image.show_volume(amp_mask, Mquat, f"amp_mask_{generation}.png")
     #image.show_volume(xp.fft.fftshift(amp_mask_), Mquat, f"amp_mask_{generation}.png")
 
     if support_ is None:
         support_ = create_support_(ac_filt_, M, Mquat, generation)
-    #image.show_volume(xp.fft.fftshift(support_), Mquat, f"support_{generation}.png")
+    image.show_volume(xp.fft.fftshift(support_), Mquat, f"support_{generation}.png")
     support_ = xp.array(support_)
 
     if rho_ is None:
-        rho_ = support_ * xp.random.rand(*support_.shape)
-    #image.show_volume(xp.fft.fftshift(rho_), Mquat, f"rho_{generation}.png")
+        rho_ = np.zeros((M, M, M)) # changed
+        #rho_ = support_ * xp.random.rand(*support_.shape)
+    image.show_volume(xp.fft.fftshift(rho_), Mquat, f"rho_{generation}.png")
     rho_ = xp.array(rho_)
     
     rho_max = xp.infty
@@ -262,9 +280,9 @@ def phase(generation, ac, support_=None, rho_=None):
 
     for i in range(settings.N_phase_loops):
         ER_loop(nER, rho_, amplitudes_, amp_mask_, support_, rho_max)
-        HIO_loop(nHIO, 0.9, rho_, amplitudes_, amp_mask_, support_, rho_max)
+        HIO_loop(nHIO, settings.beta, rho_, amplitudes_, amp_mask_, support_, rho_max)
         ER_loop(nER, rho_, amplitudes_, amp_mask_, support_, rho_max)
-        shrink_wrap(0.1, 1, rho_, support_)
+        shrink_wrap(settings.cutoff, 1, rho_, support_)
     ER_loop(nER, rho_, amplitudes_, amp_mask_, support_, rho_max)
 
     if settings.use_cupy:
@@ -282,9 +300,14 @@ def phase(generation, ac, support_=None, rho_=None):
     intensities_phased_ = np.abs(np.fft.fftn(rho_))**2
     image.show_volume(np.fft.fftshift(intensities_phased_), Mquat, f"intensities_phased_{generation}.png")
 
-    ac_phased_ = np.abs(np.fft.ifftn(intensities_phased_))
+    #ac_phased_ = np.abs(np.fft.ifftn(intensities_phased_))
+    ac_phased_ = np.fft.ifftn(intensities_phased_) # changed
     ac_phased = np.fft.fftshift(ac_phased_)
-    #image.show_volume(ac_phased, Mquat, f"autocorrelation_phased_{generation}.png")
+    factor = np.linalg.norm(ac_phased.real)/np.linalg.norm(ac_phased.imag)
+    print("factor =", factor)
+    print("ac_phased =", ac_phased)
+    ac_phased = ac_phased.real
+    image.show_volume(ac_phased, Mquat, f"autocorrelation_phased_{generation}.png")
 
     ac_phased = ac_phased.astype(np.float32)
 
