@@ -43,11 +43,12 @@ def forward(ugrid, H_, K_, L_, support, M, N, recip_extent, use_recip_sym):
 
     # Apply recip symmetry
     if use_recip_sym:
-        ugrid = np.fft.fftshift(np.fft.ifftn(np.fft.fftn(np.fft.ifftshift(ugrid.reshape((M,)*3))).real)).real
+        # try what cmtip does
+        assert np.all(np.isreal(ugrid))
+        #ugrid = np.fft.fftshift(np.fft.ifftn(np.fft.fftn(np.fft.ifftshift(ugrid.reshape((M,)*3))).real)).real
 
     # Solve NUFFT2-
     nuvect = nufft_3d_t2(H_, K_, L_, ugrid, -1, 1e-12, N)
-
     return nuvect / M**3
 
 #def forward_cmtip(ugrid, H_, K_, L_, support, use_recip_sym):

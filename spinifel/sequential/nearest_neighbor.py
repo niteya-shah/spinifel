@@ -153,14 +153,15 @@ def nearest_neighbor(model_slices, slices, batch_size):
         if settings.verbose:
             print("Using sklearn Euclidean Distance and numpy argmin")
         euDist = np.zeros((model_slices.shape[0], slices.shape[0]), dtype=slices.dtype)
-        mask,_,_,_,_ = donutMask(128,128,64,8) # FIXME: don't hardcode
-        mask = mask.flatten()
-        mask_models = numpy.matlib.repmat(mask, batch_size, 1)
-        mask_slices = numpy.matlib.repmat(mask, slices.shape[0], 1)
+        #mask,_,_,_,_ = donutMask(128,128,64,8) # FIXME: don't hardcode
+        #mask = mask.flatten()
+        #mask_models = numpy.matlib.repmat(mask, batch_size, 1)
+        #mask_slices = numpy.matlib.repmat(mask, slices.shape[0], 1)
         for i in range(model_slices.shape[0]//batch_size):
             st = i * batch_size
             en = st + batch_size
-            euDist[st:en] = euclidean_distances(mask_models*model_slices[st:en], mask_slices*slices) #FIXME: use batch_size
+            #euDist[st:en] = euclidean_distances(mask_models*model_slices[st:en], mask_slices*slices) #FIXME: use batch_size
+            euDist[st:en] = euclidean_distances(model_slices[st:en], slices) #FIXME: use batch_size
         print("**** euDist: ", euDist.shape)
         index  = np.argmin(euDist, axis=0)
 

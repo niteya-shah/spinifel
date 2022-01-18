@@ -6,7 +6,7 @@ import logging
 import numpy.matlib
 
 import spinifel.sequential.nearest_neighbor as nn
-from   spinifel import settings, utils, autocorrelation
+from   spinifel import settings, utils, autocorrelation, checkpoint
 
 
 
@@ -38,7 +38,7 @@ def match(slices_, model_slices, ref_orientations, batch_size=None):
     return ref_orientations[index]
 
 @nvtx.annotate("sequential/orientation_matching.py", is_prefix=True)
-def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_reciprocal):
+def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_reciprocal, rank):
     """
     Determine orientations of the data images by minimizing the euclidean distance with the reference images 
     computed by randomly slicing through the autocorrelation.
@@ -106,4 +106,25 @@ def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_rec
     en_match = time.monotonic()
 
     print(f"Match tot:{en_match-st_init:.2f}s. slice={en_slice-st_slice:.2f}s. match={en_match-st_match:.2f}s. slice_oh={st_slice-st_init:.2f}s. match_oh={st_match-en_slice:.2f}s.")
+
+    if 1:#comm.rank == 0:
+        myRes = {
+            'pixel_position_reciprocal': pixel_position_reciprocal,
+            'pixel_distance_reciprocal': pixel_distance_reciprocal,
+            'slices_': slices_,
+            'Mquat': Mquat,
+            'N_orientations': N_orientations,
+            'N_batch_size': N_batch_size,
+            'N_pixels': N_pixels,
+            'N_slices': N_slices,
+            'ref_orientations': ref_orientations,
+            'ref_rotmat': ref_rotmat,
+            'model_slices_new': model_slices_new,
+            'index': index,
+            'data_model_scaling_ratio': data_model_scaling_ratio,
+            'model_slice_output': model_slices*data_model_scaling_ratio,
+            'ac': ac
+        }
+        checkpoint.save_checkpoint(myRes, settings.out_dir, rank, tag="slice_and_match")
+
     return ref_orientations[index], model_slices*data_model_scaling_ratio

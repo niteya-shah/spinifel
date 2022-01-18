@@ -39,7 +39,7 @@ def core_problem(comm, uvect, H_, K_, L_, ac_support, weights, M, N,
 def setup_linops(comm, H, K, L, data,
                  ac_support, weights, x0,
                  M, N, reciprocal_extent,
-                 rlambda,
+                 rlambda,flambda,
                  use_reciprocal_symmetry):
     """Define W and d parts of the W @ x = d problem.
 
@@ -57,7 +57,8 @@ def setup_linops(comm, H, K, L, data,
     H_ = H.flatten() / reciprocal_extent * np.pi / settings.oversampling
     K_ = K.flatten() / reciprocal_extent * np.pi / settings.oversampling
     L_ = L.flatten() / reciprocal_extent * np.pi / settings.oversampling
-    
+    F_antisupport = gen_F_antisupport_cmtip(M)
+
     # Using upsampled convolution technique instead of ADA
     M_ups = settings.M_ups
     ugrid_conv = autocorrelation.adjoint(
@@ -70,13 +71,14 @@ def setup_linops(comm, H, K, L, data,
         """Define W part of the W @ x = d problem."""
         uvect_ADA = autocorrelation.core_problem_convolution(
             uvect, M, F_ugrid_conv_, M_ups, ac_support, use_reciprocal_symmetry)
+        uvect_FDF = autocorrelation.fourier_reg(uvect, ac_support, F_antisupport, M, use_reciprocal_symmetry)
         if False:  # Debug/test -> make sure all cg are in sync (same lambdas)
             print("*** check toeplitz", flush=True)
             uvect_ADA_old = core_problem(
                  comm, uvect, H_, K_, L_, ac_support, weights, M, N,
                  reciprocal_extent, use_reciprocal_symmetry)
             assert np.allclose(uvect_ADA, uvect_ADA_old)            
-        uvect = uvect_ADA + rlambda*uvect
+        uvect = uvect_ADA + rlambda*uvect + flambda*uvect_FDF
         return uvect
 
     W = LinearOperator(
@@ -232,8 +234,10 @@ def solve_ac(generation,
     weights = np.ones(N)
     
     # Use scalable heuristic for regularization lambda
-    rlambda = np.logspace(-20, 20, comm.size)[comm.rank]
-    
+    Mtot = M**3
+    rlambda = Mtot/N #np.logspace(-20, 20, comm.size)[comm.rank]
+    flambda = 1e3
+
     maxiter = settings.solve_ac_maxiter
 
     # Log central slice L~=0
@@ -255,14 +259,14 @@ def solve_ac(generation,
     W, d = setup_linops(comm, H, K, L, data,
                         ac_support, weights, x0,
                         M, N, reciprocal_extent,
-                        rlambda,
+                        rlambda, flambda,
                         use_reciprocal_symmetry)
     
     # W_0 and d_0 are given by defining W and d with rlambda=0
     W_0, d_0 = setup_linops(comm, H, K, L, data,
                         ac_support, weights, x0,
                         M, N, reciprocal_extent,
-                        0,
+                        0, flambda,
                         use_reciprocal_symmetry)
 
     ret, info = cg(W, d, x0=x0, maxiter=maxiter, callback=callback)
@@ -323,6 +327,7 @@ def solve_ac(generation,
         print('lambdas =', lambdas)
         print('solns =', solns)
 
+        """
         if generation == 0:
             # Expect non-convergence => weird results
             # Heuristic: retain rank with highest rlambda and high solution norm
@@ -371,8 +376,8 @@ def solve_ac(generation,
             fig.tight_layout()
             plt.savefig(settings.out_dir / f"summary_{generation}.png")
             plt.close('all')
-
-        ref_rank = ranks[iref]
+        """
+        ref_rank = 0#ranks[iref]
 
     else:
         ref_rank = -1
@@ -395,6 +400,7 @@ def solve_ac(generation,
 
     return ac
 
+"""
 def solve_ac_cmtip(generation,
              pixel_position_reciprocal,
              pixel_distance_reciprocal,
@@ -442,8 +448,8 @@ def solve_ac_cmtip(generation,
     
     # Use scalable heuristic for regularization lambda
     alambda = 1
-    rlambda = Mtot/N * 2**(comm.rank - comm.size/2)
-    flambda = 1e5 * pow(10, comm.rank - comm.size//2)
+    rlambda = Mtot/N #Mtot/N * 2**(comm.rank - comm.size/2)
+    flambda = 1e3 #1e5 * pow(10, comm.rank - comm.size//2)
     maxiter = settings.solve_ac_maxiter ## 100
 
     # Log central slice L~=0
@@ -574,3 +580,4 @@ def solve_ac_cmtip(generation,
         print(f"Keeping result from rank {ref_rank}.")
 
     return ac
+"""

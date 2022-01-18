@@ -5,7 +5,7 @@ import numpy as np
 import PyNVTX as nvtx
 
 from .prep import get_data
-from .autocorrelation import solve_ac, solve_ac_cmtip
+from .autocorrelation import solve_ac
 from .phasing import phase, phase_cmtip
 from .orientation_matching import match
 
@@ -14,7 +14,7 @@ from .orientation_matching import match
 @nvtx.annotate("mpi/main.py", is_prefix=True)
 def main():
     np.random.seed(0)
-    use_cmtip = 1
+    use_cmtip = 0
     use_orientations = 0
 
     comm = contexts.comm
@@ -27,6 +27,14 @@ def main():
     N_big_data_nodes = comm.size
     max_events = min(settings.N_images_max, N_big_data_nodes*N_images_per_rank)
     writer_rank = 0 # pick writer rank as core 0
+
+    # read in AC
+    #import os, pickle
+    #path="/global/cscratch1/sd/chuck/spinifel_output/orient"
+    #fname=os.path.join(path,f"generation_1_solve_ac.pickle")
+    #with open(fname, 'rb') as handle:
+    #    res = pickle.load(handle)
+    #    ac = res['ac'] # output
 
     # Reading input images using psana2
     ds = None
@@ -124,6 +132,15 @@ def main():
         else:
             ac_phased, support_, rho_ = phase(curr_gen, ac)
         logger.log(f"Problem phased in {timer.lap():.2f}s.")
+        if comm.rank == 0:
+            myRes = { 
+                     'ac': ac,
+                     'ac_phased': ac_phased,
+                     'support_': support_,
+                     'rho_': rho_
+                    }
+            checkpoint.save_checkpoint(myRes, settings.out_dir, curr_gen, tag="phase")
+        #ac_phased = ac # FIXME
 
         if comm.rank == 0:
             # Save electron density and intensity
@@ -153,7 +170,7 @@ def main():
         # Orientation matching
         orientations, model_slices = match(
             ac_phased, slices_,
-            pixel_position_reciprocal, pixel_distance_reciprocal)
+            pixel_position_reciprocal, pixel_distance_reciprocal, comm.rank)
         logger.log(f"Orientations matched in {timer.lap():.2f}s.")
 
         if comm.rank == 0:
