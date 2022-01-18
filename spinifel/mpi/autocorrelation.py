@@ -13,7 +13,7 @@ from scipy.sparse.linalg import LinearOperator, cg
 
 from spinifel import settings, utils, image, autocorrelation, contexts
 
-        
+
 @nvtx.annotate("mpi/autocorrelation.py", is_prefix=True)
 def reduce_bcast(comm, vect):
     vect = np.ascontiguousarray(vect)
@@ -36,7 +36,7 @@ def core_problem(comm, uvect, H_, K_, L_, ac_support, weights, M, N,
 
 
 @nvtx.annotate("mpi/autocorrelation.py", is_prefix=True)
-def setup_linops(comm, H, K, L, data,
+def setup_linops(comm, generation, H, K, L, data,
                  ac_support, weights, x0,
                  M, N, reciprocal_extent,
                  use_reciprocal_symmetry):
@@ -75,14 +75,26 @@ def setup_linops(comm, H, K, L, data,
     assert np.all(F_antisupport == F_antisupport[:, :, ::-1])
     assert np.all(F_antisupport == F_antisupport[::-1, ::-1, ::-1])
 
+    ### weight the old data to have uniform weighted density, i.e., set the first N points to something like 1/(N_images/(2*|q|)) and set the rest of the weights to 1
+    weights /= (settings.N_images_per_rank/(2*np.abs(q_)))
+    M_ups = settings.M_ups
+    ugrid_conv = autocorrelation.adjoint(
+            np.ones_like(data)*weights, H_, K_, L_, 1, M_ups,
+            reciprocal_extent, use_reciprocal_symmetry)
+    ugrid_conv = reduce_bcast(comm, ugrid_conv)
+    F_ugrid_conv_ = np.fft.fftn(np.fft.ifftshift(ugrid_conv)) #/ M**3
+    F_ugrid_conv = np.fft.fftshift(F_ugrid_conv_)
+
     ### 1-1) expand q regions to the H, K, L arrays
     ### take care of the corners;
     ### if there's a beamstep, add an extra < inequality for the missing center
-    q_fake = np.where(Qu_[:,:,:]>np.pi/settings.oversampling)
+    #q_fake = np.where(Qu_[:,:,:]>np.pi/settings.oversampling)
+    q_fake = np.where(np.abs(F_ugrid_conv)<=0.1*np.max(np.abs(F_ugrid_conv)))
     print('q_fake =', q_fake)
-    Hf_ = 2*np.pi*q_fake[0]/M-np.pi
-    Kf_ = 2*np.pi*q_fake[1]/M-np.pi
-    Lf_ = 2*np.pi*q_fake[2]/M-np.pi
+    print(f'# of fake q-points =', q_fake[0])
+    Hf_ = 2*np.pi*q_fake[0]/M_ups-np.pi
+    Kf_ = 2*np.pi*q_fake[1]/M_ups-np.pi
+    Lf_ = 2*np.pi*q_fake[2]/M_ups-np.pi
     print('Hf_.shape =', Hf_.shape)
     print('Kf_.shape =', Kf_.shape)
     print('Lf_.shape =', Lf_.shape)
@@ -118,16 +130,17 @@ def setup_linops(comm, H, K, L, data,
     ### 3) apply different weights to different regions
     qf_ = np.sqrt(Hf_**2+Kf_**2+Lf_**2)
     print('qf_.shape =', qf_.shape)
-    ### weight the old data to have uniform weighted density, i.e., set the first N points to something like 1/(N_images/(2*|q|)) and set the rest of the weights to 1
-    N_images = settings.N_images_per_rank
-    print('N_images =', N_images)
-    weights /= (N_images/(2*np.abs(q_)))
     print('weights =', weights)
     print('np.max(weights) =', np.max(weights))
     weightsf = np.zeros(Hf_.shape[0]) # <- turn off weightsf
     weightsf = np.ones(Hf_.shape[0]) # <- turn on weightsf
     print('weightsf =', weightsf)
-    scaling_factor = np.linalg.norm(weights)/np.linalg.norm(weightsf)
+    num_qpoints = (settings.M_ups)**3 - Hf_.shape[0]
+    print('num_qpoints = ', num_qpoints)
+    num_qpoints_f = Hf_.shape[0]
+    print('num_qpoints_f =', num_qpoints_f)
+    scaling_factor = num_qpoints_f/num_qpoints * np.linalg.norm(weights)/np.linalg.norm(weightsf)
+    scaling_factor /= comm.size
     print('scaling_factor =', scaling_factor)
     weights /= scaling_factor
     print('weights =', weights)
@@ -140,12 +153,12 @@ def setup_linops(comm, H, K, L, data,
     print('nuvect_ones.shape =', nuvect_ones.shape)
 
     ### compute type-1 NUFFT (nonuniform to uniform grid) with the nonuniform data replaced with 1's
-    M_ups = settings.M_ups
     ugrid_conv = autocorrelation.adjoint(
             nuvect_ones, H_, K_, L_, 1, M_ups, 
             reciprocal_extent, use_reciprocal_symmetry)
     ugrid_conv = reduce_bcast(comm, ugrid_conv)
     F_ugrid_conv_ = np.fft.fftn(np.fft.ifftshift(ugrid_conv)) #/ M**3
+    F_ugrid_conv = np.fft.fftshift(F_ugrid_conv_)
 
     def W_matvec(uvect):
         """Define W part of the W @ x = d problem."""
@@ -207,6 +220,10 @@ def solve_ac(generation,
     # Generate random orientations in SO(3)
     if orientations is None:
         orientations = skp.get_random_quat(N_images)
+
+    orientations_mpi = comm.gather(orientations, root=0)
+    orientations_mpi_arr = np.array(orientations_mpi)
+
     # Calculate hkl based on orientations
     H, K, L = autocorrelation.gen_nonuniform_positions(
         orientations, pixel_position_reciprocal)
@@ -246,7 +263,7 @@ def solve_ac(generation,
 
     x0 = ac_estimate.flatten()
 
-    W, d = setup_linops(comm, H, K, L, data,
+    W, d = setup_linops(comm, generation, H, K, L, data,
                         ac_support, weights, x0,
                         M, N, reciprocal_extent,
                         use_reciprocal_symmetry)
