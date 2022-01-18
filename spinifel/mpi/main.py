@@ -98,9 +98,7 @@ def main():
         if comm.rank == 0:
             # Save electron density and intensity
             rho = np.fft.ifftshift(rho_)
-            intensity = np.fft.ifftshift(np.abs(np.fft.fftshift(ac_phased)**2))
             save_mrc(settings.out_dir / f"ac-{curr_gen}.mrc", ac_phased)
-            save_mrc(settings.out_dir / f"intensity-{curr_gen}.mrc", intensity)
             save_mrc(settings.out_dir / f"rho-{curr_gen}.mrc", rho)
 
     # Use improvement of cc(prev_rho, cur_rho) to dertemine if we should
@@ -148,9 +146,7 @@ def main():
         if comm.rank == 0:
             # Save electron density and intensity
             rho = np.fft.ifftshift(rho_)
-            intensity = np.fft.ifftshift(np.abs(np.fft.fftshift(ac_phased)**2))
             save_mrc(settings.out_dir / f"ac-{generation}.mrc", ac_phased)
-            save_mrc(settings.out_dir / f"intensity-{generation}.mrc", intensity)
             save_mrc(settings.out_dir / f"rho-{generation}.mrc", rho)
 
             # Save output
