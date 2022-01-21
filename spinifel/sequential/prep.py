@@ -21,7 +21,6 @@ def get_pixel_position_reciprocal():
     return pixel_position_reciprocal
 
 
-
 @nvtx.annotate("sequential/prep.py", is_prefix=True)
 def get_pixel_index_map():
     """
@@ -32,7 +31,6 @@ def get_pixel_index_map():
                                dtype=pixel_index_type)
     prep.load_pixel_index_map(pixel_index_map)
     return pixel_index_map
-
 
 
 @nvtx.annotate("sequential/prep.py", is_prefix=True)
@@ -59,7 +57,6 @@ def get_slices(N_images, ds):
                 if i >= N_images:
                     return slices_
     return slices_
-
 
 
 @nvtx.annotate("sequential/prep.py", is_prefix=True)

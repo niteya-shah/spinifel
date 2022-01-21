@@ -8,6 +8,14 @@ from mpi4py import MPI
 from spinifel import settings, prep, image, contexts
 
 
+#_______________________________________________________________________________
+# Initialize logging for this module
+#
+
+from ..utils import getLogger, fully_qualified_module_name
+logger = getLogger(fully_qualified_module_name())
+
+
 @nvtx.annotate("mpi/prep.py", is_prefix=True)
 def get_pixel_position_reciprocal(comm):
     """Rank0 broadcast pixel reciprocal positions from input file."""
@@ -40,7 +48,7 @@ def get_orientations_prior(comm, N_images_per_rank):
                        dtype=data_type)
     i_start = comm.rank * N_images_per_rank
     i_end = i_start + N_images_per_rank
-    print(f"get_orientations_prior rank={comm.rank} st={i_start} en={i_end}")
+    logger.info(f"get_orientations_prior rank={comm.rank} st={i_start} en={i_end}")
     prep.load_orientations_prior(orientations_prior, i_start, i_end)
     return orientations_prior
 
@@ -54,7 +62,7 @@ def get_slices(comm, N_images_per_rank, ds):
     if ds is None:
         i_start = comm.rank * N_images_per_rank
         i_end = i_start + N_images_per_rank
-        print(f"get_slices rank={comm.rank} st={i_start} en={i_end}")
+        logger.info(f"get_slices rank={comm.rank} st={i_start} en={i_end}")
         prep.load_slices(slices_, i_start, i_end)
         return slices_
     else:
@@ -69,7 +77,6 @@ def get_slices(comm, N_images_per_rank, ds):
                         f"Rank {comm.rank} received too many events.")
                 i += 1
         return slices_[:i]
-
 
 
 @nvtx.annotate("mpi/prep.py", is_prefix=True)

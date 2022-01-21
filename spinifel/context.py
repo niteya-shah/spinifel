@@ -14,6 +14,19 @@ from callmonitor    import intercept as cm_intercept
 from .settings import SpinifelSettings
 from .utils    import Singleton
 
+
+#_______________________________________________________________________________
+# Initialize logging for this module
+#
+
+from .utils import getLogger, fully_qualified_module_name
+logger = getLogger(fully_qualified_module_name())
+
+
+#_______________________________________________________________________________
+# Load modules based on availability
+#
+
 MPI4PY_AVAILABLE = False
 if find_spec("mpi4py") is not None:
     import mpi4py
@@ -26,9 +39,6 @@ if find_spec("pycuda") is not None:
     # import pycuda
     import pycuda.driver as drv
     PYCUDA_AVAILABLE = True
-
-
-
 
 
 class SpinifelContexts(metaclass=Singleton):
@@ -74,9 +84,7 @@ class SpinifelContexts(metaclass=Singleton):
 
         register(MPI.Finalize)
 
-        settings = SpinifelSettings()
-        if settings.verbose:
-            print(f"MPI has been initialized on rank {self.rank}")
+        logger.debug(f"MPI has been initialized on rank {self.rank}")
 
         self._mpi_initialized = True
 
@@ -108,8 +116,7 @@ class SpinifelContexts(metaclass=Singleton):
             register(self.ctx.pop)
 
         settings = SpinifelSettings()
-        if settings.verbose:
-            print(f"Rank {self.rank} assigned to device {self.dev_id}")
+        logger.debug(f"Rank {self.rank} assigned to device {self.dev_id}")
 
         self._cuda_initialized = True
 
@@ -164,7 +171,6 @@ class SpinifelContexts(metaclass=Singleton):
         """
         loader = find_spec("finufftpy")
         return loader is not None
-
 
 
 class Profiler(metaclass=Singleton):

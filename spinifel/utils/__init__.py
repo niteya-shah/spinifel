@@ -1,5 +1,5 @@
 from .singleton  import Singleton
-from .logging    import Logger, getLogger, setLevel
+from .logging    import getLogger, setLevel, SilentLogger
 from .timer      import Timer
 from .iter_tools import prod
 from .job_tools  import getMyUnfairShare

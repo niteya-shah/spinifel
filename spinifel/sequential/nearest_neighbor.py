@@ -6,8 +6,7 @@ from   sklearn.metrics.pairwise import euclidean_distances
 from   spinifel                 import SpinifelSettings, SpinifelContexts
 
 
-
-#______________________________________________________________________________
+#_______________________________________________________________________________
 # Load global settings, and contexts
 #
 
@@ -16,6 +15,13 @@ settings = SpinifelSettings()
 
 rank = context.rank
 
+
+#_______________________________________________________________________________
+# Initialize logging for this module
+#
+
+from ..utils import getLogger, fully_qualified_module_name
+logger = getLogger(fully_qualified_module_name())
 
 
 #_______________________________________________________________________________
@@ -31,11 +37,9 @@ class CUKNNRequiredButNotFound(Exception):
     """
 
 
-
 KNN_LOADER    = find_spec("spinifel.sequential.pyCudaKNearestNeighbors")
 KNN_AVAILABLE = KNN_LOADER is not None
-if settings.verbose:
-    print(f"pyCudaKNearestNeighbors is available: {KNN_AVAILABLE}")
+logger.debug(f"pyCudaKNearestNeighbors is available: {KNN_AVAILABLE}")
 
 if settings.use_cuda and KNN_AVAILABLE:
     import spinifel.sequential.pyCudaKNearestNeighbors as pyCu
@@ -48,8 +52,8 @@ elif settings.use_cuda and not KNN_AVAILABLE:
 @nvtx.annotate("sequential/nearest_neighbor.py", is_prefix=True)
 def generate_weights(pixel_position_reciprocal, order=0):
     """
-    Generate weights: 1/(pixel_position_reciprocal)^order,
-    to counteract the decay of the SAXS pattern.
+    Generate weights: 1/(pixel_position_reciprocal)^order, to counteract the
+    decay of the SAXS pattern.
     :param pixel_position_reciprocal: reciprocal space position of each pixel
     :param order: power, uniform weights if zero
     :return weights: resolution-based weight of each pixel
@@ -88,34 +92,36 @@ def calc_argmin_gpu(euDist, n_images, n_refs, n_pixels, deviceId):
     return index
 
 
-
 @nvtx.annotate("sequential/nearest_neighbor.py", is_prefix=True)
 def nearest_neighbor(model_slices, slices, batch_size):
 
     if settings.use_cuda:
         deviceId = rank % settings._devices_per_node
-        if settings.verbose:
-            print(f"Using CUDA  to calculate Euclidean distance and heap sort (batch_size={batch_size})")
-            print(f"Rank {rank} using deviceId {deviceId}")
-        
+        logger.debug(f"Using CUDA  to calculate Euclidean distance and heap sort (batch_size={batch_size})")
+        logger.debug(f"Rank {rank} using deviceId {deviceId}")
+
         # Calculate Euclidean distance in batch to avoid running out of GPU Memory
         euDist = np.zeros((slices.shape[0], model_slices.shape[0]), dtype=slices.dtype)
         for i in range(model_slices.shape[0]//batch_size):
             st = i * batch_size
             en = st + batch_size
-            euDist[:, st:en] = calc_eudist_gpu(model_slices[st:en], slices, deviceId).reshape(slices.shape[0], batch_size)
+            euDist[:, st:en] = calc_eudist_gpu(
+                model_slices[st:en],
+                slices,
+                deviceId
+            ).reshape(slices.shape[0], batch_size)
         euDist = euDist.flatten()
-        
-        index = calc_argmin_gpu(euDist, 
-                            slices.shape[0],
-                            model_slices.shape[0],
-                            slices.shape[1],
-                            deviceId)
+
+        index = calc_argmin_gpu(
+            euDist, 
+            slices.shape[0],
+            model_slices.shape[0],
+            slices.shape[1],
+            deviceId
+        )
     else:
-        if settings.verbose:
-            print("Using sklearn Euclidean Distance and numpy argmin")
+        logger.debug("Using sklearn Euclidean Distance and numpy argmin")
         euDist    = euclidean_distances(model_slices, slices)
         index  = np.argmin(euDist, axis=0)
 
     return index
-

@@ -5,6 +5,13 @@ import PyNVTX  as nvtx
 from spinifel import autocorrelation
 
 
+#_______________________________________________________________________________
+# Initialize logging for this module
+#
+
+from .utils import getLogger, fully_qualified_module_name
+logger = getLogger(fully_qualified_module_name())
+
 
 @nvtx.annotate("slicing.py", is_prefix=True)
 def gen_model_slices(ac, ref_orientations, 
@@ -32,18 +39,17 @@ def gen_model_slices(ac, ref_orientations,
         nuvect = autocorrelation.forward(
                  ac, H_, K_, L_, 1, ac_support_size, N, reciprocal_extent, True)
     elif override_forward_with == 'cpu':
-        print(f'gen_model_slices override using forward_cpu')
+        logger.info(f'gen_model_slices override using forward_cpu')
         nuvect = autocorrelation.forward_cpu(
                  ac, H_, K_, L_, 1, ac_support_size, N, reciprocal_extent, True)
     elif override_forward_with == 'gpu':
-        print(f'gen_model_slices override using forward_gpu')
+        logger.info(f'gen_model_slices override using forward_gpu')
         nuvect = autocorrelation.forward_gpu(
                  ac, H_, K_, L_, 1, ac_support_size, N, reciprocal_extent, True)
 
     model_slices = nuvect.real
 
     return model_slices
-
 
 
 @nvtx.annotate("slicing.py", is_prefix=True)
@@ -78,7 +84,4 @@ def gen_model_slices_batch(ac, ref_orientations, pixel_position_reciprocal,
                 pixel_position_reciprocal, reciprocal_extent,
                 oversampling, ac_support_size, N_pixels, override_forward_with)
 
-
     return model_slices_batch
-        
-

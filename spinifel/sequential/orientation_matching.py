@@ -8,12 +8,20 @@ import spinifel.sequential.nearest_neighbor as nn
 from   spinifel import settings, utils, autocorrelation
 
 
+#_______________________________________________________________________________
+# Initialize logging for this module
+#
+
+from ..utils import getLogger, fully_qualified_module_name
+logger = getLogger(fully_qualified_module_name())
+
 
 @nvtx.annotate("sequential/orientation_matching.py", is_prefix=True)
 def match(slices_, model_slices, ref_orientations, batch_size=None):
     """ 
-    Determine orientations of the data images (slices_) by minimizing the euclidean distance 
-    with the reference images (model_slices) and return orientations which give the best match.
+    Determine orientations of the data images (slices_) by minimizing the
+    euclidean distance with the reference images (model_slices) and return
+    orientations which give the best match.
    
     :param slice_: data images
     :param mode_slices: reference images
@@ -41,10 +49,11 @@ def match(slices_, model_slices, ref_orientations, batch_size=None):
 @nvtx.annotate("sequential/orientation_matching.py", is_prefix=True)
 def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_reciprocal):
     """
-    Determine orientations of the data images by minimizing the euclidean distance with the reference images 
-    computed by randomly slicing through the autocorrelation.
-    MONA: This is a current hack to support Legion. For MPI, slicing is done separately 
-    from orientation matching.
+    Determine orientations of the data images by minimizing the euclidean
+    distance with the reference images computed by randomly slicing through the
+    autocorrelation.
+    MONA: This is a current hack to support Legion. For MPI, slicing is done
+    separately from orientation matching.
 
     :param ac: autocorrelation of the current electron density estimate
     :param slices_: data images
@@ -95,7 +104,7 @@ def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_rec
     # Imaginary part ~ numerical error
     model_slices_new = model_slices_new.reshape((N_orientations, N_pixels))
     data_model_scaling_ratio = slices_.std() / model_slices_new.std()
-    print(f"Data/Model std ratio: {data_model_scaling_ratio}.", flush=True)
+    logger.info(f"Data/Model std ratio: {data_model_scaling_ratio}.")
     model_slices_new *= data_model_scaling_ratio
     
     # Calculate Euclidean distance in batch to avoid running out of GPU Memory
@@ -103,5 +112,5 @@ def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_rec
     index = nn.nearest_neighbor(model_slices_new, slices_, N_batch_size)
     en_match = time.monotonic()
 
-    print(f"Match tot:{en_match-st_init:.2f}s. slice={en_slice-st_slice:.2f}s. match={en_match-st_match:.2f}s. slice_oh={st_slice-st_init:.2f}s. match_oh={st_match-en_slice:.2f}s.")
+    logger.info(f"Match tot:{en_match-st_init:.2f}s. slice={en_slice-st_slice:.2f}s. match={en_match-st_match:.2f}s. slice_oh={st_slice-st_init:.2f}s. match_oh={st_match-en_slice:.2f}s.")
     return ref_orientations[index]

@@ -13,6 +13,14 @@ from scipy.sparse.linalg import LinearOperator, cg
 
 from spinifel import settings, utils, image, autocorrelation, contexts
 
+
+#_______________________________________________________________________________
+# Initialize logging for this module
+#
+
+from ..utils import getLogger, fully_qualified_module_name
+logger = getLogger(fully_qualified_module_name())
+
         
 @nvtx.annotate("mpi/autocorrelation.py", is_prefix=True)
 def reduce_bcast(comm, vect):
@@ -107,9 +115,9 @@ def solve_ac(generation,
 
     M = settings.M
     N_images = slices_.shape[0] # N images per rank
-    print('N_images =', N_images)
+    logger.info(f"{N_images=}")
     N = int(utils.prod(slices_.shape)) # N images per rank x number of pixels per image = number of pixels per rank
-    print('N =', N)
+    logger.info(f"{N=}")
     reciprocal_extent = pixel_distance_reciprocal.max()
     use_reciprocal_symmetry = True
     ref_rank = -1 
@@ -179,14 +187,14 @@ def solve_ac(generation,
     ret, info = cg(W, d, x0=x0, maxiter=maxiter, callback=callback)
 
     if info != 0:
-        print(f'WARNING: CG did not converge at rlambda = {rlambda}')
+        logger.warning(f'WARNING: CG did not converge at rlambda = {rlambda}')
 
     soln = (np.linalg.norm(ret)**2).real # solution norm
     resid = (np.dot(ret,W_0.matvec(ret)-2*d_0) + b_squared).real # residual norm
 
     # Rank0 gathers rlambda, solution norm, residual norm from all ranks
     summary = comm.gather((comm.rank, rlambda, info, soln, resid), root=0)
-    print('summary =', summary)
+    logger.info(f"{summary=}")
     if comm.rank == 0:
         ranks, lambdas, infos, solns, resids = [np.array(el) for el in zip(*summary)]
         converged_idx = [i for i, info in enumerate(infos) if info == 0]
@@ -194,10 +202,10 @@ def solve_ac(generation,
         lambdas = np.array(lambdas)[converged_idx]
         solns = np.array(solns)[converged_idx]
         resids = np.array([item for sublist in resids for item in sublist])[converged_idx]
-        print('ranks =', ranks)
-        print('lambdas =', lambdas)
-        print('solns =', solns)
-        print('resids =', resids)
+        logger.info(f"{ranks=}")
+        logger.info(f"{lambdas=}")
+        logger.info(f"{solns=}")
+        logger.info(f"{resids=}")
 
         if generation == 0:
             # Expect non-convergence => weird results
@@ -205,7 +213,7 @@ def solve_ac(generation,
             idx = solns >= np.mean(solns)
             imax = np.argmax(lambdas[idx])
             iref = np.arange(len(ranks), dtype=int)[idx][imax]
-            print('iref =', iref)
+            logger.info(f"{iref=}")
         else:
             # Heuristic: L-curve criterion
             # Take corner of L-curve
@@ -214,7 +222,7 @@ def solve_ac(generation,
             lambdas = np.sort(lambdas) # sort lambdas in increasing order
             allCoord = np.log(valuePair) # coordinates of the loglog L-curve
             nPoints = len(resids)
-            if nPoints == 0: print('WARNING: no converged solution')
+            if nPoints == 0: logger.warning('WARNING: no converged solution')
             firstPoint = allCoord[0]
             lineVec = allCoord[-1] - allCoord[0]
             lineVecNorm = lineVec / np.sqrt(np.sum(lineVec**2))
@@ -224,7 +232,7 @@ def solve_ac(generation,
             vecToLine = vecFromFirst - vecFromFirstParallel
             distToLine = np.sqrt(np.sum(vecToLine ** 2, axis=1))
             iref = np.argmax(distToLine)
-            print('iref =', iref)
+            logger.info(f"{iref=}")
             ref_rank = ranks[iref]
 
             # Log L-curve plot
@@ -256,7 +264,7 @@ def solve_ac(generation,
     # Set up ac volume
     ac = ret.reshape((M,)*3)
     ac = np.ascontiguousarray(ac.real).astype(np.float64)
-    print(f"Rank {comm.rank} got AC in {callback.counter} iterations.", flush=True)
+    logger.info(f"Rank {comm.rank} got AC in {callback.counter} iterations.")
 
     # Log autocorrelation volume
     image.show_volume(ac, settings.Mquat, f"autocorrelation_{generation}_{comm.rank}.png")
@@ -264,6 +272,6 @@ def solve_ac(generation,
     # Rank[ref_rank] broadcasts its autocorrelation
     comm.Bcast(ac, root=ref_rank)
     if comm.rank == 0:
-        print(f"Keeping result from rank {ref_rank}.")
+        logger.info(f"Keeping result from rank {ref_rank}.")
 
     return ac

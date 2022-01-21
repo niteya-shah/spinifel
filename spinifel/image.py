@@ -8,7 +8,6 @@ from matplotlib.colors import LogNorm, SymLogNorm
 from spinifel import settings
 
 
-
 @nvtx.annotate("image.py", is_prefix=True)
 def show_image(pixel_index_map, image, filename):
     # load image data
@@ -24,7 +23,6 @@ def show_image(pixel_index_map, image, filename):
     plt.savefig(settings.out_dir / filename)
     plt.cla()
     plt.clf()
-
 
 
 @nvtx.annotate("image.py", is_prefix=True)

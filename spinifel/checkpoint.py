@@ -2,6 +2,7 @@ import pickle
 from pathlib import Path
 import os
 
+
 def generate_checkpoint_name(outdir: str, gen_num: int, tag='') -> str:
     """Constructs and returns full path of a pickle filename"""
     fname = f'generation_{gen_num}'
@@ -27,5 +28,3 @@ def load_checkpoint(outdir: str, gen_num: int, tag='') -> dict:
     fname = generate_checkpoint_name(outdir, gen_num, tag)
     with open(fname, 'rb') as handle:
         return pickle.load(handle)
-
-

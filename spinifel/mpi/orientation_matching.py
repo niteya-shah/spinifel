@@ -3,7 +3,6 @@ import PyNVTX as nvtx
 from spinifel.sequential.orientation_matching import slicing_and_match as sequential_match
 
 
-
 @nvtx.annotate("mpi/orientation_matching.py", is_prefix=True)
 def match(ac, slices_, pixel_position_reciprocal, pixel_distance_reciprocal):
     # The reference orientations don't have to match exactly between ranks.

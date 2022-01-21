@@ -22,4 +22,3 @@ def phase(generation, ac, support_=None, rho_=None):
     comm.Bcast(rho_, root=0)
 
     return ac_phased, support_, rho_
-

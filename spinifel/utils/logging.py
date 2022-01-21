@@ -64,12 +64,13 @@ def setLevel(level):
     logger_settings.level = level
 
 
-
-
-class Logger():
-    def __init__(self, active):
-        self.active = active
-
-    def log(self, msg):
-        if self.active:
-            print(msg, flush=True)
+class SilentLogger():
+    """
+    Do-nothing logger to silence non-logging MPI ranks
+    """
+    def __init__(self):
+        pass
+    def info(self, msg):
+        pass
+    def debug(self, msg):
+        pass

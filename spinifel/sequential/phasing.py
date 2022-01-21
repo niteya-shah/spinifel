@@ -4,19 +4,27 @@ import PyNVTX as nvtx
 
 from spinifel import SpinifelSettings, settings, image
 
-# settings = SpinifelSettings()
+
+#_______________________________________________________________________________
+# Initialize logging for this module
+#
+
+from ..utils import getLogger, fully_qualified_module_name
+logger = getLogger(fully_qualified_module_name())
+
+
+#_______________________________________________________________________________
+# Load Numpy/CuPy based on settings/availability
+#
 
 xp = np
 if settings.use_cupy:
-    if settings.verbose:
-        print(f"Using CuPy for FFTs.")
+    logger.debug(f"Using CuPy for FFTs.")
     import cupy as xp
     from cupyx.scipy.ndimage import gaussian_filter
 else:
-    if settings.verbose:
-        print(f"Using NumPy for FFTs.")
+    logger.debug(f"Using NumPy for FFTs.")
     from scipy.ndimage import gaussian_filter
-
 
 # Convention:
 #   In this module, trailing underscores are used to refer to numpy
@@ -34,6 +42,8 @@ else:
 # but this won't be done here at each iteration.
 # Please mind the difference when comparing results.
 
+
+#-------------------------------------------------------------------------------
 
 
 @nvtx.annotate("sequential/phasing.py", is_prefix=True)
@@ -268,8 +278,7 @@ def phase(generation, ac, support_=None, rho_=None):
     ER_loop(nER, rho_, amplitudes_, amp_mask_, support_, rho_max)
 
     if settings.use_cupy:
-        if settings.verbose:
-            print(f"Converting CuPy arrays to NumPy arrays.")    
+        logger.debug(f"Converting CuPy arrays to NumPy arrays.")
         rho_ = xp.asnumpy(rho_)
         amplitudes_ = xp.asnumpy(amplitudes_)
         amp_mask_ = xp.asnumpy(amp_mask_)

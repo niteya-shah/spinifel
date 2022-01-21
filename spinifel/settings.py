@@ -2,9 +2,7 @@
 # -*- coding: utf-8 -*-
 
 
-
 """Manage global settings for Spinifel"""
-
 
 
 from os       import environ
@@ -17,12 +15,18 @@ from argparse import ArgumentParser
 from .utils import Singleton
 
 
+#_______________________________________________________________________________
+# Initialize logging for this module
+#
+
+from .utils import getLogger, fully_qualified_module_name
+logger = getLogger(fully_qualified_module_name())
+
 
 class MalformedSettingsException(Exception):
     """
     Raise this error whenever settings inputs don't follow the format: `a.b = c`
     """
-
 
 
 class CannotProcessSettingsFile(Exception):
@@ -33,13 +37,11 @@ class CannotProcessSettingsFile(Exception):
     """
 
 
-
 class NotAVector(Exception):
     """
     Raise this error whenever trying to parse a vector representation that is
     malformed in any way.
     """
-
 
 
 def get_str(x):
@@ -49,13 +51,11 @@ def get_str(x):
     return environ[x]
 
 
-
 def get_path(x):
     """
     Return string representation of the environment variable `x`
     """
     return Path(environ[x])
-
 
 
 def str2bool(x):
@@ -66,7 +66,6 @@ def str2bool(x):
     return x.lower() in yes
 
 
-
 def get_bool(x):
     """
     Return boolean representation of the environment variable `x`
@@ -74,13 +73,11 @@ def get_bool(x):
     return str2bool(environ[x].strip())
 
 
-
 def get_int(x):
     """
     Return integer representation of the environment variable `x`
     """
     return int(environ[x])
-
 
 
 def parse_bool(x):
@@ -98,7 +95,6 @@ def parse_bool(x):
         return str2bool(x)
 
     return bool(x)
-
 
 
 def parse_strvec(x, elt_parser):
@@ -136,14 +132,12 @@ def parse_strvec(x, elt_parser):
     )
 
 
-
 def parse_strvec_int(x):
     """
     Narrowing of parse_strvec:
     parse_strvec_int = parse_strvec(___, int)
     """
     return parse_strvec(x, int)
-
 
 
 def parse_strvec_float(x):
@@ -154,14 +148,12 @@ def parse_strvec_float(x):
     return parse_strvec(x, float)
 
 
-
 def parse_strvec_bool(x):
     """
     Narrowing of parse_strvec:
     parse_strvec_int = parse_strvec(___, parse_bool)
     """
     return parse_strvec(x, parse_bool)
-
 
 
 class SpinifelSettings(metaclass=Singleton):
@@ -171,9 +163,7 @@ class SpinifelSettings(metaclass=Singleton):
     Exposes all global settings used by Spinifel
     """
 
-
     def __init__(self):
-
         self.__properties = {
             "_test": (
                 "debug", "test",
@@ -450,11 +440,9 @@ class SpinifelSettings(metaclass=Singleton):
 
         self.refresh()
 
-
     def __fget(self, attr):
         """Creates closure for fget lambda"""
         return lambda x: getattr(self, attr)
-
 
     def __init_internals(self):
         """
@@ -480,12 +468,10 @@ class SpinifelSettings(metaclass=Singleton):
                 )
             )
 
-
     def refresh(self):
         """
         Refresh internal state using environment variables
         """
-
         toml_settings = load(self.__toml)
 
         for param in self.__params:
@@ -520,15 +506,16 @@ class SpinifelSettings(metaclass=Singleton):
             if key not in environ:
                 continue
 
-            print(f"WARNING! The environment variable {key} supersedes all "
-                  f"other inputs for this setting. If this is unintensional "
-                  f"unset {key}.")
+            logger.warning(
+                f"WARNING! The environment variable {key} supersedes all "
+                f"other inputs for this setting. If this is unintensional "
+                f"unset {key}."
+            )
 
             name, env_parser = self.__environ[key]
             env_val = env_parser(key)
 
             setattr(self, name, env_val)
-
 
     def __str__(self):
         propnames = (name for (name, value) in getmembers(self))
@@ -545,7 +532,6 @@ class SpinifelSettings(metaclass=Singleton):
                     str_repr += f"    (derived data)\n"
 
         return str_repr
-
 
     def as_toml(self):
         propnames = (x[1:] for x in self.__properties.keys())
@@ -578,13 +564,11 @@ class SpinifelSettings(metaclass=Singleton):
                 str_repr += f" # {doc} ({categories[c][k]})\n"
         return str_repr
 
-
     def isprop(self, attr):
         """
         Checks if attribute has been decorated using the `@property` decorator
         """
         return isinstance(getattr(type(self), attr, None), property)
-
 
     @property
     def verbose(self):
@@ -593,7 +577,6 @@ class SpinifelSettings(metaclass=Singleton):
         """
         return (self._verbose or      # noqa: E1101 pylint: disable=no-member
                 self._verbosity > 0)  # noqa: E1101 pylint: disable=no-member
-
 
     @property
     def verbosity(self):
@@ -606,7 +589,6 @@ class SpinifelSettings(metaclass=Singleton):
             return 0
         return self._verbosity # noqa: E1101 pylint: disable=no-member
 
-
     @property
     def data_path(self):
         """
@@ -615,7 +597,6 @@ class SpinifelSettings(metaclass=Singleton):
         """
         return self._data_dir / self._data_filename
 
-
     @property
     def ps_smd_n_events(self):
         """
@@ -623,13 +604,11 @@ class SpinifelSettings(metaclass=Singleton):
         """
         return self._ps_smd_n_events # noqa: E1101 pylint: disable=no-member
 
-
     @ps_smd_n_events.setter
     def ps_smd_n_events(self, val):
         self._ps_smd_n_events = val
         # update derived environment variable
         environ["PS_SMD_N_EVENTS"] = str(val)
-
 
     @property
     def ps_eb_nodes(self):
@@ -638,13 +617,11 @@ class SpinifelSettings(metaclass=Singleton):
         """
         return self._ps_eb_nodes # noqa: E1101 pylint: disable=no-member
 
-
     @ps_eb_nodes.setter
     def ps_eb_nodes(self, val):
         self._ps_eb_nodes = val
         # update derived environment variable
         environ["PS_EB_NODES"] = str(val)
-
 
     @property
     def ps_srv_nodes(self):
@@ -653,13 +630,11 @@ class SpinifelSettings(metaclass=Singleton):
         """
         return self._ps_srv_nodes # noqa: E1101 pylint: disable=no-member
 
-
     @ps_srv_nodes.setter
     def ps_srv_nodes(self, val):
         self._ps_srv_nodes = val
         # update derived environment variable
         environ["PS_SRV_NODES"] = str(val)
-
 
     @property
     def pixel_position_shape(self):
@@ -668,14 +643,12 @@ class SpinifelSettings(metaclass=Singleton):
         """
         return self._pixel_position_shape_0 + self._det_shape
 
-
     @property
     def pixel_index_shape(self):
         """
         pixel_index_shape_0 + det_shape
         """
         return self._pixel_index_shape_0 + self._det_shape
-
 
     @property
     def Mquat(self):
@@ -684,14 +657,12 @@ class SpinifelSettings(metaclass=Singleton):
         """
         return int(self._oversampling * 20)
 
-
     @property
     def M(self):
         """
         4*Mquat + 1
         """
         return 4*self.Mquat + 1
-
 
     @property
     def M_ups(self):
@@ -700,11 +671,9 @@ class SpinifelSettings(metaclass=Singleton):
         """
         return 2*self.M
 
-
     @property
     def N_binning_tot(self):
         return self.N_clipping + self.N_binning
-
 
     @property
     def reduced_det_shape(self):
@@ -713,11 +682,9 @@ class SpinifelSettings(metaclass=Singleton):
             self.det_shape[-1] // 2**self.N_binning_tot
         )
 
-
     @property
     def reduced_pixel_position_shape(self):
         return  self.pixel_position_shape_0 + self.reduced_det_shape
-
 
     @property
     def reduced_pixel_index_shape(self):

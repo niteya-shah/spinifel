@@ -12,8 +12,15 @@ import PyNVTX    as nvtx
 from   spinifel  import SpinifelSettings, SpinifelContexts, Profiler, settings
 from   .extern   import nufft_3d_t1, nufft_3d_t2
 
+#_______________________________________________________________________________
+# Initialize logging for this module
+#
 
-#______________________________________________________________________________
+from .utils import getLogger, fully_qualified_module_name
+logger = getLogger(fully_qualified_module_name())
+
+
+#_______________________________________________________________________________
 # Load global settings, and contexts
 #
 
@@ -24,10 +31,8 @@ profiler = Profiler()
 
 xp = np
 if settings.use_cupy:
-    if settings.verbose:
-        print(f"Using CuPy for FFTs.")
+    logger.debug("Using CuPy for FFTs.")
     import cupy as xp
-
 
 
 @profiler.intercept
@@ -49,7 +54,6 @@ def forward(ugrid, H_, K_, L_, support, M, N, recip_extent, use_recip_sym):
     nuvect = nufft_3d_t2(H_, K_, L_, ugrid, -1, 1e-12, N)
 
     return nuvect / M**3
-
 
 
 @profiler.intercept
@@ -74,7 +78,6 @@ def adjoint(nuvect, H_, K_, L_, support, M, recip_extent, use_recip_sym):
     return ugrid / M**3
 
 
-
 @nvtx.annotate("autocorrelation.py", is_prefix=True)
 def core_problem(uvect, H_, K_, L_, ac_support, weights, M, N,
                  reciprocal_extent, use_reciprocal_symmetry):
@@ -88,7 +91,6 @@ def core_problem(uvect, H_, K_, L_, ac_support, weights, M, N,
         reciprocal_extent, use_reciprocal_symmetry)
     uvect_ADA = ugrid_ADA.flatten()
     return uvect_ADA
-
 
 
 @nvtx.annotate("autocorrelation.py", is_prefix=True)
@@ -126,7 +128,6 @@ def core_problem_convolution(uvect, M, F_ugrid_conv_, M_ups, ac_support,
     return ugrid_conv_out.flatten()
 
 
-
 @nvtx.annotate("autocorrelation.py", is_prefix=True)
 def fourier_reg(uvect, support, F_antisupport, M, use_recip_sym):
     ugrid = uvect.reshape((M,) * 3) * support
@@ -150,7 +151,6 @@ def fourier_reg(uvect, support, F_antisupport, M, use_recip_sym):
     return uvect
 
 
-
 @nvtx.annotate("autocorrelation.py", is_prefix=True)
 def gen_nonuniform_positions(orientations, pixel_position_reciprocal):
     # Generate q points (h,k,l) from the given rotations and pixel positions 
@@ -159,7 +159,7 @@ def gen_nonuniform_positions(orientations, pixel_position_reciprocal):
         rotmat = np.array([np.linalg.inv(skp.quaternion2rot3d(quat)) for quat in orientations])
     else:
         rotmat = np.zeros((0, 3, 3))
-        print("WARNING: gen_nonuniform_positions got empty orientation - returning h,k,l for Null rotation")
+        logger.warning("WARNING: gen_nonuniform_positions got empty orientation - returning h,k,l for Null rotation")
 
     # TODO: How to ensure we support all formats of pixel_position reciprocal
     # Current support shape is (3, N_panels, Dim_x, Dim_y) 
@@ -167,7 +167,6 @@ def gen_nonuniform_positions(orientations, pixel_position_reciprocal):
     #H, K, L = np.einsum("ijk,klm->jilm", rotmat, pixel_position_reciprocal)
     # shape -> [N_images] x det_shape
     return H, K, L
-
 
 
 @nvtx.annotate("autocorrelation.py", is_prefix=True)

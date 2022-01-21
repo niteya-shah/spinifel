@@ -8,8 +8,15 @@ from scipy.sparse.linalg import LinearOperator, cg
 
 import skopi as skp
 
-from spinifel import settings, utils, image, autocorrelation
+from spinifel import settings, image, autocorrelation
 
+
+#_______________________________________________________________________________
+# Initialize logging for this module
+#
+
+from ..utils import getLogger, fully_qualified_module_name
+logger = getLogger(fully_qualified_module_name())
 
 
 @nvtx.annotate("sequential/autocorrelation.py", is_prefix=True)
@@ -77,7 +84,6 @@ def setup_linops(H, K, L, data,
     return W, d
 
 
-
 @nvtx.annotate("sequential/autocorrelation.py", is_prefix=True)
 def solve_ac(generation,
              pixel_position_reciprocal,
@@ -138,7 +144,7 @@ def solve_ac(generation,
     ac = ac.real
     it_number = callback.counter
 
-    print(f"Recovered AC in {it_number} iterations.", flush=True)
+    logger.info(f"Recovered AC in {it_number} iterations.", flush=True)
     image.show_volume(ac, settings.Mquat, f"autocorrelation_{generation}.png")
 
     return ac
