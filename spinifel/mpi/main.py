@@ -65,7 +65,7 @@ def main():
     N_generations = settings.N_generations
 
     if settings.load_gen > 0: # Load input from previous generation
-        curr_gen = settings.load_gen + 1
+        curr_gen = settings.load_gen
         print(f"Loading checkpoint: {checkpoint.generate_checkpoint_name(settings.out_dir, settings.load_gen, settings.tag_gen)}", flush=True)
         myRes = checkpoint.load_checkpoint(settings.out_dir, 
                                            settings.load_gen, 
@@ -99,8 +99,9 @@ def main():
     # terminate the loop
     cov_xy = 0
     cov_delta = .05
+    curr_gen += 1
 
-    for generation in range(curr_gen, N_generations):
+    for generation in range(curr_gen, N_generations+1):
         logger.log(f"#"*27)
         logger.log(f"##### Generation {generation}/{N_generations} #####")
         logger.log(f"#"*27)
