@@ -34,9 +34,114 @@ def core_problem(comm, uvect, H_, K_, L_, ac_support, weights, M, N,
     uvect_ADA = reduce_bcast(comm, uvect_ADA)
     return uvect_ADA
 
+def gen_F_antisupport(M):
+    """
+    Generate an antisupport in Fourier space, which has zeros in the central
+    sphere and ones in the high-resolution corners. 
+    
+    :param M: length of the cubic antisupport volume
+    :return F_antisupport: volume that masks central region
+    """
+    # generate "antisupport" -- this has zeros in central sphere, 1s outside
+    lu = np.linspace(-np.pi, np.pi, M)
+    Hu_, Ku_, Lu_ = np.meshgrid(lu, lu, lu, indexing='ij')
+    Qu_ = np.around(np.sqrt(Hu_**2 + Ku_**2 + Lu_**2), 4)
+    F_antisupport = Qu_ > np.pi 
+
+    assert np.all(F_antisupport == F_antisupport[::-1, :, :])
+    assert np.all(F_antisupport == F_antisupport[:, ::-1, :])
+    assert np.all(F_antisupport == F_antisupport[:, :, ::-1])
+    assert np.all(F_antisupport == F_antisupport[::-1, ::-1, ::-1])
+
+    return F_antisupport
+
+def fourier_reg(uvect, support, F_antisupport, M, use_recip_sym):
+    """
+    Generate the flattened matrix component that penalizes noise in the outer
+    regions of reciprocal space, specifically outside the unit sphere of radius
+    pi, where H_max, K_max, and L_max have been normalized to equal pi.
+    
+    :param uvect: data vector on uniform grid, flattened
+    :param support: 3d support object for autocorrelation
+    :param F_antisupport: support in Fourier space, unmasked at high frequencies
+    :param M: length of data vector along each axis
+    :param use_recip_sym: if True, discard imaginary component
+    :return uvect: convolution of uvect and F_antisupport, flattened
+    """
+    ugrid = uvect.reshape((M,)*3) * support
+    if use_recip_sym:
+        assert np.all(np.isreal(ugrid))
+    F_ugrid = np.fft.fftn(np.fft.ifftshift(ugrid))
+    F_reg = F_ugrid * np.fft.ifftshift(F_antisupport)
+    reg = np.fft.fftshift(np.fft.ifftn(F_reg))
+    uvect = (reg * support).flatten()
+    if use_recip_sym:
+        uvect = uvect.real
+    return uvect
+
+def setup_linops(comm, H, K, L, data,
+                 ac_support, weights, x0,
+                 M, Mtot, N, reciprocal_extent,
+                 alambda, rlambda, flambda,
+                 use_reciprocal_symmetry):
+    """Define W and d parts of the W @ x = d problem.
+
+    W = A_adj*Da*A + rl*I
+    d = A_adj*Da*b + rl*x0
+
+    Where:
+        A represents the NUFFT operator
+        A_adj its adjoint
+        I the identity
+        D weights
+        b the data
+        x0 the initial guess (ac_estimate)
+    """
+    H_ = H.flatten().astype(np.float32) / reciprocal_extent * np.pi
+    K_ = K.flatten().astype(np.float32) / reciprocal_extent * np.pi
+    L_ = L.flatten().astype(np.float32) / reciprocal_extent * np.pi
+   
+    F_antisupport = gen_F_antisupport(M)
+ 
+    # Using upsampled convolution technique instead of ADA
+    M_ups = M * 2
+    ugrid_conv = autocorrelation.adjoint(
+        np.ones_like(data), H_, K_, L_, 1, M_ups,
+        reciprocal_extent, use_reciprocal_symmetry)
+    ugrid_conv = reduce_bcast(comm, ugrid_conv)
+    F_ugrid_conv_ = np.fft.fftn(np.fft.ifftshift(ugrid_conv)) #/ M**3
+
+    def W_matvec(uvect):
+        """Define W part of the W @ x = d problem."""
+        uvect_ADA = autocorrelation.core_problem_convolution(
+            uvect, M, F_ugrid_conv_, M_ups, ac_support, use_reciprocal_symmetry)
+        uvect_FDF = fourier_reg(uvect, ac_support, F_antisupport, M, use_recip_sym=use_reciprocal_symmetry)
+        uvect = alambda*uvect_ADA + rlambda*uvect + flambda*uvect_FDF
+        return uvect
+
+    W = LinearOperator(
+        dtype=np.complex64,
+        shape=(M**3, M**3),
+        matvec=W_matvec)
+
+    nuvect_Db = data * weights
+    uvect_ADb = autocorrelation.adjoint(
+        nuvect_Db, H_, K_, L_, ac_support, M,
+        reciprocal_extent, use_reciprocal_symmetry
+    ).flatten()
+    
+    uvect_ADb = reduce_bcast(comm, uvect_ADb)
+
+    if np.sum(np.isnan(uvect_ADb)) > 0:
+        print("Warning: nans in the adjoint calculation; intensities may be too large", flush=True)    
+
+    d = alambda*uvect_ADb + rlambda*x0
+  
+    return W, d
+
 
 @nvtx.annotate("mpi/autocorrelation.py", is_prefix=True)
-def setup_linops(comm, H, K, L, data,
+def setup_linops_spinifel(comm, H, K, L, data,
                  ac_support, weights, x0,
                  M, N, reciprocal_extent,
                  rlambda,
@@ -95,9 +200,120 @@ def setup_linops(comm, H, K, L, data,
   
     return W, d
 
+def solve_ac(generation,
+             pixel_position_reciprocal,
+             pixel_distance_reciprocal,
+             slices_,
+             orientations=None,
+             ac_estimate=None):
+    comm = MPI.COMM_WORLD
+
+    M = settings.M
+    Mtot = M**3
+    N_images = slices_.shape[0] # N images per rank
+    N = np.prod(slices_.shape) # N images per rank x number of pixels per image = number of pixels per rank
+    reciprocal_extent = pixel_distance_reciprocal.max()
+    use_reciprocal_symmetry = True
+    ref_rank = -1 
+
+    # Generate random orientations in SO(3)
+    if orientations is None:
+        orientations = skp.get_random_quat(N_images)
+    # Calculate hkl based on orientations
+    H, K, L = autocorrelation.gen_nonuniform_positions(
+        orientations, pixel_position_reciprocal)
+
+    # norm(nuvect_Db)^2 = b_squared = b_1^2 + b_2^2 +....
+    #b_squared = np.sum( np.linalg.norm( slices_.reshape(slices_.shape[0],-1) , axis=-1) **2)
+    #b_squared = reduce_bcast(comm, b_squared)
+
+    data = slices_.flatten().astype(np.float32)
+    
+    # Set up ac
+    if ac_estimate is None:
+        ac_support = np.ones((M,)*3)
+        #ac_support = np.fft.fftshift(np.fft.ifftn(np.fft.fftn(np.fft.ifftshift(ac_support)).real)).real
+        ac_estimate = np.zeros((M,)*3)
+        #ac_estimate = np.fft.fftshift(np.fft.ifftn(np.fft.fftn(np.fft.ifftshift(ac_estimate)).real)).real
+    else:
+        ac_smoothed = gaussian_filter(ac_estimate, 0.5)
+        ac_support = (ac_smoothed > 1e-12).astype(np.float)
+        #ac_support = np.fft.fftshift(np.fft.ifftn(np.fft.fftn(np.fft.ifftshift(ac_support)).real)).real
+        #ac_estimate = np.fft.fftshift(np.fft.ifftn(np.fft.fftn(np.fft.ifftshift(ac_estimate)).real)).real
+        ac_estimate *= ac_support
+
+    weights = np.ones(N).astype(np.float32)
+    
+    # Use scalable heuristic for regularization lambda
+    alambda = 1
+    #rlambda = np.logspace(-8, 8, comm.size)[comm.rank]
+    rlambda = Mtot/N * 2 **(comm.rank - comm.size/2)
+    flambda = 1e5 * pow(10, comm.rank - comm.size//2)
+    maxiter = 100
+
+    # Log central slice L~=0
+    if comm.rank == (2 if settings.use_psana else 0):
+        idx = np.abs(L) < reciprocal_extent * .01
+        plt.scatter(H[idx], K[idx], c=slices_[idx], s=1, norm=LogNorm())
+        plt.axis('equal')
+        plt.colorbar()
+        plt.savefig(settings.out_dir / f"star_{generation}.png")
+        plt.cla()
+        plt.clf()
+
+    def callback(xk):
+        callback.counter += 1
+    callback.counter = 0 # counts no. of iterations of conjugate gradient
+
+    x0 = ac_estimate.flatten()
+
+    W, d = setup_linops(comm, H, K, L, data,
+                        ac_support, weights, x0,
+                        M, Mtot, N, reciprocal_extent,
+                        alambda, rlambda, flambda,
+                        use_reciprocal_symmetry)
+    
+    ret, info = cg(W, d, x0=x0, maxiter=maxiter, callback=callback)
+
+    if info != 0:
+        print(f'WARNING: CG did not converge at rlambda = {rlambda}')
+
+    v1 = norm(ret)
+    v2 = norm(W*ret-d)
+    #soln = (np.linalg.norm(ret-ac_estimate.flatten())**2).real # solution norm
+    #resid = (np.dot(ret,W_0.matvec(ret)-2*d_0) + b_squared).real # residual norm
+
+    # Rank0 gathers rlambda, solution norm, residual norm from all ranks
+    summary = comm.gather((comm.rank, rlambda, v1, v2), root=0)
+    print('summary =', summary)
+    if comm.rank == 0:
+        ranks, lambdas, v1s, v2s = [np.array(el) for el in zip(*summary)]
+        
+        if generation == 0:
+            idx = v1s >= np.mean(v1s)
+            imax = np.argmax(lambdas[idx])
+            iref = np.arange(len(ranks), dtype=int)[idx][imax]
+        else:
+            iref = np.argmin(v1s+v2s)
+        ref_rank = ranks[iref]
+    else:
+        ref_rank = -1
+    ref_rank = comm.bcast(ref_rank, root=0)
+
+    ac = ret.reshape((M,)*3)
+    if use_reciprocal_symmetry:
+        assert np.all(np.isreal(ac))
+    ac = np.ascontiguousarray(ac.real)
+    
+    print(f"Rank {comm.rank} got AC in {callback.counter} iterations.", flush=True)
+    comm.Bcast(ac, root=ref_rank)
+    if comm.rank == 0:
+        print(f"Keeping result from rank {ref_rank}.")
+
+    return ac
 
 @nvtx.annotate("mpi/autocorrelation.py", is_prefix=True)
-def solve_ac(generation,
+def solve_ac_spinifel(generation,
              pixel_position_reciprocal,
              pixel_distance_reciprocal,
              slices_,
