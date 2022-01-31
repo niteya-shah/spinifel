@@ -142,7 +142,7 @@ def load_pixel_index_map(pixel_index_map):
 def load_slices(slices, i_start, i_end):
     """Populate intensity slices from input file."""
     with h5py.File(settings.data_path, 'r') as h5f:
-        if h5f['intensities'].shape[0] > i_end:
+        if h5f['intensities'].shape[0] >= i_end:
             slices[:] = h5f['intensities'][i_start:i_end]
         else:
             sys.exit(f"Error: Not enough intensity slices (max:{h5f['intensities'].shape[0]:d})")
