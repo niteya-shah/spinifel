@@ -97,40 +97,39 @@ def setup_linops(comm, H, K, L, data,
         b the data
         x0 the initial guess (ac_estimate)
     """
-    H_ = H.flatten().astype(np.float32) / reciprocal_extent * np.pi
-    K_ = K.flatten().astype(np.float32) / reciprocal_extent * np.pi
-    L_ = L.flatten().astype(np.float32) / reciprocal_extent * np.pi
+    H_ = H.flatten() / reciprocal_extent * np.pi
+    K_ = K.flatten() / reciprocal_extent * np.pi
+    L_ = L.flatten() / reciprocal_extent * np.pi
    
     F_antisupport = gen_F_antisupport(M)
  
     # Using upsampled convolution technique instead of ADA
     M_ups = M * 2
     ugrid_conv = autocorrelation.adjoint(
-        np.ones_like(data), H_, K_, L_, 1, M_ups,
-        reciprocal_extent, use_reciprocal_symmetry)
-    ugrid_conv = reduce_bcast(comm, ugrid_conv)
+        np.ones_like(data), H_, K_, L_, M_ups,
+        use_reciprocal_symmetry, support=None)
+    #ugrid_conv = reduce_bcast(comm, ugrid_conv)
     F_ugrid_conv_ = np.fft.fftn(np.fft.ifftshift(ugrid_conv)) #/ M**3
 
     def W_matvec(uvect):
         """Define W part of the W @ x = d problem."""
         uvect_ADA = autocorrelation.core_problem_convolution(
-            uvect, M, F_ugrid_conv_, M_ups, ac_support, use_reciprocal_symmetry)
+            uvect, M, F_ugrid_conv_, M_ups, ac_support)
         uvect_FDF = fourier_reg(uvect, ac_support, F_antisupport, M, use_recip_sym=use_reciprocal_symmetry)
         uvect = alambda*uvect_ADA + rlambda*uvect + flambda*uvect_FDF
         return uvect
 
     W = LinearOperator(
         dtype=np.complex64,
-        shape=(M**3, M**3),
+        shape=(Mtot, Mtot),
         matvec=W_matvec)
 
     nuvect_Db = data * weights
     uvect_ADb = autocorrelation.adjoint(
-        nuvect_Db, H_, K_, L_, ac_support, M,
-        reciprocal_extent, use_reciprocal_symmetry
-    ).flatten()
+        nuvect_Db, H_, K_, L_, M, support=ac_support,
+        use_recip_sym=use_reciprocal_symmetry).flatten()
     
-    uvect_ADb = reduce_bcast(comm, uvect_ADb)
+    #uvect_ADb = reduce_bcast(comm, uvect_ADb)
 
     if np.sum(np.isnan(uvect_ADb)) > 0:
         print("Warning: nans in the adjoint calculation; intensities may be too large", flush=True)    

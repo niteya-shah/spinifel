@@ -38,6 +38,8 @@ def match(slices_, model_slices, ref_orientations, batch_size=None):
 
 
 
+
+
 @nvtx.annotate("sequential/orientation_matching.py", is_prefix=True)
 def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_reciprocal):
     """
@@ -88,8 +90,7 @@ def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_rec
         st_m = i * N_batch_size * N_pixels
         en_m = st_m + (N_batch_size * N_pixels)
         model_slices_new[st_m:en_m] = autocorrelation.forward(
-                ac, H_, K_, L_, 1, M, N_batch, reciprocal_extent, True).real
-        
+                ac, H_, K_, L_, 1, reciprocal_extent, N_batch).real
     en_slice = time.monotonic()
     
     # Imaginary part ~ numerical error

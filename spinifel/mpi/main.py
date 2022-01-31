@@ -94,7 +94,6 @@ def main():
 
         ac_phased, support_, rho_ = phase(curr_gen, ac)
         logger.log(f"Problem phased in {timer.lap():.2f}s.")
-
         if comm.rank == 0:
             myRes = { 
                      'ac': ac,
