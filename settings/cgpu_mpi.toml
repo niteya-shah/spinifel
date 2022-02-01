@@ -8,8 +8,7 @@ use_callmonitor = false
 
 [data]
 in_dir = "${CFS}/m2859/data/3iyf/clean"
-out_dir = "${SCRATCH}/spinifel_output/ariana_20k_hires"
-#name = "3iyf_dp005_128x128pixels_500k.h5"
+out_dir = "${SCRATCH}/spinifel_output/"
 name = "3iyf_ariana_20k_hires.h5"
 
 [detector]
