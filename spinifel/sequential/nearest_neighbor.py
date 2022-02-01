@@ -100,7 +100,8 @@ def calc_argmin_gpu(euDist, n_images, n_refs, n_pixels, deviceId):
 @nvtx.annotate("sequential/nearest_neighbor.py", is_prefix=True)
 def nearest_neighbor(model_slices, slices, batch_size):
 
-    if settings.use_cuda:
+    # detector size (total pixels) should be >= 16 to use CUDA code
+    if settings.use_cuda and slices.shape[1] >= 16:
         deviceId = rank % settings._devices_per_node
         if settings.verbose:
             print(f"Using CUDA  to calculate Euclidean distance and heap sort (batch_size={batch_size})")
