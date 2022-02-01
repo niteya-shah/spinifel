@@ -98,7 +98,8 @@ EOF
 elif [[ ${target} = "perlmutter" ]]; then
     cat >> env.sh <<EOF
 module load PrgEnv-gnu
-module load gcc/9 # GCC 10 not supported by CUDA
+module load cpe-cuda
+module load cudatoolkit
 module load cray-fftw
 
 export CC=cc
