@@ -54,7 +54,7 @@ def get_slices(comm, N_images_per_rank, ds):
     if ds is None:
         i_start = comm.rank * N_images_per_rank
         i_end = i_start + N_images_per_rank
-        print(f"get_slices rank={comm.rank} st={i_start} en={i_end}")
+        print(f"get_slices rank={comm.rank} st={i_start} en={i_end}",flush=True)
         prep.load_slices(slices_, i_start, i_end)
         return slices_
     else:

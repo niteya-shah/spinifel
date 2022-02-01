@@ -29,10 +29,40 @@ if settings.use_cupy:
     import cupy as xp
 
 
+def forward(ugrid, H_, K_, L_, support, use_recip_sym, N):
+    """
+    Compute the forward NUFFT: from a uniform to nonuniform set of points.
+    
+    :param ugrid: 3d array with grid sampling
+    :param H_: H dimension of reciprocal space position to evaluate
+    :param K_: K dimension of reciprocal space position to evaluate
+    :param L_: L dimension of reciprocal space position to evaluate
+    :param support: 3d object support array
+    :param use_recip_sym: if True, discard imaginary component # name seems misleading
+    :return nuvect: Fourier transform of uvect sampled at nonuniform (H_, K_, L_)
+    """
+    
+    # make sure that points lie within permissible finufft domain
+    assert np.max(np.abs(np.array([H_, K_, L_]))) < 3*np.pi
+
+    # Check if recip symmetry is met
+    if use_recip_sym:
+        assert np.all(np.isreal(ugrid))
+
+    # Apply support if given, overwriting input array
+    if support is not None:
+        ugrid *= support 
+        
+    # Allocate space in memory and solve NUFFT
+    #nuvect = np.zeros(H_.shape, dtype=np.complex64)
+    #nfft.nufft3d2(H_, K_, L_, ugrid, out=nuvect, eps=1.0e-12, isign=-1)    
+    nuvect = nufft_3d_t2(H_, K_, L_, ugrid, -1, 1e-12, N)
+
+    return nuvect 
 
 @profiler.intercept
 @nvtx.annotate("autocorrelation.py", is_prefix=True)
-def forward(ugrid, H_, K_, L_, support, M, N, recip_extent, use_recip_sym):
+def forward_spinifel(ugrid, H_, K_, L_, support, M, N, recip_extent, use_recip_sym):
     """Apply the forward, NUFFT2- problem"""
 
     # Ensure that H_, K_, and L_ have the same shape
@@ -50,11 +80,42 @@ def forward(ugrid, H_, K_, L_, support, M, N, recip_extent, use_recip_sym):
 
     return nuvect / M**3
 
+def adjoint(nuvect, H_, K_, L_, M, use_recip_sym=True, support=None):
+    """
+    Compute the adjoint NUFFT: from a nonuniform to uniform set of points. 
+    The sign is set for this to be the inverse FT.
+    
+    :param nuvect: flattened data vector sampled in nonuniform space
+    :param H_: H dimension of reciprocal space position
+    :param K_: K dimension of reciprocal space position
+    :param L_: L dimension of reciprocal space position
+    :param M: cubic length of desired output array
+    :param support: 3d object support array
+    :param use_recip_sym: if True, discard imaginary component # name seems misleading
+    :return ugrid: Fourier transform of nuvect, sampled on a uniform grid
+    """
+    
+    # make sure that points lie within permissible finufft domain
+    assert np.max(np.abs(np.array([H_, K_, L_]))) < 3*np.pi
 
+    # Allocating space in memory and sovling NUFFT
+    #ugrid = np.zeros((M,)*3, dtype=np.complex64)
+    #nfft.nufft3d1(H_, K_, L_, nuvect, out=ugrid, eps=1.0e-15, isign=1)
+    ugrid = nufft_3d_t1(H_, K_, L_, nuvect, 1, 1e-12, M, M, M)
+
+    # Apply support if given
+    if support is not None:
+        ugrid *= support
+
+    # Discard imaginary component
+    if use_recip_sym:
+        ugrid = ugrid.real
+
+    return ugrid  / (M**3)
 
 @profiler.intercept
 @nvtx.annotate("autocorrelation.py", is_prefix=True)
-def adjoint(nuvect, H_, K_, L_, support, M, recip_extent, use_recip_sym):
+def adjoint_spinifel(nuvect, H_, K_, L_, support, M, recip_extent, use_recip_sym):
     """Apply the adjoint, NUFFT1+ problem"""
 
     # Ensure that H_, K_, and L_ have the same shape
@@ -89,10 +150,41 @@ def core_problem(uvect, H_, K_, L_, ac_support, weights, M, N,
     uvect_ADA = ugrid_ADA.flatten()
     return uvect_ADA
 
-
+def core_problem_convolution(uvect, M, F_ugrid_conv_, M_ups, ac_support, use_recip_sym=True):
+    """
+    Convolve data vector and input kernel of where data sample reciprocal 
+    space in upsampled regime.
+    
+    :param uvect: data vector on uniform grid, flattened
+    :param M: length of data vector along each axis
+    :param F_ugrid_conv_: Fourier transform of convolution sampling array
+    :param M_ups: length of data vector along each axis when upsampled
+    :param ac_support: 2d support object for autocorrelation
+    :param use_recip_sym: if True, discard imaginary componeent
+    :return ugrid_conv_out: convolution of uvect and F_ugrid_conv_, flattened
+    """
+    if use_recip_sym:
+        assert np.all(np.isreal(uvect))
+    # Upsample
+    ugrid = uvect.reshape((M,)*3) * ac_support
+    ugrid_ups = np.zeros((M_ups,)*3, dtype=uvect.dtype)
+    ugrid_ups[:M, :M, :M] = ugrid
+    # Convolution = Fourier multiplication
+    F_ugrid_ups = np.fft.fftn(np.fft.ifftshift(ugrid_ups))
+    F_ugrid_conv_out_ups = F_ugrid_ups * F_ugrid_conv_
+    ugrid_conv_out_ups = np.fft.fftshift(np.fft.ifftn(F_ugrid_conv_out_ups))
+    # Downsample
+    ugrid_conv_out = ugrid_conv_out_ups[:M, :M, :M]
+    ugrid_conv_out *= ac_support
+    if use_recip_sym:
+        # Both ugrid_conv and ugrid are real, so their convolution
+        # should be real, but numerical errors accumulate in the
+        # imaginary part.
+        ugrid_conv_out = ugrid_conv_out.real
+    return ugrid_conv_out.flatten()
 
 @nvtx.annotate("autocorrelation.py", is_prefix=True)
-def core_problem_convolution(uvect, M, F_ugrid_conv_, M_ups, ac_support,
+def core_problem_convolution_spinifel(uvect, M, F_ugrid_conv_, M_ups, ac_support,
                              use_reciprocal_symmetry):
     if settings.use_cupy:
         uvect = xp.asarray(uvect)
