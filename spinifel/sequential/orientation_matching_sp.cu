@@ -19,7 +19,7 @@ const int TILE = 16;
 const int imgPerThread = 6;
 
 //CUDA kernel used to computed Euclidean distance across data images and reference images.
-__global__ void computeEuDistSharReg(float *refImgs, float *dataImgs, float *euDist, int numRefImgs, int numDataImgs, long int totalPixels)
+__global__ void computeEuDistSharReg(dtype *refImgs, dtype *dataImgs, dtype *euDist, int numRefImgs, int numDataImgs, long int totalPixels)
 {
         int txId = threadIdx.x;
         int tyId = threadIdx.y;
@@ -67,12 +67,12 @@ __global__ void computeEuDistSharReg(float *refImgs, float *dataImgs, float *euD
         dtype rMod_5_8,rMod_5_9,rMod_5_10,rMod_5_11,rMod_5_12,rMod_5_13,rMod_5_14,rMod_5_15;
 
 	//euclidean distance variable in each thread.
-        float dist00 = 0.0, dist01 = 0.0, dist02 = 0.0, dist03 = 0.0, dist04 = 0.0, dist05 = 0.0;
-        float dist10 = 0.0, dist11 = 0.0, dist12 = 0.0, dist13 = 0.0, dist14 = 0.0, dist15 = 0.0;
-        float dist20 = 0.0, dist21 = 0.0, dist22 = 0.0, dist23 = 0.0, dist24 = 0.0, dist25 = 0.0;
-        float dist30 = 0.0, dist31 = 0.0, dist32 = 0.0, dist33 = 0.0, dist34 = 0.0, dist35 = 0.0;
-        float dist40 = 0.0, dist41 = 0.0, dist42 = 0.0, dist43 = 0.0, dist44 = 0.0, dist45 = 0.0;
-        float dist50 = 0.0, dist51 = 0.0, dist52 = 0.0, dist53 = 0.0, dist54 = 0.0, dist55 = 0.0;
+        dtype dist00 = 0.0, dist01 = 0.0, dist02 = 0.0, dist03 = 0.0, dist04 = 0.0, dist05 = 0.0;
+        dtype dist10 = 0.0, dist11 = 0.0, dist12 = 0.0, dist13 = 0.0, dist14 = 0.0, dist15 = 0.0;
+        dtype dist20 = 0.0, dist21 = 0.0, dist22 = 0.0, dist23 = 0.0, dist24 = 0.0, dist25 = 0.0;
+        dtype dist30 = 0.0, dist31 = 0.0, dist32 = 0.0, dist33 = 0.0, dist34 = 0.0, dist35 = 0.0;
+        dtype dist40 = 0.0, dist41 = 0.0, dist42 = 0.0, dist43 = 0.0, dist44 = 0.0, dist45 = 0.0;
+        dtype dist50 = 0.0, dist51 = 0.0, dist52 = 0.0, dist53 = 0.0, dist54 = 0.0, dist55 = 0.0;
         int y0Id,yRefs0Id,y1Id,yRefs1Id,y2Id,yRefs2Id,y3Id,yRefs3Id,y4Id,yRefs4Id,y5Id,yRefs5Id;
 
         int valx = (bxId*TILE*imgPerThread); int valy = (byId*TILE*imgPerThread);
@@ -519,9 +519,9 @@ __global__ void computeEuDistSharReg(float *refImgs, float *dataImgs, float *euD
 }
 
 //CUDA kernel used to identify maximum value and index of the value in a vector.
-__device__ int maxDistId(float *dist, int totalNN)
+__device__ int maxDistId(dtype *dist, int totalNN)
 {
-        float maxDist; int maxId;
+        dtype maxDist; int maxId;
         maxDist = dist[0]; maxId = 0;
         for(int i=1;i<totalNN;i++){
                 if(dist[i]>maxDist){
@@ -535,7 +535,7 @@ __device__ int maxDistId(float *dist, int totalNN)
 __global__ void computeKNeighbors(dtype *dEuDist, dtype *dKDist, int *dKIndex, int numDataImgs, int numRefImgs, int totalNN)
 {
         int imgId = (blockIdx.x*blockDim.x)+threadIdx.x;
-        float maxDist; int id;
+        dtype maxDist; int id;
 
         if(imgId<numDataImgs){
                 //Copy the distances and indexes of the first totalNN elements
@@ -560,12 +560,12 @@ __global__ void computeKNeighbors(dtype *dEuDist, dtype *dKDist, int *dKIndex, i
 
 // dHeapify is a CUDA version of heapify code from GeeksforGeeks
 // https://www.geeksforgeeks.org/heap-sort/
-__device__ void dHeapify(float *arr, int *idx, int n, int i)
+__device__ void dHeapify(dtype *arr, int *idx, int n, int i)
 {
         int largest = i; // Initialize largest as root
         int l = 2*i + 1; // left = 2*i + 1
         int r = 2*i + 2; // right = 2*i + 2
-        float tmpF; int tmpI;
+        dtype tmpF; int tmpI;
 
         // If left child is larger than root
         if (l < n && arr[l] > arr[largest]) largest = l;
@@ -586,11 +586,11 @@ __device__ void dHeapify(float *arr, int *idx, int n, int i)
 
 // dHeapify is a CUDA version of heapify code from GeeksforGeeks
 // https://www.geeksforgeeks.org/heap-sort/
-__global__ void computeKSort(float *dKDist, int *dKIndex, int numDataImgs, int totalNN)
+__global__ void computeKSort(dtype *dKDist, int *dKIndex, int numDataImgs, int totalNN)
 {
         int imgId = (blockIdx.x*blockDim.x)+threadIdx.x;
 
-        float tmpF; int tmpI;
+        dtype tmpF; int tmpI;
         if(imgId<numDataImgs){
                 //Build heap (rearrange array)
                 for (int i = totalNN / 2 - 1; i >= 0; i--) dHeapify(&dKDist[imgId*totalNN], &dKIndex[imgId*totalNN], totalNN, i);
@@ -611,12 +611,12 @@ __global__ void computeKSort(float *dKDist, int *dKIndex, int numDataImgs, int t
 //Function used to invoke CUDA kernels.
 py::array_t<dtype> cudaComputeEuclideanDistance(py::array_t<dtype> refImgs, py::array_t<dtype> dataImgs, int numRefImgs, int numDataImgs, int totalPixels, int deviceId)
 {
-	//cout<<"[CUDA] In CUDA Euclidean distance function."<<endl;
-	//cout<<"[CUDA] Using deviceId: " << deviceId <<endl;
+	cout<<"[CUDA] In CUDA Euclidean distance function."<<endl;
+	cout<<"[CUDA] Using deviceId: " << deviceId <<endl;
 	py:: buffer_info dataBuf = dataImgs.request();
 	py:: buffer_info refBuf = refImgs.request();
-	//cout<<"[CUDA] Dimension of dataImgs: "<<dataBuf.ndim<<" and refImgs: "<<refBuf.ndim<<endl;
-	//cout<<"[CUDA] Size of dataImgs: "<<dataBuf.size<<" and refImgs: "<<refBuf.size<<endl;
+	cout<<"[CUDA] Dimension of dataImgs: "<<dataBuf.ndim<<" and refImgs: "<<refBuf.ndim<<endl;
+	cout<<"[CUDA] Size of dataImgs: "<<dataBuf.size<<" and refImgs: "<<refBuf.size<<endl;
 
     	cudaSetDevice(deviceId);
 
@@ -625,7 +625,7 @@ py::array_t<dtype> cudaComputeEuclideanDistance(py::array_t<dtype> refImgs, py::
         cudaMalloc((void **)&dDataImgs, numDataImgs*totalPixels*sizeof(dtype));
         cudaMalloc((void **)&dRefImgs, numRefImgs*totalPixels*sizeof(dtype));
         cudaMalloc((void **)&dEuDist, numDataImgs*numRefImgs*sizeof(dtype));
-        //cudaMalloc((void **)&dKDist, numDataImgs*totalNN*sizeof(float));
+        //cudaMalloc((void **)&dKDist, numDataImgs*totalNN*sizeof(dtype));
         //cudaMalloc((void **)&dKIndex, numDataImgs*totalNN*sizeof(int));
 
 	//Allocate euDist 
@@ -645,7 +645,7 @@ py::array_t<dtype> cudaComputeEuclideanDistance(py::array_t<dtype> refImgs, py::
 
 	auto start = high_resolution_clock::now();
 	//Copy host to device
-	//cout<<"[CUDA] Copy data from host to device."<<endl;
+	cout<<"[CUDA] Copy data from host to device."<<endl;
 	cudaMemcpy(dDataImgs, dataPtr, numDataImgs*totalPixels*sizeof(dtype), cudaMemcpyHostToDevice);
 	cudaMemcpy(dRefImgs, refPtr, numRefImgs*totalPixels*sizeof(dtype), cudaMemcpyHostToDevice);
 	//cudaMemcpy(dEuDist, euDistPtr, numDataImgs*numRefImgs*sizeof(dtype), cudaMemcpyHostToDevice);
@@ -662,8 +662,8 @@ py::array_t<dtype> cudaComputeEuclideanDistance(py::array_t<dtype> refImgs, py::
         cudaDeviceSynchronize();
 
 	//Copy device to host
-	//cout<<"[CUDA] Copy data from device to host."<<endl;
-	cudaMemcpy(euDistPtr,dEuDist,numDataImgs*numRefImgs*sizeof(float),cudaMemcpyDeviceToHost);
+	cout<<"[CUDA] Copy data from device to host."<<endl;
+	cudaMemcpy(euDistPtr,dEuDist,numDataImgs*numRefImgs*sizeof(dtype),cudaMemcpyDeviceToHost);
 
 	//cout<<"[CUDA] euDistPtr values from kernel:"<<endl;
 	//for(int i=0;i<100;i++) cout<<euDistPtr[i]<<"\t";
@@ -681,11 +681,11 @@ py::array_t<dtype> cudaComputeEuclideanDistance(py::array_t<dtype> refImgs, py::
 
 py::array_t<int> cudaComputeHeapSort(py::array_t<dtype> euDist, int numDataImgs, int numRefImgs, long int totalPixels, int totalNN, int deviceId)
 {
-	    //cout<<"[CUDA] In CUDA Heap sort function."<<endl;
-	    //cout<<"[CUDA] Using deviceId: " << deviceId <<endl;
+	cout<<"[CUDA] In CUDA Heap sort function."<<endl;
+	cout<<"[CUDA] Using deviceId: " << deviceId <<endl;
         py:: buffer_info euDistBuf = euDist.request();
-        //cout<<"[CUDA] Dimension of euDist: "<<euDistBuf.ndim<<endl;
-        //cout<<"[CUDA] Size of euDist: "<<euDistBuf.size<<endl;
+        cout<<"[CUDA] Dimension of euDist: "<<euDistBuf.ndim<<endl;
+        cout<<"[CUDA] Size of euDist: "<<euDistBuf.size<<endl;
 
         cudaSetDevice(deviceId);
 
@@ -698,15 +698,15 @@ py::array_t<int> cudaComputeHeapSort(py::array_t<dtype> euDist, int numDataImgs,
         //Allocate euDist
         py::array_t<int> kIndex = py::array_t<int>(numDataImgs*totalNN);
         py::buffer_info kIndexBuf = kIndex.request();
-	//cout<<"[CUDA] Dimension of kIndex: "<<kIndexBuf.ndim<<endl;
-        //cout<<"[CUDA] Size of kIndex: "<<kIndexBuf.size<<endl;
+	cout<<"[CUDA] Dimension of kIndex: "<<kIndexBuf.ndim<<endl;
+        cout<<"[CUDA] Size of kIndex: "<<kIndexBuf.size<<endl;
 
         //Obtain numpy data pointer
         dtype* euDistPtr = reinterpret_cast<dtype*>(euDistBuf.ptr);
 	int* kIndexPtr = reinterpret_cast<int*>(kIndexBuf.ptr);
 
 	//Copy Euclidean distance to device
-	cudaMemcpy(dEuDist, euDistPtr, numDataImgs*numRefImgs*sizeof(float), cudaMemcpyHostToDevice);
+	cudaMemcpy(dEuDist, euDistPtr, numDataImgs*numRefImgs*sizeof(dtype), cudaMemcpyHostToDevice);
 
 	//Block and Grid Configuration
         int blockx = 32;
@@ -729,7 +729,7 @@ py::array_t<int> cudaComputeHeapSort(py::array_t<dtype> euDist, int numDataImgs,
         return kIndex;
 }
 
-PYBIND11_MODULE(pyCudaKNearestNeighbors, cudaBind)
+PYBIND11_MODULE(pyCudaKNearestNeighbors_SP, cudaBind)
 {
 	cudaBind.doc() = "Compute K-Nearest Neighbots between data and reference images.";
 	cudaBind.def("cudaEuclideanDistance", cudaComputeEuclideanDistance);

@@ -31,14 +31,22 @@ class CUKNNRequiredButNotFound(Exception):
     """
 
 
+if settings.use_single_prec:
+    knn_string = "spinifel.sequential.pyCudaKNearestNeighbors_SP"
+else:
+    knn_string = "spinifel.sequential.pyCudaKNearestNeighbors_DP"
 
-KNN_LOADER    = find_spec("spinifel.sequential.pyCudaKNearestNeighbors")
+KNN_LOADER    = find_spec(knn_string)
 KNN_AVAILABLE = KNN_LOADER is not None
+
 if settings.verbose:
     print(f"pyCudaKNearestNeighbors is available: {KNN_AVAILABLE}")
 
 if settings.use_cuda and KNN_AVAILABLE:
-    import spinifel.sequential.pyCudaKNearestNeighbors as pyCu
+    if settings.use_single_prec:
+        import spinifel.sequential.pyCudaKNearestNeighbors_SP as pyCu
+    else:
+        import spinifel.sequential.pyCudaKNearestNeighbors_DP as pyCu
 elif settings.use_cuda and not KNN_AVAILABLE:
     raise CUKNNRequiredButNotFound
 
@@ -66,10 +74,10 @@ def calc_eudist_gpu(model_slices, slices, deviceId):
     model_slices_flat = model_slices.flatten()
     slices_flat       = slices.flatten()
 
-    euDist = pyCu.cudaEuclideanDistance(slices_flat,
-                                        model_slices_flat,
-                                        slices.shape[0],
+    euDist = pyCu.cudaEuclideanDistance(model_slices_flat,
+                                        slices_flat,
                                         model_slices.shape[0],
+                                        slices.shape[0],
                                         slices.shape[1],
                                         deviceId)
     return euDist
@@ -92,7 +100,8 @@ def calc_argmin_gpu(euDist, n_images, n_refs, n_pixels, deviceId):
 @nvtx.annotate("sequential/nearest_neighbor.py", is_prefix=True)
 def nearest_neighbor(model_slices, slices, batch_size):
 
-    if settings.use_cuda:
+    # detector size (total pixels) should be >= 16 to use CUDA code
+    if settings.use_cuda and slices.shape[1] >= 16:
         deviceId = rank % settings._devices_per_node
         if settings.verbose:
             print(f"Using CUDA  to calculate Euclidean distance and heap sort (batch_size={batch_size})")

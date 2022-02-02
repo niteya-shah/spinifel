@@ -65,7 +65,7 @@ def main():
     N_generations = settings.N_generations
 
     if settings.load_gen > 0: # Load input from previous generation
-        curr_gen = settings.load_gen + 1
+        curr_gen = settings.load_gen
         print(f"Loading checkpoint: {checkpoint.generate_checkpoint_name(settings.out_dir, settings.load_gen, settings.tag_gen)}", flush=True)
         myRes = checkpoint.load_checkpoint(settings.out_dir, 
                                            settings.load_gen, 
@@ -83,11 +83,25 @@ def main():
         ac = solve_ac(
             curr_gen, pixel_position_reciprocal, pixel_distance_reciprocal, slices_)
         logger.log(f"AC recovered in {timer.lap():.2f}s.")
+        if comm.rank == 0:
+            myRes = { 
+                     'pixel_position_reciprocal': pixel_position_reciprocal,
+                     'pixel_distance_reciprocal': pixel_distance_reciprocal,
+                     'slices_': slices_,
+                     'ac': ac
+                    }
+            checkpoint.save_checkpoint(myRes, settings.out_dir, curr_gen, tag="solve_ac")
 
         ac_phased, support_, rho_ = phase(curr_gen, ac)
         logger.log(f"Problem phased in {timer.lap():.2f}s.")
-
         if comm.rank == 0:
+            myRes = { 
+                     'ac': ac,
+                     'ac_phased': ac_phased,
+                     'support_': support_,
+                     'rho_': rho_
+                    }
+            checkpoint.save_checkpoint(myRes, settings.out_dir, curr_gen, tag="phase")
             # Save electron density and intensity
             rho = np.fft.ifftshift(rho_)
             intensity = np.fft.ifftshift(np.abs(np.fft.fftshift(ac_phased)**2))
@@ -99,8 +113,9 @@ def main():
     # terminate the loop
     cov_xy = 0
     cov_delta = .05
+    curr_gen += 1
 
-    for generation in range(curr_gen, N_generations):
+    for generation in range(curr_gen, N_generations+1):
         logger.log(f"#"*27)
         logger.log(f"##### Generation {generation}/{N_generations} #####")
         logger.log(f"#"*27)
@@ -109,16 +124,47 @@ def main():
             ac_phased, slices_,
             pixel_position_reciprocal, pixel_distance_reciprocal)
         logger.log(f"Orientations matched in {timer.lap():.2f}s.")
+        if comm.rank == 0:
+            myRes = {'ac_phased': ac_phased, 
+                     'slices_': slices_,
+                     'pixel_position_reciprocal': pixel_position_reciprocal,
+                     'pixel_distance_reciprocal': pixel_distance_reciprocal,
+                     'orientations': orientations
+                    }
+            checkpoint.save_checkpoint(myRes, settings.out_dir, generation, tag="match")
 
         # Solve autocorrelation
         ac = solve_ac(
             generation, pixel_position_reciprocal, pixel_distance_reciprocal,
             slices_, orientations, ac_phased)
         logger.log(f"AC recovered in {timer.lap():.2f}s.")
+        if comm.rank == 0:
+            myRes = { 
+                     'pixel_position_reciprocal': pixel_position_reciprocal,
+                     'pixel_distance_reciprocal': pixel_distance_reciprocal,
+                     'slices_': slices_,
+                     'orientations': orientations,
+                     'ac_phased': ac_phased,
+                     'ac': ac
+                    }
+            checkpoint.save_checkpoint(myRes, settings.out_dir, generation, tag="solve_ac")
 
-        if comm.rank == 0: prev_rho_ = rho_[:]
+        if comm.rank == 0: 
+            prev_rho_ = rho_[:]
+            prev_support_ = support_[:]
         ac_phased, support_, rho_ = phase(generation, ac, support_, rho_)
         logger.log(f"Problem phased in {timer.lap():.2f}s.")
+        if comm.rank == 0:
+            myRes = { 
+                     'ac': ac,
+                     'prev_support_':prev_support_,
+                     'prev_rho_': prev_rho_,
+                     'ac_phased': ac_phased,
+                     'support_': support_,
+                     'rho_': rho_
+                    }
+            checkpoint.save_checkpoint(myRes, settings.out_dir, generation, tag="phase")
+
 
         # Check if density converges
         if settings.chk_convergence:
