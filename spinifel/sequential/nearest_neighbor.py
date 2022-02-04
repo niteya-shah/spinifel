@@ -126,5 +126,7 @@ def nearest_neighbor(model_slices, slices, batch_size):
         euDist    = euclidean_distances(model_slices, slices)
         index  = np.argmin(euDist, axis=0)
 
-    return index
+    return index, np.mean(euDist[index])
+
+
 

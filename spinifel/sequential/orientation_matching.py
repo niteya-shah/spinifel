@@ -32,9 +32,10 @@ def match(slices_, model_slices, ref_orientations, batch_size=None):
     if not N_slices:
         return np.zeros((0, 4))
 
-    index = nn.nearest_neighbor(model_slices, slices_, batch_size)
+    index, avg_eu_dist = nn.nearest_neighbor(model_slices, slices_, batch_size)
+    logging.info('Average Euclidean distance = ', avg_eu_dist)
 
-    return ref_orientations[index]
+    return ref_orientations[index], avg_eu_dist
 
 
 

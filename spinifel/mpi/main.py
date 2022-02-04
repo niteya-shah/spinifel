@@ -120,7 +120,7 @@ def main():
         logger.log(f"##### Generation {generation}/{N_generations} #####")
         logger.log(f"#"*27)
         # Orientation matching
-        orientations = match(
+        orientations, avg_eu_dist = match(
             ac_phased, slices_,
             pixel_position_reciprocal, pixel_distance_reciprocal)
         logger.log(f"Orientations matched in {timer.lap():.2f}s.")
@@ -129,7 +129,8 @@ def main():
                      'slices_': slices_,
                      'pixel_position_reciprocal': pixel_position_reciprocal,
                      'pixel_distance_reciprocal': pixel_distance_reciprocal,
-                     'orientations': orientations
+                     'orientations': orientations,
+                     'avg_eu_dist': avg_eu_dist
                     }
             checkpoint.save_checkpoint(myRes, settings.out_dir, generation, tag="match")
 
