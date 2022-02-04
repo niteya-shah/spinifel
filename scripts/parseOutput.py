@@ -13,7 +13,7 @@ def parse_output(filename, num_nodes, num_ranks):
 
     merge = []
     phase = []
-    slice = []
+    slices = []
     slice_oh = []
     ori_match = []
     ori_match_oh = []
@@ -27,7 +27,7 @@ def parse_output(filename, num_nodes, num_ranks):
         for match in re.findall(pattern_phase, line):
             phase.append(float(re.findall("\d+\.\d+", match)[0]))
         for match in re.findall(pattern_slice, line):
-            slice.append(float(re.findall("\d+\.\d+", match)[0]))
+            slices.append(float(re.findall("\d+\.\d+", match)[0]))
         for match in re.findall(pattern_slice_oh, line):
             slice_oh.append(float(re.findall("\d+\.\d+", match)[0]))
         for match in re.findall(pattern_match, line):
@@ -39,7 +39,7 @@ def parse_output(filename, num_nodes, num_ranks):
 
     merging_time = sum(merge)
     phasing_time = sum(phase)
-    slicing_time = (sum(slice_oh) + sum(slice)) / num_nodes / num_ranks
+    slicing_time = (sum(slice_oh) + sum(slices)) / num_nodes / num_ranks
     ori_matching_time = (sum(ori_match) + sum(ori_match_oh)) / num_nodes / num_ranks
     completed_time = sum(completed)
 
