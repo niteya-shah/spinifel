@@ -104,20 +104,23 @@ conda activate "$CONDA_ENV_DIR"
 conda install -y amityping -c lcls-ii
 conda install -y bitstruct krtc -c conda-forge
 
-# Extra deps required for psana machines, since there is no module system
-if [[ ${target} = "psbuild"* ]]; then
-    conda install -y compilers openmpi cudatoolkit=11.4 cudatoolkit-dev=11.4 cmake make -c conda-forge
-fi
-
-
-if [[ ${target} = "psbuild"* ]]; then
-    conda install -y cupy mrcfile -c conda-forge
-    pip install -v --no-binary mpi4py mpi4py
+# Extra deps required for psana machines
+if [[ ${target} = "psbuild"* ]]
+then
+    conda install -y -c conda-forge \
+        compilers                   \
+        openmpi                     \
+        cudatoolkit=11.4            \
+        cudatoolkit-dev=11.4        \
+        cmake                       \
+        make                        \
+        cupy                        \
+        mpi4py                      \
+        mrcfile
 else
     CC=$MPI4PY_CC MPICC=$MPI4PY_MPICC pip install -v --no-binary mpi4py mpi4py
     pip install --no-cache-dir mrcfile
-    pip install --no-cache-dir cupy
-
+    LDFLAGS=$CUPY_LDFLAGS pip install --no-cache-dir cupy
 fi
 
 # Install pip packages
