@@ -81,13 +81,19 @@ EOF
 elif [[ ${target} = "cgpu"* ]]; then
     cat >> env.sh <<EOF
 module purge
-module load cgpu gcc cuda openmpi fftw python
+module load cgpu
+module load gcc
+module load cuda
+module load openmpi
+module load fftw
 
 export CC=gcc
 export CXX=g++
 # compilers for mpi4py
 export MPI4PY_CC=gcc
 export MPI4PY_MPICC=\$(which mpicc)
+
+export CUPY_LDFLAGS=-L\${CUDA_ROOT}/lib64/stubs
 
 export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
 # NOTE: not sure if this is the best choice -- investigate further if this
@@ -98,7 +104,8 @@ EOF
 elif [[ ${target} = "perlmutter" ]]; then
     cat >> env.sh <<EOF
 module load PrgEnv-gnu
-module load gcc/9 # GCC 10 not supported by CUDA
+module load cudatoolkit
+module load cpe-cuda
 module load cray-fftw
 
 export CC=cc
@@ -110,7 +117,7 @@ export MPI4PY_CC="$(which cc)"
 export MPI4PY_MPICC="$(which cc) --shared"
 
 # Make sure Cray-FFTW get loaded first to avoid Conda's MKL
-export LD_PRELOAD="\$FFTW_DIR/libfftw3.so"
+export LD_PRELOAD="\${FFTW_DIR}/libfftw3.so"
 
 export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
 export GASNET_CONDUIT=ucx
