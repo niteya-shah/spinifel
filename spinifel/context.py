@@ -69,12 +69,22 @@ class SpinifelContexts(metaclass=Singleton):
         if not MPI.Is_initialized():
             MPI.Init()
 
-        self._comm = MPI.COMM_WORLD
-        self._rank = self.comm.Get_rank()
+        settings = SpinifelSettings()
+ 
+        if settings.use_psana:
+            from psana.psexp.tools import get_excl_ranks # FIXME: only available on latest psana2
+            self._commWorld = MPI.COMM_WORLD
+            excl_list = get_excl_ranks()
+            self._computeGroup = self._commWorld.group.Excl(excl_list)
+            self._comm = self._commWorld.Create(self._computeGroup)
+            if self._commWorld.rank not in excl_list:
+                self._rank = self._comm.Get_rank()
+        else:
+            self._comm = MPI.COMM_WORLD
+            self._rank = self._comm.Get_rank()
 
         register(MPI.Finalize)
 
-        settings = SpinifelSettings()
         if settings.verbose:
             print(f"MPI has been initialized on rank {self.rank}")
 
