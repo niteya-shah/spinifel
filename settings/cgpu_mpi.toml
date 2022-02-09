@@ -15,10 +15,11 @@ name = "3iyf_ariana_20k_hires.h5"
 shape = [1, 128, 128]
 
 [psana]
-enable = false
+enable = true
 ps_smd_n_events = 10000
 ps_eb_nodes = 1
 ps_srv_nodes = 0
+
 
 [runtime]
 N_images_per_rank = 2500
