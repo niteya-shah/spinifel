@@ -102,8 +102,8 @@ def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_rec
     
     # Calculate Euclidean distance in batch to avoid running out of GPU Memory
     st_match = time.monotonic()
-    index = nn.nearest_neighbor(model_slices_new, slices_, N_batch_size)
+    index, avg_mean_dist = nn.nearest_neighbor(model_slices_new, slices_, N_batch_size)
     en_match = time.monotonic()
 
     print(f"Match tot:{en_match-st_init:.2f}s. slice={en_slice-st_slice:.2f}s. match={en_match-st_match:.2f}s. slice_oh={st_slice-st_init:.2f}s. match_oh={st_match-en_slice:.2f}s.")
-    return ref_orientations[index]
+    return ref_orientations[index], avg_mean_dist
