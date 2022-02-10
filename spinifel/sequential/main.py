@@ -41,7 +41,7 @@ def main():
     logger.log(f"Problem phased in {timer.lap():.2f}s.")
 
     for generation in range(1, 10):
-        orientations = slicing_and_match(
+        orientations, avg_eu_dist = slicing_and_match(
             ac_phased, slices_,
             pixel_position_reciprocal, pixel_distance_reciprocal)
         logger.log(f"Orientations matched in {timer.lap():.2f}s.")
