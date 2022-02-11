@@ -40,26 +40,28 @@ def parse_output(filename, num_nodes, num_ranks):
 
     # merging & phasing are performed independently by each rank
     # monitor the longest time
-    merging_max, merging_mean, merging_std = np.max(merge), np.mean(merge), np.std(merge)
-    phasing_max, phasing_mean, phasing_std = np.max(phase), np.mean(phase), np.std(phase)
+    merging_max, merging_min, merging_mean, merging_std = np.max(merge), np.min(merge), np.mean(merge), np.std(merge)
+    phasing_max, phasing_min, phasing_mean, phasing_std = np.max(phase), np.min(phase), np.mean(phase), np.std(phase)
     # slicing & orientation matching perform a subset of the task
     tot_ranks = int(num_nodes * num_ranks)
     num_gen = int(len(slices) / tot_ranks)
     num_times = tot_ranks * num_gen
-    slicing_max, slicing_mean, slicing_std = np.max(slice_oh)+np.max(slices), \
+    slicing_max, slicing_min, slicing_mean, slicing_std = np.max(slice_oh)+np.max(slices), \
+                                             np.min(slice_oh)+np.min(slices), \
                                              (np.sum(slice_oh) + np.sum(slices))/num_times, \
                                              (np.std(slice_oh) + np.std(slices))/num_times
-    ori_match_max, ori_match_mean, ori_match_std = np.max(ori_match_oh)+np.max(ori_match), \
+    ori_match_max, ori_match_min, ori_match_mean, ori_match_std = np.max(ori_match_oh)+np.max(ori_match), \
+                                             np.min(ori_match_oh)+np.min(ori_match), \
                                              (np.sum(ori_match_oh) + np.sum(ori_match))/num_times,\
                                              (np.std(ori_match_oh) + np.std(ori_match))/num_times
 
-    print("Max/mean/std time per generation in seconds")
+    print(f"Max/min/mean/std time per generation and total time for {num_gen} generations in seconds")
     print(f"Loading time: {loading_time:.3f}")
-    print(f"Phasing time: {phasing_max:.3f}/{phasing_mean:.3f}/{phasing_std:.3f}")
-    print(f"Merging time: {merging_max:.3f}/{merging_mean:.3f}/{merging_std:.3f}")
-    print(f"Slicing time: {slicing_max:.3f}/{slicing_mean:.3f}/{slicing_std:.3f}")
-    print(f"Orientation matching time: {ori_match_max:.3f}/{ori_match_mean:.3f}/{ori_match_std:.3f}")
-    print(f"Total time for {num_gen} generations: {completed_time:.3f}")
+    print(f"Slicing time: {slicing_max:.3f}/{slicing_min:.3f}/{slicing_mean:.3f}/{slicing_std:.3f}/{(sum(slice_oh)+sum(slices))/tot_ranks:.3f}")
+    print(f"Orientation matching time: {ori_match_max:.3f}/{ori_match_min:.3f}/{ori_match_mean:.3f}/{ori_match_std:.3f}/{(sum(ori_match_oh)+sum(ori_match))/tot_ranks:.3f}")
+    print(f"Merging time: {merging_max:.3f}/{merging_min:.3f}/{merging_mean:.3f}/{merging_std:.3f}/{sum(merge):.3f}")
+    print(f"Phasing time: {phasing_max:.3f}/{phasing_min:.3f}/{phasing_mean:.3f}/{phasing_std:.3f}/{sum(phase):.3f}")
+    print(f"Total time from start to finish for {num_gen} generations: {completed_time:.3f}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Process arguments to parseOutput')
