@@ -18,7 +18,7 @@ def match_task(phased, slices, orientations, pixel_position, pixel_distance):
     if settings.verbosity > 0:
         print(f"{socket.gethostname()} starts Orientation Matching.", flush=True)
         print(f"{socket.gethostname()}:", end=" ", flush=False)
-    orientations.quaternions[:] = sequential_match(
+    orientations.quaternions[:], avg_eu_dist = sequential_match(
         phased.ac, slices.data, pixel_position.reciprocal, pixel_distance.reciprocal)
     if settings.verbosity > 0:
         print(f"{socket.gethostname()} finished Orientation Matching.", flush=True)
