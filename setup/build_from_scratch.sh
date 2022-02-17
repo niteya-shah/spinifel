@@ -79,7 +79,6 @@ PACKAGE_LIST=(
 
     # lcls2
     setuptools=46.4.0  # temp need specific version
-    cmake
     cython
     mongodb
     pymongo

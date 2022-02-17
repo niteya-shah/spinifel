@@ -124,7 +124,7 @@ export GASNET_CONDUIT=ucx
 EOF
 elif [[ ${target} = *"summit"* ]]; then
     cat >> env.sh <<EOF
-module load gcc fftw cuda gsl
+module load gcc fftw cuda gsl cmake
 
 export CC=gcc
 export CXX=g++
