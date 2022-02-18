@@ -122,23 +122,7 @@ export LD_PRELOAD="\${FFTW_DIR}/libfftw3.so"
 export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
 export GASNET_CONDUIT=ucx
 EOF
-elif [[ ${target} = *"summit"* ]]; then
-    cat >> env.sh <<EOF
-module load gcc fftw cuda gsl
-
-export CC=gcc
-export CXX=g++
-# compilers for mpi4py
-export MPI4PY_CC=\$OMPI_CC
-export MPI4PY_MPICC=mpicc
-
-export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
-export GASNET_CONDUIT=ibv
-
-# for Numba
-export CUDA_HOME=\$OLCF_CUDA_ROOT
-EOF
-elif [[ ${target} = *"ascent"* ]]; then
+elif [[ ${target} = *"summit"* || ${target} = *"ascent"* ]]; then
     cat >> env.sh <<EOF
 module load gcc fftw cuda gsl
 
