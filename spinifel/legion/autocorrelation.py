@@ -110,9 +110,10 @@ def right_hand_ADb_task(slices, uregion, nonuniform_v, ac, weights, M,
         nonuniform_v.H,
         nonuniform_v.K,
         nonuniform_v.L,
-        ac.support, M,
-        reciprocal_extent, use_reciprocal_symmetry
-    )
+        M,
+        support=ac.support,
+        use_recip_sym=use_reciprocal_symmetry)
+
     if settings.verbosity > 0:
         print(f"{socket.gethostname()} computed ADb.", flush=True)
 
@@ -143,9 +144,8 @@ def prep_Fconv_task(uregion_ups, nonuniform_v, ac, weights, M_ups, Mtot, N,
         nonuniform_v.H,
         nonuniform_v.K,
         nonuniform_v.L,
-        1, M_ups,
-        reciprocal_extent, use_reciprocal_symmetry
-    )
+        M_ups,
+        use_reciprocal_symmetry, support=None)
     uregion_ups.F_conv_[:] += np.fft.fftn(np.fft.ifftshift(conv_ups)) / Mtot
     if settings.verbosity > 0:
         print(f"{socket.gethostname()} computed Fconv.", flush=True)
@@ -387,3 +387,4 @@ def solve_ac(generation,
     # I tried to have `results` as a partition and copy into a region,
     # but I couldn't get it to work.
     return results_p[iref.get()]
+
