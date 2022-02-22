@@ -7,18 +7,18 @@ from pygion import task, Region, Partition, Tunable, R
 from spinifel import SpinifelContexts
 
 
-
 def gpu_task_wrapper(thunk):
     @wraps(thunk)
     def wrapper(*args, **kwargs):
         context = SpinifelContexts()
-        context.ctx.push()
+        if context.ctx is not None:
+            context.ctx.push()
         try:
             return thunk(*args, **kwargs)
         finally:
-            context.ctx.pop()
+            if context.ctx is not None:
+                context.ctx.pop()
     return wrapper
-
 
 
 @task(privileges=[R])
