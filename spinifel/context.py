@@ -51,7 +51,7 @@ class SpinifelContexts(metaclass=Singleton):
         self._mpi_initialized = False
         self._dev_id = 0
         self._cuda_initialized = False
-
+        self.ctx = None
 
     def init_mpi(self):
         """
