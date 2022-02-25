@@ -296,28 +296,8 @@ def select_ac(generation, summary):
         # Take corner of L-curve: min (v1+v2)
         iref = np.argmin(summary.v1+summary.v2)
     ref_rank = summary.rank[iref]
-
-    fig, axes = plt.subplots(figsize=(6.0, 8.0), nrows=3, ncols=1)
-    axes[0].loglog(summary.rlambda, summary.v1)
-    axes[0].loglog(summary.rlambda[iref], summary.v1[iref], "rD")
-    axes[0].set_xlabel("$\lambda_{r}$")
-    axes[0].set_ylabel("$||x_{\lambda_{r}}||_{2}$")
-    axes[1].loglog(summary.rlambda, summary.v2)
-    axes[1].loglog(summary.rlambda[iref], summary.v2[iref], "rD")
-    axes[1].set_xlabel("$\lambda_{r}$")
-    axes[1].set_ylabel("$||W \lambda_{r}-d||_{2}$")
-    axes[2].loglog(summary.v2, summary.v1) # L-curve
-    axes[2].loglog(summary.v2[iref], summary.v1[iref], "rD")
-    axes[2].set_xlabel("Residual norm $||W \lambda_{r}-d||_{2}$")
-    axes[2].set_ylabel("Solution norm $||x_{\lambda_{r}}||_{2}$")
-    fig.tight_layout()
-    plt.savefig(settings.out_dir / f"summary_{generation}.png")
-    plt.close('all')
-
     print(f"Keeping result from rank {ref_rank}.", flush=True)
-
     return iref
-
 
 
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)

@@ -54,18 +54,17 @@ test_mpi:
   tags:
     - batch
 
-# TODO: Skip for now till MPI version is stable
-#test_legion:
-#  stage: test
-#  before_script:
-#    - cd ${EXTERNAL_WORKDIR}
-#    - mkdir -p ${OUT_DIR}
-#    - source ./setup/env.sh
-#    - export PYTHONPATH=${PYTHONPATH}:${EXTERNAL_WORKDIR}
-#  script:
-#      - PYTHONPATH="$PYTHONPATH:$PWD/mpi4py_poison_wrapper" jsrun -n1 -a1 -g1 legion_python -ll:py 1 -ll:csize 8192 legion_main.py --default-settings=summit_ci.toml --mode=legion
-#  tags:
-#    - batch
+test_legion:
+  stage: test
+  before_script:
+    - cd ${EXTERNAL_WORKDIR}
+    - mkdir -p ${OUT_DIR}
+    - source ./setup/env.sh
+    - export PYTHONPATH=${PYTHONPATH}:${EXTERNAL_WORKDIR}
+  script:
+      - PYTHONPATH="$PYTHONPATH:$PWD/mpi4py_poison_wrapper" jsrun -n1 -a1 -g1 legion_python -ll:py 1 -ll:csize 8192 legion_main.py --default-settings=summit_ci.toml --mode=legion
+  tags:
+    - batch
 
 # TODO: suggest deprecating
 #test_sequential:

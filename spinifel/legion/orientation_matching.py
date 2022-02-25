@@ -1,7 +1,7 @@
 import pygion
 import socket
 import PyNVTX as nvtx
-from pygion import task, RO, WD, IndexLaunch, Tunable
+from pygion import task, RO, WD, IndexLaunch, Tunable, LayoutConstraint, SOA_C
 
 from spinifel import settings
 from spinifel.sequential.orientation_matching import slicing_and_match as sequential_match
@@ -10,8 +10,11 @@ from . import utils as lgutils
 
 
 
-@task(privileges=[
-    RO("ac"), RO("data"), WD("quaternions"), RO("reciprocal"), RO("reciprocal")])
+@task(privileges=[RO("ac"), RO("data"), WD("quaternions"), RO("reciprocal"), RO("reciprocal")], layout=[LayoutConstraint(order=SOA_C, dim=4),
+                                                                                                        LayoutConstraint(order=SOA_C, dim=4),
+                                                                                                        LayoutConstraint(order=SOA_C, dim=4),
+                                                                                                        LayoutConstraint(order=SOA_C, dim=4),
+                                                                                                        LayoutConstraint(order=SOA_C, dim=4)])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
 def match_task(phased, slices, orientations, pixel_position, pixel_distance):
