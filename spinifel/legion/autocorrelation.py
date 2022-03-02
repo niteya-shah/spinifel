@@ -348,7 +348,7 @@ def solve_ac(generation,
     alambda = 1
 #    rlambdas = Mtot/Ntot * 1e2**(np.arange(N_procs) - N_procs/2)
     rlambdas = Mtot/Ntot * 2**(np.arange(N_procs) - N_procs/2).astype(np.float)
-    flambda = 1e5 * 10**(np.arange(N_procs) - N_procs//2).astype(np.float)
+    flambdas = 1e5 * 10**(np.arange(N_procs) - N_procs//2).astype(np.float)
 
     summary = Region((N_procs,),
                 {"rank": pygion.int32, "rlambda": pygion.float32, "v1": pygion.float32, "v2": pygion.float32})
@@ -359,7 +359,7 @@ def solve_ac(generation,
         solve(
             uregion, uregion_ups, ac, results_p[i], summary_p[i],
             weights, M, M_ups, Mtot, N,
-            generation, i, alambda, rlambdas[i], flambda,
+            generation, i, alambda, rlambdas[i], flambdas[i],
             reciprocal_extent, use_reciprocal_symmetry, maxiter)
 
     iref = select_ac(generation, summary)
