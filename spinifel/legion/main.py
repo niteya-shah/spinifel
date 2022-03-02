@@ -13,7 +13,7 @@ from .autocorrelation import solve_ac
 from .phasing import phase, prev_phase, cov
 from .orientation_matching import match
 from . import mapper
-
+from . import checkpoint
 
 @task(replicable=True)
 @nvtx.annotate("legion/main.py", is_prefix=True)
@@ -53,26 +53,31 @@ def main():
      slices, slices_p) = get_data(ds)
     logger.log(f"Loaded in {timer.lap():.2f}s.")
 
-    solved = solve_ac(0, pixel_position, pixel_distance, slices, slices_p)
-    logger.log(f"AC recovered in {timer.lap():.2f}s.")
+    if settings.load_gen > 0: # Load input from previous generation
+        curr_gen = settings.load_gen
+        phased, orientations, orientations_p = checkpoint.load_checkpoint(settings.out_dir, settings.load_gen)
+    else:
+        solved = solve_ac(0, pixel_position, pixel_distance, slices, slices_p)
+        logger.log(f"AC recovered in {timer.lap():.2f}s.")
 
-    phased = phase(0, solved)
-    logger.log(f"Problem phased in {timer.lap():.2f}s.")
+        phased = phase(0, solved)
+        logger.log(f"Problem phased in {timer.lap():.2f}s.")
 
-    rho = np.fft.ifftshift(phased.rho_)
-    print('rho =', rho)
+        rho = np.fft.ifftshift(phased.rho_)
+        print('rho =', rho)
 
-    save_mrc(settings.out_dir / f"ac-0.mrc", phased.ac)
-    save_mrc(settings.out_dir / f"rho-0.mrc", rho)
+        save_mrc(settings.out_dir / f"ac-0.mrc", phased.ac)
+        save_mrc(settings.out_dir / f"rho-0.mrc", rho)
 
     # Use improvement of cc(prev_rho, cur_rho) to dertemine if we should
     # terminate the loop
     prev_phased = None
     cov_xy = 0
     cov_delta = .05
+    curr_gen +=1
 
     N_generations = settings.N_generations
-    for generation in range(1, N_generations):
+    for generation in range(curr_gen, N_generations+1):
         logger.log(f"#"*27)
         logger.log(f"##### Generation {generation}/{N_generations} #####")
         logger.log(f"#"*27)
