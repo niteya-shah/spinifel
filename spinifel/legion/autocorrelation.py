@@ -146,7 +146,7 @@ def prep_Fconv_task(uregion_ups, nonuniform_v, ac, weights, M_ups, Mtot, N,
         nonuniform_v.L,
         M_ups,
         use_reciprocal_symmetry, support=None)
-    uregion_ups.F_conv_[:] += np.fft.fftn(np.fft.ifftshift(conv_ups)) / Mtot
+    uregion_ups.F_conv_[:] += np.fft.fftn(np.fft.ifftshift(conv_ups)) #/ Mtot
     if settings.verbosity > 0:
         print(f"{socket.gethostname()} computed Fconv.", flush=True)
 
@@ -171,7 +171,7 @@ def prep_Fconv(uregion_ups, nonuniform_v, nonuniform_v_p,
 def prep_Fantisupport(uregion, M):
     lu = np.linspace(-np.pi, np.pi, M)
     Hu_, Ku_, Lu_ = np.meshgrid(lu, lu, lu, indexing='ij')
-    Qu_ = np.sqrt(Hu_**2 + Ku_**2 + Lu_**2)
+    Qu_ = np.around(np.sqrt(Hu_**2 + Ku_**2 + Lu_**2), 4)
     uregion.F_antisupport[:] = Qu_ > np.pi / settings.oversampling
 
     Fantisup = uregion.F_antisupport
@@ -348,7 +348,7 @@ def solve_ac(generation,
     alambda = 1
 #    rlambdas = Mtot/Ntot * 1e2**(np.arange(N_procs) - N_procs/2)
     rlambdas = Mtot/Ntot * 2**(np.arange(N_procs) - N_procs/2)
-    flambda = 0
+    flambda = 1e5 * pow(10, np.arange(N_procs) - N_procs//2)
 
     summary = Region((N_procs,),
                 {"rank": pygion.int32, "rlambda": pygion.float32, "v1": pygion.float32, "v2": pygion.float32})
