@@ -52,7 +52,7 @@ def main():
      pixel_index,
      slices, slices_p) = get_data(ds)
     logger.log(f"Loaded in {timer.lap():.2f}s.")
-
+    curr_gen = 0
     if settings.load_gen > 0: # Load input from previous generation
         curr_gen = settings.load_gen
         phased, orientations, orientations_p = checkpoint.load_checkpoint(settings.out_dir, settings.load_gen)
