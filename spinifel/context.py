@@ -74,11 +74,15 @@ class SpinifelContexts(metaclass=Singleton):
         if settings.use_psana:
             from psana.psexp.tools import get_excl_ranks # FIXME: only available on latest psana2
             self._commWorld = MPI.COMM_WORLD
+            print(f"commWorld: {self._commWorld, self._commWorld.size}",flush=True)
             excl_list = get_excl_ranks()
+            print(f"excl_list: {excl_list}",flush=True)
             self._computeGroup = self._commWorld.group.Excl(excl_list)
             self._comm = self._commWorld.Create(self._computeGroup)
+            print(f"_comm: {self._comm}")
             if self._commWorld.rank not in excl_list:
                 self._rank = self._comm.Get_rank()
+                print(f"_rank: {self._rank}")
         else:
             self._comm = MPI.COMM_WORLD
             self._rank = self._comm.Get_rank()

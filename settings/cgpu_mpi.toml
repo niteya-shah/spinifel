@@ -9,16 +9,21 @@ use_callmonitor = false
 [data]
 in_dir = "${CFS}/m2859/data/3iyf/clean"
 out_dir = "${SCRATCH}/spinifel_output/"
-name = "3iyf_ariana_20k_hires.h5"
+name = "3iyf_sim_400k.h5"
 
 [detector]
 shape = [1, 128, 128]
 
 [psana]
-enable = false
+enable = true
 ps_smd_n_events = 10000
 ps_eb_nodes = 1
 ps_srv_nodes = 0
+ps_batch_size = 100
+ps_dir = "/global/project/projectdirs/lcls/data2/amo/amo06516/xtc" 
+exp = "amo06516"
+runnum = 85
+
 
 [runtime]
 N_images_per_rank = 2500

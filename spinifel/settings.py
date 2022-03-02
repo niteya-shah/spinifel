@@ -260,6 +260,16 @@ class SpinifelSettings(metaclass=Singleton):
                 int, 1,
                 "PSANA experiment number"
             ),
+            "_ps_batch_size": (
+                "psana", "ps_batch_size",
+                int, 100,
+                "PSANA batch size"
+            ),
+            "_ps_dir": (
+                "psana", "ps_dir",
+                str, "",
+                "PSANA xtc2 directory"
+            ),
             "_use_callmonitor": (
                 "debug", "use_callmonitor",
                 parse_bool, False,

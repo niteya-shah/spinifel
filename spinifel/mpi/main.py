@@ -13,8 +13,13 @@ from .orientation_matching import match
 
 @nvtx.annotate("mpi/main.py", is_prefix=True)
 def main():
-
+    print("Enter the dragon",flush=True)
     comm = contexts.comm
+
+    print(f"#### comm: {comm}",flush=True)
+    #print(f"#### comm_group: {comm.Get_group()}",flush=True)
+    #print(f"#### size: {comm.size}",flush=True)
+    #print(f"#### rank: {comm.rank}",flush=True)
 
     timer = utils.Timer()
 
@@ -24,10 +29,12 @@ def main():
     N_big_data_nodes = comm.size
     max_events = min(settings.N_images_max, N_big_data_nodes*N_images_per_rank)
     writer_rank = 0 # pick writer rank as core 0
+    print(f"Got here",flush=True)
 
     # Reading input images using psana2
     ds = None
     if settings.use_psana:
+        print(f"load data from psana",flush=True)
         from psana import DataSource
         # BigData cores are those excluding Smd0, EventBuilder, & Server cores.
         N_big_data_nodes = comm.size - (1 + settings.ps_eb_nodes + settings.ps_srv_nodes)
@@ -39,10 +46,12 @@ def main():
             destination.last = destination.last % N_big_data_nodes + 1
             return destination.last
         destination.last = 0
-        ds = DataSource(exp=settings.exp, run=settings.runnum,
-                        dir=settings.data_dir, destination=destination,
+        print(f"exp:{settings.ps_exp, settings.ps_runnum, settings.ps_dir, destination}",flush=True)
+        ds = DataSource(exp=settings.ps_exp, run=settings.ps_runnum,
+                        dir=settings.ps_dir, destination=destination,
                         max_events=max_events)
-    
+    print("Done loading",flush=True)
+
     # Setup logger after knowing the writer rank 
     logger = utils.Logger(comm.rank==writer_rank)
     logger.log("In MPI main")
