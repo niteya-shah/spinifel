@@ -1,0 +1,1 @@
+from .py_device_properties import cudaDeviceProp, cudaGetDeviceCount

@@ -21,9 +21,6 @@ use_cuda = false
 use_cufinufft = false
 use_cupy = false
 
-[gpu]
-devices_per_node = 0
-
 [algorithm]
 nER = 51
 nHIO = 25

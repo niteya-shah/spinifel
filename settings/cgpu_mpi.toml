@@ -28,9 +28,6 @@ use_cupy = false
 use_single_prec = false
 chk_convergence = false
 
-[gpu]
-devices_per_node = 1
-
 [algorithm]
 N_generations = 10
 nER = 50

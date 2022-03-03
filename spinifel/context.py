@@ -5,7 +5,6 @@
 """Manages Global Contexts, eg MPI and CUDA"""
 
 
-
 from atexit         import register
 from importlib.util import find_spec
 from functools      import wraps
@@ -27,7 +26,7 @@ if find_spec("pycuda") is not None:
     import pycuda.driver as drv
     PYCUDA_AVAILABLE = True
 
-
+from .device import cudaGetDeviceCount
 
 
 
@@ -50,6 +49,7 @@ class SpinifelContexts(metaclass=Singleton):
         self._comm = None
         self._mpi_initialized = False
         self._dev_id = 0
+        self._n_device = 0
         self._cuda_initialized = False
 
 
@@ -97,8 +97,9 @@ class SpinifelContexts(metaclass=Singleton):
 
         drv.init()
 
-        settings     = SpinifelSettings()
-        self._dev_id = self.rank % drv.Device.count()
+        settings            = SpinifelSettings()
+        self._n_device, err = cudaGetDeviceCount()
+        self._dev_id        = self.rank % self.n_device
 
         dev = drv.Device(self.dev_id)
         self.ctx = dev.retain_primary_context()
@@ -136,6 +137,15 @@ class SpinifelContexts(metaclass=Singleton):
         Get CUDA device ID
         """
         return self._dev_id
+
+
+    @property
+    def n_device(self):
+        """
+        Get device count
+        """
+        return self._n_device
+
 
 
     def cuda_mem_info(self):

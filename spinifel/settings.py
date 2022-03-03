@@ -220,11 +220,6 @@ class SpinifelSettings(metaclass=Singleton):
                 parse_bool, False,
                 "use cuda wherever possible"
             ),
-            "_devices_per_node": (
-                "gpu", "devices_per_node",
-                int, 0,
-                "gpu-device count per node/resource set"
-            ),
             "_use_cufinufft": (
                 "runtime", "use_cufinufft",
                 parse_bool, False,
@@ -409,7 +404,6 @@ class SpinifelSettings(metaclass=Singleton):
             "N_IMAGES_PER_RANK": ("_N_images_per_rank", get_int),
             "VERBOSITY": ("_verbose", get_int),
             "USE_CUDA": ("_use_cuda", get_bool),
-            "DEVICES_PER_RS": ("_devices_per_node", get_int),
             "USE_CUFINUFFT": ("_use_cufinufft", get_bool),
             "USE_CUPY": ("_use_cupy", get_bool),
             "PS_SMD_N_EVENTS": ("_ps_smd_n_events", get_int),

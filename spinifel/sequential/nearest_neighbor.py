@@ -102,28 +102,31 @@ def nearest_neighbor(model_slices, slices, batch_size):
 
     # detector size (total pixels) should be >= 16 to use CUDA code
     if settings.use_cuda and slices.shape[1] >= 16:
-        deviceId = rank % settings._devices_per_node
         if settings.verbose:
-            print(f"Using CUDA  to calculate Euclidean distance and heap sort (batch_size={batch_size})")
-            print(f"Rank {rank} using deviceId {deviceId}")
+            print(f"Using CUDA to calculate Euclidean distance and heap sort ({batch_size=})")
+            print(f"Rank {rank} using device ID {context.dev_id}")
         
         # Calculate Euclidean distance in batch to avoid running out of GPU Memory
-        euDist = np.zeros((slices.shape[0], model_slices.shape[0]), dtype=slices.dtype)
+        euDist = np.zeros(
+            (slices.shape[0], model_slices.shape[0]), dtype=slices.dtype
+        )
         for i in range(model_slices.shape[0]//batch_size):
             st = i * batch_size
             en = st + batch_size
-            euDist[:, st:en] = calc_eudist_gpu(model_slices[st:en], slices, deviceId).reshape(slices.shape[0], batch_size)
+            euDist[:, st:en] = calc_eudist_gpu(
+                model_slices[st:en], slices, context.dev_id
+            ).reshape(slices.shape[0], batch_size)
         euDist = euDist.flatten()
         
         index = calc_argmin_gpu(euDist, 
                             slices.shape[0],
                             model_slices.shape[0],
                             slices.shape[1],
-                            deviceId)
+                            context.dev_id)
     else:
         if settings.verbose:
             print("Using sklearn Euclidean Distance and numpy argmin")
-        euDist    = euclidean_distances(model_slices, slices)
+        euDist = euclidean_distances(model_slices, slices)
         index  = np.argmin(euDist, axis=0)
 
     return index
