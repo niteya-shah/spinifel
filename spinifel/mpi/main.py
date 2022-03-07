@@ -1,10 +1,10 @@
-from spinifel import settings, utils, contexts, checkpoint
-from spinifel.prep import save_mrc
+from spinifel import settings, utils, contexts, checkpoint, image
+from spinifel.prep import save_mrc, compute_pixel_distance, binning_mean, binning_index 
 
 import numpy as np
 import PyNVTX as nvtx
 
-from .prep import get_data
+from .prep import get_data, compute_mean_image, show_image, bin_data
 from .autocorrelation import solve_ac
 from .phasing import phase
 from .orientation_matching import match
@@ -65,10 +65,33 @@ def main():
 
     # Load unique set of intensity slices for each rank
     (pixel_position_reciprocal,
-     pixel_distance_reciprocal,
      pixel_index_map,
      slices_) = get_data(N_images_per_rank, ds)
+    
+    # Hacky way to allow only worker ranks for computation tasks
+    if not contexts.is_worker: return
+    
+    # Computes reciprocal distance and mean image then save to .png
+    pixel_distance_reciprocal = compute_pixel_distance(
+            pixel_position_reciprocal)
+    mean_image = compute_mean_image(slices_)
+    show_image(image, ds, contexts.rank, slices_, pixel_index_map, 
+            pixel_position_reciprocal, pixel_distance_reciprocal, mean_image,
+            "image_0.png", "mean_image.png", "saxs.png")
+
+    # Bins data and save to .png files
+    (pixel_position_reciprocal,
+     pixel_index_map,
+     slices_) = bin_data(pixel_position_reciprocal, pixel_index_map, slices_)
+    pixel_distance_reciprocal = compute_pixel_distance(
+            pixel_position_reciprocal)
+    mean_image = compute_mean_image(slices_)
+    show_image(image, ds, contexts.rank, slices_, pixel_index_map, 
+            pixel_position_reciprocal, pixel_distance_reciprocal, mean_image,
+            "image_binned_0.png", "mean_image_binned.png", "saxs_binned.png")
+    
     logger.log(f"Loaded in {timer.lap():.2f}s.")
+    
 
     # Generation 0: solve_ac and phase
     N_generations = settings.N_generations

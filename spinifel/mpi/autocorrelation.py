@@ -148,7 +148,8 @@ def solve_ac(generation,
              slices_,
              orientations=None,
              ac_estimate=None):
-    comm = MPI.COMM_WORLD
+    #comm = MPI.COMM_WORLD
+    comm = contexts.comm_compute
 
     M = settings.M
     Mtot = M**3

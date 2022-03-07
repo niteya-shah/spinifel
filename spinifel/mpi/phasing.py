@@ -9,7 +9,9 @@ from spinifel.sequential.phasing import phase as sequential_phase
 def phase(generation, ac, support_=None, rho_=None):
     """Phase retrieval by Rank0 and broadcast to all ranks."""
 
-    comm = MPI.COMM_WORLD
+    #comm = MPI.COMM_WORLD
+    comm = contexts.comm_compute
+
     Mquat = settings.Mquat
     M = 4*Mquat + 1
     Mtot = M**3

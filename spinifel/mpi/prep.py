@@ -46,37 +46,79 @@ def get_orientations_prior(comm, N_images_per_rank):
 
 
 @nvtx.annotate("mpi/prep.py", is_prefix=True)
-def get_slices(comm, N_images_per_rank, ds):
-    """Each rank loads intensity slices from input file (or psana)."""
+def get_slices(comm, N_images_per_rank):
+    """Each rank loads intensity slices from input hdf5 file."""
     data_type = getattr(np, settings.data_type_str)
     slices_ = np.zeros((N_images_per_rank,) + settings.det_shape,
                        dtype=data_type)
-    if ds is None:
-        i_start = comm.rank * N_images_per_rank
-        i_end = i_start + N_images_per_rank
-        print(f"get_slices rank={comm.rank} st={i_start} en={i_end}",flush=True)
-        prep.load_slices(slices_, i_start, i_end)
-        return slices_
-    else:
-        i = 0
-        for run in ds.runs():
-            for evt in run.events():
-                raw = evt._dgrams[0].pnccdBack[0].raw
-                try:
-                    slices_[i] = raw.image
-                except IndexError:
-                    raise RuntimeError(
-                        f"Rank {comm.rank} received too many events.")
-                i += 1
-        return slices_[:i]
-
+    i_start = comm.rank * N_images_per_rank
+    i_end = i_start + N_images_per_rank
+    print(f"get_slices rank={comm.rank} st={i_start} en={i_end}",flush=True)
+    prep.load_slices(slices_, i_start, i_end)
+    return slices_
 
 
 @nvtx.annotate("mpi/prep.py", is_prefix=True)
-def compute_mean_image(comm, slices_):
+def get_slices_and_pixel_info(N_images_per_rank, ds):
+    """Each rank loads intensity slices and pixel parameters using psana2."""
+    data_type = getattr(np, settings.data_type_str)
+    slices_ = np.zeros((N_images_per_rank,) + settings.det_shape,
+                       dtype=data_type)
+    pixel_position_reciprocal = None
+    pixel_index_map = None
+    i = 0
+    for run in ds.runs():
+        # TODO: We will need all detnames below to be part of toml file.
+        det = run.Detector("amopnccd")
+        pp_det = run.Detector("pixel_position")
+        pim_det = run.Detector("pixel_index_map") 
+        
+        for evt in run.events():
+            raw = det.raw.calib(evt)
+
+            # Only need to do once for per-run variables
+            if i == 0:
+                photon_energy = det.raw.photon_energy(evt)
+                pixel_position = pp_det(evt)
+                _pixel_index_map = pim_det(evt)
+                
+                # Calculate pixel position in reciprocal space
+                from skopi.beam import convert
+                from skopi.geometry import get_reciprocal_space_pixel_position
+                wavelength = convert.photon_energy_to_wavelength(
+                        photon_energy)
+                wavevector = np.array([0, 0, 1.0 / wavelength]) # skopi convention
+                _pixel_position_reciprocal = get_reciprocal_space_pixel_position(
+                        pixel_position, wavevector)
+
+                # Spinifel requires xy (2d) or xyz (3d) dimension be the first axis
+                pixel_index_map = np.moveaxis(_pixel_index_map[:], -1, 0)
+                pixel_position_reciprocal = np.moveaxis(
+                    _pixel_position_reciprocal[:], -1, 0)
+
+            try:
+                slices_[i] = raw
+            except IndexError:
+                # TODO: Find way to include rank no. in the message below
+                raise RuntimeError(
+                    f"received too many events.")
+            i += 1
+    
+    pixel_info = {}
+    pixel_info['pixel_position_reciprocal'] = pixel_position_reciprocal
+    pixel_info['pixel_index_map'] = pixel_index_map
+    return slices_[:i], pixel_info
+
+
+@nvtx.annotate("mpi/prep.py", is_prefix=True)
+def compute_mean_image(slices_):
+    if not contexts.is_worker: return None
+    comm = contexts.comm_compute
+    
     images_sum = slices_.sum(axis=0)
     N_images = slices_.shape[0]
     images_sum_total = np.zeros_like(images_sum)
+
     comm.Reduce(images_sum, images_sum_total, op=MPI.SUM, root=0)
     N_images = comm.reduce(N_images, op=MPI.SUM, root=0)
     if comm.rank == 0:
@@ -84,6 +126,25 @@ def compute_mean_image(comm, slices_):
     else:
         # Send None rather than intermediary result
         return None
+
+
+def show_image(image, ds, rank, slices_, pixel_index_map, 
+        pixel_position_reciprocal, pixel_distance_reciprocal, mean_image,
+        image_0_name, image_mean_name,
+        image_sax_name):
+    """Asks a unique worker rank to write sample images to disk."""
+    show = False
+    if ds is None:
+        if rank == 0:
+            show = True
+    else:
+        if ds.unique_user_rank():
+            show = True
+    
+    if show:
+        image.show_image(pixel_index_map, slices_[0], image_0_name)
+        image.show_image(pixel_index_map, mean_image, image_mean_name)
+        prep.export_saxs(pixel_distance_reciprocal, mean_image, image_sax_name)
 
 
 @nvtx.annotate("mpi/prep.py", is_prefix=True)
@@ -97,38 +158,27 @@ def get_data(N_images_per_rank, ds):
     size = comm.size
 
     # Load intensity slices, reciprocal pixel position, index map
-    pixel_position_reciprocal = get_pixel_position_reciprocal(comm)
-    pixel_index_map = get_pixel_index_map(comm)
-    slices_ = get_slices(comm, N_images_per_rank, ds)
+    if ds is None:
+        pixel_position_reciprocal = get_pixel_position_reciprocal(comm)
+        pixel_index_map = get_pixel_index_map(comm)
+        slices_ = get_slices(comm, N_images_per_rank)
+    else:
+        slices_, pixel_info = get_slices_and_pixel_info(N_images_per_rank, ds)
+        pixel_position_reciprocal = pixel_info['pixel_position_reciprocal']
+        pixel_index_map = pixel_info['pixel_index_map']
     N_images_local = slices_.shape[0]
 
-    # Log mean image and saxs before binning
-    mean_image = compute_mean_image(comm, slices_)
-    if rank == (2 if settings.use_psana else 0):
-        image.show_image(pixel_index_map, slices_[0], "image_0.png")
-    if rank == 0:
-        pixel_distance_reciprocal = prep.compute_pixel_distance(
-            pixel_position_reciprocal)
-        image.show_image(pixel_index_map, mean_image, "mean_image.png")
-        prep.export_saxs(pixel_distance_reciprocal, mean_image, "saxs.png")
-
-    # Bin reciprocal position, reciprocal distance, index map, slices
-    pixel_position_reciprocal = prep.binning_mean(pixel_position_reciprocal)
-    pixel_index_map = prep.binning_index(pixel_index_map)
-    pixel_distance_reciprocal = prep.compute_pixel_distance(
-            pixel_position_reciprocal)
-    slices_ = prep.binning_sum(slices_)
-
-    # Log mean image and saxs after binning
-    mean_image = compute_mean_image(comm, slices_)
-    if rank == (2 if settings.use_psana else 0):
-        image.show_image(pixel_index_map, slices_[0], "image_binned_0.png")
-    if rank == 0:
-        image.show_image(pixel_index_map, mean_image, "mean_image_binned.png")
-        prep.export_saxs(pixel_distance_reciprocal, mean_image,
-                         "saxs_binned.png")
-
     return (pixel_position_reciprocal,
-            pixel_distance_reciprocal,
             pixel_index_map,
             slices_)
+
+
+def bin_data(pixel_position_reciprocal, pixel_index_map, slices_):
+    ## Bin reciprocal position, reciprocal distance, index map, slices
+    pixel_position_reciprocal = prep.binning_mean(pixel_position_reciprocal)
+    pixel_index_map = prep.binning_index(pixel_index_map)
+    slices_ = prep.binning_sum(slices_)
+    return (pixel_position_reciprocal,
+            pixel_index_map,
+            slices_)
+
