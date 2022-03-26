@@ -6,7 +6,7 @@ import PyNVTX as nvtx
 
 from .prep import get_data
 from .autocorrelation import solve_ac
-from .phasing import phase
+from .phasing import phase, phase_final
 from .orientation_matching import match
 
 
@@ -150,6 +150,9 @@ def main():
                 print("Stopping criteria met!")
                 break
 
+        if generation == 7:
+            ac_phased, support_, rho_ = phase_final(generation, ac, support_, rho_)
+
         if comm.rank == 0:
             # Save electron density and intensity
             rho = np.fft.ifftshift(rho_)
@@ -167,6 +170,7 @@ def main():
                      'rho_': rho_,
                      'orientations': orientations
                     }
+
             checkpoint.save_checkpoint(myRes, settings.out_dir, generation)
 
     logger.log(f"Results saved in {settings.out_dir}")
