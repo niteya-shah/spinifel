@@ -50,7 +50,7 @@ def main():
     N_generations = settings.N_generations
     for generation in range(1, N_generations):
         orientations, orientations_p = match(
-            phased, slices, slices_p, pixel_position, pixel_distance)
+            phased, slices, slices_p, pixel_position, pixel_distance, order=-1)
 
         solved = solve_ac(
             generation, pixel_position, pixel_distance, slices, slices_p,
