@@ -209,7 +209,7 @@ def shrink_wrap(cutoff, sigma, rho_, support_):
         rho_abs_ = -rho_
     # By using 'wrap', we don't need to fftshift it back and forth
     rho_gauss_ = gaussian_filter(
-        rho_abs_, mode='wrap', sigma=sigma, truncate=1) # truncate=5 changed
+        rho_abs_, mode='wrap', sigma=sigma, truncate=5) # truncate=5 changed
     #support_[:] = rho_gauss_ > rho_abs_.max() * cutoff
     support_[:] = rho_gauss_ > rho_gauss_.max() * cutoff # changed
 
@@ -253,7 +253,7 @@ def phase(generation, ac, support_=None, rho_=None):
     Hu_, Ku_, Lu_ = np.meshgrid(lu, lu, lu, indexing='ij')
     Qu_ = np.sqrt(Hu_**2+Ku_**2+Lu_**2)
     print('Qu_.shape', Qu_.shape)
-    q_corners = np.where(Qu_[:,:,:]>np.pi/settings.oversampling)
+    q_corners = np.where(Qu_[:,:,:]>=np.pi/settings.oversampling)
     intensities = xp.fft.fftshift(intensities_)
     intensities[q_corners] = 0
     intensities_ = xp.fft.ifftshift(intensities)
@@ -270,7 +270,7 @@ def phase(generation, ac, support_=None, rho_=None):
     lc = xp.linspace(-M/2+1, M/2, M)
     Hc_, Kc_, Lc_ = xp.meshgrid(lc, lc, lc, indexing='ij')
     Qc_ = xp.sqrt(Hc_**2+Kc_**2+Lc_**2)
-    corners = xp.where(Qc_[:,:,:]>(M+1)/2)
+    corners = xp.where(Qc_[:,:,:]>=(M+1)/2+2)
     amp_mask[corners] = 0
     #image.show_volume(amp_mask, Mquat, f"amp_mask_{generation}.png")
 
@@ -366,7 +366,7 @@ def phase_final(generation, ac, support_=None, rho_=None):
     Hu_, Ku_, Lu_ = np.meshgrid(lu, lu, lu, indexing='ij')
     Qu_ = np.sqrt(Hu_**2+Ku_**2+Lu_**2)
     print('Qu_.shape', Qu_.shape)
-    q_corners = np.where(Qu_[:,:,:]>np.pi/settings.oversampling)
+    q_corners = np.where(Qu_[:,:,:]>=np.pi/settings.oversampling)
     intensities = xp.fft.fftshift(intensities_)
     intensities[q_corners] = 0
     intensities_ = xp.fft.ifftshift(intensities)
@@ -383,7 +383,7 @@ def phase_final(generation, ac, support_=None, rho_=None):
     lc = xp.linspace(-M/2+1, M/2, M)
     Hc_, Kc_, Lc_ = xp.meshgrid(lc, lc, lc, indexing='ij')
     Qc_ = xp.sqrt(Hc_**2+Kc_**2+Lc_**2)
-    corners = xp.where(Qc_[:,:,:]>(M+1)/2)
+    corners = xp.where(Qc_[:,:,:]>=(M+1)/2+2)
     amp_mask[corners] = 0
     #image.show_volume(amp_mask, Mquat, f"amp_mask_{generation}.png")
 
