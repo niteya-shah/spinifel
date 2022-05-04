@@ -104,6 +104,24 @@ conda activate "$CONDA_ENV_DIR"
 conda install -y amityping -c lcls-ii
 conda install -y bitstruct krtc -c conda-forge
 
+# Important: install CuPy first, it is now a dependency for mpi4py (at least in some cases)
+(
+    set -x
+    if [[ $(hostname --fqdn) = *".crusher."* ]]; then
+        export CUPY_INSTALL_USE_HIP=1
+        export ROCM_HOME=$ROCM_PATH
+        export HCC_AMDGPU_TARGET=gfx90a
+        pip install --no-cache-dir cupy
+    elif [[ $(hostname --fqdn) = *".spock."* ]]; then
+        export CUPY_INSTALL_USE_HIP=1
+        export ROCM_HOME=$ROCM_PATH
+        export HCC_AMDGPU_TARGET=gfx908
+        pip install --no-cache-dir cupy
+    else
+        pip install --no-cache-dir cupy
+    fi
+)
+
 # Extra deps required for psana machines
 if [[ ${target} = "psbuild"* ]]
 then
@@ -126,22 +144,6 @@ fi
 # Install pip packages
 pip install --no-cache-dir callmonitor
 pip install --no-cache-dir PyNVTX
-(
-    set -x
-    if [[ $(hostname --fqdn) = *".crusher."* ]]; then
-        export CUPY_INSTALL_USE_HIP=1
-        export ROCM_HOME=$ROCM_PATH
-        export HCC_AMDGPU_TARGET=gfx90a
-        pip install --no-cache-dir cupy
-    elif [[ $(hostname --fqdn) = *".spock."* ]]; then
-        export CUPY_INSTALL_USE_HIP=1
-        export ROCM_HOME=$ROCM_PATH
-        export HCC_AMDGPU_TARGET=gfx908
-        pip install --no-cache-dir cupy
-    else
-        pip install --no-cache-dir cupy
-    fi
-)
 
 #-------------------------------------------------------------------------------
 
