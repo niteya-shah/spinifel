@@ -58,35 +58,35 @@ variables:
     - mkdir -p ${OUT_DIR}
     - source ./setup/env.sh
 
-.unit_test_script: unit_test_script
+.unit_test_script: &unit_test_script
   script:
     - ./scripts/test.sh
 
-.mpi_test_script: mpi_test_script
+.mpi_test_script: &mpi_test_script
   script:
     - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=summit_ci.toml --mode=mpi
 
-.legion_test_script: legion_test_script
+.legion_test_script: &legion_test_script
   script:
     - PYTHONPATH="$PYTHONPATH:$EXTERNAL_WORKDIR:$PWD/mpi4py_poison_wrapper" $SPINIFEL_TEST_LAUNCHER legion_python -ll:py 1 -ll:csize 8192 legion_main.py --default-settings=summit_ci.toml --mode=legion
 
-.sequential_test_script: sequential_test_script
+.sequential_test_script: &sequential_test_script
   script:
     - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=summit_ci.toml --mode=sequential
 
-.large_test_script: large_test_script
+.large_test_script: &large_test_script
   script:
     - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=summit_ci.toml --mode=mpi runtime.small_problem=false
 
-.finufft_test_script: finufft_test_script
+.finufft_test_script: &finufft_test_script
   script:
     - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=summit_ci.toml --mode=mpi runtime.use_cufinufft=false
 
-.nocuda_test_script: nocuda_test_script
+.nocuda_test_script: &nocuda_test_script
   script:
     - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=summit_ci.toml --mode=mpi runtime.use_cufinufft=false runtime.use_cuda=false runtime.use_cupy=false
 
-.cleanup_script: cleanup_script
+.cleanup_script: &cleanup_script
   script:
     - rm -rf ${EXTERNAL_WORKDIR}
 
