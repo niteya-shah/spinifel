@@ -127,6 +127,7 @@ fi
 pip install --no-cache-dir callmonitor
 pip install --no-cache-dir PyNVTX
 (
+    set -x
     if [[ $(hostname --fqdn) = *".crusher."* ]]; then
         export CUPY_INSTALL_USE_HIP=1
         export ROCM_HOME=$ROCM_PATH
