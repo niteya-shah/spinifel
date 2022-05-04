@@ -197,7 +197,8 @@ build_crusher:
   <<: [*test_rules, *build_script]
   stage: build
   tags:
-    - nobatch
+    - shell
+    - crusher
   variables:
     <<: [*crusher_variables]
 
@@ -205,7 +206,8 @@ unit_test_crusher:
   <<: [*test_rules, *test_before_script, *unit_test_script]
   stage: unit_test
   tags:
-    - batch
+    - slurm
+    - crusher
   variables:
     <<: [*crusher_variables]
 
@@ -213,7 +215,8 @@ test_mpi_crusher:
   <<: [*test_rules, *test_before_script, *mpi_test_script]
   stage: test
   tags:
-    - batch
+    - slurm
+    - crusher
   variables:
     <<: [*crusher_variables]
 
@@ -221,7 +224,8 @@ test_legion_crusher:
  <<: [*test_rules, *test_before_script, *legion_test_script]
  stage: test
  tags:
-   - batch
+   - slurm
+   - crusher
  variables:
    <<: [*crusher_variables]
 
@@ -230,7 +234,8 @@ test_legion_crusher:
 #  <<: [*test_rules, *test_before_script, *sequential_test_script]
 #  stage: test
 #  tags:
-#    - batch
+#    - slurm
+#    - crusher
 #  variables:
 #    <<: [*crusher_variables]
 
@@ -239,7 +244,8 @@ test_legion_crusher:
 #  <<: [*test_rules, *test_before_script, *large_test_script]
 #   stage: test
 #   tags:
-#     - batch
+#     - slurm
+#    - crusher
 #  variables:
 #    <<: [*crusher_variables]
 
@@ -247,7 +253,8 @@ test_finufft_crusher:
   <<: [*test_rules, *test_before_script, *finufft_test_script]
   stage: test
   tags:
-    - batch
+    - slurm
+    - crusher
   variables:
     <<: [*crusher_variables]
 
@@ -255,7 +262,8 @@ test_nocuda_crusher:
   <<: [*test_rules, *test_before_script, *nocuda_test_script]
   stage: test
   tags:
-    - batch
+    - slurm
+    - crusher
   variables:
     <<: [*crusher_variables]
 
@@ -263,6 +271,7 @@ cleanup_crusher:
   <<: [*test_rules, *cleanup_script]
   stage: cleanup
   tags:
-    - nobatch
+    - shell
+    - crusher
   variables:
     <<: [*crusher_variables]
