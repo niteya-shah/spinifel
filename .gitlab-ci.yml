@@ -7,6 +7,9 @@ variables:
   SCHEDULER_PARAMETERS: "-P CHM137 -W 1:30 -nnodes 1 -alloc_flags gpumps"
   EXTERNAL_WORKDIR: /gpfs/wolf/chm137/proj-shared/ci/${CI_PIPELINE_ID}
 
+  # launcher for tests
+  SPINIFEL_TEST_LAUNCHER: "jsrun -n1 -a1 -g1"
+
   # for script test
   DATA_DIR: /gpfs/wolf/chm137/proj-shared/spinifel_data
   DATA_FILENAME: 2CEX-10k-2.h5
@@ -23,6 +26,9 @@ variables:
   SCHEDULER_PARAMETERS: "-A CHM137_crusher -t 1:30 -N 1 -p batch"
   EXTERNAL_WORKDIR: /gpfs/alpine/chm137/proj-shared/ci/${CI_PIPELINE_ID}
 
+  # launcher for tests
+  SPINIFEL_TEST_LAUNCHER: "srun -n1"
+
   # for script test
   DATA_DIR: /gpfs/alpine/chm137/proj-shared/spinifel_data
   DATA_FILENAME: 2CEX-10k-2.h5
@@ -35,6 +41,57 @@ variables:
   IS_CRUSHER_JOB: 1
 
 
+# scripts for the various test stages
+.build_script: &build_script
+  before_script:
+    - mkdir -p $(dirname ${EXTERNAL_WORKDIR})
+    - cp -r ${CI_PROJECT_DIR} ${EXTERNAL_WORKDIR}
+    - cd ${EXTERNAL_WORKDIR}
+    - git clean -fxd
+    - git submodule update --init --recursive
+  script:
+    - ./setup/build_from_scratch.sh
+
+.test_before_script: &test_before_script
+  before_script:
+    - cd ${EXTERNAL_WORKDIR}
+    - mkdir -p ${OUT_DIR}
+    - source ./setup/env.sh
+
+.unit_test_script: unit_test_script
+  script:
+    - ./scripts/test.sh
+
+.mpi_test_script: mpi_test_script
+  script:
+    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=summit_ci.toml --mode=mpi
+
+.legion_test_script: legion_test_script
+  script:
+    - PYTHONPATH="$PYTHONPATH:$EXTERNAL_WORKDIR:$PWD/mpi4py_poison_wrapper" $SPINIFEL_TEST_LAUNCHER legion_python -ll:py 1 -ll:csize 8192 legion_main.py --default-settings=summit_ci.toml --mode=legion
+
+.sequential_test_script: sequential_test_script
+  script:
+    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=summit_ci.toml --mode=sequential
+
+.large_test_script: large_test_script
+  script:
+    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=summit_ci.toml --mode=mpi runtime.small_problem=false
+
+.finufft_test_script: finufft_test_script
+  script:
+    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=summit_ci.toml --mode=mpi runtime.use_cufinufft=false
+
+.nocuda_test_script: nocuda_test_script
+  script:
+    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=summit_ci.toml --mode=mpi runtime.use_cufinufft=false runtime.use_cuda=false runtime.use_cupy=false
+
+.cleanup_script: cleanup_script
+  script:
+    - rm -rf ${EXTERNAL_WORKDIR}
+
+
+# rules that determine when each job runs
 .test_rules: &test_rules
   rules:
     # run don't run Crusher jobs on Ascent and vice versa
@@ -58,72 +115,41 @@ stages:
 ######################################################################
 
 build_ascent:
-  <<: [*test_rules]
+  <<: [*test_rules, *build_script]
   stage: build
-  before_script:
-    - mkdir -p $(dirname ${EXTERNAL_WORKDIR})
-    - cp -r ${CI_PROJECT_DIR} ${EXTERNAL_WORKDIR}
-    - cd ${EXTERNAL_WORKDIR}
-    - git clean -fxd
-    - git submodule update --init --recursive
-  script:
-    - ./setup/build_from_scratch.sh
   tags:
     - nobatch
   variables:
     <<: [*ascent_variables]
 
 unit_test_ascent:
-  <<: [*test_rules]
+  <<: [*test_rules, *test_before_script, *unit_test_script]
   stage: unit_test
-  before_script:
-    - cd ${EXTERNAL_WORKDIR}
-  script:
-    - ./scripts/test.sh
   tags:
     - batch
   variables:
     <<: [*ascent_variables]
 
 test_mpi_ascent:
-  <<: [*test_rules]
+  <<: [*test_rules, *test_before_script, *mpi_test_script]
   stage: test
-  before_script:
-    - cd ${EXTERNAL_WORKDIR}
-    - mkdir -p ${OUT_DIR}
-    - source ./setup/env.sh
-  script:
-    - jsrun -n1 -a1 -g1 python -m spinifel --default-settings=summit_ci.toml --mode=mpi
   tags:
     - batch
   variables:
     <<: [*ascent_variables]
 
 test_legion_ascent:
-  <<: [*test_rules]
-  stage: test
-  before_script:
-    - cd ${EXTERNAL_WORKDIR}
-    - mkdir -p ${OUT_DIR}
-    - source ./setup/env.sh
-    - export PYTHONPATH=${PYTHONPATH}:${EXTERNAL_WORKDIR}
-  script:
-      - PYTHONPATH="$PYTHONPATH:$PWD/mpi4py_poison_wrapper" jsrun -n1 -a1 -g1 legion_python -ll:py 1 -ll:csize 8192 legion_main.py --default-settings=summit_ci.toml --mode=legion
-  tags:
-    - batch
-  variables:
-    <<: [*ascent_variables]
+ <<: [*test_rules, *test_before_script, *legion_test_script]
+ stage: test
+ tags:
+   - batch
+ variables:
+   <<: [*ascent_variables]
 
 # TODO: suggest deprecating
 #test_sequential_ascent:
-#  <<: [*test_rules]
+#  <<: [*test_rules, *test_before_script, *sequential_test_script]
 #  stage: test
-#  before_script:
-#    - cd ${EXTERNAL_WORKDIR}
-#    - mkdir -p ${OUT_DIR}
-#    - source ./setup/env.sh
-#  script:
-#    - jsrun -n1 -a1 -g1 python -m spinifel --default-settings=summit_ci.toml --mode=sequential
 #  tags:
 #    - batch
 #  variables:
@@ -131,53 +157,32 @@ test_legion_ascent:
 
 # TODO: Skip for now -- runs out of memory -- not sure why though
 # test_large_ascent:
-#  <<: [*test_rules]
+#  <<: [*test_rules, *test_before_script, *large_test_script]
 #   stage: test
-#   before_script:
-#     - cd ${EXTERNAL_WORKDIR}
-#     - mkdir -p ${OUT_DIR}
-#     - source ./setup/env.sh
-#   script:
-#     - jsrun -n1 -a1 -g1 python -m spinifel --default-settings=summit_ci.toml --mode=mpi runtime.small_problem=false
 #   tags:
 #     - batch
 #  variables:
 #    <<: [*ascent_variables]
 
 test_finufft_ascent:
-  <<: [*test_rules]
+  <<: [*test_rules, *test_before_script, *finufft_test_script]
   stage: test
-  before_script:
-    - cd ${EXTERNAL_WORKDIR}
-    - mkdir -p ${OUT_DIR}
-    - source ./setup/env.sh
-  script:
-    - jsrun -n1 -a1 -g1 python -m spinifel --default-settings=summit_ci.toml --mode=mpi runtime.use_cufinufft=false
   tags:
     - batch
   variables:
     <<: [*ascent_variables]
 
 test_nocuda_ascent:
-  <<: [*test_rules]
+  <<: [*test_rules, *test_before_script, *nocuda_test_script]
   stage: test
-  before_script:
-    - cd ${EXTERNAL_WORKDIR}
-    - mkdir -p ${OUT_DIR}
-    - source ./setup/env.sh
-  script:
-    - jsrun -n1 -a1 -g1 python -m spinifel --default-settings=summit_ci.toml --mode=mpi runtime.use_cufinufft=false runtime.use_cuda=false runtime.use_cupy=false
   tags:
     - batch
   variables:
     <<: [*ascent_variables]
 
 cleanup_ascent:
-  <<: [*test_rules]
+  <<: [*test_rules, *cleanup_script]
   stage: cleanup
-  before_script:
-  script:
-    - rm -rf ${EXTERNAL_WORKDIR}
   tags:
     - nobatch
   variables:
@@ -189,136 +194,75 @@ cleanup_ascent:
 ######################################################################
 
 build_crusher:
-  <<: [*test_rules]
+  <<: [*test_rules, *build_script]
   stage: build
-  before_script:
-    - mkdir -p $(dirname ${EXTERNAL_WORKDIR})
-    - cp -r ${CI_PROJECT_DIR} ${EXTERNAL_WORKDIR}
-    - cd ${EXTERNAL_WORKDIR}
-    - git clean -fxd
-    - git submodule update --init --recursive
-  script:
-    - ./setup/build_from_scratch.sh
   tags:
-    - shell
-    - crusher
+    - nobatch
   variables:
     <<: [*crusher_variables]
 
 unit_test_crusher:
-  <<: [*test_rules]
+  <<: [*test_rules, *test_before_script, *unit_test_script]
   stage: unit_test
-  before_script:
-    - cd ${EXTERNAL_WORKDIR}
-  script:
-    - ./scripts/test.sh
   tags:
-    - slurm
-    - crusher
+    - batch
   variables:
     <<: [*crusher_variables]
 
 test_mpi_crusher:
-  <<: [*test_rules]
+  <<: [*test_rules, *test_before_script, *mpi_test_script]
   stage: test
-  before_script:
-    - cd ${EXTERNAL_WORKDIR}
-    - mkdir -p ${OUT_DIR}
-    - source ./setup/env.sh
-  script:
-    - srun -n1 python -m spinifel --default-settings=summit_ci.toml --mode=mpi
   tags:
-    - slurm
-    - crusher
+    - batch
   variables:
     <<: [*crusher_variables]
 
 test_legion_crusher:
- <<: [*test_rules]
+ <<: [*test_rules, *test_before_script, *legion_test_script]
  stage: test
- before_script:
-   - cd ${EXTERNAL_WORKDIR}
-   - mkdir -p ${OUT_DIR}
-   - source ./setup/env.sh
-   - export PYTHONPATH=${PYTHONPATH}:${EXTERNAL_WORKDIR}
- script:
-     - PYTHONPATH="$PYTHONPATH:$PWD/mpi4py_poison_wrapper" srun -n1 --cpu-bind none legion_python -ll:py 1 -ll:csize 8192 legion_main.py --default-settings=summit_ci.toml --mode=legion
  tags:
-   - slurm
-   - crusher
+   - batch
  variables:
    <<: [*crusher_variables]
 
 # TODO: suggest deprecating
 #test_sequential_crusher:
-#  <<: [*test_rules]
+#  <<: [*test_rules, *test_before_script, *sequential_test_script]
 #  stage: test
-#  before_script:
-#    - cd ${EXTERNAL_WORKDIR}
-#    - mkdir -p ${OUT_DIR}
-#    - source ./setup/env.sh
-#  script:
-#    - srun -n1 python -m spinifel --default-settings=summit_ci.toml --mode=sequential
 #  tags:
-#    - slurm
-#    - crusher
+#    - batch
 #  variables:
 #    <<: [*crusher_variables]
 
 # TODO: Skip for now -- runs out of memory -- not sure why though
 # test_large_crusher:
-#  <<: [*test_rules]
+#  <<: [*test_rules, *test_before_script, *large_test_script]
 #   stage: test
-#   before_script:
-#     - cd ${EXTERNAL_WORKDIR}
-#     - mkdir -p ${OUT_DIR}
-#     - source ./setup/env.sh
-#   script:
-#     - srun -n1 python -m spinifel --default-settings=summit_ci.toml --mode=mpi runtime.small_problem=false
 #   tags:
-#     - slurm
-#     - crusher
+#     - batch
 #  variables:
 #    <<: [*crusher_variables]
 
 test_finufft_crusher:
-  <<: [*test_rules]
+  <<: [*test_rules, *test_before_script, *finufft_test_script]
   stage: test
-  before_script:
-    - cd ${EXTERNAL_WORKDIR}
-    - mkdir -p ${OUT_DIR}
-    - source ./setup/env.sh
-  script:
-    - srun -n1 python -m spinifel --default-settings=summit_ci.toml --mode=mpi runtime.use_cufinufft=false
   tags:
-    - slurm
-    - crusher
+    - batch
   variables:
     <<: [*crusher_variables]
 
 test_nocuda_crusher:
-  <<: [*test_rules]
+  <<: [*test_rules, *test_before_script, *nocuda_test_script]
   stage: test
-  before_script:
-    - cd ${EXTERNAL_WORKDIR}
-    - mkdir -p ${OUT_DIR}
-    - source ./setup/env.sh
-  script:
-    - srun -n1 python -m spinifel --default-settings=summit_ci.toml --mode=mpi runtime.use_cufinufft=false runtime.use_cuda=false runtime.use_cupy=false
   tags:
-    - slurm
-    - crusher
+    - batch
   variables:
     <<: [*crusher_variables]
 
 cleanup_crusher:
-  <<: [*test_rules]
+  <<: [*test_rules, *cleanup_script]
   stage: cleanup
-  before_script:
-  script:
-    - rm -rf ${EXTERNAL_WORKDIR}
   tags:
-    - shell
-    - crusher
+    - nobatch
   variables:
     <<: [*crusher_variables]
