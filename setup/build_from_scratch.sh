@@ -106,7 +106,6 @@ conda install -y bitstruct krtc -c conda-forge
 
 # Important: install CuPy first, it is now a dependency for mpi4py (at least in some cases)
 (
-    set -x
     if [[ $(hostname --fqdn) = *".crusher."* ]]; then
         export CUPY_INSTALL_USE_HIP=1
         export ROCM_HOME=$ROCM_PATH
