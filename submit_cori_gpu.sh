@@ -17,9 +17,10 @@ t_start=`date +%s`
 source setup/env.sh
 
 export SLURM_CPU_BIND="cores"
+
 srun python -m spinifel --default-settings=cgpu_mpi.toml --mode=mpi
+#srun legion_python -ll:py 1 -ll:pyomp 4 -ll:csize 8192 --default-settings=cgpu_mpi.toml --mode=legion
 
 t_end=`date +%s`
 echo PSJobCompleted TotalElapsed $((t_end-t_start)) $t_start $t_end
-
 

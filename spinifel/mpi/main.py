@@ -114,7 +114,7 @@ def main():
         # Orientation matching
         #orientations = match(
         #    ac, slices_,
-        #    pixel_position_reciprocal, pixel_distance_reciprocal, order=-1)
+        #    pixel_position_reciprocal, pixel_distance_reciprocal, order=0)
         orientations = match(
             ac_phased, slices_,
             pixel_position_reciprocal, pixel_distance_reciprocal, order=-1)
@@ -158,6 +158,7 @@ def main():
             rho = np.fft.ifftshift(rho_)
             intensity = np.fft.fftshift(np.fft.fftn(np.fft.ifftshift(ac)))
             intensity = np.ascontiguousarray(intensity.real).astype(np.float64)
+            np.save(settings.out_dir / f"ac-{generation}.npy", ac_phased)
             save_mrc(settings.out_dir / f"ac-{generation}.mrc", ac_phased)
             save_mrc(settings.out_dir / f"intensity-{generation}.mrc", intensity)
             save_mrc(settings.out_dir / f"rho-{generation}.mrc", rho)
