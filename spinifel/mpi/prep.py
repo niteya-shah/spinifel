@@ -102,6 +102,8 @@ def get_data(N_images_per_rank, ds):
     slices_ = get_slices(comm, N_images_per_rank, ds)
     N_images_local = slices_.shape[0]
 
+    orientations_prior = get_orientations_prior(comm, N_images_per_rank)
+
     # Log mean image and saxs before binning
     mean_image = compute_mean_image(comm, slices_)
     if rank == (2 if settings.use_psana else 0):
@@ -110,7 +112,7 @@ def get_data(N_images_per_rank, ds):
         pixel_distance_reciprocal = prep.compute_pixel_distance(
             pixel_position_reciprocal)
         image.show_image(pixel_index_map, mean_image, "mean_image.png")
-        prep.export_saxs(pixel_distance_reciprocal, mean_image, "saxs.png")
+        #prep.export_saxs(pixel_distance_reciprocal, mean_image, "saxs.png")
 
     # Bin reciprocal position, reciprocal distance, index map, slices
     pixel_position_reciprocal = prep.binning_mean(pixel_position_reciprocal)
@@ -125,10 +127,11 @@ def get_data(N_images_per_rank, ds):
         image.show_image(pixel_index_map, slices_[0], "image_binned_0.png")
     if rank == 0:
         image.show_image(pixel_index_map, mean_image, "mean_image_binned.png")
-        prep.export_saxs(pixel_distance_reciprocal, mean_image,
-                         "saxs_binned.png")
+        #prep.export_saxs(pixel_distance_reciprocal, mean_image,
+        #                 "saxs_binned.png")
 
     return (pixel_position_reciprocal,
             pixel_distance_reciprocal,
             pixel_index_map,
-            slices_)
+            slices_,
+            orientations_prior)

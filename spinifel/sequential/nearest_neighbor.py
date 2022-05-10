@@ -93,7 +93,7 @@ def calc_argmin_gpu(euDist, n_images, n_refs, n_pixels, deviceId):
 
 
 @nvtx.annotate("sequential/nearest_neighbor.py", is_prefix=True)
-def nearest_neighbor(model_slices, slices, batch_sizei, pixel_position_reciprocal, order):
+def nearest_neighbor(model_slices, slices, batch_size, pixel_position_reciprocal, order):
 
     if settings.use_cuda:
         deviceId = rank % settings._devices_per_node

@@ -1,4 +1,4 @@
-from spinifel import settings, utils, contexts, checkpoint
+from spinifel import settings, utils, image, contexts, checkpoint
 from spinifel.prep import save_mrc
 
 import numpy as np
@@ -6,7 +6,7 @@ import PyNVTX as nvtx
 
 from .prep import get_data
 from .autocorrelation import solve_ac
-from .phasing import phase
+from .phasing import phase, phase_final
 from .orientation_matching import match
 
 
@@ -55,15 +55,11 @@ def main():
     logger.log(f"max_events: {max_events}")
 
     # Load unique set of intensity slices for each rank
-    #(pixel_position_reciprocal,
-    # pixel_distance_reciprocal,
-    # pixel_index_map,
-    # slices_,
-    # orientations_prior) = get_data(N_images_per_rank, ds)
     (pixel_position_reciprocal,
      pixel_distance_reciprocal,
      pixel_index_map,
-     slices_) = get_data(N_images_per_rank, ds)
+     slices_,
+     orientations_prior) = get_data(N_images_per_rank, ds)
     logger.log(f"Loaded in {timer.lap():.2f}s.")
 
     #print(f"load ground-truth orientations")
@@ -89,7 +85,7 @@ def main():
         logger.log(f"##### Generation {curr_gen}/{N_generations} #####")
         logger.log(f"#"*27)
         ac = solve_ac(
-            curr_gen, pixel_position_reciprocal, pixel_distance_reciprocal, slices_) #, orientations)
+            curr_gen, pixel_position_reciprocal, pixel_distance_reciprocal, slices_) #, orientations) # changed
         logger.log(f"AC recovered in {timer.lap():.2f}s.")
 
         ac_phased, support_, rho_ = phase(curr_gen, ac)
@@ -98,24 +94,35 @@ def main():
         if comm.rank == 0:
             # Save electron density and intensity
             rho = np.fft.ifftshift(rho_)
+            intensity = np.fft.fftshift(np.fft.fftn(np.fft.ifftshift(ac)))
+            intensity = np.ascontiguousarray(intensity.real).astype(np.float64)
             save_mrc(settings.out_dir / f"ac-{curr_gen}.mrc", ac_phased)
+            save_mrc(settings.out_dir / f"intensity-{curr_gen}.mrc", intensity)
             save_mrc(settings.out_dir / f"rho-{curr_gen}.mrc", rho)
+
+            image.show_volume(intensity, settings.Mquat, f"intensity_{curr_gen}.png")
 
     # Use improvement of cc(prev_rho, cur_rho) to dertemine if we should
     # terminate the loop
     cov_xy = 0
     cov_delta = .05
 
-    for generation in range(curr_gen, N_generations):
+    for generation in range(curr_gen+1, N_generations):
         logger.log(f"#"*27)
         logger.log(f"##### Generation {generation}/{N_generations} #####")
         logger.log(f"#"*27)
         # Orientation matching
+        #orientations = match(
+        #    ac, slices_,
+        #    pixel_position_reciprocal, pixel_distance_reciprocal, order=-1)
         orientations = match(
             ac_phased, slices_,
-            pixel_position_reciprocal, pixel_distance_reciprocal, order=-2)
+            pixel_position_reciprocal, pixel_distance_reciprocal, order=-1)
         logger.log(f"Orientations matched in {timer.lap():.2f}s.")
         # Solve autocorrelation
+        #ac = solve_ac(
+        #    generation, pixel_position_reciprocal, pixel_distance_reciprocal,
+        #    slices_, orientations, ac)
         ac = solve_ac(
             generation, pixel_position_reciprocal, pixel_distance_reciprocal,
             slices_, orientations, ac_phased)
@@ -143,11 +150,19 @@ def main():
                 print("Stopping criteria met!")
                 break
 
+        if generation == 7:
+            ac_phased, support_, rho_ = phase_final(generation, ac, support_, rho_)
+
         if comm.rank == 0:
             # Save electron density and intensity
             rho = np.fft.ifftshift(rho_)
+            intensity = np.fft.fftshift(np.fft.fftn(np.fft.ifftshift(ac)))
+            intensity = np.ascontiguousarray(intensity.real).astype(np.float64)
             save_mrc(settings.out_dir / f"ac-{generation}.mrc", ac_phased)
+            save_mrc(settings.out_dir / f"intensity-{generation}.mrc", intensity)
             save_mrc(settings.out_dir / f"rho-{generation}.mrc", rho)
+
+            image.show_volume(intensity, settings.Mquat, f"intensity_{generation}.png")
 
             # Save output
             myRes = {'ac_phased': ac_phased, 
@@ -155,6 +170,7 @@ def main():
                      'rho_': rho_,
                      'orientations': orientations
                     }
+
             checkpoint.save_checkpoint(myRes, settings.out_dir, generation)
 
     logger.log(f"Results saved in {settings.out_dir}")

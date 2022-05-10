@@ -122,11 +122,11 @@ def setup_linops(comm, generation, H, K, L, data,
     ### original copy of data
     data_temp = data
     print('BEFORE: data.shape =', data.shape)
-    
+
     ### append dataf to data
     data = np.append(data, dataf)
     print('AFTER: data.shape =', data.shape)
-    
+
     ### 3) apply different weights to different regions
     qf_ = np.sqrt(Hf_**2+Kf_**2+Lf_**2)
     print('qf_.shape =', qf_.shape)

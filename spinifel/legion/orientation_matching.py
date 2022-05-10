@@ -14,19 +14,19 @@ from . import utils as lgutils
     RO("ac"), RO("data"), WD("quaternions"), RO("reciprocal"), RO("reciprocal")])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
-def match_task(phased, slices, orientations, pixel_position, pixel_distance):
+def match_task(phased, slices, orientations, pixel_position, pixel_distance, order):
     if settings.verbosity > 0:
         print(f"{socket.gethostname()} starts Orientation Matching.", flush=True)
         print(f"{socket.gethostname()}:", end=" ", flush=False)
     orientations.quaternions[:] = sequential_match(
-        phased.ac, slices.data, pixel_position.reciprocal, pixel_distance.reciprocal)
+        phased.ac, slices.data, pixel_position.reciprocal, pixel_distance.reciprocal, order)
     if settings.verbosity > 0:
         print(f"{socket.gethostname()} finished Orientation Matching.", flush=True)
 
 
 
 @nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
-def match(phased, slices, slices_p, pixel_position, pixel_distance):
+def match(phased, slices, slices_p, pixel_position, pixel_distance, order):
     # The reference orientations don't have to match exactly between ranks.
     # Each rank aligns its own slices.
     # We can call the sequential function on each rank, provided that the
@@ -40,6 +40,6 @@ def match(phased, slices, slices_p, pixel_position, pixel_distance):
         # location of the slices.
         match_task(
             phased, slices_p[i], orientations_p[i],
-            pixel_position, pixel_distance)
+            pixel_position, pixel_distance, order)
 
     return orientations, orientations_p
