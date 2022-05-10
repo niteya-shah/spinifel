@@ -76,7 +76,8 @@ def setup_linops(comm, generation, H, K, L, data,
     assert np.all(F_antisupport == F_antisupport[::-1, ::-1, ::-1])
 
     ### weight the old data to have uniform weighted density, i.e., set the first N points to something like 1/(N_images/(2*|q|)) and set the rest of the weights to 1
-    weights /= (settings.N_images_per_rank/(2*np.abs(q_)))
+    #weights /= (settings.N_images_per_rank/(2*np.abs(q_)))
+    weights *= (2*np.abs(q_)/settings.N_images_per_rank)
     M_ups = settings.M_ups
     ugrid_conv = autocorrelation.adjoint(
             np.ones_like(data)*weights, H_, K_, L_, 1, M_ups,
@@ -90,11 +91,12 @@ def setup_linops(comm, generation, H, K, L, data,
     ### if there's a beamstep, add an extra < inequality for the missing center
     #q_fake = np.where(Qu_[:,:,:]>np.pi/settings.oversampling)
     q_fake = np.where(np.abs(F_ugrid_conv)<=0.1*np.max(np.abs(F_ugrid_conv)))
+    #q_fake = np.where(np.abs(F_ugrid_conv)<=0.5*np.max(np.abs(F_ugrid_conv)))
     print('q_fake =', q_fake)
-    print(f'# of fake q-points =', q_fake[0])
-    Hf_ = 2*np.pi*q_fake[0]/M_ups-np.pi
-    Kf_ = 2*np.pi*q_fake[1]/M_ups-np.pi
-    Lf_ = 2*np.pi*q_fake[2]/M_ups-np.pi
+    print(f'# of fake q-points =', len(q_fake[0]))
+    Hf_ = 2*np.pi*q_fake[0]/(M_ups-1)-np.pi
+    Kf_ = 2*np.pi*q_fake[1]/(M_ups-1)-np.pi
+    Lf_ = 2*np.pi*q_fake[2]/(M_ups-1)-np.pi
     print('Hf_.shape =', Hf_.shape)
     print('Kf_.shape =', Kf_.shape)
     print('Lf_.shape =', Lf_.shape)
@@ -117,6 +119,7 @@ def setup_linops(comm, generation, H, K, L, data,
 
     ### 2) fill in the expanded regions with data sliced from old autocorrelation
     dataf = autocorrelation.forward(ugrid, Hf_, Kf_, Lf_, 1, M, Hf_.shape[0], reciprocal_extent, use_reciprocal_symmetry)
+    dataf = np.zeros_like(dataf) # added
     print('dataf.shape =', dataf.shape)
     
     ### original copy of data
@@ -159,6 +162,9 @@ def setup_linops(comm, generation, H, K, L, data,
     ugrid_conv = reduce_bcast(comm, ugrid_conv)
     F_ugrid_conv_ = np.fft.fftn(np.fft.ifftshift(ugrid_conv)) #/ M**3
     F_ugrid_conv = np.fft.fftshift(F_ugrid_conv_)
+
+    if comm.rank == 0:
+        image.show_volume(F_ugrid_conv.real, settings.Mquat*2, f"F_ugrid_conv_{generation}.png")
 
     def W_matvec(uvect):
         """Define W part of the W @ x = d problem."""
@@ -220,9 +226,6 @@ def solve_ac(generation,
     # Generate random orientations in SO(3)
     if orientations is None:
         orientations = skp.get_random_quat(N_images)
-
-    orientations_mpi = comm.gather(orientations, root=0)
-    orientations_mpi_arr = np.array(orientations_mpi)
 
     # Calculate hkl based on orientations
     H, K, L = autocorrelation.gen_nonuniform_positions(

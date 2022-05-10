@@ -8,7 +8,7 @@ use_callmonitor = false
 
 [data]
 in_dir = "${CFS}/m2859/data/3iyf/clean"
-out_dir = "${SCRATCH}/spinifel_output"
+out_dir = "${SCRATCH}/spinifel_output/20220422_qfilling_phasingON_order0_attempt6"
 name = "3iyf_dp005_128x128pixels_500k.h5"
 
 [detector]
@@ -36,7 +36,7 @@ N_generations = 20
 nER = 50
 nHIO = 50
 beta = 0.5
-cutoff = 0.015
+cutoff = 0.05
 N_phase_loops = 10
 N_clipping = 0
 N_binning = 0
