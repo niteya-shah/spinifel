@@ -11,7 +11,7 @@ from scipy.linalg        import norm
 from scipy.ndimage       import gaussian_filter
 from scipy.sparse.linalg import LinearOperator, cg
 
-from spinifel import settings, utils, image, autocorrelation, contexts
+from spinifel import settings, utils, image, autocorrelation, contexts, checkpoint
 
 
 @nvtx.annotate("mpi/autocorrelation.py", is_prefix=True)
@@ -102,6 +102,12 @@ def setup_linops(comm, generation, H, K, L, data,
     print('Lf_.shape =', Lf_.shape)
     print('np.min(Hf_) =', np.min(Hf_))
     print('np.max(Hf_) =', np.max(Hf_))
+    # Save output
+    myRes = {'HKL_': [H_,K_,L_],
+             'HKLf_': [Hf_,Kf_,Lf_],
+            }
+    if comm.rank == 0:
+        checkpoint.save_checkpoint(myRes, settings.out_dir, generation, tag="hkl", protocol=4) 
 
     ### original copy of H_, K_, L_
     H_temp, K_temp, L_temp = H_, K_, L_
@@ -119,16 +125,26 @@ def setup_linops(comm, generation, H, K, L, data,
 
     ### 2) fill in the expanded regions with data sliced from old autocorrelation
     dataf = autocorrelation.forward(ugrid, Hf_, Kf_, Lf_, 1, M, Hf_.shape[0], reciprocal_extent, use_reciprocal_symmetry)
-    dataf = np.zeros_like(dataf) # added
-    print('dataf.shape =', dataf.shape)
+    #dataf = np.zeros_like(dataf) # added
+    print('dataf.shape =', dataf.shape, type(dataf))
+
+    # Save output
+    myRes = {'data': data,
+             'dataf': dataf,
+             'HKL_': [H_,K_,L_],
+             'HKLf_': [Hf_,Kf_,Lf_],
+             'ugrid': ugrid
+            }
+    if comm.rank == 0:
+        checkpoint.save_checkpoint(myRes, settings.out_dir, generation, tag="data", protocol=4) 
     
     ### original copy of data
     data_temp = data
-    print('BEFORE: data.shape =', data.shape)
+    print('BEFORE: data.shape =', data.shape, type(data))
 
     ### append dataf to data
     data = np.append(data, dataf)
-    print('AFTER: data.shape =', data.shape)
+    print('AFTER: data.shape =', data.shape, type(data))
 
     ### 3) apply different weights to different regions
     qf_ = np.sqrt(Hf_**2+Kf_**2+Lf_**2)
@@ -154,6 +170,13 @@ def setup_linops(comm, generation, H, K, L, data,
     print('onesf.shape =', onesf.shape)
     nuvect_ones = np.append(ones_temp * weights, onesf * weightsf)
     print('nuvect_ones.shape =', nuvect_ones.shape)
+    # Save output
+    myRes = {'weights': weights,
+             'weightsf': weightsf,
+            }
+    if comm.rank == 0:
+        checkpoint.save_checkpoint(myRes, settings.out_dir, generation, tag="weight", protocol=4) 
+
 
     ### compute type-1 NUFFT (nonuniform to uniform grid) with the nonuniform data replaced with 1's
     ugrid_conv = autocorrelation.adjoint(

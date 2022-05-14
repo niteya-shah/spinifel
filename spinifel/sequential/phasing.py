@@ -379,12 +379,12 @@ def phase_final(generation, ac, support_=None, rho_=None):
     amp_mask_ = xp.ones((M, M, M), dtype=xp.bool_)
     # Mask out central peak
     amp_mask_[0, 0, 0] = 0
-    amp_mask = xp.fft.fftshift(amp_mask_)
+    amp_mask = xp.fft.ifftshift(amp_mask_)
     # Mask out corners
-    lc = xp.linspace(-M/2+1, M/2, M)
+    lc = xp.linspace(-M/2, M/2, M)
     Hc_, Kc_, Lc_ = xp.meshgrid(lc, lc, lc, indexing='ij')
     Qc_ = xp.sqrt(Hc_**2+Kc_**2+Lc_**2)
-    corners = xp.where(Qc_[:,:,:]>=(M+1)/2)
+    corners = xp.where(Qc_[:,:,:]>=(M+1)/2-5)
     amp_mask[corners] = 0
     #image.show_volume(amp_mask, Mquat, f"amp_mask_{generation}.png")
 

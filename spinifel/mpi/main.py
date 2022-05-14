@@ -62,8 +62,8 @@ def main():
      orientations_prior) = get_data(N_images_per_rank, ds)
     logger.log(f"Loaded in {timer.lap():.2f}s.")
 
-    #print(f"load ground-truth orientations")
-    #orientations = orientations_prior
+    print(f"load ground-truth orientations")
+    orientations = orientations_prior
 
     # Generation 0: solve_ac and phase
     N_generations = settings.N_generations
@@ -115,10 +115,10 @@ def main():
         #orientations = match(
         #    ac, slices_,
         #    pixel_position_reciprocal, pixel_distance_reciprocal, order=0)
-        orientations = match(
-            ac_phased, slices_,
-            pixel_position_reciprocal, pixel_distance_reciprocal, order=-1)
-        logger.log(f"Orientations matched in {timer.lap():.2f}s.")
+        #orientations = match(
+        #    ac_phased, slices_,
+        #    pixel_position_reciprocal, pixel_distance_reciprocal, order=-1)
+        #logger.log(f"Orientations matched in {timer.lap():.2f}s.")
         # Solve autocorrelation
         #ac = solve_ac(
         #    generation, pixel_position_reciprocal, pixel_distance_reciprocal,
@@ -126,11 +126,22 @@ def main():
         ac = solve_ac(
             generation, pixel_position_reciprocal, pixel_distance_reciprocal,
             slices_, orientations, ac_phased)
+        myRes = {'ac': ac, 
+                }
+        checkpoint.save_checkpoint(myRes, settings.out_dir, generation, tag='ac', protocol=4)
+
+
         logger.log(f"AC recovered in {timer.lap():.2f}s.")
 
         if comm.rank == 0: prev_rho_ = rho_[:]
         ac_phased, support_, rho_ = phase(generation, ac, support_, rho_)
         logger.log(f"Problem phased in {timer.lap():.2f}s.")
+        myRes = {'ac_phased': ac_phased, 
+                 'support_': support_,
+                 'rho_': rho_,
+                }
+        checkpoint.save_checkpoint(myRes, settings.out_dir, generation, tag='phase', protocol=4)
+
 
         # Check if density converges
         if settings.chk_convergence:
@@ -172,7 +183,7 @@ def main():
                      'orientations': orientations
                     }
 
-            checkpoint.save_checkpoint(myRes, settings.out_dir, generation)
+            checkpoint.save_checkpoint(myRes, settings.out_dir, generation, tag='', protocol=4)
 
     logger.log(f"Results saved in {settings.out_dir}")
     logger.log(f"Successfully completed in {timer.total():.2f}s.")
