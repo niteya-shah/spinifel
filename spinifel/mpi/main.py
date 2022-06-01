@@ -85,8 +85,21 @@ def main():
         logger.log(f"##### Generation {curr_gen}/{N_generations} #####")
         logger.log(f"#"*27)
         ac = solve_ac(
-            curr_gen, pixel_position_reciprocal, pixel_distance_reciprocal, slices_) #, orientations) # changed
+            curr_gen, pixel_position_reciprocal, pixel_distance_reciprocal, slices_, orientations) # changed
+        print(f"###### ac centred? {np.where(ac==np.max(ac))}")
+        ac = np.fft.ifftshift(np.fft.ifftshift(ac))
+        print(f"###### ac centred? {np.where(ac==np.max(ac))}")
+ 
         logger.log(f"AC recovered in {timer.lap():.2f}s.")
+        if comm.rank == 0:
+            # Save output
+            myRes = {'ac': ac,
+                     'pixel_position_reciprocal': pixel_position_reciprocal,
+                     'pixel_distance_reciprocal': pixel_distance_reciprocal,
+                     'slices_': slices_,
+                     'orientations': orientations 
+                    }
+            checkpoint.save_checkpoint(myRes, settings.out_dir, 0, 'ac', 4)
 
         ac_phased, support_, rho_ = phase(curr_gen, ac)
         logger.log(f"Problem phased in {timer.lap():.2f}s.")
@@ -101,6 +114,14 @@ def main():
             save_mrc(settings.out_dir / f"rho-{curr_gen}.mrc", rho)
 
             image.show_volume(intensity, settings.Mquat, f"intensity_{curr_gen}.png")
+            # Save output
+            myRes = {'ac': ac,
+                     'ac_phased': ac_phased, 
+                     'support_': support_,
+                     'rho_': rho_,
+                    }
+            checkpoint.save_checkpoint(myRes, settings.out_dir, 0, '', 4)
+
 
     # Use improvement of cc(prev_rho, cur_rho) to dertemine if we should
     # terminate the loop
@@ -126,6 +147,10 @@ def main():
         ac = solve_ac(
             generation, pixel_position_reciprocal, pixel_distance_reciprocal,
             slices_, orientations, ac_phased)
+        print(f"###### ac centred? {np.where(ac==np.max(ac))}")
+        ac = np.fft.ifftshift(np.fft.ifftshift(ac))
+        print(f"###### ac centred? {np.where(ac==np.max(ac))}")
+ 
         myRes = {'ac': ac, 
                 }
         checkpoint.save_checkpoint(myRes, settings.out_dir, generation, tag='ac', protocol=4)

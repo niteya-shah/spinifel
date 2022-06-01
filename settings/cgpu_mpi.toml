@@ -8,7 +8,7 @@ use_callmonitor = false
 
 [data]
 in_dir = "${CFS}/m2859/data/3iyf/clean"
-out_dir = "${SCRATCH}/spinifel_output/qfilling_hires"
+out_dir = "${SCRATCH}/spinifel_output/qfilling_forward_div2"
 name = "3iyf_dp005_128x128pixels_500k.h5"
 
 [detector]
@@ -32,7 +32,7 @@ chk_convergence = false
 devices_per_node = 1
 
 [algorithm]
-N_generations = 20
+N_generations = 8
 nER = 50
 nHIO = 50
 beta = 0.5

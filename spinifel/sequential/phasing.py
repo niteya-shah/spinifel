@@ -78,7 +78,7 @@ def recenter(rho_, support_, M):
 
 
 @nvtx.annotate("sequential/phasing.py", is_prefix=True)
-def create_support_(ac_, M, Mquat, generation):
+def create_support_(ac_, M, Mquat):
     """
     Generate a support based on the region of high ACF signal (thresh_support_)
     inside the central quarter region of the full ACF volume (square_support_).
@@ -86,20 +86,23 @@ def create_support_(ac_, M, Mquat, generation):
     :param ac_: autocorrelation volume, fftshifted
     :param M: cubic length of autocorrelation volume
     :param Mquat: cubic length of region of interest
-    :param generation: current iteration
     """
     sl = slice(Mquat, -Mquat)
     square_support = xp.zeros((M, M, M), dtype=xp.bool_)
     square_support[sl, sl, sl] = 1
-    square_support_ = xp.fft.ifftshift(square_support)
-    #image.show_volume(square_support, Mquat, f"square_support_{generation}.png")
-
-    thresh_support_ = ac_ > 1e-2 * ac_.max()
-    #image.show_volume(np.fft.fftshift(thresh_support_), Mquat, f"thresh_support_{generation}.png")
-
+    square_support_ = xp.fft.ifftshift(square_support) # centre to bar => ifftshift
+    thresh_support_ = ac_ > 1e-2 * ac_.max() # set threshold at 1% of max ACF
     return xp.logical_and(square_support_, thresh_support_)
 
 
+@nvtx.annotate("sequential/phasing.py", is_prefix=True)
+def create_density_(support_):
+    """
+    Generate a random electron density (centred at 0,0,0) inside the support_
+    
+    :param support_: support centred at 0,0,0 
+    """
+    return support_ * xp.random.rand(*support_.shape)
 
 @nvtx.annotate("sequential/phasing.py", is_prefix=True)
 def ER_loop(n_loops, rho_, amplitudes_, amp_mask_, support_, rho_max):
@@ -176,7 +179,7 @@ def step_phase(rho_, amplitudes_, amp_mask_, support_):
     :return rho_mod_: updated density estimate 
     :return support_star_: updated support
     """
-    rho_hat_ = xp.fft.fftn(rho_)
+    rho_hat_ = xp.fft.fftn(rho_) # electron density to amplitude/phase => fftn
     phases_ = xp.angle(rho_hat_)
     # changes below
     rho_filter_ = xp.where(support_, rho_, 0) # added
@@ -246,9 +249,9 @@ def phase(generation, ac, support_=None, rho_=None):
     ac_filt = ac.real
     print('type(ac_filt) =', type(ac_filt))
     #image.show_volume(ac_filt, Mquat, f"autocorrelation_filtered_{generation}.png")
-    ac_filt_ = xp.fft.ifftshift(ac_filt)
+    ac_filt_ = xp.fft.ifftshift(ac_filt) # centre to bar => ifftshift
 
-    intensities_ = xp.abs(xp.fft.fftn(ac_filt_))
+    intensities_ = xp.abs(xp.fft.ifftn(ac_filt_)) #### FIXME ac to intensity => ifftn
     ## set intensity corners to 0 # added
     lu = np.linspace(-np.pi, np.pi, M)
     Hu_, Ku_, Lu_ = np.meshgrid(lu, lu, lu, indexing='ij')
@@ -266,30 +269,26 @@ def phase(generation, ac, support_=None, rho_=None):
     amp_mask_ = xp.ones((M, M, M), dtype=xp.bool_)
     # Mask out central peak
     amp_mask_[0, 0, 0] = 0
-    amp_mask = xp.fft.fftshift(amp_mask_)
+
+    amp_mask = xp.fft.fftshift(amp_mask_) ##### bar to centre => fftshift
     # Mask out corners
-    lc = xp.linspace(-M/2+1, M/2, M)
+    lc = xp.linspace(-M/2, M/2, M) ##### FIXME -M/2+1 -> -M/2
     Hc_, Kc_, Lc_ = xp.meshgrid(lc, lc, lc, indexing='ij')
     Qc_ = xp.sqrt(Hc_**2+Kc_**2+Lc_**2)
-    corners = xp.where(Qc_[:,:,:]>=(M+1)/2)
+    corners = xp.where(Qc_[:,:,:]>=(M+1)/2-5) ##### FIXME reduce by -5
     amp_mask[corners] = 0
     #image.show_volume(amp_mask, Mquat, f"amp_mask_{generation}.png")
-
-    amp_mask_ = xp.fft.ifftshift(amp_mask)
+    amp_mask_ = xp.fft.ifftshift(amp_mask) ##### centre to bar => ifftshift
 
     if support_ is None:
-        support_ = create_support_(ac_filt_, M, Mquat, generation)
-    #image.show_volume(xp.fft.fftshift(support_), Mquat, f"support_{generation}.png")
+        support_ = create_support_(ac_filt_, M, Mquat)
     support_ = xp.array(support_)
 
     if rho_ is None:
-        rho_ = np.zeros((M, M, M)) # changed
-        #rho_ = support_ * xp.random.rand(*support_.shape)
-    #image.show_volume(xp.fft.fftshift(rho_), Mquat, f"rho_{generation}.png")
+        rho_ = create_density_(support_)
     rho_ = xp.array(rho_)
     
     rho_max = xp.infty
-
     nER = settings.nER
     nHIO = settings.nHIO
     beta = settings.beta
@@ -318,8 +317,8 @@ def phase(generation, ac, support_=None, rho_=None):
     #image.show_volume(np.fft.fftshift(intensities_phased_), Mquat, f"intensities_phased_{generation}.png")
 
     #ac_phased_ = np.abs(np.fft.ifftn(intensities_phased_))
-    ac_phased_ = np.fft.ifftn(intensities_phased_) # changed
-    ac_phased = np.fft.fftshift(ac_phased_)
+    ac_phased_ = np.fft.fftn(intensities_phased_) ##### FIXME intensity to ac => fftn
+    ac_phased = np.fft.fftshift(ac_phased_) # bar to centre => fftshift
     factor = np.linalg.norm(ac_phased.real)/np.linalg.norm(ac_phased.imag)
     print("factor =", factor)
     ac_phased = ac_phased.real
@@ -367,7 +366,7 @@ def phase_final(generation, ac, support_=None, rho_=None):
     Hu_, Ku_, Lu_ = np.meshgrid(lu, lu, lu, indexing='ij')
     Qu_ = np.sqrt(Hu_**2+Ku_**2+Lu_**2)
     print('Qu_.shape', Qu_.shape)
-    q_corners = np.where(Qu_[:,:,:]>=np.pi/settings.oversampling)
+    q_corners = np.where(Qu_[:,:,:]>=np.pi/settings.oversampling-0.4)
     intensities = xp.fft.fftshift(intensities_)
     intensities[q_corners] = 0
     intensities_ = xp.fft.ifftshift(intensities)
@@ -379,19 +378,19 @@ def phase_final(generation, ac, support_=None, rho_=None):
     amp_mask_ = xp.ones((M, M, M), dtype=xp.bool_)
     # Mask out central peak
     amp_mask_[0, 0, 0] = 0
-    amp_mask = xp.fft.ifftshift(amp_mask_)
+    amp_mask = xp.fft.ifftshift(amp_mask_) ##### FIXME fftshift -> ifftshift
     # Mask out corners
-    lc = xp.linspace(-M/2, M/2, M)
+    lc = xp.linspace(-M/2, M/2, M) ##### FIXME -M/2+1 -> -M/2
     Hc_, Kc_, Lc_ = xp.meshgrid(lc, lc, lc, indexing='ij')
     Qc_ = xp.sqrt(Hc_**2+Kc_**2+Lc_**2)
-    corners = xp.where(Qc_[:,:,:]>=(M+1)/2-5)
+    corners = xp.where(Qc_[:,:,:]>=(M+1)/2-5) ##### FIXME -5
     amp_mask[corners] = 0
     #image.show_volume(amp_mask, Mquat, f"amp_mask_{generation}.png")
 
-    amp_mask_ = xp.fft.ifftshift(amp_mask)
+    amp_mask_ = xp.fft.fftshift(amp_mask) ##### FIXME ifftshift -> fftshift
 
     if support_ is None:
-        support_ = create_support_(ac_filt_, M, Mquat, generation)
+        support_ = create_support_(ac_filt_, M, Mquat)
     #image.show_volume(xp.fft.fftshift(support_), Mquat, f"support_{generation}.png")
     support_ = xp.array(support_)
 
@@ -431,7 +430,7 @@ def phase_final(generation, ac, support_=None, rho_=None):
 
     #ac_phased_ = np.abs(np.fft.ifftn(intensities_phased_))
     ac_phased_ = np.fft.ifftn(intensities_phased_) # changed
-    ac_phased = np.fft.fftshift(ac_phased_)
+    ac_phased = np.fft.ifftshift(ac_phased_) ##### FIXME fftshift -> ifftshift
     factor = np.linalg.norm(ac_phased.real)/np.linalg.norm(ac_phased.imag)
     print("factor =", factor)
     ac_phased = ac_phased.real

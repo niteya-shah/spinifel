@@ -69,7 +69,7 @@ def setup_linops(comm, generation, H, K, L, data,
     Qu_ = np.sqrt(Hu_**2+Ku_**2+Lu_**2)
     print('Qu_.shape', Qu_.shape)
 
-    F_antisupport = Qu_ > np.pi / settings.oversampling
+    F_antisupport = Qu_ >= np.pi / settings.oversampling ##### FIXME > -> >=
     assert np.all(F_antisupport == F_antisupport[::-1, :, :])
     assert np.all(F_antisupport == F_antisupport[:, ::-1, :])
     assert np.all(F_antisupport == F_antisupport[:, :, ::-1])
@@ -83,9 +83,22 @@ def setup_linops(comm, generation, H, K, L, data,
             np.ones_like(data)*weights, H_, K_, L_, 1, M_ups,
             reciprocal_extent, use_reciprocal_symmetry)
     ugrid_conv = reduce_bcast(comm, ugrid_conv)
-    F_ugrid_conv_ = np.fft.fftn(np.fft.ifftshift(ugrid_conv)) #/ M**3
-    F_ugrid_conv = np.fft.fftshift(F_ugrid_conv_)
 
+    ugrid_conv_ = np.fft.fftshift(ugrid_conv) ##### FIXME: put origin at 0,0,0
+    print(f"##### Check ugrid_conv_ at 0,0,0: {np.where(ugrid_conv_==np.max(ugrid_conv_))}")
+    F_ugrid_conv_ = np.fft.fftn(ugrid_conv_) #/ M**3 
+    F_ugrid_conv = np.fft.ifftshift(F_ugrid_conv_) ###### FIXME: fftshift -> ifftshift
+    print(f"###### Check ugrid_conv centre: {np.where(ugrid_conv==np.max(ugrid_conv))}")
+
+    # Save output
+    myRes = {'weights': weights,
+             'HKL_': [H_,K_,L_],
+             'ugrid_conv': ugrid_conv,
+             'F_ugrid_conv': F_ugrid_conv
+            }
+    if comm.rank == 0:
+        checkpoint.save_checkpoint(myRes, settings.out_dir, generation, tag="ugrid", protocol=4) 
+ 
     ### 1-1) expand q regions to the H, K, L arrays
     ### take care of the corners;
     ### if there's a beamstep, add an extra < inequality for the missing center
@@ -183,8 +196,16 @@ def setup_linops(comm, generation, H, K, L, data,
             nuvect_ones, H_, K_, L_, 1, M_ups, 
             reciprocal_extent, use_reciprocal_symmetry)
     ugrid_conv = reduce_bcast(comm, ugrid_conv)
-    F_ugrid_conv_ = np.fft.fftn(np.fft.ifftshift(ugrid_conv)) #/ M**3
-    F_ugrid_conv = np.fft.fftshift(F_ugrid_conv_)
+    # Save output
+    myRes = {'ugrid_conv': ugrid_conv,
+            }
+    if comm.rank == 0:
+        checkpoint.save_checkpoint(myRes, settings.out_dir, generation, tag="ugrid1", protocol=4) 
+    ugrid_conv_ = np.fft.fftshift(ugrid_conv)
+    print(f"#####1 Check ugrid_conv_ at 0,0,0: {np.where(ugrid_conv_==np.max(ugrid_conv_))}")
+    F_ugrid_conv_ = np.fft.fftn(ugrid_conv_) #/ M**3
+    F_ugrid_conv = np.fft.ifftshift(F_ugrid_conv_) ##### FIXME: fftshift -> ifftshift
+    print(f"######1 Check ugrid_conv centre: {np.where(ugrid_conv==np.max(ugrid_conv))}")
 
     if comm.rank == 0:
         image.show_volume(F_ugrid_conv.real, settings.Mquat*2, f"F_ugrid_conv_{generation}.png")
@@ -220,12 +241,14 @@ def setup_linops(comm, generation, H, K, L, data,
     
     uvect_ADb = reduce_bcast(comm, uvect_ADb)
     
+
     d = uvect_ADb
 
     ### 4) reduce H, K, L and data arrays back to their original sizes
     H_, K_, L_ = H_temp, K_temp, L_temp
     data = data_temp
   
+    print(f"##### W,d shape: {W.shape, d.shape}")
     return W, d
 
 
@@ -268,7 +291,16 @@ def solve_ac(generation,
         ac_support = np.fft.fftshift(np.fft.ifftn(np.fft.fftn(np.fft.ifftshift(ac_support)).real)).real
         ac_estimate = np.fft.fftshift(np.fft.ifftn(np.fft.fftn(np.fft.ifftshift(ac_estimate)).real)).real
         ac_estimate *= ac_support
+        print(f"#####1 ac_smoothed centred?: {np.where(ac_smoothed==np.max(ac_smoothed))}")
+    print(f"##### ac_estimate centred?: {np.where(ac_estimate==np.max(ac_estimate))}")
 
+    # Save output
+    myRes = {'ac_estimate': ac_estimate,
+             'ac_support': ac_support,
+            }
+    if comm.rank == 0:
+        checkpoint.save_checkpoint(myRes, settings.out_dir, generation, tag="solve", protocol=4) 
+ 
     weights = np.ones(N)
     
     maxiter = settings.solve_ac_maxiter
