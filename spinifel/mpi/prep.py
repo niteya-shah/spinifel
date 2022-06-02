@@ -67,20 +67,37 @@ def get_slices_and_pixel_info(N_images_per_rank, ds):
     pixel_position_reciprocal = None
     pixel_index_map = None
     i = 0
+
+    # TODO: Legion - we can make callback works for spinifel
+    # ds.analyze(callback, N_images_per_rank)
+
+
     for run in ds.runs():
         # TODO: We will need all detnames below to be part of toml file.
         det = run.Detector("amopnccd")
-        pp_det = run.Detector("pixel_position")
-        pim_det = run.Detector("pixel_index_map") 
+
+        # Test data (amo06516 and xpptut15/3iyf) store run's related data in BeginRun.
+        # In the real case, these data will come from calibration constant.
+        # Note:
+        # - For amo06516, pixel position reciprocal will be calculated (see
+        #   below) using the photon energy value per event.
+        # - The move axis is done so that the dimension xy (2d) or xyz (3d) 
+        #   becomes the first axis.
+        _pixel_index_map = run.beginruns[0].scan[0].raw.pixel_index_map
+        pixel_index_map = np.moveaxis(_pixel_index_map[:], -1, 0)
+        if run.expt == "xpptut15":
+            _pixel_position_reciprocal = run.beginruns[0].scan[0].raw.pixel_position_reciprocal
+            pixel_position_reciprocal = np.moveaxis(
+                _pixel_position_reciprocal[:], -1, 0)
+        elif run.expt == "amo06516":
+            pixel_position = run.beginruns[0].scan[0].raw.pixel_position
         
         for evt in run.events():
             raw = det.raw.calib(evt)
 
             # Only need to do once for per-run variables
-            if i == 0:
+            if i == 0 and run.expt=="amo06516":
                 photon_energy = det.raw.photon_energy(evt)
-                pixel_position = pp_det(evt)
-                _pixel_index_map = pim_det(evt)
                 
                 # Calculate pixel position in reciprocal space
                 from skopi.beam import convert
@@ -90,9 +107,6 @@ def get_slices_and_pixel_info(N_images_per_rank, ds):
                 wavevector = np.array([0, 0, 1.0 / wavelength]) # skopi convention
                 _pixel_position_reciprocal = get_reciprocal_space_pixel_position(
                         pixel_position, wavevector)
-
-                # Spinifel requires xy (2d) or xyz (3d) dimension be the first axis
-                pixel_index_map = np.moveaxis(_pixel_index_map[:], -1, 0)
                 pixel_position_reciprocal = np.moveaxis(
                     _pixel_position_reciprocal[:], -1, 0)
 
