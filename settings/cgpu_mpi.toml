@@ -12,21 +12,25 @@ out_dir = "${SCRATCH}/spinifel_output/"
 name = "3iyf_sim_400k.h5"
 
 [detector]
-shape = [4, 512, 512]
+#shape = [4, 512, 512]
+shape = [1, 128, 128]
 
 [psana]
-enable = true
+enable = true 
 ps_smd_n_events = 10000
 ps_eb_nodes = 1
 ps_srv_nodes = 0
-ps_batch_size = 100
-ps_dir = "/global/project/projectdirs/lcls/data2/amo/amo06516/xtc" 
-exp = "amo06516"
-runnum = 85
+#ps_batch_size = 1000
+#ps_dir = "/global/project/projectdirs/lcls/data2/amo/amo06516/xtc" 
+#exp = "amo06516"
+#runnum = 85
+ps_dir = "/global/cfs/cdirs/m2859/data/3iyf/xtc2"
+exp = "xpptut15"
+runnum = 1
 
 
 [runtime]
-N_images_per_rank = 2500
+N_images_per_rank = 1000
 use_cuda = false
 use_cufinufft = false
 use_cupy = false
@@ -37,7 +41,7 @@ chk_convergence = false
 devices_per_node = 1
 
 [algorithm]
-N_generations = 10
+N_generations = 3
 nER = 50
 nHIO = 25
 beta = 0.3
