@@ -39,13 +39,24 @@ def main():
         # BigData cores are those excluding Smd0, EventBuilder, & Server cores.
         N_big_data_nodes = comm.size - (1 + settings.ps_eb_nodes + settings.ps_srv_nodes)
         writer_rank = 1 + settings.ps_eb_nodes # pick writer rank as the first BigData core
+
+        # Limit batch size to 100
         batch_size = min(N_images_per_rank, 100)
+
+        # Calculate total no. of images that will be processed (limit by max)
         max_events = min(settings.N_images_max, N_big_data_nodes*N_images_per_rank)
+        
         def destination(timestamp):
             # Return big data node destination, numbered from 1, round-robin
             destination.last = destination.last % N_big_data_nodes + 1
             return destination.last
         destination.last = 0
+
+        # Create a datasource and ask for images. For example, 
+        # batch_size = 100, N_images_per_rank = 4000, N_big_data_nodes = 3
+        # -- > max_events = 12000
+        # The destination callback above sends events to BigData cores
+        # in round robin order.
         print(f"exp:{settings.ps_exp, settings.ps_runnum, settings.ps_dir, destination}",flush=True)
         ds = DataSource(exp=settings.ps_exp, run=settings.ps_runnum,
                         dir=settings.ps_dir, destination=destination,
@@ -64,6 +75,9 @@ def main():
     logger.log(f"max_events: {max_events}")
 
     # Load unique set of intensity slices for each rank
+    # In psana2 mode, get_data loops over the event loop 
+    # until the data array is filled with N_images_per_rank
+    # events.
     (pixel_position_reciprocal,
      pixel_index_map,
      slices_) = get_data(N_images_per_rank, ds)
