@@ -68,8 +68,8 @@ def adjoint(nuvect, H_, K_, L_, support, M, recip_extent, use_recip_sym):
 
     # Apply recip symmetry
     if use_recip_sym:
-        #ugrid = np.fft.fftshift(np.fft.ifftn(np.fft.fftn(np.fft.ifftshift(ugrid.reshape((M,)*3))).real)).real
-        ugrid = ugrid.real
+        ugrid = np.fft.fftshift(np.fft.ifftn(np.fft.fftn(np.fft.ifftshift(ugrid.reshape((M,)*3))).real)).real
+        ##### FIXME: ugrid = ugrid.real -> do fft stuff above
 
     return ugrid / M**3
 
@@ -100,15 +100,16 @@ def core_problem_convolution(uvect, M, F_ugrid_conv_, M_ups, ac_support,
         F_ugrid_conv_ = xp.asarray(F_ugrid_conv_)
     
     # Upsample
-    uvect = np.fft.fftshift(np.fft.ifftn(np.fft.fftn(np.fft.ifftshift(uvect.reshape((M,)*3))).real)).real
+    uvect = xp.fft.fftshift(xp.fft.ifftn(xp.fft.fftn(xp.fft.ifftshift(uvect.reshape((M,)*3))).real)).real ##### FIXME: np->xp & fftshift->ifftshift & ifftshift->fftshift
+    print(f"##### core_problem uvect: {np.where(uvect==np.max(uvect))}")
     ugrid = uvect * ac_support
     ugrid_ups = xp.zeros((M_ups,) * 3, dtype=uvect.dtype)            
     ugrid_ups[:M, :M, :M] = ugrid
     
     # Convolution = Fourier multiplication
-    F_ugrid_ups = xp.fft.fftn(xp.fft.ifftshift(ugrid_ups)) / M**3 * (M_ups/M)**3
+    F_ugrid_ups = xp.fft.fftn(xp.fft.ifftshift(ugrid_ups)) / M**3 * (M_ups/M)**3 ##### FIXME: ifftshift -> fftshift
     F_ugrid_conv_out_ups = F_ugrid_ups * F_ugrid_conv_
-    ugrid_conv_out_ups = xp.fft.fftshift(xp.fft.ifftn(F_ugrid_conv_out_ups))
+    ugrid_conv_out_ups = xp.fft.fftshift(xp.fft.ifftn(F_ugrid_conv_out_ups)) ##### FIXME: fftshift -> ifftshift
     
     # Downsample
     ugrid_conv_out = ugrid_conv_out_ups[:M, :M, :M]
@@ -119,7 +120,7 @@ def core_problem_convolution(uvect, M, F_ugrid_conv_, M_ups, ac_support,
         # Both ugrid_conv and ugrid are real, so their convolution
         # should be real, but numerical errors accumulate in the
         # imaginary part.
-        ugrid_conv_out = np.fft.fftshift(np.fft.ifftn(np.fft.fftn(np.fft.ifftshift(ugrid_conv_out.reshape((M,)*3))).real)).real
+        ugrid_conv_out = xp.fft.fftshift(xp.fft.ifftn(xp.fft.fftn(xp.fft.ifftshift(ugrid_conv_out.reshape((M,)*3))).real)).real ##### FIXME: np->xp & fftshift->ifftshift & ifftshift->fftshift & no need to reshape ugrid_conv_out which is already (M,M,M)
 
     if settings.use_cupy:
         ugrid_conv_out = xp.asnumpy(ugrid_conv_out)

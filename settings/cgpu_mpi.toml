@@ -32,7 +32,7 @@ chk_convergence = false
 devices_per_node = 1
 
 [algorithm]
-N_generations = 8
+N_generations = 2
 nER = 50
 nHIO = 50
 beta = 0.5

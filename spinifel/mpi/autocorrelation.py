@@ -67,9 +67,9 @@ def setup_linops(comm, generation, H, K, L, data,
     lu = np.linspace(-np.pi, np.pi, M)
     Hu_, Ku_, Lu_ = np.meshgrid(lu, lu, lu, indexing='ij')
     Qu_ = np.sqrt(Hu_**2+Ku_**2+Lu_**2)
-    print('Qu_.shape', Qu_.shape)
+    print('Qu_.shape, min: ', Qu_.shape, np.where(Qu_==np.min(Qu_)))
 
-    F_antisupport = Qu_ >= np.pi / settings.oversampling ##### FIXME > -> >=
+    F_antisupport = Qu_ > np.pi / settings.oversampling 
     assert np.all(F_antisupport == F_antisupport[::-1, :, :])
     assert np.all(F_antisupport == F_antisupport[:, ::-1, :])
     assert np.all(F_antisupport == F_antisupport[:, :, ::-1])
@@ -84,11 +84,11 @@ def setup_linops(comm, generation, H, K, L, data,
             reciprocal_extent, use_reciprocal_symmetry)
     ugrid_conv = reduce_bcast(comm, ugrid_conv)
 
-    ugrid_conv_ = np.fft.fftshift(ugrid_conv) ##### FIXME: put origin at 0,0,0
+    ugrid_conv_ = np.fft.ifftshift(ugrid_conv) ##### FIXME: put origin at 0,0,0
     print(f"##### Check ugrid_conv_ at 0,0,0: {np.where(ugrid_conv_==np.max(ugrid_conv_))}")
     F_ugrid_conv_ = np.fft.fftn(ugrid_conv_) #/ M**3 
-    F_ugrid_conv = np.fft.ifftshift(F_ugrid_conv_) ###### FIXME: fftshift -> ifftshift
-    print(f"###### Check ugrid_conv centre: {np.where(ugrid_conv==np.max(ugrid_conv))}")
+    F_ugrid_conv = np.fft.fftshift(F_ugrid_conv_) 
+    print(f"###### Check ugrid_conv centre {ugrid_conv.shape}: {np.where(ugrid_conv==np.max(ugrid_conv))}")
 
     # Save output
     myRes = {'weights': weights,
@@ -201,11 +201,11 @@ def setup_linops(comm, generation, H, K, L, data,
             }
     if comm.rank == 0:
         checkpoint.save_checkpoint(myRes, settings.out_dir, generation, tag="ugrid1", protocol=4) 
-    ugrid_conv_ = np.fft.fftshift(ugrid_conv)
+    ugrid_conv_ = np.fft.ifftshift(ugrid_conv)
     print(f"#####1 Check ugrid_conv_ at 0,0,0: {np.where(ugrid_conv_==np.max(ugrid_conv_))}")
     F_ugrid_conv_ = np.fft.fftn(ugrid_conv_) #/ M**3
-    F_ugrid_conv = np.fft.ifftshift(F_ugrid_conv_) ##### FIXME: fftshift -> ifftshift
-    print(f"######1 Check ugrid_conv centre: {np.where(ugrid_conv==np.max(ugrid_conv))}")
+    F_ugrid_conv = np.fft.fftshift(F_ugrid_conv_)
+    print(f"######1 Check ugrid_conv centre {ugrid_conv.shape}: {np.where(ugrid_conv==np.max(ugrid_conv))}")
 
     if comm.rank == 0:
         image.show_volume(F_ugrid_conv.real, settings.Mquat*2, f"F_ugrid_conv_{generation}.png")
@@ -214,15 +214,23 @@ def setup_linops(comm, generation, H, K, L, data,
         """Define W part of the W @ x = d problem."""
         uvect_ADA = autocorrelation.core_problem_convolution(
             uvect, M, F_ugrid_conv_, M_ups, ac_support, use_reciprocal_symmetry)
-        if False:  # Debug/test -> make sure all cg are in sync (same lambdas)
+        if False: #True:  # Debug/test -> make sure all cg are in sync (same lambdas)
             print('# Debug/test')
             uvect_ADA_old = core_problem(
                  comm, uvect, H_, K_, L_, ac_support, weights, M, N,
                  reciprocal_extent, use_reciprocal_symmetry)
+            # Save output
+            myRes = {'uvect_ADA': uvect_ADA,
+                     'uvect_ADA_old': uvect_ADA_old
+                    }
+            if comm.rank == 0:
+                checkpoint.save_checkpoint(myRes, settings.out_dir, generation, tag="matvec", protocol=4) 
             print('np.linalg.norm(uvect_ADA) =', np.linalg.norm(uvect_ADA))
             print('np.linalg.norm(uvect_ADA_old) =', np.linalg.norm(uvect_ADA_old))
-            print('np.linalg.norm(uvect_ADA) / np.linalg.norm(uvect_ADA_old) =', np.linalg.norm(uvect_ADA) / np.linalg.norm(uvect_ADA_old))
-            #assert np.allclose(uvect_ADA, uvect_ADA_old)            
+            if np.linalg.norm(uvect_ADA_old) > 0:
+                print('np.linalg.norm(uvect_ADA) / np.linalg.norm(uvect_ADA_old) =', np.linalg.norm(uvect_ADA) / np.linalg.norm(uvect_ADA_old))
+            print(f"debug: max uvect_ADA diff: {np.max(np.abs(uvect_ADA-uvect_ADA_old))}",flush=True)
+            assert np.allclose(uvect_ADA, uvect_ADA_old, atol=1e-4)
         uvect = uvect_ADA
         return uvect
 
@@ -232,7 +240,7 @@ def setup_linops(comm, generation, H, K, L, data,
         matvec=W_matvec)
 
     nuvect_Db = np.append(data_temp * weights, dataf * weightsf).astype(np.float64)
-    print('nuvect_Db.shape =', nuvect_Db.shape)
+    print('nuvect_Db.shape =', nuvect_Db.shape, flush=True)
 
     uvect_ADb = autocorrelation.adjoint(
         nuvect_Db, H_, K_, L_, ac_support, M,
@@ -241,11 +249,10 @@ def setup_linops(comm, generation, H, K, L, data,
     
     uvect_ADb = reduce_bcast(comm, uvect_ADb)
     
-
     d = uvect_ADb
 
     ### 4) reduce H, K, L and data arrays back to their original sizes
-    H_, K_, L_ = H_temp, K_temp, L_temp
+    H_, K_, L_ = H_temp, K_temp, L_temp ##### FIXME: why? exiting function deletes these variables anyway 
     data = data_temp
   
     print(f"##### W,d shape: {W.shape, d.shape}")
@@ -282,9 +289,9 @@ def solve_ac(generation,
     # Set up ac
     if ac_estimate is None:
         ac_support = np.ones((M,)*3)
-        ac_support = np.fft.fftshift(np.fft.ifftn(np.fft.fftn(np.fft.ifftshift(ac_support)).real)).real
+        ac_support = np.fft.fftshift(np.fft.ifftn(np.fft.fftn(np.fft.ifftshift(ac_support)).real)).real ##### FIXME: remove
         ac_estimate = np.zeros((M,)*3)
-        ac_estimate = np.fft.fftshift(np.fft.ifftn(np.fft.fftn(np.fft.ifftshift(ac_estimate)).real)).real
+        ac_estimate = np.fft.fftshift(np.fft.ifftn(np.fft.fftn(np.fft.ifftshift(ac_estimate)).real)).real ##### FIXME: remove
     else:
         ac_smoothed = gaussian_filter(ac_estimate, 0.5)
         ac_support = (ac_smoothed > 1e-12).astype(np.float64)
@@ -325,7 +332,6 @@ def solve_ac(generation,
                         ac_support, weights, x0,
                         M, N, reciprocal_extent,
                         use_reciprocal_symmetry)
-    
     ret, info = cg(W, d, x0=x0, maxiter=maxiter, callback=callback)
     print('ret =', ret)
     print('info =', info)
