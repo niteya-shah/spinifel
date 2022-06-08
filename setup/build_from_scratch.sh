@@ -141,17 +141,6 @@ pip install --no-cache-dir PyNVTX
 
 
 #_______________________________________________________________________________
-# Overwrite the conda libraries with system libraries => don't let anaconda
-# provide libraries (like openmp) that are already provided by the system
-
-if [[ ${target} = *"summit"* || ${target} = *"ascent"* ]]
-then
-    ${root_dir}/../scripts/fix_lib_olcf.sh
-fi
-
-#-------------------------------------------------------------------------------
-
-#_______________________________________________________________________________
 # Install UCX
 
 if [[ $GASNET_CONDUIT = "ucx" ]]
