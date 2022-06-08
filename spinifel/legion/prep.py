@@ -16,8 +16,7 @@ psana = None
 if settings.use_psana:
     import psana
     from psana.psexp.legion_node import smd_chunks, smd_batches, batch_events
-
-
+    from psana.psexp.legion_node import smd_batches_without_transitions, smd_chunks_steps
 
 @task(privileges=[WD])
 @nvtx.annotate("legion/prep.py", is_prefix=True)
@@ -25,16 +24,30 @@ def load_pixel_position(pixel_position):
     prep.load_pixel_position_reciprocal(pixel_position.reciprocal)
 
 
+@task(privileges=[WD])
+@nvtx.annotate("legion/prep.py", is_prefix=True)
+def load_pixel_position_psana(pixel_position,run):
+    pixel_position_val = 0
+    if run.expt == "xpptut15":
+        prep.load_pixel_position_reciprocal_psana(run,
+                                                  pixel_position_val,
+                                                  pixel_position.reciprocal)
+    # TODO - this needs to be setup for psana
+    elif run.expt == "amo06516":
+        pygion.fill(pixel_position, 'reciprocal', 0)
+    else:
+        assert False
 
 @nvtx.annotate("legion/prep.py", is_prefix=True)
-def get_pixel_position():
+def get_pixel_position(run=None):
     pixel_position_type = getattr(pygion, settings.pixel_position_type_str)
     pixel_position = Region(settings.pixel_position_shape,
                             {'reciprocal': pixel_position_type})
-    load_pixel_position(pixel_position)
+    if run == None:
+        load_pixel_position(pixel_position)
+    else:
+        load_pixel_position_psana(pixel_position, run)
     return pixel_position
-
-
 
 @task(privileges=[WD])
 @nvtx.annotate("legion/prep.py", is_prefix=True)
@@ -42,17 +55,25 @@ def load_pixel_index(pixel_index):
     prep.load_pixel_index_map(pixel_index.map)
 
 
+@task(privileges=[WD])
+@nvtx.annotate("legion/prep.py", is_prefix=True)
+def load_pixel_index_psana(pixel_index, run):
+    pixel_index.map[:] = np.moveaxis(run.beginruns[0].scan[0].raw.pixel_index_map, -1, 0)
 
 @nvtx.annotate("legion/prep.py", is_prefix=True)
-def get_pixel_index():
+def get_pixel_index(run=None):
     pixel_index_type = getattr(pygion, settings.pixel_index_type_str)
     pixel_index = Region(settings.pixel_index_shape,
                          {'map': pixel_index_type})
-    load_pixel_index(pixel_index)
+    # psana
+    if run:
+        load_pixel_index_psana(pixel_index, run)
+    else:
+        load_pixel_index(pixel_index)
     return pixel_index
 
 
-
+# this is the equivalent of big data (the loop around batch_events)
 @task(privileges=[WD])
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def load_slices_psana(slices, rank, N_images_per_rank, smd_chunk, run):
@@ -70,6 +91,24 @@ def load_slices_psana(slices, rank, N_images_per_rank, smd_chunk, run):
         print(f"{socket.gethostname()} loaded slices.", flush=True)
 
 
+@task(privileges=[WD])
+@nvtx.annotate("legion/prep.py", is_prefix=True)
+def load_slices_psana2(slices, rank, N_images_per_rank, smd_chunk, run):
+    i = 0
+    if settings.verbosity > 0:
+        print(f'{socket.gethostname()} load_slices_psana2, rank = {rank}',flush=True)
+    det = run.Detector("amopnccd")
+    for smd_batch in smd_batches_without_transitions(smd_chunk, run):
+        for evt in batch_events(smd_batch,run):
+            raw = det.raw.calib(evt)
+            try:
+                slices.data[i] = raw
+            except IndexError:
+                raise RuntimeError(
+                    f"Task received too many events.")
+            i += 1
+    if settings.verbosity > 0:
+        print(f"{socket.gethostname()} loaded slices.", flush=True)
 
 @task(privileges=[WD])
 @nvtx.annotate("legion/prep.py", is_prefix=True)
@@ -82,8 +121,6 @@ def load_slices_hdf5(slices, rank, N_images_per_rank):
     if settings.verbosity > 0:
         print(f"{socket.gethostname()} loaded slices.", flush=True)
 
-
-
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def get_slices(ds):
     N_images_per_rank = settings.N_images_per_rank
@@ -91,21 +128,29 @@ def get_slices(ds):
     sec_shape = settings.det_shape
     slices, slices_p = lgutils.create_distributed_region(
         N_images_per_rank, fields_dict, sec_shape)
+    pixel_position = None
+    pixel_index = None
     if ds is not None:
         n_nodes = Tunable.select(Tunable.NODE_COUNT).get()
         chunk_i = 0
-        runs = list(ds.runs())
-        pygion.execution_fence(block=True)
-        for run in runs:
-            for smd_chunk in smd_chunks(run):
+        val = 0
+        for run in ds.runs():
+            # load pixel index map and pixel position reciprocal only once
+            if val == 0:
+                # pixel index map
+                pixel_index = get_pixel_index(run)
+                # TODO pixel_position.reciprocal for "am06516"
+                pixel_position = get_pixel_position(run)
+            val= val+1
+            for smd_chunk, step_data in smd_chunks_steps(run):
                 i = chunk_i % n_nodes
-                load_slices_psana(slices_p[i], i, N_images_per_rank, smd_chunk, run, point=i)
+                load_slices_psana2(slices_p[i], i, N_images_per_rank, bytearray(smd_chunk), run, point=i)
                 chunk_i += 1
         pygion.execution_fence(block=True)
     else:
         for i, slices_subr in enumerate(slices_p):
             load_slices_hdf5(slices_subr, i, N_images_per_rank, point=i)
-    return slices, slices_p
+    return slices, slices_p, pixel_position, pixel_index
 
 
 @task(privileges=[WD])
@@ -229,7 +274,6 @@ def show_image(pixel_index, images, image_index, name):
     image.show_image(pixel_index.map, images.data[image_index], name)
 
 
-
 @task(privileges=[RO, RO])
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def export_saxs(pixel_distance, mean_image, name):
@@ -242,9 +286,16 @@ def export_saxs(pixel_distance, mean_image, name):
 
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def get_data(ds):
-    pixel_position = get_pixel_position()
-    pixel_index = get_pixel_index()
-    slices, slices_p = get_slices(ds)
+    print(f"{socket.gethostname()} loading slices.", flush=True)
+
+    # if psana load pixel_position/pixel_index using first 'run'
+    slices, slices_p, pixel_position, pixel_index = get_slices(ds)
+
+    # if not psana - load pixel_postion/pixel_index from hdf5 file
+    if ds == None:
+        pixel_position = get_pixel_position(ds)
+        pixel_index = get_pixel_index()
+
     mean_image = compute_mean_image(slices, slices_p)
     show_image(pixel_index, slices_p[0], 0, "image_0.png")
     show_image(pixel_index, mean_image, ..., "mean_image.png")

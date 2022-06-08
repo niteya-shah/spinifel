@@ -255,6 +255,21 @@ class SpinifelSettings(metaclass=Singleton):
                 str, "xpptut1",
                 "PSANA experiment name"
             ),
+            "_ps_batch_size": (
+                "psana", "ps_batch_size",
+                int, 100,
+                "PSANA batch size"
+            ),
+            "_ps_dir": (
+                "psana", "ps_dir",
+                str, "",
+                "PSANA xtc2 directory"
+            ),
+            "_ps_parallel": (
+                "psana", "ps_parallel",
+                str, "legion",
+                "Use legion or mpi mode for PSANA"
+            ),
             "_ps_runnum": (
                 "psana", "runnum",
                 int, 1,
@@ -415,6 +430,7 @@ class SpinifelSettings(metaclass=Singleton):
             "PS_SMD_N_EVENTS": ("_ps_smd_n_events", get_int),
             "PS_EB_NODES": ("_ps_eb_nodes", get_int),
             "PS_SRV_NODES": ("_ps_srv_nodes", get_int),
+            "PS_PARALLEL": ("_ps_parallel", get_str),
             "USE_CALLMONITOR": ("_use_callmonitor", get_bool),
             "CHK_CONVERGENCE": ("_chk_convergence", get_bool)
         }
@@ -660,6 +676,20 @@ class SpinifelSettings(metaclass=Singleton):
         # update derived environment variable
         environ["PS_SRV_NODES"] = str(val)
 
+    @property
+    def ps_parallel(self):
+        """
+        ps parallel mode
+        """
+        return self._ps_parallel
+
+    @ps_parallel.setter
+    def ps_parallel(self, val):
+        """
+        update derived environment variable
+        """
+        self._ps_parallel = val
+        environ["PS_PARALLEL"] = val
 
     @property
     def pixel_position_shape(self):
