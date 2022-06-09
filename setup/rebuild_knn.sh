@@ -44,6 +44,12 @@ then
         orientation_matching_sp.cu -o pyCudaKNearestNeighbors_SP${pybind11_suffix}
     nvcc -O3 -shared -std=c++11 ${pybind11_inclues} \
         orientation_matching_dp.cu -o pyCudaKNearestNeighbors_DP${pybind11_suffix}
+elif [[ $(hostname --fqdn) = *".crusher."* ]]
+then
+    hipcc -O3 -shared -std=c++11 -fPIC --amdgpu-target=gfx90a -DUSE_HIP ${pybind11_inclues} \
+        orientation_matching_sp.cu -o pyCudaKNearestNeighbors_SP${pybind11_suffix}
+    hipcc -O3 -shared -std=c++11 -fPIC --amdgpu-target=gfx90a -DUSE_HIP ${pybind11_inclues} \
+        orientation_matching_dp.cu -o pyCudaKNearestNeighbors_DP${pybind11_suffix}
 elif [[ $(hostname --fqdn) = *".spock."* ]]
 then
     hipcc -O3 -shared -std=c++11 -fPIC --amdgpu-target=gfx908 -DUSE_HIP ${pybind11_inclues} \
