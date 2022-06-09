@@ -11,5 +11,5 @@ export PYTHONPATH="$PYTHONPATH:$root_dir"
 
 set -x
 
-pytest spinifel/tests
+pytest -s spinifel/tests
 # pytest tests

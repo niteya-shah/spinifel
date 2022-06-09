@@ -110,9 +110,10 @@ def right_hand_ADb_task(slices, uregion, nonuniform_v, ac, weights, M,
         nonuniform_v.H,
         nonuniform_v.K,
         nonuniform_v.L,
-        ac.support, M,
-        reciprocal_extent, use_reciprocal_symmetry
-    )
+        M,
+        support=ac.support,
+        use_recip_sym=use_reciprocal_symmetry)
+
     if settings.verbosity > 0:
         print(f"{socket.gethostname()} computed ADb.", flush=True)
 
@@ -143,10 +144,9 @@ def prep_Fconv_task(uregion_ups, nonuniform_v, ac, weights, M_ups, Mtot, N,
         nonuniform_v.H,
         nonuniform_v.K,
         nonuniform_v.L,
-        1, M_ups,
-        reciprocal_extent, use_reciprocal_symmetry
-    )
-    uregion_ups.F_conv_[:] += np.fft.fftn(np.fft.ifftshift(conv_ups)) / Mtot
+        M_ups,
+        use_reciprocal_symmetry, support=None)
+    uregion_ups.F_conv_[:] += np.fft.fftn(np.fft.ifftshift(conv_ups)) #/ Mtot
     if settings.verbosity > 0:
         print(f"{socket.gethostname()} computed Fconv.", flush=True)
 
@@ -171,7 +171,7 @@ def prep_Fconv(uregion_ups, nonuniform_v, nonuniform_v_p,
 def prep_Fantisupport(uregion, M):
     lu = np.linspace(-np.pi, np.pi, M)
     Hu_, Ku_, Lu_ = np.meshgrid(lu, lu, lu, indexing='ij')
-    Qu_ = np.sqrt(Hu_**2 + Ku_**2 + Lu_**2)
+    Qu_ = np.around(np.sqrt(Hu_**2 + Ku_**2 + Lu_**2), 4)
     uregion.F_antisupport[:] = Qu_ > np.pi / settings.oversampling
 
     Fantisup = uregion.F_antisupport
@@ -296,28 +296,8 @@ def select_ac(generation, summary):
         # Take corner of L-curve: min (v1+v2)
         iref = np.argmin(summary.v1+summary.v2)
     ref_rank = summary.rank[iref]
-
-    fig, axes = plt.subplots(figsize=(6.0, 8.0), nrows=3, ncols=1)
-    axes[0].loglog(summary.rlambda, summary.v1)
-    axes[0].loglog(summary.rlambda[iref], summary.v1[iref], "rD")
-    axes[0].set_xlabel("$\lambda_{r}$")
-    axes[0].set_ylabel("$||x_{\lambda_{r}}||_{2}$")
-    axes[1].loglog(summary.rlambda, summary.v2)
-    axes[1].loglog(summary.rlambda[iref], summary.v2[iref], "rD")
-    axes[1].set_xlabel("$\lambda_{r}$")
-    axes[1].set_ylabel("$||W \lambda_{r}-d||_{2}$")
-    axes[2].loglog(summary.v2, summary.v1) # L-curve
-    axes[2].loglog(summary.v2[iref], summary.v1[iref], "rD")
-    axes[2].set_xlabel("Residual norm $||W \lambda_{r}-d||_{2}$")
-    axes[2].set_ylabel("Solution norm $||x_{\lambda_{r}}||_{2}$")
-    fig.tight_layout()
-    plt.savefig(settings.out_dir / f"summary_{generation}.png")
-    plt.close('all')
-
     print(f"Keeping result from rank {ref_rank}.", flush=True)
-
     return iref
-
 
 
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
@@ -367,8 +347,8 @@ def solve_ac(generation,
 
     alambda = 1
 #    rlambdas = Mtot/Ntot * 1e2**(np.arange(N_procs) - N_procs/2)
-    rlambdas = Mtot/Ntot * 2**(np.arange(N_procs) - N_procs/2)
-    flambda = 0
+    rlambdas = Mtot/Ntot * 2**(np.arange(N_procs) - N_procs/2).astype(np.float)
+    flambdas = 1e5 * 10**(np.arange(N_procs) - N_procs//2).astype(np.float)
 
     summary = Region((N_procs,),
                 {"rank": pygion.int32, "rlambda": pygion.float32, "v1": pygion.float32, "v2": pygion.float32})
@@ -379,7 +359,7 @@ def solve_ac(generation,
         solve(
             uregion, uregion_ups, ac, results_p[i], summary_p[i],
             weights, M, M_ups, Mtot, N,
-            generation, i, alambda, rlambdas[i], flambda,
+            generation, i, alambda, rlambdas[i], flambdas[i],
             reciprocal_extent, use_reciprocal_symmetry, maxiter)
 
     iref = select_ac(generation, summary)
@@ -387,3 +367,4 @@ def solve_ac(generation,
     # I tried to have `results` as a partition and copy into a region,
     # but I couldn't get it to work.
     return results_p[iref.get()]
+
