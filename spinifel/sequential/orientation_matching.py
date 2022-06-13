@@ -41,17 +41,17 @@ def match(slices_, model_slices, ref_orientations, batch_size=None):
 
 
 @nvtx.annotate("sequential/orientation_matching.py", is_prefix=True)
-def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_reciprocal):
+def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_reciprocal, ref_orientations=None):
     """
-    Determine orientations of the data images by minimizing the euclidean distance with the reference images 
-    computed by randomly slicing through the autocorrelation.
-    MONA: This is a current hack to support Legion. For MPI, slicing is done separately 
-    from orientation matching.
+    Determine orientations of the data images by minimizing the euclidean 
+    distance with the reference images computed by randomly slicing through 
+    the autocorrelation.
 
     :param ac: autocorrelation of the current electron density estimate
     :param slices_: data images
     :param pixel_position_reciprocal: pixel positions in reciprocal space
     :param pixel_distance_reciprocal: pixel distance in reciprocal space
+    :param ref_orientations: optional parameter for unit tests
     :return ref_orientations: array of quaternions matched to slices_
     """
     st_init = time.monotonic()
@@ -68,7 +68,10 @@ def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_rec
     if not N_slices:
         return np.zeros((0, 4))
 
-    ref_orientations = skp.get_uniform_quat(N_orientations, True)
+    if ref_orientations is None:
+        ref_orientations = skp.get_uniform_quat(N_orientations, True)
+    else:
+        print(f'Warning: {ref_orientations.shape[0]} referenced orientations were given (unit test).')
     ref_rotmat = np.array([np.linalg.inv(skp.quaternion2rot3d(quat)) for quat in ref_orientations])
     reciprocal_extent = pixel_distance_reciprocal.max()
 
