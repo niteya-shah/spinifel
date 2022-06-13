@@ -3,7 +3,7 @@
 
 
 from . import settings
-
+from tests import run_tests
 
 
 if __name__ == "__main__":
@@ -22,6 +22,8 @@ if __name__ == "__main__":
     elif settings.mode == "mpi":
         from .mpi import main
         main()
+    elif settings.mode == "test":
+        run_tests()
     elif settings.mode == "legion":
         from .legion import main
         main()
