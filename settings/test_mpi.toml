@@ -16,7 +16,7 @@ name = "3iyf_sim_400k.h5"
 shape = [1, 128, 128]
 
 [psana]
-enable = true 
+enable = true
 ps_smd_n_events = 10000
 ps_eb_nodes = 1
 ps_srv_nodes = 0
@@ -30,7 +30,7 @@ runnum = 1
 
 
 [runtime]
-N_images_per_rank = 100
+N_images_per_rank = 1000
 use_cuda = true
 use_cufinufft = true
 use_cupy = true
@@ -41,7 +41,8 @@ chk_convergence = false
 devices_per_node = 1
 
 [algorithm]
-N_generations = 3
+oversampling = 1
+N_generations = 1
 nER = 50
 nHIO = 25
 beta = 0.3
