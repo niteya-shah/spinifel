@@ -13,11 +13,6 @@ import numpy as np
 import os
 from spinifel import prep
 
-test_data_dir = os.environ.get('test_data_dir', '')
-if not test_data_dir:
-    print(f'test_data_dir not given. exit')
-    exit()
-
 from dataclasses import dataclass
 
 @dataclass
@@ -46,6 +41,12 @@ class InputData:
 
 def test_match(test_case):
     print(f'Test case: {test_case}')
+    
+    test_data_dir = os.environ.get('test_data_dir', '')
+    if not test_data_dir:
+        print(f'test_data_dir not given. exit')
+        exit()
+
     
     # Load input test data. Note that known_orientations is the 
     # correct orientations as stored in hdf5 files
