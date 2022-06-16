@@ -1,108 +1,178 @@
-import numpy  as np
-import PyNVTX as nvtx
-import skopi  as skp
+import os
+os.environ['CUPY_ACCELERATORS']="cub,cutensor"
+
 import time
-import logging
+import numpy  as np
+import skopi  as skp
+import cupy as cp
+from pycuda import gpuarray
+import pycuda.autoinit
 
-import spinifel.sequential.nearest_neighbor as nn
-from   spinifel import settings, utils, autocorrelation
+from cufinufft import cufinufft
+
+import PyNVTX  as nvtx
+
+class SNM:
+
+    def __init__(self, settings, slices_, pixel_position_reciprocal, pixel_distance_reciprocal):
+        """
+        Initialise our Slicing and matching class, storing reused data in memory so that we 
+        we dont have to continously recalculate them.
+        :param settings
+        :param slices_
+        :param xp(optional)
+        """
+
+        self.N_orientations = settings.N_orientations
+        self.N_batch_size = settings.N_batch_size
+        self.reduced_det_shape = settings.reduced_det_shape
+        self.oversampling = settings.oversampling
+        self.N_pixels = np.prod(self.reduced_det_shape)
+        self.N = self.N_pixels * self.N_orientations
+        self.ref_orientations = skp.get_uniform_quat(self.N_orientations, True)
+        ref_rotmat = np.array([np.linalg.inv(skp.quaternion2rot3d(quat)) for quat in self.ref_orientations])
+        self.ref_rotmat = cp.array(ref_rotmat)
+        assert self.N_orientations % self.N_batch_size == 0, "N_orientations must be divisible by N_batch_size"
+
+        self.eps = 1e-12
+        self.isign = -1
+
+        self.N_slices = slices_.shape[0]
+        assert slices_.shape == (self.N_slices,) + self.reduced_det_shape
+
+        self.reciprocal_extent = pixel_distance_reciprocal.max()
+        self.pixel_position_reciprocal_gpu = cp.array(pixel_position_reciprocal)
+        self.mult = (np.pi / (self.oversampling * self.reciprocal_extent))
+        self.slices_ = cp.array(slices_.reshape((self.N_slices, self.N_pixels)), dtype=cp.float64)
+        self.slices_2 = cp.square(self.slices_).sum(axis=1)
+        self.slices_std = self.slices_.std()
+
+    @staticmethod
+    def gpuarray_from_cupy(arr):
+        """
+        Convert from GPUarray(pycuda) to cupy. The conversion is zero-cost.
+        :param arr
+        :return arr
+        """
+        assert isinstance(arr, cp.ndarray)
+        shape = arr.shape
+        dtype = arr.dtype
+
+        def alloc(x):
+            return arr.data.ptr
+
+        if arr.flags.c_contiguous:
+            order = 'C'
+        elif arr.flags.f_contiguous:
+            order = 'F'
+        else:
+            raise ValueError('arr order cannot be determined')
+        return gpuarray.GPUArray(shape=shape,
+                                dtype=dtype,
+                                allocator=alloc,
+                                order=order)
+
+    @staticmethod
+    def gpuarray_to_cupy(arr):
+        """
+        Convert from cupy to GPUarray(pycuda). The conversion is zero-cost.
+        :param arr
+        :return arr
+        """
+        assert isinstance(arr, gpuarray.GPUArray)
+        return cp.asarray(arr)
+
+    #TODO Static method or not?
+    @staticmethod
+    def euclidean_dist(x ,y, y_2, dist, start, end):
+        """
+        Computes the pair-wise euclidean distance betwee two image groups. This formulation relies on blas support from CUDA/ROCM.
+        The computation relies on the fact that 
+        (x - y)^2 = ||x||^2 + ||y||^2  - 2<x,y>
+        ||y||^2 can be pre-computed and stored.
+        -2 <x,y> can be written in blas notation. 
+        """
+        x_2 = cp.square(x).sum(axis=1)
+        cp.add(x_2[:,cp.newaxis], y_2[cp.newaxis,:],out=dist[start:end])
+        return cp.cublas.gemm('N','T',x,y,out=dist[start:end],alpha=-2.0,beta=1.0)
+
+    @staticmethod
+    def transpose(x, y, z):
+        """Transposes the order of the (x, y, z) coordinates to (z, y, x)"""
+        return z, y, x
+
+    def forward(self, ugrid, H_, K_, L_, support, use_recip_sym, N):
+
+        assert H_.shape == K_.shape == L_.shape
+        # Use one of the stack functions or do piecwise? this will allocate memory for no reason
+        assert cp.max(cp.abs(cp.array([H_, K_, L_]))) < 3*np.pi
+
+        if use_recip_sym:
+            assert cp.all(cp.isreal(ugrid))
+
+        if support is not None:
+            ugrid *= support 
+
+        dev_id = cp.cuda.device.Device().id
+        complex_dtype = cp.complex128
+        dtype         = cp.float64
+
+        H_, K_, L_ = self.transpose(H_, K_, L_)
+
+        #TODO convert to GPUarray
+        H_,K_,L_,ugrid = map(self.gpuarray_from_cupy, [H_,K_,L_,ugrid])
+
+        nuvect_gpu = gpuarray.GPUArray(shape=(N,), dtype=complex_dtype)
+        if not hasattr(self, "plan"):
+            self.plan = cufinufft(2, ugrid.shape, 1, self.eps, isign=self.isign, dtype=dtype,gpu_method=1, gpu_device_id=dev_id)
+        
+        self.plan.set_pts(H_, K_, L_)
+        self.plan.execute(nuvect_gpu, ugrid)
+
+        return nuvect_gpu
+
+    @nvtx.annotate("sequential/main.py::modified", is_prefix=True)
+    def slicing_and_match(self, ac):
+        """
+        Determine orientations of the data images by minimizing the euclidean distance with the reference images 
+        computed by randomly slicing through the autocorrelation.
+
+        MONA: This is a current hack to support Legion. For MPI, slicing is done separately 
+        from orientation matching. 
+
+        NITEYA: This version shifts to cupy completely to speedup the computation
+
+        :param ac: autocorrelation of the current electron density estimate
+        :param slices_: data images
+        :param pixel_position_reciprocal: pixel positions in reciprocal space
+        :param pixel_distance_reciprocal: pixel distance in reciprocal space
+        :return ref_orientations: array of quaternions matched to slices_
+        """
 
 
+        if not self.N_slices:
+            return cp.zeros((0, 4))
 
-@nvtx.annotate("sequential/orientation_matching.py", is_prefix=True)
-def match(slices_, model_slices, ref_orientations, batch_size=None):
-    """ 
-    Determine orientations of the data images (slices_) by minimizing the euclidean distance 
-    with the reference images (model_slices) and return orientations which give the best match.
-   
-    :param slice_: data images
-    :param mode_slices: reference images
-    :param ref_orientations: referene orientations
-    :param batch_size: batch size
-    :return ref_orientations: array of quaternions matched to slices_
-    """
-    
-    if batch_size is None:
-        batch_size = model_slices.shape[0]
-    
-    N_slices = slices_.shape[0]
-    # TODO move this up to main level
-    #assert slices_.shape == (N_slices,) + settings.reduced_det_shape
+        if not hasattr(self, "dist"):
+            self.dist = cp.empty((self.N_orientations, self.N_slices))
+        ugrid_gpu = cp.array(ac, dtype=cp.complex128)
+        for i in range(self.N_orientations//self.N_batch_size):
+            st = i * self.N_batch_size
+            en = st + self.N_batch_size
+            N_batch = self.N_pixels * self.N_batch_size
+            st_m = i * self.N_batch_size
+            en_m = st_m + self.N_batch_size
 
-    if not N_slices:
-        return np.zeros((0, 4))
+            #Question are H,K,L constant? Can we precalculate them and then store them?
+            H, K, L = cp.einsum("ijk,klmn->jilmn", self.ref_rotmat[st:en], self.pixel_position_reciprocal_gpu,optimize=True) * self.mult
+            H_ = H.flatten() 
+            K_ = K.flatten()
+            L_ = L.flatten()
 
-    index = nn.nearest_neighbor(model_slices, slices_, batch_size)
+            data_images = self.gpuarray_to_cupy(self.forward(ugrid_gpu, H_,K_,L_, 1, self.reciprocal_extent, N_batch)).real.reshape(self.N_batch_size, -1)
+            data_images *= self.slices_std/data_images.std()
 
-    return ref_orientations[index]
-
-
-
-
-
-@nvtx.annotate("sequential/orientation_matching.py", is_prefix=True)
-def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_reciprocal):
-    """
-    Determine orientations of the data images by minimizing the euclidean distance with the reference images 
-    computed by randomly slicing through the autocorrelation.
-    MONA: This is a current hack to support Legion. For MPI, slicing is done separately 
-    from orientation matching.
-
-    :param ac: autocorrelation of the current electron density estimate
-    :param slices_: data images
-    :param pixel_position_reciprocal: pixel positions in reciprocal space
-    :param pixel_distance_reciprocal: pixel distance in reciprocal space
-    :return ref_orientations: array of quaternions matched to slices_
-    """
-    st_init = time.monotonic()
-    logger = logging.getLogger(__name__)
-    Mquat = settings.Mquat
-    M = 4 * Mquat + 1
-    N_orientations = settings.N_orientations
-    N_batch_size = settings.N_batch_size
-    N_pixels = utils.prod(settings.reduced_det_shape)
-    N_slices = slices_.shape[0]
-    assert slices_.shape == (N_slices,) + settings.reduced_det_shape
-    N = N_pixels * N_orientations
-
-    if not N_slices:
-        return np.zeros((0, 4))
-
-    ref_orientations = skp.get_uniform_quat(N_orientations, True)
-    ref_rotmat = np.array([np.linalg.inv(skp.quaternion2rot3d(quat)) for quat in ref_orientations])
-    reciprocal_extent = pixel_distance_reciprocal.max()
-
-    # Calulate Model Slices in batch
-    assert N_orientations % N_batch_size == 0, "N_orientations must be divisible by N_batch_size"
-    slices_ = slices_.reshape((N_slices, N_pixels))
-    model_slices_new = np.zeros((N,))
-    
-    st_slice = time.monotonic()
-
-    for i in range(N_orientations//N_batch_size):
-        st = i * N_batch_size
-        en = st + N_batch_size
-        H, K, L = np.einsum("ijk,klmn->jilmn", ref_rotmat[st:en], pixel_position_reciprocal)
-        H_ = H.flatten() / reciprocal_extent * np.pi / settings.oversampling
-        K_ = K.flatten() / reciprocal_extent * np.pi / settings.oversampling
-        L_ = L.flatten() / reciprocal_extent * np.pi / settings.oversampling
-        N_batch = N_pixels * N_batch_size
-        st_m = i * N_batch_size * N_pixels
-        en_m = st_m + (N_batch_size * N_pixels)
-        model_slices_new[st_m:en_m] = autocorrelation.forward(
-                ac, H_, K_, L_, 1, reciprocal_extent, N_batch).real
-    en_slice = time.monotonic()
-    
-    # Imaginary part ~ numerical error
-    model_slices_new = model_slices_new.reshape((N_orientations, N_pixels))
-    data_model_scaling_ratio = slices_.std() / model_slices_new.std()
-    print(f"Data/Model std ratio: {data_model_scaling_ratio}.", flush=True)
-    model_slices_new *= data_model_scaling_ratio
-    
-    # Calculate Euclidean distance in batch to avoid running out of GPU Memory
-    st_match = time.monotonic()
-    index = nn.nearest_neighbor(model_slices_new, slices_, N_batch_size)
-    en_match = time.monotonic()
-
-    print(f"Match tot:{en_match-st_init:.2f}s. slice={en_slice-st_slice:.2f}s. match={en_match-st_match:.2f}s. slice_oh={st_slice-st_init:.2f}s. match_oh={st_match-en_slice:.2f}s.")
-    return ref_orientations[index]
+            #TODO Approximate data model scaling? Is it allowed?
+            self.euclidean_dist(data_images, self.slices_, self.slices_2, self.dist, st_m, en_m)
+        index = self.dist.argmin(axis=0).get()
+        return self.ref_orientations[index]
