@@ -20,8 +20,8 @@ elif [[ ${target} = "psbuild"* ]]; then
     export NVCCFLAGS="-std=c++17 -ccbin=${CXX} -O3 ${NVARCH} -Wno-deprecated-gpu-targets --default-stream per-thread -Xcompiler "\"${CXXFLAGS}\"
     make -j${THREADS:-8} site=psbuild lib
 else
-    echo "Cannot build cuFINUFFT for this architecture"
-    exit
+    export NVCCFLAGS="-std=c++17 -ccbin=${CXX} -O3 ${NVARCH} -Wno-deprecated-gpu-targets --compiler-options=-fPIC --default-stream per-thread -Xcompiler "\"${CXXFLAGS}\"
+    make -j
 fi
 
 

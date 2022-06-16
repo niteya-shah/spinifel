@@ -234,8 +234,19 @@ export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
 export GASNET_CONDUIT=${GASNET_CONDUIT:-ucx}
 EOF
 else
-    echo "I don't know how to build it on this machine..."
-    exit 1
+    cat >> env.sh <<EOF
+module load gcc
+module load cuda
+module load openmpi
+
+export CC=gcc
+export CXX=g++
+# compilers for mpi4py
+export MPI4PY_CC=gcc
+export MPI4PY_MPICC=\$(which mpicc)
+
+export CUPY_LDFLAGS=-L\${CUDA_ROOT}/lib64/stubs
+EOF
 fi
 
 cat >> env.sh <<EOF

@@ -48,7 +48,7 @@ def setup_linops(H, K, L, data,
 
     # Using upsampled convolution technique instead of ADA
     M_ups = settings.M_ups
-    ugrid_conv = autocorrelation.adjoint(
+    ugrid_conv = autocorrelation.adjoint_spinifel(
         np.ones_like(data), H_, K_, L_, 1, M_ups,
         reciprocal_extent, use_reciprocal_symmetry)
     F_ugrid_conv_ = np.fft.fftn(np.fft.ifftshift(ugrid_conv)) / M**3
@@ -68,7 +68,7 @@ def setup_linops(H, K, L, data,
         matvec=W_matvec)
 
     nuvect_Db = data * weights
-    uvect_ADb = autocorrelation.adjoint(
+    uvect_ADb = autocorrelation.adjoint_spinifel(
         nuvect_Db, H_, K_, L_, ac_support, M,
         reciprocal_extent, use_reciprocal_symmetry
     ).flatten()
