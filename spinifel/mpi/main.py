@@ -50,13 +50,7 @@ def get_known_answers(logger, pixel_position_reciprocal, pixel_distance_reciproc
 
 @nvtx.annotate("mpi/main.py", is_prefix=True)
 def main():
-    print("Enter the dragon",flush=True)
     comm = contexts.comm
-
-    print(f"#### comm: {comm}",flush=True)
-    #print(f"#### comm_group: {comm.Get_group()}",flush=True)
-    #print(f"#### size: {comm.size}",flush=True)
-    #print(f"#### rank: {comm.rank}",flush=True)
 
     timer = utils.Timer()
 
@@ -66,12 +60,10 @@ def main():
     N_big_data_nodes = comm.size
     max_events = min(settings.N_images_max, N_big_data_nodes*N_images_per_rank)
     writer_rank = 0 # pick writer rank as core 0
-    print(f"Got here",flush=True)
 
     # Reading input images using psana2
     ds = None
     if settings.use_psana:
-        print(f"load data from psana",flush=True)
         from psana import DataSource
         # BigData cores are those excluding Smd0, EventBuilder, & Server cores.
         N_big_data_nodes = comm.size - (1 + settings.ps_eb_nodes + settings.ps_srv_nodes)
@@ -94,11 +86,9 @@ def main():
         # -- > max_events = 12000
         # The destination callback above sends events to BigData cores
         # in round robin order.
-        print(f"exp:{settings.ps_exp, settings.ps_runnum, settings.ps_dir, destination}",flush=True)
         ds = DataSource(exp=settings.ps_exp, run=settings.ps_runnum,
                         dir=settings.ps_dir, destination=destination,
                         max_events=max_events)
-    print("Done loading",flush=True)
 
     # Setup logger after knowing the writer rank 
     logger = utils.Logger(comm.rank==writer_rank)
@@ -178,7 +168,7 @@ def main():
             ac = solve_ac(
                 curr_gen, pixel_position_reciprocal, pixel_distance_reciprocal, slices_)
             logger.log(f"AC recovered in {timer.lap():.2f}s.")
-            if comm.rank == 0:
+            if comm.rank == writer_rank:
                 myRes = { 
                          'pixel_position_reciprocal': pixel_position_reciprocal,
                          'pixel_distance_reciprocal': pixel_distance_reciprocal,
@@ -189,7 +179,7 @@ def main():
 
             ac_phased, support_, rho_ = phase(curr_gen, ac)
             logger.log(f"Problem phased in {timer.lap():.2f}s.")
-            if comm.rank == 0:
+            if comm.rank == writer_rank:
                 myRes = { 
                          'ac': ac,
                          'ac_phased': ac_phased,
@@ -241,7 +231,7 @@ def main():
                 pixel_distance_reciprocal)
 
         logger.log(f"Orientations matched in {timer.lap():.2f}s.")
-        if comm.rank == 0 and not flag_test:
+        if comm.rank == writer_rank and not flag_test:
             myRes = {'ac_phased': ac_phased, 
                      'slices_': slices_,
                      'pixel_position_reciprocal': pixel_position_reciprocal,
@@ -263,7 +253,7 @@ def main():
                 slices_, orientations, ac_phased)
         
         logger.log(f"AC recovered in {timer.lap():.2f}s.")
-        if comm.rank == 0 and not flag_test:
+        if comm.rank == writer_rank and not flag_test:
             myRes = { 
                      'pixel_position_reciprocal': pixel_position_reciprocal,
                      'pixel_distance_reciprocal': pixel_distance_reciprocal,
@@ -291,7 +281,7 @@ def main():
             assert cc_test_rho > test_accept_thres
 
         logger.log(f"Problem phased in {timer.lap():.2f}s.")
-        if comm.rank == 0 and not flag_test:
+        if comm.rank == writer_rank and not flag_test:
             myRes = { 
                      'ac': ac,
                      'prev_support_':prev_support_,
@@ -306,7 +296,7 @@ def main():
         # Check if density converges
         if settings.chk_convergence and not flag_test:
             # Calculate correlation coefficient
-            if comm.rank == 0:
+            if comm.rank == writer_rank:
                 prev_cov_xy = cov_xy
                 cov_xy = np.corrcoef(prev_rho_.flatten(), rho_.flatten())[0,1]
             else:
@@ -321,7 +311,7 @@ def main():
                 print("Stopping criteria met!")
                 break
 
-        if comm.rank == 0 and not flag_test:
+        if comm.rank == writer_rank and not flag_test:
             # Save electron density and intensity
             rho = np.fft.ifftshift(rho_)
             intensity = np.fft.ifftshift(np.abs(np.fft.fftshift(ac_phased)**2))
