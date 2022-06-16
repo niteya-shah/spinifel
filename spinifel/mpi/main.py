@@ -175,7 +175,7 @@ def main():
                          'slices_': slices_,
                          'ac': ac
                         }
-                checkpoint.save_checkpoint(myRes, settings.out_dir, curr_gen, tag="solve_ac")
+                checkpoint.save_checkpoint(myRes, settings.out_dir, curr_gen, tag="solve_ac", protocol=4)
 
             ac_phased, support_, rho_ = phase(curr_gen, ac)
             logger.log(f"Problem phased in {timer.lap():.2f}s.")
@@ -186,7 +186,7 @@ def main():
                          'support_': support_,
                          'rho_': rho_
                         }
-                checkpoint.save_checkpoint(myRes, settings.out_dir, curr_gen, tag="phase")
+                checkpoint.save_checkpoint(myRes, settings.out_dir, curr_gen, tag="phase",protocol=4)
                 # Save electron density and intensity
                 rho = np.fft.ifftshift(rho_)
                 intensity = np.fft.ifftshift(np.abs(np.fft.fftshift(ac_phased)**2))
@@ -238,7 +238,7 @@ def main():
                      'pixel_distance_reciprocal': pixel_distance_reciprocal,
                      'orientations': orientations
                     }
-            checkpoint.save_checkpoint(myRes, settings.out_dir, generation, tag="match")
+            checkpoint.save_checkpoint(myRes, settings.out_dir, generation, tag="match",protocol=4)
 
         # Solve autocorrelation
         if flag_test:
@@ -262,7 +262,7 @@ def main():
                      'ac_phased': ac_phased,
                      'ac': ac
                     }
-            checkpoint.save_checkpoint(myRes, settings.out_dir, generation, tag="solve_ac")
+            checkpoint.save_checkpoint(myRes, settings.out_dir, generation, tag="solve_ac",protocol=4)
 
             # Save rho and support for comparisons in the next generation
             prev_rho_ = rho_[:]
@@ -290,7 +290,7 @@ def main():
                      'support_': support_,
                      'rho_': rho_
                     }
-            checkpoint.save_checkpoint(myRes, settings.out_dir, generation, tag="phase")
+            checkpoint.save_checkpoint(myRes, settings.out_dir, generation, tag="phase",protocol=4)
 
 
         # Check if density converges
@@ -325,7 +325,7 @@ def main():
                      'rho_': rho_,
                      'orientations': orientations
                     }
-            checkpoint.save_checkpoint(myRes, settings.out_dir, generation)
+            checkpoint.save_checkpoint(myRes, settings.out_dir, generation, tag="", protocol=4)
 
     logger.log(f"Results saved in {settings.out_dir}")
     logger.log(f"Successfully completed in {timer.total():.2f}s.")
