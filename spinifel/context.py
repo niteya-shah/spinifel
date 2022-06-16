@@ -76,17 +76,11 @@ class SpinifelContexts(metaclass=Singleton):
             # A _comm_compute is created here to include only the worker ranks.
             from psana.psexp.tools import get_excl_ranks # FIXME: only available on latest psana2
             self._comm = MPI.COMM_WORLD
-            print(f"comm: {self._comm, self._comm.size}",flush=True)
             self._psana_excl_ranks = get_excl_ranks()
 
-            print(f"self._psana_excl_ranks: {self._psana_excl_ranks}",flush=True)
             self._grp_compute = self._comm.group.Excl(self._psana_excl_ranks)
             self._comm_compute = self._comm.Create(self._grp_compute)
-            if self._comm.rank not in self._psana_excl_ranks:
-                print(f"comm_compute: {self._comm_compute, self._comm_compute.size}", flush=True)
-                print(f'my comm_compute rank: {self.comm_compute.Get_rank()}', flush=True)
             self._rank = self._comm.Get_rank()
-            print(f"rank: {self._rank}", flush=True)
         else:
             self._comm = MPI.COMM_WORLD
             self._rank = self._comm.Get_rank()
