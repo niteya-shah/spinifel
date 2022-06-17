@@ -1,5 +1,6 @@
 #!/bin/bash
 
+set -xe
 
 # Clone test data and save them to test_data_dir
 if [ -z ${test_data_dir+x} ]; then
