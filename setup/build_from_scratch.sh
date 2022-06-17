@@ -148,17 +148,6 @@ pip install --no-cache-dir PyNVTX
 
 
 #_______________________________________________________________________________
-# Overwrite the conda libraries with system libraries => don't let anaconda
-# provide libraries (like openmp) that are already provided by the system
-
-if [[ ${target} = *"summit"* || ${target} = *"ascent"* ]]
-then
-    ${root_dir}/../scripts/fix_lib_olcf.sh
-fi
-
-#-------------------------------------------------------------------------------
-
-#_______________________________________________________________________________
 # Install UCX
 
 if [[ $GASNET_CONDUIT = "ucx" ]]
@@ -253,6 +242,29 @@ fi
 #-------------------------------------------------------------------------------
 
 
+#_______________________________________________________________________________
+# Overwrite the conda libraries with system libraries => don't let anaconda
+# provide libraries (like openmp) that are already provided by the system
+
+# FIXME (Elliott): After this point, CMake will be BROKEN. If you try
+# to do any further builds, they will NOT work. The error looks like:
+#
+# cmake: symbol lookup error: cmake: undefined symbol: uv_fs_get_system_error
+#
+# This is probably happening because we're overwriting important
+# libraries from Conda with system ones. Unfortunately, this does not
+# work. I think the long term solution needs to be more precise about
+# exactly what system libraries we're going to get (e.g., OpenMP, but
+# not others). What we've got right now is far too indiscriminant. But
+# as an immediate hack, we'll just put this as late in the build as
+# possible so that we hope we don't mess with anything important.
+
+if [[ ${target} = *"summit"* || ${target} = *"ascent"* ]]
+then
+    ${root_dir}/../scripts/fix_lib_olcf.sh
+fi
+
+#-------------------------------------------------------------------------------
 
 
 
