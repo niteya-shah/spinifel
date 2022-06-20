@@ -93,6 +93,11 @@ def get_slices_and_pixel_info(N_images_per_rank, ds):
             pixel_position = run.beginruns[0].scan[0].raw.pixel_position
         
         for evt in run.events():
+            # A quick hack to allow psana2 to exit the loop by throwing
+            # all images after N_images_per_rank away.
+            if i >= N_images_per_rank: 
+                continue
+
             raw = det.raw.calib(evt)
 
             # Only need to do once for per-run variables
