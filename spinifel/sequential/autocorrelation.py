@@ -44,7 +44,7 @@ class Merge:
 
         self.N = np.prod(slices_.shape)
         self.reciprocal_extent = pixel_distance_reciprocal.max()
-        self.pixel_position_reciprocal = cp.array(pixel_position_reciprocal)
+        self.pixel_position_reciprocal = np.array(pixel_position_reciprocal)
         self.mult = np.pi / (self.reciprocal_extent * settings.oversampling)
         self.N_images = slices_.shape[0]
 
@@ -115,7 +115,7 @@ class Merge:
 
     def get_non_uniform_positions(self, orientations):
         if orientations.shape[0] > 0:
-            rotmat = cp.array([np.linalg.inv(skp.quaternion2rot3d(quat))
+            rotmat = np.array([np.linalg.inv(skp.quaternion2rot3d(quat))
                               for quat in orientations])
         else:
             rotmat = np.zeros((0, 3, 3))
@@ -124,11 +124,14 @@ class Merge:
 
 # TODO : How to ensure we support all formats of pixel_position reciprocal
 # Current support shape is(3, N_panels, Dim_x, Dim_y)
-        H, K, L = cp.einsum("ijk,klmn->jilmn", rotmat,
-                            self.pixel_position_reciprocal, optimize=True) * self.mult
+        if not hasattr(self, "einsum_path"):
+            self.einsum_path = np.einsum_path("ijk,klmn->jilmn", rotmat,
+                            self.pixel_position_reciprocal, optimize="optimal")[0]
+        H, K, L = np.einsum("ijk,klmn->jilmn", rotmat,
+                            self.pixel_position_reciprocal, optimize=self.einsum_path) 
 #H, K, L = np.einsum("ijk,klm->jilm", rotmat, pixel_position_reciprocal)
 # shape->[N_images] x det_shape
-        return H, K, L
+        return H* self.mult, K* self.mult, L* self.mult
 
     def adjoint(self, nuvect, H_, K_, L_, support, M):
         assert H_.shape == K_.shape == L_.shape
@@ -139,10 +142,12 @@ class Merge:
         H_, K_, L_ = self.transpose(H_, K_, L_)
         shape = (M, M, M)
 # TODO convert to GPUarray
-        H_, K_, L_, nuvect = map(self.gpuarray_from_cupy, [H_, K_, L_, nuvect])
+        nuvect_ga = self.gpuarray_from_cupy(nuvect)
 
-        ugrid_gpu = gpuarray.GPUArray(shape=shape, dtype=complex_dtype, order="F")
-
+        ugrid = gpuarray.GPUArray(shape=shape, dtype=complex_dtype, order="F")
+        H_ = gpuarray.to_gpu(H_)
+        K_ = gpuarray.to_gpu(K_)
+        L_ = gpuarray.to_gpu(L_)
         if not hasattr(self, "plan"):
             self.plan = {}
         if not shape in self.plan:
@@ -156,8 +161,8 @@ class Merge:
                 gpu_method=1,
                 gpu_device_id=dev_id)
         self.plan[shape].set_pts(H_, K_, L_)
-        self.plan[shape].execute(nuvect, ugrid_gpu)
-        ugrid_gpu = self.gpuarray_to_cupy(ugrid_gpu)
+        self.plan[shape].execute(nuvect_ga, ugrid)
+        ugrid_gpu = self.gpuarray_to_cupy(ugrid)
         ugrid_gpu *= support
         if self.use_reciprocal_symmetry:
             ugrid_gpu = ugrid_gpu.real
@@ -200,9 +205,9 @@ class Merge:
         return ugrid_conv_out.flatten()
 
     def setup_linops(self, H, K, L, ac_support, x0):
-        H_ = H.flatten()
-        K_ = K.flatten()
-        L_ = L.flatten()
+        H_ = H.reshape(-1)
+        K_ = K.reshape(-1)
+        L_ = L.reshape(-1)
 
         ugrid_conv = self.adjoint(self.nuvect, H_, K_, L_, 1, self.M_ups)
 
@@ -232,18 +237,19 @@ class Merge:
         # ac_estimate is modified in place and hence its value changes for each run
         if orientations is None:
             orientations = skp.get_random_quat(self.N_images)
+
         H, K, L = self.get_non_uniform_positions(orientations)
         if ac_estimate is None:
-            ac_support = cp.ones((self.M,) * 3)
-            ac_estimate = cp.zeros((self.M,) * 3)
+            ac_support = np.ones((self.M,) * 3)
+            ac_estimate = np.zeros((self.M,) * 3)
         else:
             ac_smoothed = gaussian_filter(ac_estimate, 0.5)
             ac_support = (ac_smoothed > 1e-12).astype(np.float)
             ac_estimate *= ac_support
-
         ac_estimate = cp.array(ac_estimate)
         ac_support = cp.array(ac_support)
-        x0 = ac_estimate.flatten()
+        x0 = ac_estimate.reshape(-1)
+
         W, d = self.setup_linops(H, K, L, ac_support, x0)
         ret, info = cg(W, d, x0=x0, maxiter=self.maxiter,
                        callback=self.callback)

@@ -1,3 +1,4 @@
+from ctypes import sizeof
 import os
 os.environ['CUPY_ACCELERATORS']="cub,cutensor"
 
@@ -5,7 +6,8 @@ import time
 import numpy  as np
 import skopi  as skp
 import cupy as cp
-from pycuda import gpuarray
+import pycuda.gpuarray as gpuarray
+import pycuda.driver as cuda
 import pycuda.autoinit
 
 from cufinufft import cufinufft
@@ -31,7 +33,7 @@ class SNM:
         self.N = self.N_pixels * self.N_orientations
         self.ref_orientations = skp.get_uniform_quat(self.N_orientations, True)
         ref_rotmat = np.array([np.linalg.inv(skp.quaternion2rot3d(quat)) for quat in self.ref_orientations])
-        self.ref_rotmat = cp.array(ref_rotmat)
+        self.ref_rotmat = np.array(ref_rotmat)
         assert self.N_orientations % self.N_batch_size == 0, "N_orientations must be divisible by N_batch_size"
 
         self.eps = 1e-12
@@ -41,11 +43,15 @@ class SNM:
         assert slices_.shape == (self.N_slices,) + self.reduced_det_shape
 
         self.reciprocal_extent = pixel_distance_reciprocal.max()
-        self.pixel_position_reciprocal_gpu = cp.array(pixel_position_reciprocal)
+        self.pixel_position_reciprocal_gpu = np.array(pixel_position_reciprocal)
         self.mult = (np.pi / (self.oversampling * self.reciprocal_extent))
         self.slices_ = cp.array(slices_.reshape((self.N_slices, self.N_pixels)), dtype=cp.float64)
         self.slices_2 = cp.square(self.slices_).sum(axis=1)
         self.slices_std = self.slices_.std()
+
+        self.H_ = gpuarray.empty(shape=(self.N_pixels * self.N_batch_size,), dtype=np.float64)
+        self.K_ = gpuarray.empty(shape=(self.N_pixels * self.N_batch_size,), dtype=np.float64)
+        self.L_ = gpuarray.empty(shape=(self.N_pixels * self.N_batch_size,), dtype=np.float64)
 
     @staticmethod
     def gpuarray_from_cupy(arr):
@@ -102,33 +108,31 @@ class SNM:
         return z, y, x
 
     def forward(self, ugrid, H_, K_, L_, support, use_recip_sym, N):
-
         assert H_.shape == K_.shape == L_.shape
         # Use one of the stack functions or do piecwise? this will allocate memory for no reason
         assert cp.max(cp.abs(cp.array([H_, K_, L_]))) < 3*np.pi
-
         if use_recip_sym:
-            assert cp.all(cp.isreal(ugrid))
+            assert (ugrid.real == ugrid).get().all()
 
         if support is not None:
             ugrid *= support 
 
         dev_id = cp.cuda.device.Device().id
-        complex_dtype = cp.complex128
-        dtype         = cp.float64
+        complex_dtype = np.complex128
+        dtype         = np.float64
 
         H_, K_, L_ = self.transpose(H_, K_, L_)
 
-        #TODO convert to GPUarray
-        H_,K_,L_,ugrid = map(self.gpuarray_from_cupy, [H_,K_,L_,ugrid])
+        self.H_.set(H_)
+        self.K_.set(K_)
+        self.L_.set(L_)
 
         nuvect_gpu = gpuarray.GPUArray(shape=(N,), dtype=complex_dtype)
         if not hasattr(self, "plan"):
-            self.plan = cufinufft(2, ugrid.shape, 1, self.eps, isign=self.isign, dtype=dtype,gpu_method=1, gpu_device_id=dev_id)
-        
-        self.plan.set_pts(H_, K_, L_)
-        self.plan.execute(nuvect_gpu, ugrid)
+            self.plan = cufinufft(2, ugrid.shape, 1, self.eps, isign=self.isign, dtype=dtype, gpu_method=1, gpu_device_id=dev_id)
 
+        self.plan.set_pts(self.H_, self.K_, self.L_)
+        self.plan.execute(nuvect_gpu, ugrid)
         return nuvect_gpu
 
     @nvtx.annotate("sequential/main.py::modified", is_prefix=True)
@@ -149,30 +153,49 @@ class SNM:
         :return ref_orientations: array of quaternions matched to slices_
         """
 
-
+        st_init = time.monotonic()
         if not self.N_slices:
             return cp.zeros((0, 4))
 
         if not hasattr(self, "dist"):
             self.dist = cp.empty((self.N_orientations, self.N_slices))
-        ugrid_gpu = cp.array(ac, dtype=cp.complex128)
+        ugrid_gpu = gpuarray.to_gpu(ac.astype(np.complex128))
+        slices_time = 0
+        match_time = 0
+        match_oth_time = 0
+        slice_init = time.monotonic()
         for i in range(self.N_orientations//self.N_batch_size):
+            slice_start = time.monotonic()
             st = i * self.N_batch_size
             en = st + self.N_batch_size
             N_batch = self.N_pixels * self.N_batch_size
             st_m = i * self.N_batch_size
             en_m = st_m + self.N_batch_size
-
             #Question are H,K,L constant? Can we precalculate them and then store them?
-            H, K, L = cp.einsum("ijk,klmn->jilmn", self.ref_rotmat[st:en], self.pixel_position_reciprocal_gpu,optimize=True) * self.mult
-            H_ = H.flatten() 
-            K_ = K.flatten()
-            L_ = L.flatten()
-
-            data_images = self.gpuarray_to_cupy(self.forward(ugrid_gpu, H_,K_,L_, 1, self.reciprocal_extent, N_batch)).real.reshape(self.N_batch_size, -1)
+            if not hasattr(self, "einsum_path"):
+                self.einsum_path = np.einsum_path("ijk,klmn->jilmn", self.ref_rotmat[st:en], self.pixel_position_reciprocal_gpu, optimize='optimal')[0] 
+            H, K, L = np.einsum("ijk,klmn->jilmn", self.ref_rotmat[st:en], self.pixel_position_reciprocal_gpu, optimize=self.einsum_path) 
+            H_ = H.reshape(-1) * self.mult
+            K_ = K.reshape(-1) * self.mult
+            L_ = L.reshape(-1) * self.mult
+            forward_result = self.forward(ugrid_gpu, H_,K_,L_, 1, self.reciprocal_extent, N_batch)
+            data_images = self.gpuarray_to_cupy(forward_result).real.reshape(self.N_batch_size, -1)
+            del forward_result
+            slices_time += time.monotonic() - slice_start
+            match_start = time.monotonic()
             data_images *= self.slices_std/data_images.std()
-
             #TODO Approximate data model scaling? Is it allowed?
+            match_middle = time.monotonic()
+            match_oth_time += match_middle - match_start
             self.euclidean_dist(data_images, self.slices_, self.slices_2, self.dist, st_m, en_m)
+            match_time +=  time.monotonic() - match_middle
+
+        match_start = time.monotonic()
         index = self.dist.argmin(axis=0).get()
+        en_match = time.monotonic()
+        match_time += en_match - match_start
+
+        print(f"Match tot:{en_match-st_init:.2f}s. slice={slices_time:.2f}s. match={match_time:.2f}s. slice_oh={slice_init-st_init:.2f}s. match_oh={match_oth_time:.2f}s.")
         return self.ref_orientations[index]
+
+
