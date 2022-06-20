@@ -54,6 +54,7 @@ class SNM:
         self.L_ = gpuarray.empty(shape=(self.N_pixels * self.N_batch_size,), dtype=np.float64)
 
     @staticmethod
+    @nvtx.annotate("sequential/orientation_matching.py::modified", is_prefix=True)
     def gpuarray_from_cupy(arr):
         """
         Convert from GPUarray(pycuda) to cupy. The conversion is zero-cost.
@@ -79,6 +80,7 @@ class SNM:
                                 order=order)
 
     @staticmethod
+    @nvtx.annotate("sequential/orientation_matching.py::modified", is_prefix=True)
     def gpuarray_to_cupy(arr):
         """
         Convert from cupy to GPUarray(pycuda). The conversion is zero-cost.
@@ -88,9 +90,8 @@ class SNM:
         assert isinstance(arr, gpuarray.GPUArray)
         return cp.asarray(arr)
 
-    #TODO Static method or not?
-    @staticmethod
-    def euclidean_dist(x ,y, y_2, dist, start, end):
+    @nvtx.annotate("sequential/orientation_matching.py::modified", is_prefix=True)
+    def euclidean_dist(self, x ,y, y_2, dist, start, end):
         """
         Computes the pair-wise euclidean distance betwee two image groups. This formulation relies on blas support from CUDA/ROCM.
         The computation relies on the fact that 
@@ -107,6 +108,7 @@ class SNM:
         """Transposes the order of the (x, y, z) coordinates to (z, y, x)"""
         return z, y, x
 
+    @nvtx.annotate("sequential/orientation_matching.py::modified", is_prefix=True)
     def forward(self, ugrid, H_, K_, L_, support, use_recip_sym, N):
         assert H_.shape == K_.shape == L_.shape
         # Use one of the stack functions or do piecwise? this will allocate memory for no reason
@@ -135,7 +137,7 @@ class SNM:
         self.plan.execute(nuvect_gpu, ugrid)
         return nuvect_gpu
 
-    @nvtx.annotate("sequential/main.py::modified", is_prefix=True)
+    @nvtx.annotate("sequential/orientation_matching.py::modified", is_prefix=True)
     def slicing_and_match(self, ac):
         """
         Determine orientations of the data images by minimizing the euclidean distance with the reference images 
@@ -183,8 +185,8 @@ class SNM:
             del forward_result
             slices_time += time.monotonic() - slice_start
             match_start = time.monotonic()
-            data_images *= self.slices_std/data_images.std()
             #TODO Approximate data model scaling? Is it allowed?
+            data_images *= self.slices_std/data_images.std()
             match_middle = time.monotonic()
             match_oth_time += match_middle - match_start
             self.euclidean_dist(data_images, self.slices_, self.slices_2, self.dist, st_m, en_m)

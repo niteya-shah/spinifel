@@ -28,6 +28,7 @@ from scipy.ndimage import gaussian_filter
 import numpy as np
 
 class Merge:
+
     def __init__(
             self,
             settings,
@@ -74,6 +75,7 @@ class Merge:
         self.F_antisupport = cp.array(F_antisupport)
 
     @staticmethod
+    @nvtx.annotate("sequential/autocorrelation.py::modified", is_prefix=True)
     def gpuarray_from_cupy(arr):
         """
         Convert from GPUarray(pycuda) to cupy. The conversion is zero-cost.
@@ -99,6 +101,7 @@ class Merge:
                                  order=order)
 
     @staticmethod
+    @nvtx.annotate("sequential/autocorrelation.py::modified", is_prefix=True)
     def gpuarray_to_cupy(arr):
         """
         Convert from cupy to GPUarray(pycuda). The conversion is zero-cost.
@@ -109,10 +112,12 @@ class Merge:
         return cp.asarray(arr)
 
     @staticmethod
+    @nvtx.annotate("sequential/autocorrelation.py::modified", is_prefix=True)
     def transpose(x, y, z):
         """Transposes the order of the (x, y, z) coordinates to (z, y, x)"""
         return z, y, x
 
+    @nvtx.annotate("sequential/autocorrelation.py::modified", is_prefix=True)
     def get_non_uniform_positions(self, orientations):
         if orientations.shape[0] > 0:
             rotmat = np.array([np.linalg.inv(skp.quaternion2rot3d(quat))
@@ -133,6 +138,7 @@ class Merge:
 # shape->[N_images] x det_shape
         return H* self.mult, K* self.mult, L* self.mult
 
+    @nvtx.annotate("sequential/autocorrelation.py::modified", is_prefix=True)
     def adjoint(self, nuvect, H_, K_, L_, support, M):
         assert H_.shape == K_.shape == L_.shape
         dev_id = cp.cuda.device.Device().id
@@ -169,6 +175,7 @@ class Merge:
         ugrid_gpu /= M**3
         return ugrid_gpu
 
+    @nvtx.annotate("sequential/autocorrelation.py::modified", is_prefix=True)
     def fourier_reg(self, uvect, support):
         ugrid = uvect.reshape((self.M,) * 3) * support
         if self.use_reciprocal_symmetry:
@@ -204,6 +211,7 @@ class Merge:
             ugrid_conv_out = ugrid_conv_out.real
         return ugrid_conv_out.flatten()
 
+    @nvtx.annotate("sequential/autocorrelation.py::modified", is_prefix=True)
     def setup_linops(self, H, K, L, ac_support, x0):
         H_ = H.reshape(-1)
         K_ = K.reshape(-1)
@@ -233,6 +241,7 @@ class Merge:
 
         return W, d
 
+    @nvtx.annotate("sequential/autocorrelation.py::modified", is_prefix=True)
     def solve_ac(self, generation, orientations = None, ac_estimate = None):
         # ac_estimate is modified in place and hence its value changes for each run
         if orientations is None:
