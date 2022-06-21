@@ -5,9 +5,9 @@ import numpy as np
 import PyNVTX as nvtx
 
 from .prep import get_data
-from .autocorrelation import solve_ac
 from .phasing import phase
-from .orientation_matching import match
+from spinifel.sequential.orientation_matching import SNM
+from spinifel.sequential.autocorrelation import Merge
 
 
 
@@ -64,6 +64,9 @@ def main():
     # Generation 0: solve_ac and phase
     N_generations = settings.N_generations
 
+    mg = Merge(settings, slices_, pixel_position_reciprocal, pixel_distance_reciprocal)
+    snm = SNM(settings, slices_, pixel_position_reciprocal, pixel_distance_reciprocal)
+
     if settings.load_gen > 0: # Load input from previous generation
         curr_gen = settings.load_gen
         print(f"Loading checkpoint: {checkpoint.generate_checkpoint_name(settings.out_dir, settings.load_gen, settings.tag_gen)}", flush=True)
@@ -80,8 +83,7 @@ def main():
         logger.log(f"#"*27)
         logger.log(f"##### Generation {curr_gen}/{N_generations} #####")
         logger.log(f"#"*27)
-        ac = solve_ac(
-            curr_gen, pixel_position_reciprocal, pixel_distance_reciprocal, slices_)
+        ac = mg.solve_ac(curr_gen)
         logger.log(f"AC recovered in {timer.lap():.2f}s.")
         if comm.rank == 0:
             myRes = { 
@@ -120,9 +122,7 @@ def main():
         logger.log(f"##### Generation {generation}/{N_generations} #####")
         logger.log(f"#"*27)
         # Orientation matching
-        orientations = match(
-            ac_phased, slices_,
-            pixel_position_reciprocal, pixel_distance_reciprocal)
+        orientations = snm.slicing_and_match(ac_phased)
         logger.log(f"Orientations matched in {timer.lap():.2f}s.")
         if comm.rank == 0:
             myRes = {'ac_phased': ac_phased, 
@@ -134,9 +134,7 @@ def main():
             checkpoint.save_checkpoint(myRes, settings.out_dir, generation, tag="match",protocol=4)
 
         # Solve autocorrelation
-        ac = solve_ac(
-            generation, pixel_position_reciprocal, pixel_distance_reciprocal,
-            slices_, orientations, ac_phased)
+        ac = mg.solve_ac(generation, orientations, ac_phased)
         logger.log(f"AC recovered in {timer.lap():.2f}s.")
         if comm.rank == 0:
             myRes = { 

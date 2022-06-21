@@ -1,4 +1,3 @@
-from ctypes import sizeof
 import os
 os.environ['CUPY_ACCELERATORS']="cub,cutensor"
 

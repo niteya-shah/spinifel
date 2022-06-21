@@ -1,246 +1,318 @@
 import matplotlib.pyplot as plt
-import numpy.matlib
-import numpy as np
-import PyNVTX as nvtx
-import skopi as skp
-
 from mpi4py              import MPI
 from matplotlib          import cm
 from matplotlib.colors   import LogNorm, SymLogNorm
-from scipy.linalg        import norm
+# from scipy.linalg        import norm
 from scipy.ndimage       import gaussian_filter
-from scipy.sparse.linalg import LinearOperator, cg
+# from scipy.sparse.linalg import LinearOperator, cg
 
-from spinifel import settings, utils, image, autocorrelation, contexts
-
-        
-@nvtx.annotate("mpi/autocorrelation.py", is_prefix=True)
-def reduce_bcast(comm, vect):
-    vect = np.ascontiguousarray(vect)
-    reduced_vect = np.zeros_like(vect)
-    comm.Reduce(vect, reduced_vect, op=MPI.SUM, root=0)
-    vect = reduced_vect
-    comm.Bcast(vect, root=0)
-    return vect
+from spinifel import image
 
 
-@nvtx.annotate("mpi/autocorrelation.py", is_prefix=True)
-def core_problem(comm, uvect, H_, K_, L_, ac_support, weights, M, N,
-                 reciprocal_extent, use_reciprocal_symmetry):
-    comm.Bcast(uvect, root=0)
-    uvect_ADA = autocorrelation.core_problem(
-        uvect, H_, K_, L_, ac_support, weights, M, N,
-        reciprocal_extent, use_reciprocal_symmetry)
-    uvect_ADA = reduce_bcast(comm, uvect_ADA)
-    return uvect_ADA
+import os
+os.environ['CUPY_ACCELERATORS'] = "cub,cutensor"
 
-@nvtx.annotate("mpi/autocorrelation.py", is_prefix=True)
-def gen_F_antisupport(M):
-    """
-    Generate an antisupport in Fourier space, which has zeros in the central
-    sphere and ones in the high-resolution corners. 
-    
-    :param M: length of the cubic antisupport volume
-    :return F_antisupport: volume that masks central region
-    """
-    # generate "antisupport" -- this has zeros in central sphere, 1s outside
-    lu = np.linspace(-np.pi, np.pi, M)
-    Hu_, Ku_, Lu_ = np.meshgrid(lu, lu, lu, indexing='ij')
-    Qu_ = np.around(np.sqrt(Hu_**2 + Ku_**2 + Lu_**2), 4)
-    F_antisupport = Qu_ > np.pi 
+from pycuda import gpuarray
+import pycuda.autoinit
 
-    assert np.all(F_antisupport == F_antisupport[::-1, :, :])
-    assert np.all(F_antisupport == F_antisupport[:, ::-1, :])
-    assert np.all(F_antisupport == F_antisupport[:, :, ::-1])
-    assert np.all(F_antisupport == F_antisupport[::-1, ::-1, ::-1])
+import skopi as skp
+import PyNVTX as nvtx
 
-    return F_antisupport
+from cufinufft import cufinufft
 
-@nvtx.annotate("mpi/autocorrelation.py", is_prefix=True)
-def fourier_reg(uvect, support, F_antisupport, M, use_recip_sym):
-    """
-    Generate the flattened matrix component that penalizes noise in the outer
-    regions of reciprocal space, specifically outside the unit sphere of radius
-    pi, where H_max, K_max, and L_max have been normalized to equal pi.
-    
-    :param uvect: data vector on uniform grid, flattened
-    :param support: 3d support object for autocorrelation
-    :param F_antisupport: support in Fourier space, unmasked at high frequencies
-    :param M: length of data vector along each axis
-    :param use_recip_sym: if True, discard imaginary component
-    :return uvect: convolution of uvect and F_antisupport, flattened
-    """
-    ugrid = uvect.reshape((M,)*3) * support
-    if use_recip_sym:
-        assert np.all(np.isreal(ugrid))
-    F_ugrid = np.fft.fftn(np.fft.ifftshift(ugrid))
-    F_reg = F_ugrid * np.fft.ifftshift(F_antisupport)
-    reg = np.fft.fftshift(np.fft.ifftn(F_reg))
-    uvect = (reg * support).flatten()
-    if use_recip_sym:
-        uvect = uvect.real
-    return uvect
+from cupyx.scipy.sparse.linalg import LinearOperator, cg
+from cupyx.scipy.linalg import norm
 
-@nvtx.annotate("mpi/autocorrelation.py", is_prefix=True)
-def setup_linops(comm, H, K, L, data,
-                 ac_support, weights, x0,
-                 M, Mtot, N, reciprocal_extent,
-                 alambda, rlambda, flambda,
-                 use_reciprocal_symmetry):
-    """Define W and d parts of the W @ x = d problem.
+import cupy as cp
+from scipy.ndimage import gaussian_filter
+import numpy as np
 
-    W = A_adj*Da*A + rl*I
-    d = A_adj*Da*b + rl*x0
+class Merge:
 
-    Where:
-        A represents the NUFFT operator
-        A_adj its adjoint
-        I the identity
-        D weights
-        b the data
-        x0 the initial guess (ac_estimate)
-    """
-    H_ = H.flatten() / reciprocal_extent * np.pi
-    K_ = K.flatten() / reciprocal_extent * np.pi
-    L_ = L.flatten() / reciprocal_extent * np.pi
-   
-    F_antisupport = gen_F_antisupport(M)
- 
-    # Using upsampled convolution technique instead of ADA
-    M_ups = M * 2
-    ugrid_conv = autocorrelation.adjoint(
-        np.ones_like(data), H_, K_, L_, M_ups,
-        use_reciprocal_symmetry, support=None)
-    #ugrid_conv = reduce_bcast(comm, ugrid_conv)
-    F_ugrid_conv_ = np.fft.fftn(np.fft.ifftshift(ugrid_conv)) #/ M**3
+    def __init__(
+            self,
+            settings,
+            slices_,
+            pixel_position_reciprocal,
+            pixel_distance_reciprocal):
+        self.comm = MPI.COMM_WORLD
 
-    def W_matvec(uvect):
-        """Define W part of the W @ x = d problem."""
-        uvect_ADA = autocorrelation.core_problem_convolution(
-            uvect, M, F_ugrid_conv_, M_ups, ac_support)
-        uvect_FDF = fourier_reg(uvect, ac_support, F_antisupport, M, use_recip_sym=use_reciprocal_symmetry)
-        uvect = alambda*uvect_ADA + rlambda*uvect + flambda*uvect_FDF
+        self.M = settings.M
+        self.Mtot = self.M ** 3
+        self.use_psana = settings.use_psana
+        self.out_dir = settings.out_dir
+
+        self.maxiter = settings.solve_ac_maxiter
+        self.oversampling = settings.oversampling
+        self.M_ups = settings.M_ups
+
+        self.sign = 1
+        self.eps = 1e-12
+
+        self.N = np.prod(slices_.shape)
+        self.reciprocal_extent = pixel_distance_reciprocal.max()
+        self.pixel_position_reciprocal = np.array(pixel_position_reciprocal)
+        self.mult = np.pi / (self.reciprocal_extent * settings.oversampling)
+        self.N_images = slices_.shape[0]
+        self.use_reciprocal_symmetry = True
+        self.slices_ = slices_
+
+        self.alambda = 1
+        self.rlambda = self.Mtot/self.N * 2 **(self.comm.rank - self.comm.size/2)
+        self.flambda = 1e5 * pow(10, self.comm.rank - self.comm.size//2)
+
+
+        data = cp.array(slices_.flatten())
+        weights = cp.ones(self.N)
+        self.nuvect_Db = (data * weights).astype(cp.complex128)
+        self.nuvect = cp.ones_like(data, dtype=cp.complex128)
+
+        def callback(xk):
+            callback.counter += 1
+
+        self.callback = callback
+        self.callback.counter = 0
+
+        lu = np.linspace(-np.pi, np.pi, self.M)
+        Hu_, Ku_, Lu_ = np.meshgrid(lu, lu, lu, indexing='ij')
+        Qu_ = np.sqrt(Hu_**2 + Ku_**2 + Lu_**2)
+        F_antisupport = Qu_ > np.pi / settings.oversampling
+        assert np.all(F_antisupport == F_antisupport[::-1, :, :])
+        assert np.all(F_antisupport == F_antisupport[:, ::-1, :])
+        assert np.all(F_antisupport == F_antisupport[:, :, ::-1])
+        assert np.all(F_antisupport == F_antisupport[::-1, ::-1, ::-1])
+        self.F_antisupport = cp.array(F_antisupport)
+
+    @staticmethod
+    @nvtx.annotate("sequential/autocorrelation.py::modified", is_prefix=True)
+    def gpuarray_from_cupy(arr):
+        """
+        Convert from GPUarray(pycuda) to cupy. The conversion is zero-cost.
+        :param arr
+        :return arr
+        """
+        assert isinstance(arr, cp.ndarray)
+        shape = arr.shape
+        dtype = arr.dtype
+
+        def alloc(x):
+            return arr.data.ptr
+
+        if arr.flags.c_contiguous:
+            order = 'C'
+        elif arr.flags.f_contiguous:
+            order = 'F'
+        else:
+            raise ValueError('arr order cannot be determined')
+        return gpuarray.GPUArray(shape=shape,
+                                 dtype=dtype,
+                                 allocator=alloc,
+                                 order=order)
+
+    @staticmethod
+    @nvtx.annotate("sequential/autocorrelation.py::modified", is_prefix=True)
+    def gpuarray_to_cupy(arr):
+        """
+        Convert from cupy to GPUarray(pycuda). The conversion is zero-cost.
+        :param arr
+        :return arr
+        """
+        assert isinstance(arr, gpuarray.GPUArray)
+        return cp.asarray(arr)
+
+    @staticmethod
+    @nvtx.annotate("sequential/autocorrelation.py::modified", is_prefix=True)
+    def transpose(x, y, z):
+        """Transposes the order of the (x, y, z) coordinates to (z, y, x)"""
+        return z, y, x
+
+    @nvtx.annotate("sequential/autocorrelation.py::modified", is_prefix=True)
+    def get_non_uniform_positions(self, orientations):
+        if orientations.shape[0] > 0:
+            rotmat = np.array([np.linalg.inv(skp.quaternion2rot3d(quat))
+                              for quat in orientations])
+        else:
+            rotmat = np.zeros((0, 3, 3))
+            print(
+                "WARNING: gen_nonuniform_positions got empty orientation - returning h,k,l for Null rotation")
+
+# TODO : How to ensure we support all formats of pixel_position reciprocal
+# Current support shape is(3, N_panels, Dim_x, Dim_y)
+        if not hasattr(self, "einsum_path"):
+            self.einsum_path = np.einsum_path("ijk,klmn->jilmn", rotmat,
+                            self.pixel_position_reciprocal, optimize="optimal")[0]
+        H, K, L = np.einsum("ijk,klmn->jilmn", rotmat,
+                            self.pixel_position_reciprocal, optimize=self.einsum_path) 
+#H, K, L = np.einsum("ijk,klm->jilm", rotmat, pixel_position_reciprocal)
+# shape->[N_images] x det_shape
+        return H* self.mult, K* self.mult, L* self.mult
+
+    @nvtx.annotate("sequential/autocorrelation.py::modified", is_prefix=True)
+    def adjoint(self, nuvect, H_, K_, L_, support, M):
+        assert H_.shape == K_.shape == L_.shape
+        dev_id = cp.cuda.device.Device().id
+        complex_dtype = cp.complex128
+        dtype = cp.float64
+
+        H_, K_, L_ = self.transpose(H_, K_, L_)
+        shape = (M, M, M)
+# TODO convert to GPUarray
+        nuvect_ga = self.gpuarray_from_cupy(nuvect)
+
+        ugrid = gpuarray.GPUArray(shape=shape, dtype=complex_dtype, order="F")
+        H_ = gpuarray.to_gpu(H_)
+        K_ = gpuarray.to_gpu(K_)
+        L_ = gpuarray.to_gpu(L_)
+        if not hasattr(self, "plan"):
+            self.plan = {}
+        if not shape in self.plan:
+            self.plan[shape] = cufinufft(
+                1,
+                shape,
+                1,
+                self.eps,
+                isign=self.sign,
+                dtype=dtype,
+                gpu_method=1,
+                gpu_device_id=dev_id)
+        self.plan[shape].set_pts(H_, K_, L_)
+        self.plan[shape].execute(nuvect_ga, ugrid)
+        ugrid_gpu = self.gpuarray_to_cupy(ugrid)
+        ugrid_gpu *= support
+        if self.use_reciprocal_symmetry:
+            ugrid_gpu = ugrid_gpu.real
+        ugrid_gpu /= M**3
+        return ugrid_gpu
+
+    @nvtx.annotate("sequential/autocorrelation.py::modified", is_prefix=True)
+    def fourier_reg(self, uvect, support):
+        ugrid = uvect.reshape((self.M,) * 3) * support
+        if self.use_reciprocal_symmetry:
+            assert cp.all(cp.isreal(ugrid))
+
+        F_ugrid = cp.fft.fftn(cp.fft.ifftshift(ugrid))  # / M**3
+        F_reg = F_ugrid * cp.fft.ifftshift(self.F_antisupport)
+        reg = cp.fft.fftshift(cp.fft.ifftn(F_reg))
+        uvect = (reg * support).flatten()
+        if self.use_reciprocal_symmetry:
+            uvect = uvect.real
+
         return uvect
 
-    W = LinearOperator(
-        dtype=np.complex64,
-        shape=(Mtot, Mtot),
-        matvec=W_matvec)
+    def core_problem_convolution(self, uvect, F_ugrid_conv_, ac_support):
+        if self.use_reciprocal_symmetry:
+            assert cp.all(cp.isreal(uvect))
+        ugrid = uvect.reshape((self.M,) * 3) * ac_support
+        ugrid_ups = cp.zeros((self.M_ups,) * 3, dtype=uvect.dtype)
+        ugrid_ups[:self.M, :self.M, :self.M] = ugrid
+        # Convolution = Fourier multiplication
+        F_ugrid_ups = cp.fft.fftn(cp.fft.ifftshift(ugrid_ups))
+        F_ugrid_conv_out_ups = F_ugrid_ups * F_ugrid_conv_
+        ugrid_conv_out_ups = cp.fft.fftshift(
+            cp.fft.ifftn(F_ugrid_conv_out_ups))
+        # Downsample
+        ugrid_conv_out = ugrid_conv_out_ups[:self.M, :self.M, :self.M]
+        ugrid_conv_out *= ac_support
+        if self.use_reciprocal_symmetry:
+            # Both ugrid_conv and ugrid are real, so their convolution
+            # should be real, but numerical errors accumulate in the
+            # imaginary part.
+            ugrid_conv_out = ugrid_conv_out.real
+        return ugrid_conv_out.flatten()
 
-    nuvect_Db = data * weights
-    uvect_ADb = autocorrelation.adjoint(
-        nuvect_Db, H_, K_, L_, M, support=ac_support,
-        use_recip_sym=use_reciprocal_symmetry).flatten()
+    @nvtx.annotate("sequential/autocorrelation.py::modified", is_prefix=True)
+    def setup_linops(self, H, K, L, ac_support, x0):
+        H_ = H.reshape(-1)
+        K_ = K.reshape(-1)
+        L_ = L.reshape(-1)
+
+        ugrid_conv = self.adjoint(self.nuvect, H_, K_, L_, 1, self.M_ups)
+
+        F_ugrid_conv_ = cp.fft.fftn(
+            cp.fft.ifftshift(ugrid_conv))/self.M**3
+
+        def W_matvec(uvect):
+            """Define W part of the W @ x = d problem."""
+            uvect_ADA = self.core_problem_convolution(
+                uvect, F_ugrid_conv_, ac_support)
+            uvect_FDF = self.fourier_reg(uvect, ac_support)
+            uvect = uvect_ADA + self.rlambda * uvect + self.flambda * uvect_FDF
+            return uvect
+
+        W = LinearOperator(
+            dtype=np.complex64,
+            shape=(self.M**3, self.M**3),
+            matvec=W_matvec)
     
-    #uvect_ADb = reduce_bcast(comm, uvect_ADb)
+        uvect_ADb = self.adjoint(
+            self.nuvect_Db, H_, K_, L_, ac_support, self.M).flatten()
+        d = uvect_ADb + self.rlambda * x0
 
-    if np.sum(np.isnan(uvect_ADb)) > 0:
-        print("Warning: nans in the adjoint calculation; intensities may be too large", flush=True)    
+        return W, d
 
-    d = alambda*uvect_ADb + rlambda*x0
-  
-    return W, d
+    @nvtx.annotate("sequential/autocorrelation.py::modified", is_prefix=True)
+    def solve_ac(self, generation, orientations = None, ac_estimate = None):
+        # ac_estimate is modified in place and hence its value changes for each run
+        if orientations is None:
+            orientations = skp.get_random_quat(self.N_images)
 
-@nvtx.annotate("mpi/autocorrelation.py", is_prefix=True)
-def solve_ac(generation,
-             pixel_position_reciprocal,
-             pixel_distance_reciprocal,
-             slices_,
-             orientations=None,
-             ac_estimate=None):
-    comm = MPI.COMM_WORLD
-
-    M = settings.M
-    Mtot = M**3
-    N_images = slices_.shape[0] # N images per rank
-    N = np.prod(slices_.shape) # N images per rank x number of pixels per image = number of pixels per rank
-    reciprocal_extent = pixel_distance_reciprocal.max()
-    use_reciprocal_symmetry = True
-    ref_rank = -1 
-
-    # Generate random orientations in SO(3)
-    if orientations is None:
-        orientations = skp.get_random_quat(N_images)
-    # Calculate hkl based on orientations
-    H, K, L = autocorrelation.gen_nonuniform_positions(
-        orientations, pixel_position_reciprocal)
-
-    data = slices_.flatten().astype(np.float32)
-    
-    # Set up ac
-    if ac_estimate is None:
-        ac_support = np.ones((M,)*3)
-        ac_estimate = np.zeros((M,)*3)
-    else:
-        ac_smoothed = gaussian_filter(ac_estimate, 0.5)
-        ac_support = (ac_smoothed > 1e-12).astype(np.float)
-        ac_estimate *= ac_support
-
-    weights = np.ones(N).astype(np.float32)
-    
-    # Use scalable heuristic for regularization lambda
-    alambda = 1
-    rlambda = Mtot/N * 2 **(comm.rank - comm.size/2)
-    flambda = 1e5 * pow(10, comm.rank - comm.size//2)
-    maxiter = 100
-
-    # Log central slice L~=0
-    if comm.rank == (2 if settings.use_psana else 0):
-        idx = np.abs(L) < reciprocal_extent * .01
-        plt.scatter(H[idx], K[idx], c=slices_[idx], s=1, norm=LogNorm())
-        plt.axis('equal')
-        plt.colorbar()
-        plt.savefig(settings.out_dir / f"star_{generation}.png")
-        plt.cla()
-        plt.clf()
-
-    def callback(xk):
-        callback.counter += 1
-    callback.counter = 0 # counts no. of iterations of conjugate gradient
-
-    x0 = ac_estimate.flatten()
-
-    W, d = setup_linops(comm, H, K, L, data,
-                        ac_support, weights, x0,
-                        M, Mtot, N, reciprocal_extent,
-                        alambda, rlambda, flambda,
-                        use_reciprocal_symmetry)
-    
-    ret, info = cg(W, d, x0=x0, maxiter=maxiter, callback=callback)
-
-    if info != 0:
-        print(f'WARNING: CG did not converge at rlambda = {rlambda}')
-
-    v1 = norm(ret)
-    v2 = norm(W*ret-d)
-
-    # Rank0 gathers rlambda, solution norm, residual norm from all ranks
-    summary = comm.gather((comm.rank, rlambda, v1, v2), root=0)
-    print('summary =', summary)
-    if comm.rank == 0:
-        ranks, lambdas, v1s, v2s = [np.array(el) for el in zip(*summary)]
-        
-        if generation == 0:
-            idx = v1s >= np.mean(v1s)
-            imax = np.argmax(lambdas[idx])
-            iref = np.arange(len(ranks), dtype=int)[idx][imax]
+        H, K, L = self.get_non_uniform_positions(orientations)
+        if ac_estimate is None:
+            ac_support = np.ones((self.M,) * 3)
+            ac_estimate = np.zeros((self.M,) * 3)
         else:
-            iref = np.argmin(v1s+v2s)
-        ref_rank = ranks[iref]
-        print(f"Keeping result from rank {ref_rank}: v1={v1s[iref]} and v2={v2s[iref]}", flush=True)
-    else:
+            ac_smoothed = gaussian_filter(ac_estimate, 0.5)
+            ac_support = (ac_smoothed > 1e-12).astype(np.float)
+            ac_estimate *= ac_support
+
+        if self.comm.rank == (2 if self.use_psana else 0):
+            idx = np.abs(L) < self.reciprocal_extent * .01
+            plt.scatter(H[idx], K[idx], c=self.slices_[idx], s=1, norm=LogNorm())
+            plt.axis('equal')
+            plt.colorbar()
+            plt.savefig(self.out_dir / f"star_{generation}.png")
+            plt.cla()
+            plt.clf()
+
         ref_rank = -1
-    ref_rank = comm.bcast(ref_rank, root=0)
+        ac_estimate = cp.array(ac_estimate)
+        ac_support = cp.array(ac_support)
+        x0 = ac_estimate.reshape(-1)
 
-    ac = ret.reshape((M,)*3)
-    if use_reciprocal_symmetry:
-        assert np.all(np.isreal(ac))
-    ac = np.ascontiguousarray(ac.real)
-   
-    # Log autocorrelation volume
-    image.show_volume(ac, settings.Mquat, f"autocorrelation_{generation}_{comm.rank}.png") 
+        W, d = self.setup_linops(H, K, L, ac_support, x0)
+        ret, info = cg(W, d, x0=x0, maxiter=self.maxiter,
+                       callback=self.callback)
 
-    print(f"Rank {comm.rank} got AC in {callback.counter} iterations.", flush=True)
-    comm.Bcast(ac, root=ref_rank)
-    return ac
+        if info != 0:
+            print(f'WARNING: CG did not converge at rlambda = {self.rlambda}')
 
+        v1 = norm(ret).get()
+        v2 = norm(W*ret-d).get()
+
+        # Rank0 gathers rlambda, solution norm, residual norm from all ranks
+        summary = self.comm.gather((self.comm.rank, self.rlambda, v1, v2), root=0)
+        print('summary =', summary)
+        if self.comm.rank == 0:
+            ranks, lambdas, v1s, v2s = [np.array(el) for el in zip(*summary)]
+            
+            if generation == 0:
+                idx = v1s >= np.mean(v1s)
+                imax = np.argmax(lambdas[idx])
+                iref = np.arange(len(ranks), dtype=int)[idx][imax]
+            else:
+                iref = np.argmin(v1s+v2s)
+            ref_rank = ranks[iref]
+            print(f"Keeping result from rank {ref_rank}: v1={v1s[iref]} and v2={v2s[iref]}", flush=True)
+        else:
+            ref_rank = -1
+        ref_rank = self.comm.bcast(ref_rank, root=0)
+
+        ac = ret.reshape((self.M,) * 3).get()
+        if self.use_reciprocal_symmetry:
+            assert np.all(np.isreal(ac))
+        ac = np.ascontiguousarray(ac.real)
+        image.show_volume(ac, self.Mquat, f"autocorrelation_{generation}_{self.comm.rank}.png") 
+        print(f"Rank {self.comm.rank} got AC in {self.callback.counter} iterations.", flush=True)
+        self.comm.Bcast(ac, root=ref_rank)
+
+        return ac
