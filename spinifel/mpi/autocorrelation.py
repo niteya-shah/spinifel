@@ -21,7 +21,7 @@ import PyNVTX as nvtx
 from cufinufft import cufinufft
 
 from cupyx.scipy.sparse.linalg import LinearOperator, cg
-from cupyx.scipy.linalg import norm
+from cupy.linalg import norm
 
 import cupy as cp
 from scipy.ndimage import gaussian_filter
@@ -42,8 +42,9 @@ class MergeMPI(Merge):
         self.out_dir = settings.out_dir
 
         self.slices_ = slices_
-
+        self.Mquat = settings.Mquat 
         self.alambda = 1
+        self.Mtot = self.M ** 3
         self.rlambda = self.Mtot/self.N * 2 **(self.comm.rank - self.comm.size/2)
         self.flambda = 1e5 * pow(10, self.comm.rank - self.comm.size//2)
 
