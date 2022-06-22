@@ -7,7 +7,7 @@ import PyNVTX as nvtx
 from .prep import get_data
 from .phasing import phase
 from spinifel.sequential.orientation_matching import SNM
-from spinifel.sequential.autocorrelation import Merge
+from .autocorrelation import MergeMPI
 
 
 
@@ -64,7 +64,7 @@ def main():
     # Generation 0: solve_ac and phase
     N_generations = settings.N_generations
 
-    mg = Merge(settings, slices_, pixel_position_reciprocal, pixel_distance_reciprocal)
+    mg = MergeMPI(settings, slices_, pixel_position_reciprocal, pixel_distance_reciprocal)
     snm = SNM(settings, slices_, pixel_position_reciprocal, pixel_distance_reciprocal)
 
     if settings.load_gen > 0: # Load input from previous generation

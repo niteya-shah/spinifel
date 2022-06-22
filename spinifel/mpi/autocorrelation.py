@@ -26,8 +26,9 @@ from cupyx.scipy.linalg import norm
 import cupy as cp
 from scipy.ndimage import gaussian_filter
 import numpy as np
+from spinifel.sequential.autocorrelation import Merge
 
-class Merge:
+class MergeMPI(Merge):
 
     def __init__(
             self,
@@ -35,220 +36,16 @@ class Merge:
             slices_,
             pixel_position_reciprocal,
             pixel_distance_reciprocal):
+        super().__init__(settings, slices_, pixel_position_reciprocal, pixel_distance_reciprocal)
         self.comm = MPI.COMM_WORLD
-
-        self.M = settings.M
-        self.Mtot = self.M ** 3
         self.use_psana = settings.use_psana
         self.out_dir = settings.out_dir
 
-        self.maxiter = settings.solve_ac_maxiter
-        self.oversampling = settings.oversampling
-        self.M_ups = settings.M_ups
-
-        self.sign = 1
-        self.eps = 1e-12
-
-        self.N = np.prod(slices_.shape)
-        self.reciprocal_extent = pixel_distance_reciprocal.max()
-        self.pixel_position_reciprocal = np.array(pixel_position_reciprocal)
-        self.mult = np.pi / (self.reciprocal_extent * settings.oversampling)
-        self.N_images = slices_.shape[0]
-        self.use_reciprocal_symmetry = True
         self.slices_ = slices_
 
         self.alambda = 1
         self.rlambda = self.Mtot/self.N * 2 **(self.comm.rank - self.comm.size/2)
         self.flambda = 1e5 * pow(10, self.comm.rank - self.comm.size//2)
-
-
-        data = cp.array(slices_.flatten())
-        weights = cp.ones(self.N)
-        self.nuvect_Db = (data * weights).astype(cp.complex128)
-        self.nuvect = cp.ones_like(data, dtype=cp.complex128)
-
-        def callback(xk):
-            callback.counter += 1
-
-        self.callback = callback
-        self.callback.counter = 0
-
-        lu = np.linspace(-np.pi, np.pi, self.M)
-        Hu_, Ku_, Lu_ = np.meshgrid(lu, lu, lu, indexing='ij')
-        Qu_ = np.sqrt(Hu_**2 + Ku_**2 + Lu_**2)
-        F_antisupport = Qu_ > np.pi / settings.oversampling
-        assert np.all(F_antisupport == F_antisupport[::-1, :, :])
-        assert np.all(F_antisupport == F_antisupport[:, ::-1, :])
-        assert np.all(F_antisupport == F_antisupport[:, :, ::-1])
-        assert np.all(F_antisupport == F_antisupport[::-1, ::-1, ::-1])
-        self.F_antisupport = cp.array(F_antisupport)
-
-    @staticmethod
-    @nvtx.annotate("sequential/autocorrelation.py::modified", is_prefix=True)
-    def gpuarray_from_cupy(arr):
-        """
-        Convert from GPUarray(pycuda) to cupy. The conversion is zero-cost.
-        :param arr
-        :return arr
-        """
-        assert isinstance(arr, cp.ndarray)
-        shape = arr.shape
-        dtype = arr.dtype
-
-        def alloc(x):
-            return arr.data.ptr
-
-        if arr.flags.c_contiguous:
-            order = 'C'
-        elif arr.flags.f_contiguous:
-            order = 'F'
-        else:
-            raise ValueError('arr order cannot be determined')
-        return gpuarray.GPUArray(shape=shape,
-                                 dtype=dtype,
-                                 allocator=alloc,
-                                 order=order)
-
-    @staticmethod
-    @nvtx.annotate("sequential/autocorrelation.py::modified", is_prefix=True)
-    def gpuarray_to_cupy(arr):
-        """
-        Convert from cupy to GPUarray(pycuda). The conversion is zero-cost.
-        :param arr
-        :return arr
-        """
-        assert isinstance(arr, gpuarray.GPUArray)
-        return cp.asarray(arr)
-
-    @staticmethod
-    @nvtx.annotate("sequential/autocorrelation.py::modified", is_prefix=True)
-    def transpose(x, y, z):
-        """Transposes the order of the (x, y, z) coordinates to (z, y, x)"""
-        return z, y, x
-
-    @nvtx.annotate("sequential/autocorrelation.py::modified", is_prefix=True)
-    def get_non_uniform_positions(self, orientations):
-        if orientations.shape[0] > 0:
-            rotmat = np.array([np.linalg.inv(skp.quaternion2rot3d(quat))
-                              for quat in orientations])
-        else:
-            rotmat = np.zeros((0, 3, 3))
-            print(
-                "WARNING: gen_nonuniform_positions got empty orientation - returning h,k,l for Null rotation")
-
-# TODO : How to ensure we support all formats of pixel_position reciprocal
-# Current support shape is(3, N_panels, Dim_x, Dim_y)
-        if not hasattr(self, "einsum_path"):
-            self.einsum_path = np.einsum_path("ijk,klmn->jilmn", rotmat,
-                            self.pixel_position_reciprocal, optimize="optimal")[0]
-        H, K, L = np.einsum("ijk,klmn->jilmn", rotmat,
-                            self.pixel_position_reciprocal, optimize=self.einsum_path) 
-#H, K, L = np.einsum("ijk,klm->jilm", rotmat, pixel_position_reciprocal)
-# shape->[N_images] x det_shape
-        return H* self.mult, K* self.mult, L* self.mult
-
-    @nvtx.annotate("sequential/autocorrelation.py::modified", is_prefix=True)
-    def adjoint(self, nuvect, H_, K_, L_, support, M):
-        assert H_.shape == K_.shape == L_.shape
-        dev_id = cp.cuda.device.Device().id
-        complex_dtype = cp.complex128
-        dtype = cp.float64
-
-        H_, K_, L_ = self.transpose(H_, K_, L_)
-        shape = (M, M, M)
-# TODO convert to GPUarray
-        nuvect_ga = self.gpuarray_from_cupy(nuvect)
-
-        ugrid = gpuarray.GPUArray(shape=shape, dtype=complex_dtype, order="F")
-        H_ = gpuarray.to_gpu(H_)
-        K_ = gpuarray.to_gpu(K_)
-        L_ = gpuarray.to_gpu(L_)
-        if not hasattr(self, "plan"):
-            self.plan = {}
-        if not shape in self.plan:
-            self.plan[shape] = cufinufft(
-                1,
-                shape,
-                1,
-                self.eps,
-                isign=self.sign,
-                dtype=dtype,
-                gpu_method=1,
-                gpu_device_id=dev_id)
-        self.plan[shape].set_pts(H_, K_, L_)
-        self.plan[shape].execute(nuvect_ga, ugrid)
-        ugrid_gpu = self.gpuarray_to_cupy(ugrid)
-        ugrid_gpu *= support
-        if self.use_reciprocal_symmetry:
-            ugrid_gpu = ugrid_gpu.real
-        ugrid_gpu /= M**3
-        return ugrid_gpu
-
-    @nvtx.annotate("sequential/autocorrelation.py::modified", is_prefix=True)
-    def fourier_reg(self, uvect, support):
-        ugrid = uvect.reshape((self.M,) * 3) * support
-        if self.use_reciprocal_symmetry:
-            assert cp.all(cp.isreal(ugrid))
-
-        F_ugrid = cp.fft.fftn(cp.fft.ifftshift(ugrid))  # / M**3
-        F_reg = F_ugrid * cp.fft.ifftshift(self.F_antisupport)
-        reg = cp.fft.fftshift(cp.fft.ifftn(F_reg))
-        uvect = (reg * support).flatten()
-        if self.use_reciprocal_symmetry:
-            uvect = uvect.real
-
-        return uvect
-
-    def core_problem_convolution(self, uvect, F_ugrid_conv_, ac_support):
-        if self.use_reciprocal_symmetry:
-            assert cp.all(cp.isreal(uvect))
-        ugrid = uvect.reshape((self.M,) * 3) * ac_support
-        ugrid_ups = cp.zeros((self.M_ups,) * 3, dtype=uvect.dtype)
-        ugrid_ups[:self.M, :self.M, :self.M] = ugrid
-        # Convolution = Fourier multiplication
-        F_ugrid_ups = cp.fft.fftn(cp.fft.ifftshift(ugrid_ups))
-        F_ugrid_conv_out_ups = F_ugrid_ups * F_ugrid_conv_
-        ugrid_conv_out_ups = cp.fft.fftshift(
-            cp.fft.ifftn(F_ugrid_conv_out_ups))
-        # Downsample
-        ugrid_conv_out = ugrid_conv_out_ups[:self.M, :self.M, :self.M]
-        ugrid_conv_out *= ac_support
-        if self.use_reciprocal_symmetry:
-            # Both ugrid_conv and ugrid are real, so their convolution
-            # should be real, but numerical errors accumulate in the
-            # imaginary part.
-            ugrid_conv_out = ugrid_conv_out.real
-        return ugrid_conv_out.flatten()
-
-    @nvtx.annotate("sequential/autocorrelation.py::modified", is_prefix=True)
-    def setup_linops(self, H, K, L, ac_support, x0):
-        H_ = H.reshape(-1)
-        K_ = K.reshape(-1)
-        L_ = L.reshape(-1)
-
-        ugrid_conv = self.adjoint(self.nuvect, H_, K_, L_, 1, self.M_ups)
-
-        F_ugrid_conv_ = cp.fft.fftn(
-            cp.fft.ifftshift(ugrid_conv))/self.M**3
-
-        def W_matvec(uvect):
-            """Define W part of the W @ x = d problem."""
-            uvect_ADA = self.core_problem_convolution(
-                uvect, F_ugrid_conv_, ac_support)
-            uvect_FDF = self.fourier_reg(uvect, ac_support)
-            uvect = uvect_ADA + self.rlambda * uvect + self.flambda * uvect_FDF
-            return uvect
-
-        W = LinearOperator(
-            dtype=np.complex64,
-            shape=(self.M**3, self.M**3),
-            matvec=W_matvec)
-    
-        uvect_ADb = self.adjoint(
-            self.nuvect_Db, H_, K_, L_, ac_support, self.M).flatten()
-        d = uvect_ADb + self.rlambda * x0
-
-        return W, d
 
     @nvtx.annotate("sequential/autocorrelation.py::modified", is_prefix=True)
     def solve_ac(self, generation, orientations = None, ac_estimate = None):

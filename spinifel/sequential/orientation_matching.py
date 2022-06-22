@@ -44,6 +44,10 @@ class SNM:
         self.reciprocal_extent = pixel_distance_reciprocal.max()
         self.pixel_position_reciprocal_gpu = np.array(pixel_position_reciprocal)
         self.mult = (np.pi / (self.oversampling * self.reciprocal_extent))
+        self.HKL_mat = pycuda.driver.pagelocked_empty((self.ref_rotmat.shape[1],self.ref_rotmat.shape[0],*pixel_position_reciprocal.shape[1:]), self.ref_rotmat.dtype)
+        np.einsum("ijk,klmn->jilmn", self.ref_rotmat, self.pixel_position_reciprocal_gpu, optimize='greedy', out=self.HKL_mat)
+        self.HKL_mat *= self.mult
+
         self.slices_ = cp.array(slices_.reshape((self.N_slices, self.N_pixels)), dtype=cp.float64)
         self.slices_2 = cp.square(self.slices_).sum(axis=1)
         self.slices_std = self.slices_.std()
@@ -173,12 +177,9 @@ class SNM:
             st_m = i * self.N_batch_size
             en_m = st_m + self.N_batch_size
             #Question are H,K,L constant? Can we precalculate them and then store them?
-            if not hasattr(self, "einsum_path"):
-                self.einsum_path = np.einsum_path("ijk,klmn->jilmn", self.ref_rotmat[st:en], self.pixel_position_reciprocal_gpu, optimize='optimal')[0] 
-            H, K, L = np.einsum("ijk,klmn->jilmn", self.ref_rotmat[st:en], self.pixel_position_reciprocal_gpu, optimize=self.einsum_path) 
-            H_ = H.reshape(-1) * self.mult
-            K_ = K.reshape(-1) * self.mult
-            L_ = L.reshape(-1) * self.mult
+            H_ = self.HKL_mat[0,st:en,:].reshape(-1)
+            K_ = self.HKL_mat[1,st:en,:].reshape(-1)
+            L_ = self.HKL_mat[2,st:en,:].reshape(-1)
             forward_result = self.forward(ugrid_gpu, H_,K_,L_, 1, self.reciprocal_extent, N_batch)
             data_images = self.gpuarray_to_cupy(forward_result).real.reshape(self.N_batch_size, -1)
             del forward_result
