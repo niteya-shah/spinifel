@@ -55,7 +55,7 @@ class Merge:
         self.flambda = 1e3
 
         data = np.array(slices_.reshape(-1), dtype=cp.complex128)
-        weights = cp.ones(self.N)
+        weights = np.ones(self.N)
         self.nuvect_Db = cp.array((data * weights).astype(np.complex128))
         self.nuvect = cp.ones_like(data, dtype=cp.complex128)
 
@@ -241,7 +241,7 @@ class Merge:
             return uvect
 
         W = LinearOperator(
-            dtype=np.complex64,
+            dtype=np.complex128,
             shape=(self.M**3, self.M**3),
             matvec=W_matvec)
     
