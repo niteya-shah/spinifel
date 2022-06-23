@@ -36,6 +36,11 @@ class Merge:
             pixel_position_reciprocal,
             pixel_distance_reciprocal):
         self.M = settings.M
+        self.N_images = slices_.shape[0]
+        self.N = np.prod(slices_.shape)
+        self.reciprocal_extent = pixel_distance_reciprocal.max()
+        self.use_reciprocal_symmetry = True
+
         self.maxiter = settings.solve_ac_maxiter
         self.oversampling = settings.oversampling
         self.M_ups = settings.M_ups
@@ -43,19 +48,15 @@ class Merge:
         self.sign = 1
         self.eps = 1e-12
 
-        self.N = np.prod(slices_.shape)
-        self.reciprocal_extent = pixel_distance_reciprocal.max()
         self.pixel_position_reciprocal = np.array(pixel_position_reciprocal)
         self.mult = np.pi / (self.reciprocal_extent * settings.oversampling)
-        self.N_images = slices_.shape[0]
 
-        self.use_reciprocal_symmetry = True
         self.rlambda = 1 / self.N / 1000
         self.flambda = 1e3
 
-        data = cp.array(slices_.flatten())
+        data = np.array(slices_.reshape(-1), dtype=cp.complex128)
         weights = cp.ones(self.N)
-        self.nuvect_Db = (data * weights).astype(cp.complex128)
+        self.nuvect_Db = cp.array((data * weights).astype(np.complex128))
         self.nuvect = cp.ones_like(data, dtype=cp.complex128)
 
         def callback(xk):
@@ -63,6 +64,14 @@ class Merge:
 
         self.callback = callback
         self.callback.counter = 0
+
+        reduced_det_shape = settings.reduced_det_shape
+        self.N_pixels = np.prod(reduced_det_shape)
+
+        self.H_ = gpuarray.empty(shape=(self.N_pixels * self.N_images,), dtype=np.float64)
+        self.K_ = gpuarray.empty(shape=(self.N_pixels * self.N_images,), dtype=np.float64)
+        self.L_ = gpuarray.empty(shape=(self.N_pixels * self.N_images,), dtype=np.float64)
+
 
         lu = np.linspace(-np.pi, np.pi, self.M)
         Hu_, Ku_, Lu_ = np.meshgrid(lu, lu, lu, indexing='ij')
@@ -73,6 +82,7 @@ class Merge:
         assert np.all(F_antisupport == F_antisupport[:, :, ::-1])
         assert np.all(F_antisupport == F_antisupport[::-1, ::-1, ::-1])
         self.F_antisupport = cp.array(F_antisupport)
+
 
     @staticmethod
     @nvtx.annotate("sequential/autocorrelation.py::modified", is_prefix=True)
@@ -136,7 +146,7 @@ class Merge:
                             self.pixel_position_reciprocal, optimize=self.einsum_path) 
 #H, K, L = np.einsum("ijk,klm->jilm", rotmat, pixel_position_reciprocal)
 # shape->[N_images] x det_shape
-        return H* self.mult, K* self.mult, L* self.mult
+        return H, K, L
 
     @nvtx.annotate("sequential/autocorrelation.py::modified", is_prefix=True)
     def adjoint(self, nuvect, H_, K_, L_, support, M):
@@ -151,9 +161,9 @@ class Merge:
         nuvect_ga = self.gpuarray_from_cupy(nuvect)
 
         ugrid = gpuarray.GPUArray(shape=shape, dtype=complex_dtype, order="F")
-        H_ = gpuarray.to_gpu(H_)
-        K_ = gpuarray.to_gpu(K_)
-        L_ = gpuarray.to_gpu(L_)
+        self.H_.set(H_)
+        self.K_.set(K_)
+        self.L_.set(L_)
         if not hasattr(self, "plan"):
             self.plan = {}
         if not shape in self.plan:
@@ -166,7 +176,7 @@ class Merge:
                 dtype=dtype,
                 gpu_method=1,
                 gpu_device_id=dev_id)
-        self.plan[shape].set_pts(H_, K_, L_)
+        self.plan[shape].set_pts(self.H_, self.K_, self.L_)
         self.plan[shape].execute(nuvect_ga, ugrid)
         ugrid_gpu = self.gpuarray_to_cupy(ugrid)
         ugrid_gpu *= support
@@ -184,7 +194,7 @@ class Merge:
         F_ugrid = cp.fft.fftn(cp.fft.ifftshift(ugrid))  # / M**3
         F_reg = F_ugrid * cp.fft.ifftshift(self.F_antisupport)
         reg = cp.fft.fftshift(cp.fft.ifftn(F_reg))
-        uvect = (reg * support).flatten()
+        uvect = (reg * support).reshape(-1)
         if self.use_reciprocal_symmetry:
             uvect = uvect.real
 
@@ -209,13 +219,13 @@ class Merge:
             # should be real, but numerical errors accumulate in the
             # imaginary part.
             ugrid_conv_out = ugrid_conv_out.real
-        return ugrid_conv_out.flatten()
+        return ugrid_conv_out.reshape(-1)
 
     @nvtx.annotate("sequential/autocorrelation.py::modified", is_prefix=True)
     def setup_linops(self, H, K, L, ac_support, x0):
-        H_ = H.reshape(-1)
-        K_ = K.reshape(-1)
-        L_ = L.reshape(-1)
+        H_ = H.reshape(-1) * self.mult
+        K_ = K.reshape(-1) * self.mult
+        L_ = L.reshape(-1) * self.mult
 
         ugrid_conv = self.adjoint(self.nuvect, H_, K_, L_, 1, self.M_ups)
 

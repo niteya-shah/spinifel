@@ -42,13 +42,61 @@ class MergeMPI(Merge):
         self.out_dir = settings.out_dir
 
         self.slices_ = slices_
-        self.Mquat = settings.Mquat 
+        self.Mquat = settings.Mquat
+        self.M_ups = self.M * 2
         self.alambda = 1
         self.Mtot = self.M ** 3
         self.rlambda = self.Mtot/self.N * 2 **(self.comm.rank - self.comm.size/2)
         self.flambda = 1e5 * pow(10, self.comm.rank - self.comm.size//2)
+        self.ref_rank = -1
+        self.mult = np.pi / (self.reciprocal_extent)
 
-    @nvtx.annotate("sequential/autocorrelation.py::modified", is_prefix=True)
+        lu = np.linspace(-np.pi, np.pi, self.M)
+        Hu_, Ku_, Lu_ = np.meshgrid(lu, lu, lu, indexing='ij')
+
+        Qu_ = np.around(np.sqrt(Hu_**2 + Ku_**2 + Lu_**2), 4)
+        F_antisupport = Qu_ > np.pi 
+
+        assert np.all(F_antisupport == F_antisupport[::-1, :, :])
+        assert np.all(F_antisupport == F_antisupport[:, ::-1, :])
+        assert np.all(F_antisupport == F_antisupport[:, :, ::-1])
+        assert np.all(F_antisupport == F_antisupport[::-1, ::-1, ::-1])
+        self.F_antisupport = cp.array(F_antisupport)
+
+    @nvtx.annotate("mpi/autocorrelation.py::modified", is_prefix=True)
+    def setup_linops(self, H, K, L, ac_support, x0):
+        H_ = H.reshape(-1) * self.mult
+        K_ = K.reshape(-1) * self.mult
+        L_ = L.reshape(-1) * self.mult
+
+        ugrid_conv = self.adjoint(self.nuvect, H_, K_, L_, 1, self.M_ups)
+
+        F_ugrid_conv_ = cp.fft.fftn(
+            cp.fft.ifftshift(ugrid_conv))
+
+        def W_matvec(uvect):
+            """Define W part of the W @ x = d problem."""
+            uvect_ADA = self.core_problem_convolution(
+                uvect, F_ugrid_conv_, ac_support)
+            uvect_FDF = self.fourier_reg(uvect, ac_support)
+            uvect = self.alambda*uvect_ADA + self.rlambda*uvect + self.flambda*uvect_FDF
+
+            return uvect
+
+        W = LinearOperator(
+            dtype=np.complex128,
+            shape=(self.Mtot, self.Mtot),
+            matvec=W_matvec)
+    
+        uvect_ADb = self.adjoint(
+            self.nuvect_Db, H_, K_, L_, ac_support, self.M).reshape(-1)
+        if cp.sum(cp.isnan(uvect_ADb)) > 0:
+            print("Warning: nans in the adjoint calculation; intensities may be too large", flush=True) 
+        d = self.alambda * uvect_ADb + self.rlambda * x0
+
+        return W, d
+
+    @nvtx.annotate("mpi/autocorrelation.py::modified", is_prefix=True)
     def solve_ac(self, generation, orientations = None, ac_estimate = None):
         # ac_estimate is modified in place and hence its value changes for each run
         if orientations is None:
@@ -60,19 +108,19 @@ class MergeMPI(Merge):
             ac_estimate = np.zeros((self.M,) * 3)
         else:
             ac_smoothed = gaussian_filter(ac_estimate, 0.5)
-            ac_support = (ac_smoothed > 1e-12).astype(np.float)
+            ac_support = (ac_smoothed > 1e-12)
             ac_estimate *= ac_support
 
-        if self.comm.rank == (2 if self.use_psana else 0):
-            idx = np.abs(L) < self.reciprocal_extent * .01
-            plt.scatter(H[idx], K[idx], c=self.slices_[idx], s=1, norm=LogNorm())
-            plt.axis('equal')
-            plt.colorbar()
-            plt.savefig(self.out_dir / f"star_{generation}.png")
-            plt.cla()
-            plt.clf()
+        # if self.comm.rank == (2 if self.use_psana else 0):
+        #     idx = np.abs(L) < self.reciprocal_extent * .01
+        #     plt.scatter(H[idx], K[idx], c=self.slices_[idx], s=1, norm=LogNorm())
+        #     plt.axis('equal')
+        #     plt.colorbar()
+        #     plt.savefig(self.out_dir / f"star_{generation}.png")
+        #     plt.cla()
+        #     plt.clf()
 
-        ref_rank = -1
+
         ac_estimate = cp.array(ac_estimate)
         ac_support = cp.array(ac_support)
         x0 = ac_estimate.reshape(-1)
@@ -99,11 +147,11 @@ class MergeMPI(Merge):
                 iref = np.arange(len(ranks), dtype=int)[idx][imax]
             else:
                 iref = np.argmin(v1s+v2s)
-            ref_rank = ranks[iref]
-            print(f"Keeping result from rank {ref_rank}: v1={v1s[iref]} and v2={v2s[iref]}", flush=True)
+            self.ref_rank = ranks[iref]
+            print(f"Keeping result from rank {self.ref_rank}: v1={v1s[iref]} and v2={v2s[iref]}", flush=True)
         else:
-            ref_rank = -1
-        ref_rank = self.comm.bcast(ref_rank, root=0)
+            self.ref_rank = -1
+        self.ref_rank = self.comm.bcast(self.ref_rank, root=0)
 
         ac = ret.reshape((self.M,) * 3).get()
         if self.use_reciprocal_symmetry:
@@ -111,6 +159,6 @@ class MergeMPI(Merge):
         ac = np.ascontiguousarray(ac.real)
         image.show_volume(ac, self.Mquat, f"autocorrelation_{generation}_{self.comm.rank}.png") 
         print(f"Rank {self.comm.rank} got AC in {self.callback.counter} iterations.", flush=True)
-        self.comm.Bcast(ac, root=ref_rank)
+        self.comm.Bcast(ac, root=self.ref_rank)
 
         return ac
