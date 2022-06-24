@@ -263,7 +263,7 @@ class Merge:
             ac_estimate = np.zeros((self.M,) * 3)
         else:
             ac_smoothed = gaussian_filter(ac_estimate, 0.5)
-            ac_support = (ac_smoothed > 1e-12).astype(np.float)
+            ac_support = (ac_smoothed > 1e-12).astype(np.float64)
             ac_estimate *= ac_support
         ac_estimate = cp.array(ac_estimate)
         ac_support = cp.array(ac_support)

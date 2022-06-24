@@ -176,7 +176,6 @@ class SNM:
             N_batch = self.N_pixels * self.N_batch_size
             st_m = i * self.N_batch_size
             en_m = st_m + self.N_batch_size
-            #Question are H,K,L constant? Can we precalculate them and then store them?
             H_ = self.HKL_mat[0,st:en,:].reshape(-1)
             K_ = self.HKL_mat[1,st:en,:].reshape(-1)
             L_ = self.HKL_mat[2,st:en,:].reshape(-1)
@@ -185,7 +184,7 @@ class SNM:
             del forward_result
             slices_time += time.monotonic() - slice_start
             match_start = time.monotonic()
-            #TODO Approximate data model scaling? Is it allowed?
+            #TODO Approximate data model scaling? Are we doing this or not?
             data_images *= self.slices_std/data_images.std()
             match_middle = time.monotonic()
             match_oth_time += match_middle - match_start
