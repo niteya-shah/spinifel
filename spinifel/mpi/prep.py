@@ -85,12 +85,18 @@ def get_slices_and_pixel_info(N_images_per_rank, ds):
         #   becomes the first axis.
         _pixel_index_map = run.beginruns[0].scan[0].raw.pixel_index_map
         pixel_index_map = np.moveaxis(_pixel_index_map[:], -1, 0)
-        if run.expt == "xpptut15":
+
+        pixel_position_reciprocal = None
+        if hasattr(run.beginruns[0].scan[0].raw, 'pixel_position_reciprocal'):
             _pixel_position_reciprocal = run.beginruns[0].scan[0].raw.pixel_position_reciprocal
             pixel_position_reciprocal = np.moveaxis(
                 _pixel_position_reciprocal[:], -1, 0)
-        elif run.expt == "amo06516":
+        
+        pixel_position = None
+        if hasattr(run.beginruns[0].scan[0].raw, 'pixel_position'):
             pixel_position = run.beginruns[0].scan[0].raw.pixel_position
+
+        assert pixel_position_reciprocal is not None or pixel_position is not None
         
         for evt in run.events():
             # A quick hack to allow psana2 to exit the loop by throwing
@@ -101,7 +107,7 @@ def get_slices_and_pixel_info(N_images_per_rank, ds):
             raw = det.raw.calib(evt)
 
             # Only need to do once for per-run variables
-            if i == 0 and run.expt=="amo06516":
+            if pixel_position_reciprocal is None:
                 photon_energy = det.raw.photon_energy(evt)
                 
                 # Calculate pixel position in reciprocal space
