@@ -21,12 +21,12 @@ ps_eb_nodes = 1
 ps_srv_nodes = 0
 #ps_batch_size = 1000
 ps_dir = "/global/cfs/cdirs/m2859/data/amo06516"
-exp = "amo06516"
-runnum = 90
+exp = "xpptut15"
+runnum = 1
 
 
 [runtime]
-N_images_per_rank = 1000
+N_images_per_rank = 1600
 use_cuda = true 
 use_cufinufft = true
 use_cupy = true
