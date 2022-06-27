@@ -163,7 +163,9 @@ def load_volume(volume):
 
 @nvtx.annotate("prep.py", is_prefix=True)
 def compute_pixel_distance(pixel_position_reciprocal):
-    return np.sqrt((pixel_position_reciprocal**2).sum(axis=0))
+    """pixel_position_reciprocal is of shape [q, # of panels, # of rows, # of columns], 
+    where the first two dimensions of q corresponds to qx and qy."""
+    return np.sqrt((pixel_position_reciprocal[:2]**2).sum(axis=0))
 
 
 
