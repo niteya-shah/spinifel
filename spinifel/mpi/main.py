@@ -8,6 +8,7 @@ from .prep import get_data
 from .phasing import phase
 from spinifel.sequential.orientation_matching import SNM
 from .autocorrelation import MergeMPI
+from spinifel.extern.NUFFT import NUFFT
 
 
 
@@ -66,6 +67,10 @@ def main():
 
     mg = MergeMPI(settings, slices_, pixel_position_reciprocal, pixel_distance_reciprocal)
     snm = SNM(settings, slices_, pixel_position_reciprocal, pixel_distance_reciprocal)
+    nufft = NUFFT(settings, pixel_position_reciprocal, pixel_distance_reciprocal)
+    #TODO Fix this formulation to a better version
+    mg.nufft = nufft
+    snm.nufft = nufft
 
     if settings.load_gen > 0: # Load input from previous generation
         curr_gen = settings.load_gen

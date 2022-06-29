@@ -69,7 +69,7 @@ class MergeMPI(Merge):
         K_ = K.reshape(-1) * self.mult
         L_ = L.reshape(-1) * self.mult
 
-        ugrid_conv = self.adjoint(self.nuvect, H_, K_, L_, 1, self.M_ups)
+        ugrid_conv = self.nufft.adjoint(self.nuvect, H_, K_, L_, 1,self.use_reciprocal_symmetry, self.M_ups)
 
         F_ugrid_conv_ = cp.fft.fftn(
             cp.fft.ifftshift(ugrid_conv))
@@ -88,8 +88,8 @@ class MergeMPI(Merge):
             shape=(self.Mtot, self.Mtot),
             matvec=W_matvec)
     
-        uvect_ADb = self.adjoint(
-            self.nuvect_Db, H_, K_, L_, ac_support, self.M).reshape(-1)
+        uvect_ADb = self.nufft.adjoint(
+            self.nuvect_Db, H_, K_, L_, ac_support,self.use_reciprocal_symmetry, self.M).reshape(-1)
         if cp.sum(cp.isnan(uvect_ADb)) > 0:
             print("Warning: nans in the adjoint calculation; intensities may be too large", flush=True) 
         d = self.alambda * uvect_ADb + self.rlambda * x0
