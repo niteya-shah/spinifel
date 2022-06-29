@@ -40,7 +40,7 @@ if settings.use_cuda and settings.use_cufinufft:
         raise CUFINUFFTRequiredButNotFound
 else:
     if context.finufftpy_available:
-        if version("finufftpy") not in ["1.1.2"]:
+        if version("finufft") not in ["1.1.2", "2.1.0"]:
             raise FINUFFTPYVersionUnsupported
     else:
         raise FINUFFTPYRequiredButNotFound

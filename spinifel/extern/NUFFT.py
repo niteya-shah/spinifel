@@ -20,9 +20,9 @@ if settings.use_cufinufft:
     from cufinufft import cufinufft
     mode = "cufinufft" + version("cufinufft") 
 
-elif settings.finufftpy_available:
-    from nfft import nfft
-    mode = "finufftpy" + version("finufftpy")
+elif context.finufftpy_available:
+    import finufft
+    mode = "finufft" + version("finufft")
 
 class NUFFT:
     def __init__(self,settings, pixel_position_reciprocal, pixel_distance_reciprocal) -> None:
@@ -58,7 +58,7 @@ class NUFFT:
 
             self.HKL_mat = pycuda.driver.pagelocked_empty((self.ref_rotmat.shape[1],self.ref_rotmat.shape[0],*pixel_position_reciprocal.shape[1:]), self.ref_rotmat.dtype)
 
-        elif settings.finufftpy_available:
+        elif context.finufftpy_available:
             self.H_f = np.empty((self.N_pixels * self.N_batch_size,), dtype=np.float64)
             self.K_f = np.empty((self.N_pixels * self.N_batch_size,), dtype=np.float64)
             self.L_f = np.empty((self.N_pixels * self.N_batch_size,), dtype=np.float64)
@@ -264,7 +264,7 @@ class NUFFT:
             ugrid_gpu /= M**3
             return self.gpuarray_to_cupy(ugrid_gpu)
 
-    elif mode == "finufftpy1.1.2":
+    elif mode == "finufft2.1.0":
 
         @nvtx.annotate("NUFFT/finufft/forward", is_prefix=True)
         def forward(self, ugrid, st, en, support, use_recip_sym, N):
@@ -280,7 +280,7 @@ class NUFFT:
             # Solve the NUFFT
             #
 
-            assert not nfft.nufft3d2(H_, K_, L_, nuvect, self.isign, self.eps, ugrid)
+            assert not finufft.nufft3d2(H_, K_, L_, nuvect, self.isign, self.eps, ugrid)
 
             return nuvect
 
@@ -294,13 +294,13 @@ class NUFFT:
             # Ensure that H, K, and L have the same shape
             assert H_.shape == K_.shape == L_.shape
 
-            ugrid = np.zeros(M, dtype=np.complex128, order='F')
+            ugrid = np.zeros((M,M,M), dtype=np.complex128, order='F')
 
             #__________________________________________________________________________
             # Solve the NUFFT
             #
 
-            assert not nfft.nufft3d1(H_, K_, L_, nuvect, self.isign, self.eps, M[0], M[1], M[2], ugrid)
+            finufft.nufft3d1(H_, K_, L_,nuvect.get(),n_modes=(M, M, M),isign=self.isign,eps= self.eps ,out= ugrid)
 
             #
             #--------------------------------------------------------------------------

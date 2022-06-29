@@ -6,10 +6,7 @@ from .prep import get_data
 from .autocorrelation import Merge
 from .phasing import phase
 from .orientation_matching import SNM
-import cupy as cp
 import gc
-import pycuda.driver as cuda
-import pycuda.autoinit
 from spinifel.extern.NUFFT import NUFFT
 
 

@@ -14,13 +14,8 @@ from spinifel import settings, utils, image, autocorrelation
 import os
 os.environ['CUPY_ACCELERATORS'] = "cub,cutensor"
 
-from pycuda import gpuarray
-import pycuda.autoinit
-
 import skopi as skp
 import PyNVTX as nvtx
-
-from cufinufft import cufinufft
 
 from cupyx.scipy.sparse.linalg import LinearOperator, cg
 import cupy as cp
@@ -141,7 +136,7 @@ class Merge:
         K_ = K.reshape(-1) * self.mult
         L_ = L.reshape(-1) * self.mult
 
-        ugrid_conv = self.nufft.adjoint(self.nuvect, H_, K_, L_, 1, self.use_reciprocal_symmetry, self.M_ups)
+        ugrid_conv = cp.array(self.nufft.adjoint(self.nuvect, H_, K_, L_, 1, self.use_reciprocal_symmetry, self.M_ups))
 
         F_ugrid_conv_ = cp.fft.fftn(
             cp.fft.ifftshift(ugrid_conv))/self.M**3
@@ -159,8 +154,8 @@ class Merge:
             shape=(self.M**3, self.M**3),
             matvec=W_matvec)
     
-        uvect_ADb = self.nufft.adjoint(
-            self.nuvect_Db, H_, K_, L_, ac_support, self.use_reciprocal_symmetry, self.M).flatten()
+        uvect_ADb = cp.array(self.nufft.adjoint(
+            self.nuvect_Db, H_, K_, L_, ac_support, self.use_reciprocal_symmetry, self.M).flatten())
         d = uvect_ADb + self.rlambda * x0
 
         return W, d
