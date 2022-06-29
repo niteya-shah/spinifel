@@ -10,6 +10,8 @@ import cupy as cp
 import gc
 import pycuda.driver as cuda
 import pycuda.autoinit
+from spinifel.extern.NUFFT import NUFFT
+
 
 @nvtx.annotate("sequential/main.py", is_prefix=True)
 def main():
@@ -32,10 +34,16 @@ def main():
      pixel_distance_reciprocal,
      pixel_index_map,
      slices_) = get_data(N_images, ds)
+    
     logger.log(f"Loaded in {timer.lap():.2f}s.")
+
     mg = Merge(settings, slices_, pixel_position_reciprocal, pixel_distance_reciprocal)
     snm = SNM(settings, slices_, pixel_position_reciprocal, pixel_distance_reciprocal)
- 
+    nufft = NUFFT(settings, pixel_position_reciprocal, pixel_distance_reciprocal)
+    #TODO Fix this formulation to a better version
+    mg.nufft = nufft
+    snm.nufft = nufft
+
     ac = mg.solve_ac(0)
     logger.log(f"AC recovered in {timer.lap():.2f}s.")
 

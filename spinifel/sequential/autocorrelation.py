@@ -68,11 +68,6 @@ class Merge:
         reduced_det_shape = settings.reduced_det_shape
         self.N_pixels = np.prod(reduced_det_shape)
 
-        self.H_ = gpuarray.empty(shape=(self.N_pixels * self.N_images,), dtype=np.float64)
-        self.K_ = gpuarray.empty(shape=(self.N_pixels * self.N_images,), dtype=np.float64)
-        self.L_ = gpuarray.empty(shape=(self.N_pixels * self.N_images,), dtype=np.float64)
-
-
         lu = np.linspace(-np.pi, np.pi, self.M)
         Hu_, Ku_, Lu_ = np.meshgrid(lu, lu, lu, indexing='ij')
         Qu_ = np.sqrt(Hu_**2 + Ku_**2 + Lu_**2)
@@ -82,50 +77,6 @@ class Merge:
         assert np.all(F_antisupport == F_antisupport[:, :, ::-1])
         assert np.all(F_antisupport == F_antisupport[::-1, ::-1, ::-1])
         self.F_antisupport = cp.array(F_antisupport)
-
-
-    @staticmethod
-    @nvtx.annotate("sequential/autocorrelation.py::modified", is_prefix=True)
-    def gpuarray_from_cupy(arr):
-        """
-        Convert from GPUarray(pycuda) to cupy. The conversion is zero-cost.
-        :param arr
-        :return arr
-        """
-        assert isinstance(arr, cp.ndarray)
-        shape = arr.shape
-        dtype = arr.dtype
-
-        def alloc(x):
-            return arr.data.ptr
-
-        if arr.flags.c_contiguous:
-            order = 'C'
-        elif arr.flags.f_contiguous:
-            order = 'F'
-        else:
-            raise ValueError('arr order cannot be determined')
-        return gpuarray.GPUArray(shape=shape,
-                                 dtype=dtype,
-                                 allocator=alloc,
-                                 order=order)
-
-    @staticmethod
-    @nvtx.annotate("sequential/autocorrelation.py::modified", is_prefix=True)
-    def gpuarray_to_cupy(arr):
-        """
-        Convert from cupy to GPUarray(pycuda). The conversion is zero-cost.
-        :param arr
-        :return arr
-        """
-        assert isinstance(arr, gpuarray.GPUArray)
-        return cp.asarray(arr)
-
-    @staticmethod
-    @nvtx.annotate("sequential/autocorrelation.py::modified", is_prefix=True)
-    def transpose(x, y, z):
-        """Transposes the order of the (x, y, z) coordinates to (z, y, x)"""
-        return z, y, x
 
     @nvtx.annotate("sequential/autocorrelation.py::modified", is_prefix=True)
     def get_non_uniform_positions(self, orientations):
@@ -147,43 +98,6 @@ class Merge:
 #H, K, L = np.einsum("ijk,klm->jilm", rotmat, pixel_position_reciprocal)
 # shape->[N_images] x det_shape
         return H, K, L
-
-    @nvtx.annotate("sequential/autocorrelation.py::modified", is_prefix=True)
-    def adjoint(self, nuvect, H_, K_, L_, support, M):
-        assert H_.shape == K_.shape == L_.shape
-        dev_id = cp.cuda.device.Device().id
-        complex_dtype = cp.complex128
-        dtype = cp.float64
-
-        H_, K_, L_ = self.transpose(H_, K_, L_)
-        shape = (M, M, M)
-# TODO convert to GPUarray
-        nuvect_ga = self.gpuarray_from_cupy(nuvect)
-
-        ugrid = gpuarray.GPUArray(shape=shape, dtype=complex_dtype, order="F")
-        self.H_.set(H_)
-        self.K_.set(K_)
-        self.L_.set(L_)
-        if not hasattr(self, "plan"):
-            self.plan = {}
-        if not shape in self.plan:
-            self.plan[shape] = cufinufft(
-                1,
-                shape,
-                1,
-                self.eps,
-                isign=self.sign,
-                dtype=dtype,
-                gpu_method=1,
-                gpu_device_id=dev_id)
-        self.plan[shape].set_pts(self.H_, self.K_, self.L_)
-        self.plan[shape].execute(nuvect_ga, ugrid)
-        ugrid_gpu = self.gpuarray_to_cupy(ugrid)
-        ugrid_gpu *= support
-        if self.use_reciprocal_symmetry:
-            ugrid_gpu = ugrid_gpu.real
-        ugrid_gpu /= M**3
-        return ugrid_gpu
 
     @nvtx.annotate("sequential/autocorrelation.py::modified", is_prefix=True)
     def fourier_reg(self, uvect, support):
@@ -227,7 +141,7 @@ class Merge:
         K_ = K.reshape(-1) * self.mult
         L_ = L.reshape(-1) * self.mult
 
-        ugrid_conv = self.adjoint(self.nuvect, H_, K_, L_, 1, self.M_ups)
+        ugrid_conv = self.nufft.adjoint(self.nuvect, H_, K_, L_, 1, self.use_reciprocal_symmetry, self.M_ups)
 
         F_ugrid_conv_ = cp.fft.fftn(
             cp.fft.ifftshift(ugrid_conv))/self.M**3
@@ -245,8 +159,8 @@ class Merge:
             shape=(self.M**3, self.M**3),
             matvec=W_matvec)
     
-        uvect_ADb = self.adjoint(
-            self.nuvect_Db, H_, K_, L_, ac_support, self.M).flatten()
+        uvect_ADb = self.nufft.adjoint(
+            self.nuvect_Db, H_, K_, L_, ac_support, self.use_reciprocal_symmetry, self.M).flatten()
         d = uvect_ADb + self.rlambda * x0
 
         return W, d
