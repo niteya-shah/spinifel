@@ -22,6 +22,9 @@ if __name__ == "__main__":
     elif settings.mode == "mpi":
         from .mpi import main
         main()
+    elif settings.mode == "psana2":
+        from .mpi import main_psana2
+        main_psana2()
     elif settings.mode == "test":
         run_tests()
     elif settings.mode == "legion":

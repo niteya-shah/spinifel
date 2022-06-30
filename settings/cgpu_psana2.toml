@@ -1,0 +1,50 @@
+# This toml file contains settings for the Cori quicktart
+
+[debug]
+test = "Quickstart settings for Cori"
+verbose = true
+verbosity = 0
+use_callmonitor = false
+
+[data]
+in_dir = "${CFS}/m2859/data/3iyf/clean"
+out_dir = "${SCRATCH}/spinifel_output/"
+name = "3iyf_sim_400k.h5"
+
+[detector]
+shape = [4, 512, 512]
+
+[psana]
+enable = true 
+ps_smd_n_events = 10000
+ps_eb_nodes = 1
+ps_srv_nodes = 0
+#ps_batch_size = 1000
+ps_dir = "/global/cfs/cdirs/m2859/data/amo06516"
+exp = "xpptut15"
+runnum = 1
+
+
+[runtime]
+N_images_per_rank = 100
+use_cuda = true 
+use_cufinufft = true
+use_cupy = true
+use_single_prec = true
+chk_convergence = false
+
+[gpu]
+devices_per_node = 1
+
+[algorithm]
+N_generations = 3
+nER = 50
+nHIO = 25
+beta = 0.3
+cutoff = 0.05
+N_phase_loops = 10
+N_clipping = 0
+N_binning = 2
+N_orientations = 10000  # model_slices
+N_batch_size = 1000
+N_images_max = 200
