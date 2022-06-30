@@ -1,7 +1,7 @@
-# This toml file contains settings for the summit quicktart
+# This toml file contains settings for the crusher quickstart
 
 [debug]
-test = "Quickstart settings for Summit"
+test = "Quickstart settings for Crusher, small dataset"
 verbose = true
 verbosity = 0
 use_callmonitor = false

@@ -194,7 +194,9 @@ EOF
 elif [[ $(hostname --fqdn) = *".crusher."* ]]; then
     cat >> env.sh <<EOF
 module load PrgEnv-gnu
-module load rocm/4.5.0
+module load rocm/5.1.0
+module use /gpfs/alpine/proj-shared/stf006/bjoo/llvm-amd-stg-open-f1937ea/modules
+module load amd-llvm
 module load cray-fftw
 
 export CC=cc
@@ -207,6 +209,7 @@ export MPI4PY_MPICC="$(which cc) --shared"
 
 # Make sure Cray-FFTW get loaded first to avoid Conda's MKL
 export LD_PRELOAD="\${FFTW_DIR}/libfftw3.so"
+export LD_LIBRARY_PATH=/opt/rocm-5.1.0/hipfft/lib:$LD_LIBRARY_PATH
 
 export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
 export GASNET_CONDUIT=${GASNET_CONDUIT:-ofi-slingshot11}

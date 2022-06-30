@@ -36,7 +36,9 @@ if settings.use_cuda and settings.use_cufinufft:
     if settings.mode == "mpi":
         context.init_mpi()  # Ensures that MPI has been initalized
     context.init_cuda() # this must be called _after_ init_mpi
-    from pycuda.gpuarray import GPUArray, to_gpu
+    from PyGPU import GPUArray, to_gpu
+    #from pycuda.gpuarray import GPUArray, to_gpu
+    
 
     if context.cufinufft_available:
         from cufinufft      import cufinufft
