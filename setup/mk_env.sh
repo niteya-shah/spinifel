@@ -195,7 +195,7 @@ elif [[ $(hostname --fqdn) = *".crusher."* ]]; then
     cat >> env.sh <<EOF
 module load PrgEnv-gnu
 module load rocm/5.1.0
-module use /gpfs/alpine/proj-shared/stf006/bjoo/llvm-amd-stg-open-f1937ea/modules
+module use /gpfs/alpine/world-shared/stf006/djh992/llvm-bjoo/modules # Until bjoo fixes this
 module load amd-llvm
 module load cray-fftw
 
