@@ -24,6 +24,6 @@
 	path = setup/ucx
 	url = https://github.com/openucx/ucx.git
 [submodule "setup/PyBindGPU"]
-    path = setup/PyBindGPU
-    url = https://github.com/darrenjhsu/PybindGPU.git
-    branch = crusher
+	path = setup/PyBindGPU
+	url = https://github.com/darrenjhsu/PybindGPU.git
+	branch = crusher
