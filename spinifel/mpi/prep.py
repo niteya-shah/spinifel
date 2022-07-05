@@ -198,11 +198,14 @@ def get_data(N_images_per_rank, ds):
             slices_)
 
 
-def bin_data(pixel_position_reciprocal, pixel_index_map, slices_):
+def bin_data(pixel_position_reciprocal=None, pixel_index_map=None, slices_=None):
     ## Bin reciprocal position, reciprocal distance, index map, slices
-    pixel_position_reciprocal = prep.binning_mean(pixel_position_reciprocal)
-    pixel_index_map = prep.binning_index(pixel_index_map)
-    slices_ = prep.binning_sum(slices_)
+    if pixel_position_reciprocal is not None:
+        pixel_position_reciprocal = prep.binning_mean(pixel_position_reciprocal)
+    if pixel_index_map is not None:
+        pixel_index_map = prep.binning_index(pixel_index_map)
+    if slices_ is not None:
+        slices_ = prep.binning_sum(slices_)
     return (pixel_position_reciprocal,
             pixel_index_map,
             slices_)
