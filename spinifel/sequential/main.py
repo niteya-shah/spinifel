@@ -34,12 +34,9 @@ def main():
     
     logger.log(f"Loaded in {timer.lap():.2f}s.")
 
-    mg = Merge(settings, slices_, pixel_position_reciprocal, pixel_distance_reciprocal)
-    snm = SNM(settings, slices_, pixel_position_reciprocal, pixel_distance_reciprocal)
     nufft = NUFFT(settings, pixel_position_reciprocal, pixel_distance_reciprocal)
-    #TODO Fix this formulation to a better version
-    mg.nufft = nufft
-    snm.nufft = nufft
+    mg = Merge(settings, slices_, pixel_position_reciprocal, pixel_distance_reciprocal, nufft)
+    snm = SNM(settings, slices_, pixel_position_reciprocal, pixel_distance_reciprocal, nufft)
 
     ac = mg.solve_ac(0)
     logger.log(f"AC recovered in {timer.lap():.2f}s.")

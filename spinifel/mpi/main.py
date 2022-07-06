@@ -65,12 +65,9 @@ def main():
     # Generation 0: solve_ac and phase
     N_generations = settings.N_generations
 
-    mg = MergeMPI(settings, slices_, pixel_position_reciprocal, pixel_distance_reciprocal)
-    snm = SNM(settings, slices_, pixel_position_reciprocal, pixel_distance_reciprocal)
     nufft = NUFFT(settings, pixel_position_reciprocal, pixel_distance_reciprocal)
-    #TODO Fix this formulation to a better version
-    mg.nufft = nufft
-    snm.nufft = nufft
+    mg = MergeMPI(settings, slices_, pixel_position_reciprocal, pixel_distance_reciprocal, nufft)
+    snm = SNM(settings, slices_, pixel_position_reciprocal, pixel_distance_reciprocal, nufft)
 
     if settings.load_gen > 0: # Load input from previous generation
         curr_gen = settings.load_gen
