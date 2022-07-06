@@ -2,11 +2,12 @@ import time
 import numpy  as np
 import skopi  as skp
 import PyNVTX  as nvtx
+import logging
 
 import spinifel.sequential.nearest_neighbor as nn
 from   spinifel import settings, utils, autocorrelation
 
-from spinifel import SpinifelSettings
+from   spinifel import utils, autocorrelation, SpinifelSettings
 settings = SpinifelSettings()
 if settings.use_cuda:
     import os
@@ -73,7 +74,7 @@ class SNM:
         Thin wrapper for the GEMM function to support both scipy blas routines and cublas gemm
         """
         if settings.use_cuda:
-            return cp.cublas.gemm(
+            return xp.cublas.gemm(
                 'N', 'T', x, y, out=out, alpha=-2.0, beta=1.0)
         else:
             # This will not overwrite out as we dont use fortran order for our
@@ -93,7 +94,7 @@ class SNM:
         """
         x_2 = xp.square(x).sum(axis=1)
         xp.add(x_2[:, xp.newaxis], y_2[xp.newaxis, :], out=dist[start:end])
-        return self.gemm(x, y, dist[start:end])
+        return self.euclidean_gemm(x, y, dist[start:end])
 
     @nvtx.annotate("sequential/orientation_matching.py::modified",
                    is_prefix=True)
@@ -179,7 +180,7 @@ def match(slices_, model_slices, ref_orientations, batch_size=None):
 
     N_slices = slices_.shape[0]
     # TODO move this up to main level
-    #assert slices_.shape == (N_slices,) + parms.reduced_det_shape
+    #assert slices_.shape == (N_slices,) + settings.reduced_det_shape
 
     if not N_slices:
         return np.zeros((0, 4))
@@ -187,7 +188,6 @@ def match(slices_, model_slices, ref_orientations, batch_size=None):
     index = nn.nearest_neighbor(model_slices, slices_, batch_size)
 
     return ref_orientations[index]
-
 
 @nvtx.annotate("sequential/orientation_matching.py", is_prefix=True)
 def slicing_and_match(
@@ -209,20 +209,19 @@ def slicing_and_match(
     """
     st_init = time.monotonic()
     logger = logging.getLogger(__name__)
-    Mquat = parms.Mquat
+    Mquat = settings.Mquat
     M = 4 * Mquat + 1
-    N_orientations = parms.N_orientations
-    N_batch_size = parms.N_batch_size
-    N_pixels = utils.prod(parms.reduced_det_shape)
+    N_orientations = settings.N_orientations
+    N_batch_size = settings.N_batch_size
+    N_pixels = utils.prod(settings.reduced_det_shape)
     N_slices = slices_.shape[0]
-    assert slices_.shape == (N_slices,) + parms.reduced_det_shape
+    assert slices_.shape == (N_slices,) + settings.reduced_det_shape
     N = N_pixels * N_orientations
 
     if not N_slices:
         return np.zeros((0, 4))
 
     ref_orientations = skp.get_uniform_quat(N_orientations, True)
-    #ref_rotmat = np.array([skp.quaternion2rot3d(quat) for quat in ref_orientations])
     ref_rotmat = np.array([np.linalg.inv(skp.quaternion2rot3d(quat))
                           for quat in ref_orientations])
     reciprocal_extent = pixel_distance_reciprocal.max()
@@ -239,21 +238,20 @@ def slicing_and_match(
         en = st + N_batch_size
         H, K, L = np.einsum("ijk,klmn->jilmn",
                             ref_rotmat[st:en], pixel_position_reciprocal)
-        H_ = H.flatten() / reciprocal_extent * np.pi / parms.oversampling
-        K_ = K.flatten() / reciprocal_extent * np.pi / parms.oversampling
-        L_ = L.flatten() / reciprocal_extent * np.pi / parms.oversampling
+        H_ = H.flatten() / reciprocal_extent * np.pi / settings.oversampling
+        K_ = K.flatten() / reciprocal_extent * np.pi / settings.oversampling
+        L_ = L.flatten() / reciprocal_extent * np.pi / settings.oversampling
         N_batch = N_pixels * N_batch_size
         st_m = i * N_batch_size * N_pixels
         en_m = st_m + (N_batch_size * N_pixels)
         model_slices_new[st_m:en_m] = autocorrelation.forward(
-                ac, H_, K_, L_, 1, M, N_batch, reciprocal_extent, True).real
-
+                ac, H_, K_, L_, 1, reciprocal_extent, N_batch).real
     en_slice = time.monotonic()
 
     # Imaginary part ~ numerical error
     model_slices_new = model_slices_new.reshape((N_orientations, N_pixels))
     data_model_scaling_ratio = slices_.std() / model_slices_new.std()
-    print(f"New Data/Model std ratio: {data_model_scaling_ratio}.", flush=True)
+    print(f"Data/Model std ratio: {data_model_scaling_ratio}.", flush=True)
     model_slices_new *= data_model_scaling_ratio
 
     # Calculate Euclidean distance in batch to avoid running out of GPU Memory
