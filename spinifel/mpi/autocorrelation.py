@@ -16,7 +16,7 @@ from spinifel.sequential.autocorrelation import Merge
 
 from spinifel import SpinifelSettings
 settings = SpinifelSettings()
-if settings.use_cuda:
+if settings.use_cupy:
     import os
     os.environ['CUPY_ACCELERATORS'] = "cub,cutensor"
 

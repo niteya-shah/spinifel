@@ -9,7 +9,7 @@ from   spinifel import settings, utils, autocorrelation
 
 from   spinifel import utils, autocorrelation, SpinifelSettings
 settings = SpinifelSettings()
-if settings.use_cuda:
+if settings.use_cupy:
     import os
     os.environ['CUPY_ACCELERATORS'] = "cub,cutensor"
 
