@@ -10,8 +10,7 @@ def parse_output(filename, num_nodes, num_ranks):
     pattern_slice_oh = re.compile("slice_oh=\d+\.\d+s")
     pattern_match = re.compile("match=\d+\.\d+s")
     pattern_match_oh = re.compile("match_oh=\d+\.\d+s")
-#    pattern_completed = re.compile("completed in \d+\.\d+s")
-    pattern_completed = re.compile("Total: \d+\.\d+s")
+    pattern_completed = re.compile("completed in \d+\.\d+s")
 
     merge = []
     phase = []

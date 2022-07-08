@@ -10,7 +10,7 @@ import numpy     as np
 import skopi     as skp
 import PyNVTX    as nvtx
 from   spinifel  import SpinifelSettings, SpinifelContexts, Profiler, settings
-# from   .extern   import nufft_3d_t1, nufft_3d_t2
+from   .extern   import nufft_3d_t1, nufft_3d_t2
 
 
 #______________________________________________________________________________

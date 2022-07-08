@@ -117,7 +117,7 @@ conda install -y bitstruct krtc -c conda-forge
         export HCC_AMDGPU_TARGET=gfx908
         pip install --no-cache-dir cupy
     else
-        pip install cupy-cuda114
+        pip install --no-cache-dir cupy
     fi
 )
 
@@ -137,8 +137,7 @@ then
 else
     CC=$MPI4PY_CC MPICC=$MPI4PY_MPICC pip install -v --no-binary mpi4py mpi4py
     pip install --no-cache-dir mrcfile
-    LDFLAGS=$CUPY_LDFLAGS pip install --no-cache-dir cupy-cuda114
-    python -m cupyx.tools.install_library --cuda 11.4 --library cutensor
+    LDFLAGS=$CUPY_LDFLAGS pip install --no-cache-dir cupy
 fi
 
 # Install pip packages

@@ -6,8 +6,7 @@ from .prep import get_data
 from .autocorrelation import Merge
 from .phasing import phase
 from .orientation_matching import SNM
-import gc
-from spinifel.extern.NUFFT import NUFFT
+from spinifel.extern.nufft_ext import NUFFT
 
 
 @nvtx.annotate("sequential/main.py", is_prefix=True)
@@ -31,12 +30,25 @@ def main():
      pixel_distance_reciprocal,
      pixel_index_map,
      slices_) = get_data(N_images, ds)
-    
+
     logger.log(f"Loaded in {timer.lap():.2f}s.")
 
-    nufft = NUFFT(settings, pixel_position_reciprocal, pixel_distance_reciprocal)
-    mg = Merge(settings, slices_, pixel_position_reciprocal, pixel_distance_reciprocal, nufft)
-    snm = SNM(settings, slices_, pixel_position_reciprocal, pixel_distance_reciprocal, nufft)
+    nufft = NUFFT(
+        settings,
+        pixel_position_reciprocal,
+        pixel_distance_reciprocal)
+    mg = Merge(
+        settings,
+        slices_,
+        pixel_position_reciprocal,
+        pixel_distance_reciprocal,
+        nufft)
+    snm = SNM(
+        settings,
+        slices_,
+        pixel_position_reciprocal,
+        pixel_distance_reciprocal,
+        nufft)
 
     ac = mg.solve_ac(0)
     logger.log(f"AC recovered in {timer.lap():.2f}s.")
@@ -49,11 +61,10 @@ def main():
         orientations = snm.slicing_and_match(ac_phased)
         logger.log(f"Orientations matched in {timer.lap():.2f}s.")
 
-        ac = mg.solve_ac(generation,orientations, ac_phased)
+        ac = mg.solve_ac(generation, orientations, ac_phased)
         logger.log(f"AC recovered in {timer.lap():.2f}s.")
 
         ac_phased, support_, rho_ = phase(generation, ac, support_, rho_)
         logger.log(f"Problem phased in {timer.lap():.2f}s.")
 
-        gc.collect() 
     logger.log(f"Total: {timer.total():.2f}s.")

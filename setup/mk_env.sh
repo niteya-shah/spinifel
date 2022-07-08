@@ -233,7 +233,7 @@ export LD_PRELOAD="\${FFTW_DIR}/libfftw3.so"
 export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
 export GASNET_CONDUIT=${GASNET_CONDUIT:-ucx}
 EOF
-else
+elif [[ $(hostname --fqdn) = *"darwin"* ]]; then
     cat >> env.sh <<EOF
 module load gcc
 module load cuda
@@ -247,6 +247,9 @@ export MPI4PY_MPICC=\$(which mpicc)
 
 export CUPY_LDFLAGS=-L\${CUDA_ROOT}/lib64/stubs
 EOF
+else
+    echo "I don't know how to build it on this machine..."
+    exit 1
 fi
 
 cat >> env.sh <<EOF
