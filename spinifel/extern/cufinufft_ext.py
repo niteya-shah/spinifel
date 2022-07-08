@@ -10,7 +10,7 @@ from   sys      import getsizeof
 import numpy    as np
 import PyNVTX   as nvtx
 from   spinifel import SpinifelSettings, SpinifelContexts, Profiler
-from   .        import transpose, CUFINUFFTRequiredButNotFound
+from   .util        import transpose, CUFINUFFTRequiredButNotFound
 
 
 
