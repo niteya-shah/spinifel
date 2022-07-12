@@ -40,11 +40,10 @@ class NUFFT:
 
         self.pixel_position_reciprocal = pixel_position_reciprocal
         self.ref_orientations = skp.get_uniform_quat(self.N_orientations, True)
-        ref_rotmat = np.array(
-            [np.linalg.inv(skp.quaternion2rot3d(quat)) for quat in self.ref_orientations])
         # Save reference rotation matrix so that we dont re-create it every
         # time
-        self.ref_rotmat = np.array(ref_rotmat)
+        self.ref_rotmat = np.array(
+            [np.linalg.inv(skp.quaternion2rot3d(quat)) for quat in self.ref_orientations])
 
         self.eps = 1e-12
         self.isign = -1
