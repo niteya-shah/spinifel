@@ -197,8 +197,8 @@ def load_volume(volume):
 def compute_pixel_distance(pixel_position_reciprocal):
     """pixel_position_reciprocal is of shape [q, # of panels, # of rows, # of columns], 
     where the first two dimensions of q corresponds to qx and qy."""
-    #return np.sqrt((pixel_position_reciprocal[:2,:,:,:]**2).sum(axis=0))
-    return np.sqrt((pixel_position_reciprocal[:2]**2).sum(axis=0))
+    return np.sqrt((pixel_position_reciprocal[:2,:,:,:]**2).sum(axis=0))
+    #return np.sqrt((pixel_position_reciprocal[:2]**2).sum(axis=0))
 
 
 
