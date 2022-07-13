@@ -1,6 +1,10 @@
 import numpy as np
 import skopi as sk
-
+use_cupy=True
+if use_cupy:
+    import cupy as xp
+else:
+    xp = np
 """
 Batched versions of skopi geometry functions for handling rotations.
 """
@@ -33,7 +37,7 @@ def quaternion2rot3d(quat):
     q33 = quat[:,3] * quat[:,3]
 
     # Obtain the rotation matrix
-    rotation = np.zeros((quat.shape[0], 3, 3))
+    rotation = xp.zeros((quat.shape[0], 3, 3))
     rotation[:,0, 0] = (1. - 2. * (q22 + q33))
     rotation[:,0, 1] = 2. * (q12 - q03)
     rotation[:,0, 2] = 2. * (q13 + q02)
@@ -62,12 +66,12 @@ def axis_angle_to_quaternion(axis, theta):
     quat : numpy.ndarray, size (num_pts, 4)
         quaternions corresponding to axis/theta rotations
     """
-    axis /= np.linalg.norm(axis, axis=1)[:,None]
+    axis /= xp.linalg.norm(axis, axis=1)[:,None]
     angle = theta / 2
 
-    quat = np.zeros((len(theta), 4))
-    quat[:,0] = np.cos(angle)
-    quat[:,1:] = np.sin(angle)[:,None] * axis
+    quat = xp.zeros((len(theta), 4))
+    quat[:,0] = xp.cos(angle)
+    quat[:,1:] = xp.sin(angle)[:,None] * axis
 
     return quat
 
@@ -92,7 +96,7 @@ def quaternion_product(q1, q0):
     """
     p0, p1, p2, p3 = q1[:,0], q1[:,1], q1[:,2], q1[:,3]
     r0, r1, r2, r3 = q0[:,0], q0[:,1], q0[:,2], q0[:,3]
-    q_prod = np.array([r0 * p0 - r1 * p1 - r2 * p2 - r3 * p3,
+    q_prod = xp.array([r0 * p0 - r1 * p1 - r2 * p2 - r3 * p3,
                        r0 * p1 + r1 * p0 - r2 * p3 + r3 * p2,
                        r0 * p2 + r1 * p3 + r2 * p0 - r3 * p1,
                        r0 * p3 - r1 * p2 + r2 * p1 + r3 * p0]).T
@@ -119,13 +123,13 @@ def get_preferred_orientation_quat(num_pts, sigma, base_quat=None):
         quaternions with preferred orientations
     """
     if base_quat is None:
-        base_quat = sk.get_random_quat(1) ### need to change to skopi
-    base_quat = np.tile(base_quat, num_pts).reshape(num_pts, 4)
+        base_quat = xp.array(sk.get_random_quat(1)) ### need to change to skopi
+    base_quat = xp.tile(base_quat, num_pts).reshape(num_pts, 4)
 
-    R_random = quaternion2rot3d(sk.get_random_quat(num_pts)) ### need to change to skopi
-    unitvec = np.array([0,0,1.0])
-    rot_axis = np.matmul(unitvec, R_random)
-    theta = sigma * np.random.randn(num_pts)
+    R_random = quaternion2rot3d(xp.array(sk.get_random_quat(num_pts))) ### need to change to skopi
+    unitvec = xp.array([0,0,1.0])
+    rot_axis = xp.matmul(unitvec, R_random)
+    theta = sigma * xp.random.randn(num_pts)
     rand_axis = theta[:,None] * rot_axis
     pref_quat = axis_angle_to_quaternion(rand_axis, theta)
     quat = quaternion_product(pref_quat, base_quat)
