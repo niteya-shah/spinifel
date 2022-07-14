@@ -289,11 +289,7 @@ def align_volumes(mrc1, mrc2, zoom=1, sigma=0, n_iterations=10, n_search=420, ns
     
     # evaluate both hands
     opt_q1, cc1 = scan_orientations(mrc1, mrc2, n_iterations, n_search, nscs=nscs)
-    #Work around for bug in cupy normalize axis_indices
-    if use_cupy:
-        opt_q2, cc2 = scan_orientations(xp.array(np.flip(mrc1.get(), [0,1,2])), mrc2, n_iterations, n_search, nscs=nscs)
-    else:
-        opt_q2, cc2 = scan_orientations(np.flip(mrc1, [0,1,2]), mrc2, n_iterations, n_search, nscs=nscs)
+    opt_q2, cc2 = scan_orientations(flip(mrc1, [0,1,2]), mrc2, n_iterations, n_search, nscs=nscs)
     if cc1 > cc2: 
         opt_q, cc_r, invert = opt_q1, cc1, False
     else: 
@@ -303,7 +299,7 @@ def align_volumes(mrc1, mrc2, zoom=1, sigma=0, n_iterations=10, n_search=420, ns
     # generate final aligned map
     if invert:
         print("Map had to be inverted")
-        mrc1_original = xp.flip(mrc1_original, [0,1,2])
+        mrc1_original = flip(mrc1_original, [0,1,2])
     r_vol = rotate_volume(mrc1_original, np.expand_dims(opt_q, axis=0))[0]
     final_cc = pearson_cc(xp.expand_dims(r_vol.flatten(), axis=0), xp.expand_dims(mrc2_original.flatten(), axis=0))
     print(f"Final CC between unzoomed / unfiltered volumes is: {float(final_cc):.3f}")
@@ -314,3 +310,10 @@ def align_volumes(mrc1, mrc2, zoom=1, sigma=0, n_iterations=10, n_search=420, ns
         save_mrc(output, np.array(r_vol), voxel_size=voxel_size)
             
     return r_vol, mrc2_original
+
+# Work around for bug in cupy flip and its normalize axis indicies
+def flip(arr, orien):
+    if use_cupy:
+        return xp.array(np.flip(arr.get(), orien))
+    else:
+        return np.flip(arr, orien)
