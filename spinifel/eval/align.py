@@ -191,7 +191,7 @@ def scan_orientations_fine(mrc1, mrc2, opt_q, prev_score, n_iterations=10, n_sea
         else:
             opt_q = quat[xp.argmax(ccs)]
         #print(torch.max(ccs), opt_q) # useful for debugging
-        prev_score = xp.max( )     
+        prev_score = xp.max(ccs)     
     
     return opt_q, prev_score
 
