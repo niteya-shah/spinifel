@@ -2,6 +2,7 @@ import numpy as np
 import mrcfile
 from geom import *
 from scipy import ndimage
+import skopi as sk
 if use_cupy:
     import cupy as xp
     from cupyx.scipy import ndimage
@@ -113,7 +114,7 @@ def pearson_cc(arr1, arr2):
     vy = arr2 - arr2.mean(axis=-1)[:,None]
     numerator = xp.sum(vx * vy, axis=1)
     # Merge Square root because we have squares
-    denom = xp.sqrt(xp.sum(vx**2, axis=1)) * np.sqrt(xp.sum(vy**2, axis=1))
+    denom = xp.sqrt(xp.sum(vx**2, axis=1)) * xp.sqrt(xp.sum(vy**2, axis=1))
     return numerator / denom
 
 def score_deformations(mrc1, mrc2, warp):
@@ -148,7 +149,7 @@ def score_deformations(mrc1, mrc2, warp):
         
     # score each deformed volume using the Pearson CC
     wmrc1_flat = wmrc1.reshape(wmrc1.shape[0],-1)
-    mrc2_flat = np.expand_dims(mrc2.flatten(), axis=0)
+    mrc2_flat = xp.expand_dims(mrc2.flatten(), axis=0)
     ccs = pearson_cc(wmrc1_flat, mrc2_flat)
     return ccs
 
@@ -190,7 +191,7 @@ def scan_orientations_fine(mrc1, mrc2, opt_q, prev_score, n_iterations=10, n_sea
         else:
             opt_q = quat[xp.argmax(ccs)]
         #print(torch.max(ccs), opt_q) # useful for debugging
-        prev_score = xp.max(ccs)     
+        prev_score = xp.max( )     
     
     return opt_q, prev_score
 
@@ -300,7 +301,7 @@ def align_volumes(mrc1, mrc2, zoom=1, sigma=0, n_iterations=10, n_search=420, ns
     if invert:
         print("Map had to be inverted")
         mrc1_original = flip(mrc1_original, [0,1,2])
-    r_vol = rotate_volume(mrc1_original, np.expand_dims(opt_q, axis=0))[0]
+    r_vol = rotate_volume(mrc1_original, xp.expand_dims(opt_q, axis=0))[0]
     final_cc = pearson_cc(xp.expand_dims(r_vol.flatten(), axis=0), xp.expand_dims(mrc2_original.flatten(), axis=0))
     print(f"Final CC between unzoomed / unfiltered volumes is: {float(final_cc):.3f}")
     if use_cupy:
