@@ -12,7 +12,7 @@ from scipy.ndimage       import gaussian_filter
 from scipy.sparse.linalg import LinearOperator, cg
 
 from spinifel import settings, utils, image, autocorrelation, contexts
-
+from spinifel import checkpoint
         
 @nvtx.annotate("mpi/autocorrelation.py", is_prefix=True)
 def reduce_bcast(comm, vect):
@@ -82,7 +82,7 @@ def fourier_reg(uvect, support, F_antisupport, M, use_recip_sym):
     return uvect
 
 @nvtx.annotate("mpi/autocorrelation.py", is_prefix=True)
-def setup_linops(comm, H, K, L, data,
+def setup_linops(comm, generation, H, K, L, data,
                  ac_support, weights, x0,
                  M, Mtot, N, reciprocal_extent,
                  alambda, rlambda, flambda,
@@ -105,13 +105,12 @@ def setup_linops(comm, H, K, L, data,
     L_ = L.flatten() / reciprocal_extent * np.pi
    
     F_antisupport = gen_F_antisupport(M)
- 
+
     # Using upsampled convolution technique instead of ADA
     M_ups = M * 2
     ugrid_conv = autocorrelation.adjoint(
         np.ones_like(data), H_, K_, L_, M_ups,
         use_reciprocal_symmetry, support=None)
-    #ugrid_conv = reduce_bcast(comm, ugrid_conv)
     F_ugrid_conv_ = np.fft.fftn(np.fft.ifftshift(ugrid_conv)) #/ M**3
 
     def W_matvec(uvect):
@@ -132,13 +131,11 @@ def setup_linops(comm, H, K, L, data,
         nuvect_Db, H_, K_, L_, M, support=ac_support,
         use_recip_sym=use_reciprocal_symmetry).flatten()
     
-    #uvect_ADb = reduce_bcast(comm, uvect_ADb)
-
     if np.sum(np.isnan(uvect_ADb)) > 0:
         print("Warning: nans in the adjoint calculation; intensities may be too large", flush=True)    
 
     d = alambda*uvect_ADb + rlambda*x0
-  
+
     return W, d
 
 @nvtx.annotate("mpi/autocorrelation.py", is_prefix=True)
@@ -200,14 +197,12 @@ def solve_ac(generation,
 
     x0 = ac_estimate.flatten()
 
-    W, d = setup_linops(comm, H, K, L, data,
+    W, d = setup_linops(comm, generation, H, K, L, data,
                         ac_support, weights, x0,
                         M, Mtot, N, reciprocal_extent,
                         alambda, rlambda, flambda,
                         use_reciprocal_symmetry)
-    
     ret, info = cg(W, d, x0=x0, maxiter=maxiter, callback=callback)
-
     if info != 0:
         print(f'WARNING: CG did not converge at rlambda = {rlambda}')
 
@@ -236,8 +231,6 @@ def solve_ac(generation,
     if use_reciprocal_symmetry:
         assert np.all(np.isreal(ac))
     ac = np.ascontiguousarray(ac.real)
-   
-    # Log autocorrelation volume
     image.show_volume(ac, settings.Mquat, f"autocorrelation_{generation}_{comm.rank}.png") 
 
     print(f"Rank {comm.rank} got AC in {callback.counter} iterations.", flush=True)

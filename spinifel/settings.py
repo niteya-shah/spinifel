@@ -407,7 +407,7 @@ class SpinifelSettings(metaclass=Singleton):
             ),
             "_load_generation": (
                 "algorithm", "load_generation",
-                int, 0,
+                int, -1,
                 "start from output of this generation"
             )
         }
@@ -440,7 +440,7 @@ class SpinifelSettings(metaclass=Singleton):
         p.add_argument("--default-settings", type=str, nargs=1, default=None)
         p.add_argument("--mode", type=str, nargs=1, required=True)
         p.add_argument("-t","--tag-generation", type=str, default=None)
-        p.add_argument("-g","--load-generation", type=int, default=0)
+        p.add_argument("-g","--load-generation", type=int, default=-1)
 
         self.__args, self.__params = p.parse_known_args()
 

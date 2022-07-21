@@ -64,7 +64,7 @@ def main():
     # Generation 0: solve_ac and phase
     N_generations = settings.N_generations
 
-    if settings.load_gen > 0: # Load input from previous generation
+    if settings.load_gen >= 0: # Load input from previous generation
         curr_gen = settings.load_gen
         print(f"Loading checkpoint: {checkpoint.generate_checkpoint_name(settings.out_dir, settings.load_gen, settings.tag_gen)}", flush=True)
         myRes = checkpoint.load_checkpoint(settings.out_dir, 
@@ -88,20 +88,21 @@ def main():
                      'pixel_position_reciprocal': pixel_position_reciprocal,
                      'pixel_distance_reciprocal': pixel_distance_reciprocal,
                      'slices_': slices_,
-                     'ac': ac
+                     'ac': ac,
                     }
-            checkpoint.save_checkpoint(myRes, settings.out_dir, curr_gen, tag="solve_ac", protocol=4)
+            checkpoint.save_checkpoint(myRes, settings.out_dir, curr_gen, tag="solve_ac")
 
         ac_phased, support_, rho_ = phase(curr_gen, ac)
         logger.log(f"Problem phased in {timer.lap():.2f}s.")
+
         if comm.rank == 0:
             myRes = { 
                      'ac': ac,
                      'ac_phased': ac_phased,
                      'support_': support_,
-                     'rho_': rho_
+                     'rho_': rho_,
                     }
-            checkpoint.save_checkpoint(myRes, settings.out_dir, curr_gen, tag="phase",protocol=4)
+            checkpoint.save_checkpoint(myRes, settings.out_dir, curr_gen, tag="")
             # Save electron density and intensity
             rho = np.fft.ifftshift(rho_)
             intensity = np.fft.ifftshift(np.abs(np.fft.fftshift(ac_phased)**2))
@@ -131,12 +132,14 @@ def main():
                      'pixel_distance_reciprocal': pixel_distance_reciprocal,
                      'orientations': orientations
                     }
-            checkpoint.save_checkpoint(myRes, settings.out_dir, generation, tag="match",protocol=4)
+            checkpoint.save_checkpoint(myRes, settings.out_dir, generation, tag="match")
 
         # Solve autocorrelation
         ac = solve_ac(
-            generation, pixel_position_reciprocal, pixel_distance_reciprocal,
-            slices_, orientations, ac_phased)
+            generation, pixel_position_reciprocal, 
+            pixel_distance_reciprocal, slices_, 
+            orientations, ac_phased)
+
         logger.log(f"AC recovered in {timer.lap():.2f}s.")
         if comm.rank == 0:
             myRes = { 
@@ -145,14 +148,16 @@ def main():
                      'slices_': slices_,
                      'orientations': orientations,
                      'ac_phased': ac_phased,
-                     'ac': ac
+                     'ac': ac,
                     }
-            checkpoint.save_checkpoint(myRes, settings.out_dir, generation, tag="solve_ac",protocol=4)
+            checkpoint.save_checkpoint(myRes, settings.out_dir, generation, tag="solve_ac")
 
         if comm.rank == 0: 
             prev_rho_ = rho_[:]
             prev_support_ = support_[:]
-        ac_phased, support_, rho_ = phase(generation, ac, support_, rho_)
+ 
+        ac_phased, support_, rho_ = phase(curr_gen, ac, support_, rho_)
+
         logger.log(f"Problem phased in {timer.lap():.2f}s.")
         if comm.rank == 0:
             myRes = { 
@@ -161,10 +166,10 @@ def main():
                      'prev_rho_': prev_rho_,
                      'ac_phased': ac_phased,
                      'support_': support_,
-                     'rho_': rho_
+                     'rho_': rho_,
+                     'orientations': orientations,
                     }
-            checkpoint.save_checkpoint(myRes, settings.out_dir, generation, tag="phase",protocol=4)
-
+            checkpoint.save_checkpoint(myRes, settings.out_dir, generation, tag="")
 
         # Check if density converges
         if settings.chk_convergence:
@@ -191,14 +196,6 @@ def main():
             save_mrc(settings.out_dir / f"ac-{generation}.mrc", ac_phased)
             save_mrc(settings.out_dir / f"intensity-{generation}.mrc", intensity)
             save_mrc(settings.out_dir / f"rho-{generation}.mrc", rho)
-
-            # Save output
-            myRes = {'ac_phased': ac_phased, 
-                     'support_': support_,
-                     'rho_': rho_,
-                     'orientations': orientations
-                    }
-            checkpoint.save_checkpoint(myRes, settings.out_dir, generation, tag="", protocol=4)
 
     logger.log(f"Results saved in {settings.out_dir}")
     logger.log(f"Successfully completed in {timer.total():.2f}s.")
