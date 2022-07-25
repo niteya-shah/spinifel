@@ -83,7 +83,7 @@ def main():
         ac = solve_ac(
             curr_gen, pixel_position_reciprocal, pixel_distance_reciprocal, slices_)
         logger.log(f"AC recovered in {timer.lap():.2f}s.")
-        if comm.rank == 0:
+        if comm.rank == 0 and settings.checkpoint:
             myRes = { 
                      'pixel_position_reciprocal': pixel_position_reciprocal,
                      'pixel_distance_reciprocal': pixel_distance_reciprocal,
@@ -96,13 +96,14 @@ def main():
         logger.log(f"Problem phased in {timer.lap():.2f}s.")
 
         if comm.rank == 0:
-            myRes = { 
-                     'ac': ac,
-                     'ac_phased': ac_phased,
-                     'support_': support_,
-                     'rho_': rho_,
-                    }
-            checkpoint.save_checkpoint(myRes, settings.out_dir, curr_gen, tag="")
+            if settings.checkpoint:
+                myRes = { 
+                         'ac': ac,
+                         'ac_phased': ac_phased,
+                         'support_': support_,
+                         'rho_': rho_,
+                        }
+                checkpoint.save_checkpoint(myRes, settings.out_dir, curr_gen, tag="")
             # Save electron density and intensity
             rho = np.fft.ifftshift(rho_)
             intensity = np.fft.ifftshift(np.abs(np.fft.fftshift(ac_phased)**2))
@@ -125,7 +126,7 @@ def main():
             ac_phased, slices_,
             pixel_position_reciprocal, pixel_distance_reciprocal)
         logger.log(f"Orientations matched in {timer.lap():.2f}s.")
-        if comm.rank == 0:
+        if comm.rank == 0 and settings.checkpoint:
             myRes = {'ac_phased': ac_phased, 
                      'slices_': slices_,
                      'pixel_position_reciprocal': pixel_position_reciprocal,
@@ -141,7 +142,7 @@ def main():
             orientations, ac_phased)
 
         logger.log(f"AC recovered in {timer.lap():.2f}s.")
-        if comm.rank == 0:
+        if comm.rank == 0 and settings.checkpoint:
             myRes = { 
                      'pixel_position_reciprocal': pixel_position_reciprocal,
                      'pixel_distance_reciprocal': pixel_distance_reciprocal,
@@ -160,36 +161,18 @@ def main():
 
         logger.log(f"Problem phased in {timer.lap():.2f}s.")
         if comm.rank == 0:
-            myRes = { 
-                     'ac': ac,
-                     'prev_support_':prev_support_,
-                     'prev_rho_': prev_rho_,
-                     'ac_phased': ac_phased,
-                     'support_': support_,
-                     'rho_': rho_,
-                     'orientations': orientations,
-                    }
-            checkpoint.save_checkpoint(myRes, settings.out_dir, generation, tag="")
+            if settings.checkpoint:
+                myRes = { 
+                         'ac': ac,
+                         'prev_support_':prev_support_,
+                         'prev_rho_': prev_rho_,
+                         'ac_phased': ac_phased,
+                         'support_': support_,
+                         'rho_': rho_,
+                         'orientations': orientations,
+                        }
+                checkpoint.save_checkpoint(myRes, settings.out_dir, generation, tag="")
 
-        # Check if density converges
-        if settings.chk_convergence:
-            # Calculate correlation coefficient
-            if comm.rank == 0:
-                prev_cov_xy = cov_xy
-                cov_xy = np.corrcoef(prev_rho_.flatten(), rho_.flatten())[0,1]
-            else:
-                prev_cov_xy = None
-                cov_xy = None
-            logger.log(f"CC in {timer.lap():.2f}s. cc={cov_xy:.2f} delta={cov_xy-prev_cov_xy:.2f}")
-            
-            # Stop if improvement in cc is less than cov_delta
-            prev_cov_xy = comm.bcast(prev_cov_xy, root=0)
-            cov_xy = comm.bcast(cov_xy, root=0)
-            if cov_xy - prev_cov_xy < cov_delta:
-                print("Stopping criteria met!")
-                break
-
-        if comm.rank == 0:
             # Save electron density and intensity
             rho = np.fft.ifftshift(rho_)
             intensity = np.fft.ifftshift(np.abs(np.fft.fftshift(ac_phased)**2))

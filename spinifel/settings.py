@@ -190,6 +190,11 @@ class SpinifelSettings(metaclass=Singleton):
                 int, 0,
                 "reporting verbosity"
             ),
+            "_checkpoint": (
+                "debug", "checkpoint",
+                parse_bool, True,
+                "save intermediate checkpoint"
+            ),
             "_data_dir": (
                 "data", "in_dir",
                 Path, Path(""),
