@@ -14,24 +14,56 @@ def parse_input():
     parser = argparse.ArgumentParser(
         description="Simulate a simple SPI dataset.")
     parser.add_argument(
-        '-m', '--mrc_file', help='mrc file of reconstructed map', required=True, type=str)
+        '-m',
+        '--mrc_file',
+        help='mrc file of reconstructed map',
+        required=True,
+        type=str)
     parser.add_argument(
-        '-d', '--dataset', help='h5 file of simulated data', required=True, type=str)
+        '-d',
+        '--dataset',
+        help='h5 file of simulated data',
+        required=True,
+        type=str)
     parser.add_argument(
-        '-p', '--pdb_file', help='pdb file for reference structure', required=True, type=str)
+        '-p',
+        '--pdb_file',
+        help='pdb file for reference structure',
+        required=True,
+        type=str)
     parser.add_argument(
-        '-o', '--output', help='output directory for aligned volumes', required=False, type=str)
+        '-o',
+        '--output',
+        help='output directory for aligned volumes',
+        required=False,
+        type=str)
     # optional arguments to adjust alignment protocol
     parser.add_argument('--zoom', help='Zoom factor during alignment',
                         required=False, type=float, default=1)
-    parser.add_argument('--sigma', help='Sigma for Gaussian filtering during alignment',
-                        required=False, type=float, default=0)
-    parser.add_argument('--niter', help='Number of alignment iterations to run',
-                        required=False, type=int, default=10)
-    parser.add_argument('--nsearch', help='Number of quaternions to score per iteration',
-                        required=False, type=int, default=360)
-    parser.add_argument('--use-cupy', help='Use CuPy for GPU accelerated FSC calculation',
-                        required=False, type=util.strtobool, default=True)
+    parser.add_argument(
+        '--sigma',
+        help='Sigma for Gaussian filtering during alignment',
+        required=False,
+        type=float,
+        default=0)
+    parser.add_argument(
+        '--niter',
+        help='Number of alignment iterations to run',
+        required=False,
+        type=int,
+        default=10)
+    parser.add_argument(
+        '--nsearch',
+        help='Number of quaternions to score per iteration',
+        required=False,
+        type=int,
+        default=360)
+    parser.add_argument(
+        '--use-cupy',
+        help='Use CuPy for GPU accelerated FSC calculation',
+        required=False,
+        type=util.strtobool,
+        default=True)
 
 
     return vars(parser.parse_args())
@@ -45,7 +77,8 @@ if __name__ == '__main__':
         xp = np
         from scipy import ndimage
 
-    # Monkey patch our imports to allow command line arguments to change imports
+    # Monkey patch our imports to allow command line arguments to change
+    # imports
     config.xp = xp
     config.ndimage = ndimage
     from eval.fsc import compute_fsc, compute_reference, plot
@@ -70,8 +103,9 @@ if __name__ == '__main__':
         save_mrc(os.path.join(args['output'], "aligned.mrc"), ali_volume)
 
     # compute fsc
-    resolution, rshell, fsc_val = compute_fsc(ali_reference, ali_volume, dist_recip_max)
-    
+    resolution, rshell, fsc_val = compute_fsc(
+        ali_reference, ali_volume, dist_recip_max)
+
     # optionally plot
     if args['output'] is not None:
         plot(rshell, fsc_val, args['output'])

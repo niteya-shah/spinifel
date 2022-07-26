@@ -1,3 +1,4 @@
+from .config import xp, ndimage
 import matplotlib.pyplot as plt
 import time
 import numpy as np
@@ -5,7 +6,6 @@ import scipy.interpolate
 import os
 import matplotlib
 matplotlib.use('Agg')
-from .config import xp, ndimage
 
 def get_reciprocal_mesh(voxel_number_1d, distance_reciprocal_max, xp):
     """
@@ -67,9 +67,14 @@ def compute_reference(pdb_file, M, distance_reciprocal_max):
 
     return density
 
-def compute_fsc(volume1, volume2, distance_reciprocal_max, spacing=0.01, output=None):
+def compute_fsc(
+        volume1,
+        volume2,
+        distance_reciprocal_max,
+        spacing=0.01,
+        output=None):
     """
-    Compute the Fourier shell correlation (FSC) curve, with the 
+    Compute the Fourier shell correlation (FSC) curve, with the
     estimated resolution based on a threshold of 0.5.
 
     Parameters
@@ -103,8 +108,15 @@ def compute_fsc(volume1, volume2, distance_reciprocal_max, spacing=0.01, output=
     for i, r in enumerate(r_spacings):
         indices = xp.where((smags > r) & (smags < r + spacing))[0]
         numerator = xp.sum(ft1[indices] * ft2[indices])
-        denominator = xp.sqrt(xp.sum(
-            xp.square(xp.abs(ft1[indices]))) * xp.sum(xp.square(xp.abs(ft2[indices]))))
+        denominator = xp.sqrt(
+            xp.sum(
+                xp.square(
+                    xp.abs(
+                        ft1[indices]))) *
+            xp.sum(
+                    xp.square(
+                        xp.abs(
+                            ft2[indices]))))
         rshell[i] = r + 0.5 * spacing
         fsc[i] = numerator.real / denominator
 
@@ -123,11 +135,12 @@ def compute_fsc(volume1, volume2, distance_reciprocal_max, spacing=0.01, output=
     return resolution, rshell, fsc
 
 def plot(rshell, fsc, output):
-    f, ax1 = plt.subplots(figsize=(5,3))
-    ax1.plot(rshell,fsc, c='black')
-    ax1.scatter(rshell,fsc, c='black')
-    ax1.plot([rshell.min(),rshell.max()],[0.5,0.5], c='grey', linestyle='dashed')
-    ax1.set_xlim(rshell.min(),rshell.max())
-    ax1.set_xlabel("Resolution (1/${\mathrm{\AA}}$)")
+    f, ax1 = plt.subplots(figsize=(5, 3))
+    ax1.plot(rshell, fsc, c='black')
+    ax1.scatter(rshell, fsc, c='black')
+    ax1.plot([rshell.min(), rshell.max()], [
+             0.5, 0.5], c='grey', linestyle='dashed')
+    ax1.set_xlim(rshell.min(), rshell.max())
+    ax1.set_xlabel("Resolution (1/${\\mathrm{\\AA}}$)")
     ax1.set_ylabel("FSC", fontsize=12)
     f.savefig(os.path.join(output, "fsc.png"), dpi=300, bbox_inches='tight')
