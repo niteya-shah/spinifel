@@ -24,6 +24,13 @@ else:
     from scipy.linalg.blas import dgemm
     xp = np
 
+if settings.use_single_prec:
+    f_type = xp.float32
+    c_type = xp.complex64
+else:
+    f_type = xp.float64
+    c_type = xp.complex128
+
 class SNM:
 
     def __init__(
@@ -60,7 +67,7 @@ class SNM:
             slices_.reshape(
                 (self.N_slices,
                  self.N_pixels)),
-            dtype=xp.float64)
+            dtype=f_type)
         self.slices_2 = xp.square(self.slices_).sum(axis=1)
         self.slices_std = self.slices_.std()
 
@@ -120,7 +127,7 @@ class SNM:
 
         if not hasattr(self, "dist"):
             self.dist = xp.empty((self.N_orientations, self.N_slices))
-        ugrid_gpu = gpuarray.to_gpu(ac.astype(np.complex128))
+        ugrid_gpu = gpuarray.to_gpu(ac.astype(c_type))
         slices_time = 0
         match_time = 0
         match_oth_time = 0

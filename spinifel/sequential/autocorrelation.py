@@ -26,6 +26,13 @@ else:
     from scipy.sparse.linalg import LinearOperator, cg
     xp = np
 
+if settings.use_single_prec:
+    f_type = xp.float32
+    c_type = xp.complex64
+else:
+    f_type = xp.float64
+    c_type = xp.complex128
+
 class Merge:
     def __init__(
             self,
@@ -55,10 +62,10 @@ class Merge:
         self.rlambda = 1 / self.N / 1000
         self.flambda = 1e3
 
-        data = np.array(slices_.reshape(-1), dtype=xp.complex128)
+        data = np.array(slices_.reshape(-1), dtype=c_type)
         weights = np.ones(self.N)
-        self.nuvect_Db = xp.array((data * weights).astype(np.complex128))
-        self.nuvect = xp.ones_like(data, dtype=xp.complex128)
+        self.nuvect_Db = xp.array((data * weights).astype(c_type))
+        self.nuvect = xp.ones_like(data, dtype=c_type)
 
         def callback(xk):
             callback.counter += 1
@@ -173,7 +180,7 @@ class Merge:
         # We use double precision here as Conjugated Gradient can be
         # numberically unstable at lower precision
         W = LinearOperator(
-            dtype=np.complex128,
+            dtype=c_type,
             shape=(self.M**3, self.M**3),
             matvec=W_matvec)
 
@@ -203,7 +210,7 @@ class Merge:
             ac_estimate = np.zeros((self.M,) * 3)
         else:
             ac_smoothed = gaussian_filter(ac_estimate, 0.5)
-            ac_support = (ac_smoothed > 1e-12).astype(np.float64)
+            ac_support = (ac_smoothed > 1e-12).astype(f_type)
             ac_estimate *= ac_support
         ac_estimate = xp.array(ac_estimate)
         ac_support = xp.array(ac_support)

@@ -24,6 +24,13 @@ elif context.finufftpy_available:
     import finufft
     mode = "finufft" + version("finufft")
 
+if settings.use_single_prec:
+    f_type = np.float32
+    c_type = np.complex64
+else:
+    f_type = np.float64
+    c_type = np.complex128
+
 class NUFFT:
     def __init__(
             self,
@@ -61,38 +68,38 @@ class NUFFT:
                     self.N_pixels *
                     self.N_batch_size,
                 ),
-                dtype=np.float64)
+                dtype=f_type)
             self.K_f = gpuarray.empty(
                 shape=(
                     self.N_pixels *
                     self.N_batch_size,
                 ),
-                dtype=np.float64)
+                dtype=f_type)
             self.L_f = gpuarray.empty(
                 shape=(
                     self.N_pixels *
                     self.N_batch_size,
                 ),
-                dtype=np.float64)
+                dtype=f_type)
 
             self.H_a = gpuarray.empty(
                 shape=(
                     self.N_pixels *
                     self.N_images,
                 ),
-                dtype=np.float64)
+                dtype=f_type)
             self.K_a = gpuarray.empty(
                 shape=(
                     self.N_pixels *
                     self.N_images,
                 ),
-                dtype=np.float64)
+                dtype=f_type)
             self.L_a = gpuarray.empty(
                 shape=(
                     self.N_pixels *
                     self.N_images,
                 ),
-                dtype=np.float64)
+                dtype=f_type)
 
             # Store memory that we have to send to the gpu constantly in pinned
             # memory.
@@ -101,18 +108,18 @@ class NUFFT:
 
         elif context.finufftpy_available:
             self.H_f = np.empty(
-                (self.N_pixels * self.N_batch_size,), dtype=np.float64)
+                (self.N_pixels * self.N_batch_size,), dtype=f_type)
             self.K_f = np.empty(
-                (self.N_pixels * self.N_batch_size,), dtype=np.float64)
+                (self.N_pixels * self.N_batch_size,), dtype=f_type)
             self.L_f = np.empty(
-                (self.N_pixels * self.N_batch_size,), dtype=np.float64)
+                (self.N_pixels * self.N_batch_size,), dtype=f_type)
 
             self.H_a = np.empty(
-                (self.N_pixels * self.N_images,), dtype=np.float64)
+                (self.N_pixels * self.N_images,), dtype=f_type)
             self.K_a = np.empty(
-                (self.N_pixels * self.N_images,), dtype=np.float64)
+                (self.N_pixels * self.N_images,), dtype=f_type)
             self.L_a = np.empty(
-                (self.N_pixels * self.N_images,), dtype=np.float64)
+                (self.N_pixels * self.N_images,), dtype=f_type)
 
             self.HKL_mat = np.empty((self.ref_rotmat.shape[1],
                                      self.ref_rotmat.shape[0],
@@ -160,7 +167,7 @@ class NUFFT:
             """
             assert isinstance(arr, cp.ndarray)
             shape = arr.shape
-            dtype = arr.dtype
+            arr_dtype = arr.dtype
 
             def alloc(x):
                 return arr.data.ptr
@@ -172,7 +179,7 @@ class NUFFT:
             else:
                 raise ValueError('arr order cannot be determined')
             return gpuarray.GPUArray(shape=shape,
-                                     dtype=dtype,
+                                     dtype=arr_dtype,
                                      allocator=alloc,
                                      order=order)
 
@@ -193,8 +200,6 @@ class NUFFT:
                 ugrid *= support
 
             dev_id = cp.cuda.device.Device().id
-            complex_dtype = np.complex128
-            dtype         = np.float64
 
             H_, K_, L_ = self.transpose(H_, K_, L_)
 
@@ -202,7 +207,7 @@ class NUFFT:
             self.K_f.set(K_)
             self.L_f.set(L_)
 
-            nuvect = gpuarray.GPUArray(shape=(N,), dtype=complex_dtype)
+            nuvect = gpuarray.GPUArray(shape=(N,), dtype=c_type)
             if not hasattr(self, "plan_f"):
                 self.plan_f = cufinufft(
                     2,
@@ -210,7 +215,7 @@ class NUFFT:
                     1,
                     self.eps,
                     isign=self.isign,
-                    dtype=dtype,
+                    dtype=f_type,
                     gpu_method=1,
                     gpu_device_id=dev_id)
 
@@ -230,8 +235,6 @@ class NUFFT:
                 M):
             assert H_.shape == K_.shape == L_.shape
             dev_id = cp.cuda.device.Device().id
-            complex_dtype = cp.complex128
-            dtype = cp.float64
 
             H_, K_, L_ = self.transpose(H_, K_, L_)
             shape = (M, M, M)
@@ -239,7 +242,7 @@ class NUFFT:
             nuvect_ga = self.gpuarray_from_cupy(nuvect)
 
             ugrid = gpuarray.GPUArray(
-                shape=shape, dtype=complex_dtype, order="F")
+                shape=shape, dtype=c_type, order="F")
             self.H_a.set(H_)
             self.K_a.set(K_)
             self.L_a.set(L_)
@@ -252,7 +255,7 @@ class NUFFT:
                     1,
                     self.eps,
                     isign=self.isign,
-                    dtype=dtype,
+                    dtype=f_type,
                     gpu_method=1,
                     gpu_device_id=dev_id)
             self.plan_a[shape].set_pts(self.H_a, self.K_a, self.L_a)
@@ -280,9 +283,6 @@ class NUFFT:
 
             dim = 3
             dev_id = cp.cuda.device.Device().id
-            complex_dtype = np.complex128
-            dtype         = np.float64
-
             H_, K_, L_ = self.transpose(H_, K_, L_)
 
             self.H_.set(H_)
@@ -293,7 +293,7 @@ class NUFFT:
             forward_opts.gpu_method = 1   # Override with method 1. The default is 2
             forward_opts.cuda_device_id = dev_id
 
-            nuvect = gpuarray.GPUArray(shape=(N,), dtype=complex_dtype)
+            nuvect = gpuarray.GPUArray(shape=(N,), dtype=c_type)
 
             if not hasattr(self, "plan"):
                 self.plan = cufinufft(
@@ -302,7 +302,7 @@ class NUFFT:
                     1,
                     self.isign,
                     self.eps,
-                    dtype=dtype,
+                    dtype=f_type,
                     opts=forward_opts)
 
             self.plan.set_pts(self.H_f.shape[0], self.H_f, self.K_f, self.L_f)
@@ -324,8 +324,6 @@ class NUFFT:
             dim = 3
             assert H_.shape == K_.shape == L_.shape
             dev_id = cp.cuda.device.Device().id
-            complex_dtype = cp.complex128
-            dtype = cp.float64
 
             H_, K_, L_ = self.transpose(H_, K_, L_)
             shape = (M, M, M)
@@ -333,7 +331,7 @@ class NUFFT:
             nuvect_ga = self.gpuarray_from_cupy(nuvect)
 
             ugrid = gpuarray.GPUArray(
-                shape=shape, dtype=complex_dtype, order="F")
+                shape=shape, dtype=c_type, order="F")
             self.H_a.set(H_)
             self.K_a.set(K_)
             self.L_a.set(L_)
@@ -347,7 +345,7 @@ class NUFFT:
                 self.plan = {}
             if shape not in self.plan:
                 self.plan[shape] = cufinufft(
-                    1, shape, self.isign, self.eps, dtype=dtype, opts=adjoint_opts)
+                    1, shape, self.isign, self.eps, dtype=f_type, opts=adjoint_opts)
             self.plan[shape].set_pts(self.H_, self.K_, self.L_)
             self.plan[shape].execute(nuvect_ga, ugrid)
             ugrid_gpu = self.gpuarray_to_cupy(ugrid)
@@ -367,7 +365,7 @@ class NUFFT:
             assert H_.shape == K_.shape == L_.shape
 
             # Allocate space in memory
-            nuvect = np.zeros(N, dtype=np.complex128)
+            nuvect = np.zeros(N, dtype=c_type)
 
             #__________________________________________________________________
             # Solve the NUFFT
@@ -396,7 +394,7 @@ class NUFFT:
             # Ensure that H, K, and L have the same shape
             assert H_.shape == K_.shape == L_.shape
 
-            ugrid = np.zeros((M, M, M), dtype=np.complex128, order='F')
+            ugrid = np.zeros((M, M, M), dtype=c_type, order='F')
 
             #__________________________________________________________________
             # Solve the NUFFT
