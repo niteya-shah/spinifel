@@ -1,47 +1,11 @@
 import matplotlib.pyplot as plt
-import argparse
 import time
-import os
 import numpy as np
-import h5py
-import mrcfile
 import scipy.interpolate
-from align import save_mrc, align_volumes
+import os
 import matplotlib
 matplotlib.use('Agg')
-
-"""
-Estimate resolution based on the Fourier shell correlation (FSC) between 
-the output MRC file and a reference density map generated from a PDB file.
-"""
-
-def parse_input():
-    """
-    Parse command line input.
-    """
-    parser = argparse.ArgumentParser(
-        description="Simulate a simple SPI dataset.")
-    parser.add_argument(
-        '-m', '--mrc_file', help='mrc file of reconstructed map', required=True, type=str)
-    parser.add_argument(
-        '-d', '--dataset', help='h5 file of simulated data', required=True, type=str)
-    parser.add_argument(
-        '-p', '--pdb_file', help='pdb file for reference structure', required=True, type=str)
-    parser.add_argument(
-        '-o', '--output', help='output directory for aligned volumes', required=False, type=str)
-    # optional arguments to adjust alignment protocol
-    parser.add_argument('--zoom', help='Zoom factor during alignment',
-                        required=False, type=float, default=1)
-    parser.add_argument('--sigma', help='Sigma for Gaussian filtering during alignment',
-                        required=False, type=float, default=0)
-    parser.add_argument('--niter', help='Number of alignment iterations to run',
-                        required=False, type=int, default=10)
-    parser.add_argument('--nsearch', help='Number of quaternions to score per iteration',
-                        required=False, type=int, default=360)
-    parser.add_argument('--use-cupy', help='Use CuPy for GPU accelerated FSC calculation',
-                        required=False, type=bool, default=True)
-
-    return vars(parser.parse_args())
+from .config import xp, ndimage
 
 def get_reciprocal_mesh(voxel_number_1d, distance_reciprocal_max, xp):
     """
@@ -53,6 +17,8 @@ def get_reciprocal_mesh(voxel_number_1d, distance_reciprocal_max, xp):
         number of voxels per axis
     distance_reciprocal_max : float
         maximum voxel resolution in inverse Angstrom
+    xp: package
+        use numpy or cupy
 
     Returns
     -------
@@ -67,7 +33,7 @@ def get_reciprocal_mesh(voxel_number_1d, distance_reciprocal_max, xp):
 
     return reciprocal_mesh
 
-def compute_reference(pdb_file, M, distance_reciprocal_max, xp):
+def compute_reference(pdb_file, M, distance_reciprocal_max):
     """
     Compute the reference density map from a PDB file using skopi.
 
@@ -101,7 +67,7 @@ def compute_reference(pdb_file, M, distance_reciprocal_max, xp):
 
     return density
 
-def compute_fsc(volume1, volume2, distance_reciprocal_max, xp, spacing=0.01, output=None):
+def compute_fsc(volume1, volume2, distance_reciprocal_max, spacing=0.01, output=None):
     """
     Compute the Fourier shell correlation (FSC) curve, with the 
     estimated resolution based on a threshold of 0.5.
@@ -124,7 +90,6 @@ def compute_fsc(volume1, volume2, distance_reciprocal_max, xp, spacing=0.01, out
     resolution : float
         estimated resolution of reconstructed map in Angstroms
     """
-
     mesh = get_reciprocal_mesh(volume1.shape[0], distance_reciprocal_max, xp)
     smags = xp.linalg.norm(xp.array(mesh), axis=-1).reshape(-1) * 1e-10
     volume1 = xp.array(volume1)
@@ -155,49 +120,14 @@ def compute_fsc(volume1, volume2, distance_reciprocal_max, xp, spacing=0.01, out
         resolution = -1
         print("Resolution could not be estimated.")
 
-    # optionally plot
-    if output is not None:
-        f, ax1 = plt.subplots(figsize=(5,3))
-        ax1.plot(rshell,fsc, c='black')
-        ax1.scatter(rshell,fsc, c='black')
-        ax1.plot([rshell.min(),rshell.max()],[0.5,0.5], c='grey', linestyle='dashed')
-        ax1.set_xlim(rshell.min(),rshell.max())
-        ax1.set_xlabel("Resolution (1/${\mathrm{\AA}}$)")
-        ax1.set_ylabel("FSC", fontsize=12)
-        f.savefig(os.path.join(output, "fsc.png"), dpi=300, bbox_inches='tight')
+    return resolution, rshell, fsc
 
-    return resolution
-
-def main():
-
-    args = parse_input()
-    if not os.path.isdir(args['output']):
-        os.mkdir(args['output'])
-    if args['use_cupy']:
-        import cupy as xp
-        from cupyx.scipy import ndimage
-    else:
-        xp = np
-        from scipy import ndimage
-
-    # load and prepare input files
-    volume = mrcfile.open(args['mrc_file']).data.copy()
-    with h5py.File(args['dataset'], "r") as f:
-        dist_recip_max = np.linalg.norm(
-            f['pixel_position_reciprocal'][:], axis=-1).max()
-    reference = compute_reference(
-        args['pdb_file'], volume.shape[0], dist_recip_max, xp)
-
-    # align volumes
-    ali_volume, ali_reference = align_volumes(volume, reference, xp, ndimage, zoom=args['zoom'], sigma=args['sigma'],
-                                              n_iterations=args['niter'], n_search=args['nsearch'])
-    if args['output'] is not None:
-        save_mrc(os.path.join(args['output'], "reference.mrc"), ali_reference)
-        save_mrc(os.path.join(args['output'], "aligned.mrc"), ali_volume)
-
-    # compute fsc
-    resolution = compute_fsc(ali_reference, ali_volume,
-                             dist_recip_max, xp, output=args['output'])
-
-if __name__ == '__main__':
-    main()
+def plot(rshell, fsc, output):
+    f, ax1 = plt.subplots(figsize=(5,3))
+    ax1.plot(rshell,fsc, c='black')
+    ax1.scatter(rshell,fsc, c='black')
+    ax1.plot([rshell.min(),rshell.max()],[0.5,0.5], c='grey', linestyle='dashed')
+    ax1.set_xlim(rshell.min(),rshell.max())
+    ax1.set_xlabel("Resolution (1/${\mathrm{\AA}}$)")
+    ax1.set_ylabel("FSC", fontsize=12)
+    f.savefig(os.path.join(output, "fsc.png"), dpi=300, bbox_inches='tight')

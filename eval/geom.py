@@ -1,11 +1,12 @@
 import numpy as np
 import skopi as sk
+from .config import xp, ndimage
 
 """
 Batched versions of skopi geometry functions for handling rotations.
 """
 
-def quaternion2rot3d(quat, xp):
+def quaternion2rot3d(quat):
     """
     Convert a set of quaternions to rotation matrices.
     This function was originally adopted from:
@@ -46,7 +47,7 @@ def quaternion2rot3d(quat, xp):
 
     return rotation
 
-def axis_angle_to_quaternion(axis, theta, xp):
+def axis_angle_to_quaternion(axis, theta):
     """
     Convert an angular rotation around an axis series to quaternions.
 
@@ -71,7 +72,7 @@ def axis_angle_to_quaternion(axis, theta, xp):
 
     return quat
 
-def quaternion_product(q1, q0, xp):
+def quaternion_product(q1, q0):
     """
     Compute quaternion product, q1 x q0, according to:
     https://www.mathworks.com/help/aeroblks/quaternionmultiplication.html.
@@ -99,7 +100,7 @@ def quaternion_product(q1, q0, xp):
 
     return q_prod
 
-def get_preferred_orientation_quat(num_pts, sigma, xp, base_quat=None):
+def get_preferred_orientation_quat(num_pts, sigma, base_quat=None):
     """
     Sample quaternions distributed around a given or random position in a restricted
     range in SO(3), where the spread of the distribution is determined by sigma.
@@ -123,12 +124,12 @@ def get_preferred_orientation_quat(num_pts, sigma, xp, base_quat=None):
     base_quat = xp.tile(base_quat, num_pts).reshape(num_pts, 4)
 
     # need to change to skopi
-    R_random = quaternion2rot3d(xp.array(sk.get_random_quat(num_pts)), xp)
+    R_random = quaternion2rot3d(xp.array(sk.get_random_quat(num_pts)))
     unitvec = xp.array([0, 0, 1.0])
     rot_axis = xp.matmul(unitvec, R_random)
     theta = sigma * xp.random.randn(num_pts)
     rand_axis = theta[:, None] * rot_axis
-    pref_quat = axis_angle_to_quaternion(rand_axis, theta, xp)
-    quat = quaternion_product(pref_quat, base_quat, xp)
+    pref_quat = axis_angle_to_quaternion(rand_axis, theta)
+    quat = quaternion_product(pref_quat, base_quat)
 
     return quat
