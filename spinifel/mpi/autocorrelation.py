@@ -107,7 +107,7 @@ class MergeMPI(Merge):
 
         # double precision is used for convergence with Conjugated Gradient
         W = LinearOperator(
-            dtype=np.complex128,
+            dtype=c_type,
             shape=(self.Mtot, self.Mtot),
             matvec=W_matvec)
 
