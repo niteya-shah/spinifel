@@ -2,9 +2,9 @@ from functools import wraps
 import numpy  as np
 import PyNVTX as nvtx
 
-from pygion import task, Region, Partition, Tunable, R
+from pygion import task, Region, Partition, Tunable, R, Ipartition, WD, Ispace
 
-from spinifel import SpinifelContexts
+from spinifel import SpinifelContexts, settings
 
 
 def gpu_task_wrapper(thunk):
@@ -48,3 +48,87 @@ def create_distributed_region(N_images_per_rank, fields_dict, sec_shape):
         N_images_per_rank * np.eye(len(shape_total), 1),
         shape_local)
     return region, region_p
+
+@nvtx.annotate("legion/utils.py", is_prefix=True)
+def create_partition_with_offset(region, secShape, nImagesPerRank, maxImagesPerRank, stride, nPoints,offset):
+    nImages = nPoints * maxImagesPerRank
+    shape_total = (nImages,) + secShape
+    shape_local = (nImagesPerRank,) + secShape
+    if offset == 0:
+        region_p = Partition.restrict(
+            region, [nPoints],
+            stride * np.eye(len(shape_total), 1),
+            shape_local)
+        return region_p
+    pending_p = Ipartition.pending(region.ispace, nPoints)
+    for i in range(nPoints):
+        ispace = []
+        startpoint = (maxImagesPerRank*i + offset,) + (0,0,0)
+        ispace.append(Ispace(shape_local, startpoint))
+        pending_p.union([i],ispace)
+        region_p = Partition(region, pending_p)
+    return region_p
+
+# create a set of partitions to be used for filling in subregions
+@nvtx.annotate("legion/utils.py", is_prefix=True)
+def init_partitions(slices, nPoints, batchSize, maxBatchSize,curBatchSize,secShape):
+    p = []
+    #assume divisible by batchSize
+    assert(maxBatchSize%batchSize == 0)
+    num_parts = maxBatchSize//batchSize
+    for i in range(num_parts):
+        offset = curBatchSize
+        p1 = create_partition_with_offset(slices, secShape, batchSize,maxBatchSize, maxBatchSize, nPoints, offset)
+        curBatchSize = curBatchSize+batchSize
+        p.append(p1)
+
+    if settings.verbose:
+        for j in range(nPoints):
+            print(f' init_parts {i}: p1[{j}] = {p1[j].ispace.bounds}')
+    return p
+
+def create_region(shape, fieldsDict):
+    r = Region(shape, fieldsDict)
+    return r
+
+def create_fill_region(shape,fieldsDict,val):
+    r = create_region(shape, fieldsDict)
+    for field_name in fieldsDict.keys():
+        pygion.fill(r, field_name, val)
+    return r
+
+@task(inner=True, privileges=[WD])
+def fill_region(merged, val):
+    for field_name in merged.keys():
+        pygion.fill(merged, field_name, val)
+
+
+# create a region containing maxImagesPerRank*nPoints*secShape
+def create_max_region(maxImagesPerRank,
+                      fieldsDict,
+                      secShape, nPoints):
+    N_images = nPoints * maxImagesPerRank
+    shape_total = (N_images,) + secShape
+    region = Region(shape_total, fieldsDict)
+
+    if settings.verbose:
+        print(f' region = {region.ispace.bounds}, max_images_per_rank = {maxImagesPerRank}, n_points={nPoints}')
+    return region
+
+
+# union partitions with stride
+def union_partitions_with_stride(region, secShape, nImagesPerRank, maxImagesPerRank, stride,  nPoints):
+    nImages = nPoints * maxImagesPerRank
+    shape_total = (nImages,) + secShape
+    shape_local = (nImagesPerRank,) + secShape
+    region_p = Partition.restrict(
+        region, [nPoints],
+        stride * np.eye(len(shape_total), 1),
+        shape_local)
+
+    if settings.verbose:
+        for i in range(nPoints):
+            print(f'Union: region_p[{i}] = {region_p[i].ispace.domain.extent}, {region_p[i].ispace.bounds}')
+
+    return region_p
+

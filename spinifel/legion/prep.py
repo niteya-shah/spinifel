@@ -4,13 +4,11 @@ import PyNVTX as nvtx
 import os
 import pygion
 import socket
-from pygion import task, Tunable, Partition, Region, WD, RO, Reduce, IndexLaunch
+from pygion import task, Tunable, Partition, Region, WD, RO, RW, Reduce, IndexLaunch
 
 from spinifel import settings, prep, image
 
 from . import utils as lgutils
-
-
 
 psana = None
 if settings.use_psana:
@@ -27,16 +25,9 @@ def load_pixel_position(pixel_position):
 @task(privileges=[WD])
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def load_pixel_position_psana(pixel_position,run):
-    pixel_position_val = 0
-    if run.expt == "xpptut15":
-        prep.load_pixel_position_reciprocal_psana(run,
-                                                  pixel_position_val,
-                                                  pixel_position.reciprocal)
-    # TODO - this needs to be setup for psana
-    elif run.expt == "amo06516":
-        pygion.fill(pixel_position, 'reciprocal', 0)
-    else:
-        assert False
+    pygion.fill(pixel_position, 'reciprocal', 0.0)
+    prep.load_pixel_position_reciprocal_psana(run,
+                                              pixel_position.reciprocal)
 
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def get_pixel_position(run=None):
@@ -83,10 +74,14 @@ def load_slices_psana(slices, rank, N_images_per_rank, smd_chunk, run):
             raw = evt._dgrams[0].pnccdBack[0].raw
             try:
                 slices.data[i] = raw.image
+                print(f' {rank} loading {i}')
             except IndexError:
                 raise RuntimeError(
                     f"Rank {rank} received too many events.")
             i += 1
+            if i==N_images_per_rank:
+                print(f'Rank {rank} returning early i={i}, N_images_per_rank={N_images_per_rank}')
+                return
     if settings.verbosity > 0:
         print(f"{socket.gethostname()} loaded slices.", flush=True)
 
@@ -106,9 +101,9 @@ def load_slices_psana2(slices, rank, N_images_per_rank, smd_chunk, run):
             except IndexError:
                 raise RuntimeError(
                     f"Task received too many events.")
-            i += 1
+            i = i+1
     if settings.verbosity > 0:
-        print(f"{socket.gethostname()} loaded slices.", flush=True)
+        print(f"{socket.gethostname()} loaded {i} slices.", flush=True)
 
 @task(privileges=[WD])
 @nvtx.annotate("legion/prep.py", is_prefix=True)
@@ -139,7 +134,6 @@ def get_slices(ds):
             if val == 0:
                 # pixel index map
                 pixel_index = get_pixel_index(run)
-                # TODO pixel_position.reciprocal for "am06516"
                 pixel_position = get_pixel_position(run)
             val= val+1
             for smd_chunk, step_data in smd_chunks_steps(run):
@@ -200,8 +194,6 @@ def calculate_pixel_distance(pixel_position, pixel_distance):
     pixel_distance.reciprocal[:] = prep.compute_pixel_distance(
             pixel_position.reciprocal)
 
-
-
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def compute_pixel_distance(pixel_position):
     pixel_position_type = getattr(pygion, settings.pixel_position_type_str)
@@ -254,7 +246,6 @@ def apply_slices_binning(old_slices, new_slices):
     new_slices.data[:] = prep.binning_sum(old_slices.data)
 
 
-
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def bin_slices(old_slices, old_slices_p):
     N_images_per_rank = settings.N_images_per_rank
@@ -262,17 +253,23 @@ def bin_slices(old_slices, old_slices_p):
     sec_shape = settings.reduced_det_shape
     new_slices, new_slices_p = lgutils.create_distributed_region(
         N_images_per_rank, fields_dict, sec_shape)
+
     for old_slices_subr, new_slices_subr in zip(old_slices_p, new_slices_p):
         apply_slices_binning(old_slices_subr, new_slices_subr)
     return new_slices, new_slices_p
 
+#perform binning by copying the old data without creating a new region
+@task(privileges=[RW])
+@nvtx.annotate("legion/prep.py", is_prefix=True)
+def apply_slices_binning_new(slices):
+    data[:] = slices.data
+    slices.data[:] = prep.binning_sum(data)
 
 
 @task(privileges=[RO, RO])
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def show_image(pixel_index, images, image_index, name):
     image.show_image(pixel_index.map, images.data[image_index], name)
-
 
 @task(privileges=[RO, RO])
 @nvtx.annotate("legion/prep.py", is_prefix=True)
@@ -282,7 +279,48 @@ def export_saxs(pixel_distance, mean_image, name):
     # Legion seems to reset the global seterr from parms.py.
     prep.export_saxs(pixel_distance.reciprocal, mean_image.data, name)
 
+@nvtx.annotate("legion/prep.py", is_prefix=True)
+def init_partitions_regions_psana2():
+    # minimum batch size = n_images_per_rank
+    n_images_per_rank = settings.N_images_per_rank
+    n_points = Tunable.select(Tunable.GLOBAL_PYS).get()
 
+    # batch size
+    batch_size = settings.N_images_per_rank
+
+    # total batches per rank
+    # N_images_max = maximum # of images in total
+    # i.e size of the region
+    assert settings.N_images_max%settings.N_images_per_rank == 0
+
+    total_batches = settings.N_images_max//settings.N_images_per_rank
+
+    # max batches per iteration
+    max_batches = settings.N_image_batches_max
+
+    # N_max_images_per_rank
+    max_images_per_rank = settings.N_images_max
+
+    # max batch size per iter per rank
+    # settings.N_image_batches_max*batch_size
+    # max_batch_size = max_batches*batch_size
+
+    fields_dict = {"data": getattr(pygion, settings.data_type_str)}
+    sec_shape = settings.reduced_det_shape
+
+    slices  = lgutils.create_max_region(max_images_per_rank,fields_dict,sec_shape,n_points)
+    # start at the first batch
+    cur_batch_size = 0
+    # create all the partitions
+    p = lgutils.init_partitions(slices,n_points,batch_size,max_images_per_rank,cur_batch_size,sec_shape)
+
+    # create settings.N_batches_max*batch_size det_shape slices per rank
+    sec_shape = settings.det_shape
+    max_images_per_iter = max_batches*batch_size
+    slices_images  = lgutils.create_max_region(max_images_per_iter,fields_dict,sec_shape,n_points)
+    slices_images_p = lgutils.init_partitions(slices_images,n_points,batch_size,max_images_per_iter,
+                                              cur_batch_size,sec_shape)
+    return slices, p, slices_images, slices_images_p
 
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def get_data(ds):
@@ -310,3 +348,94 @@ def get_data(ds):
     pixel_distance = compute_pixel_distance(pixel_position)
     export_saxs(pixel_distance, mean_image, "saxs_binned.png")
     return (pixel_position, pixel_distance, pixel_index, slices, slices_p)
+
+#load pixel data from psana2
+@nvtx.annotate("legion/prep.py", is_prefix=True)
+def load_pixel_data(ds):
+    pixel_position = None
+    pixel_index = None
+    assert ds is not None
+    n_nodes = Tunable.select(Tunable.NODE_COUNT).get()
+    gen_run = ds.runs()
+    for run in gen_run:
+        # load pixel index map and pixel position reciprocal only once
+        pixel_index = get_pixel_index(run)
+        pixel_position = get_pixel_position(run)
+        break
+
+    pixel_distance = compute_pixel_distance(pixel_position)
+    return pixel_position, pixel_distance, pixel_index, run
+
+
+#process pixel data after first set of slices are loaded
+@nvtx.annotate("legion/prep.py", is_prefix=True)
+def bin_slices_new(old_slices_p, new_slices_p):
+    for old_slices_subr, new_slices_subr in zip(old_slices_p, new_slices_p):
+        apply_slices_binning(old_slices_subr, new_slices_subr)
+
+
+@nvtx.annotate("legion/prep.py", is_prefix=True)
+def process_data(slices, slices_p, slices_bin, slices_bin_p,
+                 pixel_distance, pixel_index, pixel_position, iteration):
+
+    #returns a region that contains the mean of images
+    mean_image = compute_mean_image(slices,slices_p)
+
+    show_image(pixel_index, slices_p[0], 0, "image_{iteration}.png")
+    show_image(pixel_index, mean_image, ..., "mean_image_{iteration}.png")
+    export_saxs(pixel_distance, mean_image, "saxs_{iteration}.png")
+
+    # bin pixel position and pixel index
+    # return a region that contains the binned pixel_position + pixel_index
+    if iteration == 0:
+        pixel_position = bin_pixel_position(pixel_position)
+        pixel_index = bin_pixel_index(pixel_index)
+
+    # bin slices new is passed the current set of images,
+    # and the slices_bin partition to copy the binned
+    # slices into
+    bin_slices_new(slices_p, slices_bin_p)
+
+    # get the mean of the binned slices
+    mean_image = compute_mean_image(slices_bin, slices_bin_p)
+    show_image(pixel_index, slices_bin_p[0], 0, "image_binned_{iteration}.png")
+    show_image(pixel_index, mean_image, ..., "mean_image_binned_{iteration}.png")
+
+    # return a region pixel_distance based on the binned pixel_position
+    # done only on iteraton 1
+    if iteration == 0:
+        pixel_distance = compute_pixel_distance(pixel_position)
+
+    export_saxs(pixel_distance, mean_image, "saxs_binned_{iteration}.png")
+
+    # mean_image region is no longer needed
+    pygion.fill(mean_image, 'data', 0)
+
+    # return regions containing binned pixel_position, pixel_distance, pixel_index
+    return (pixel_position, pixel_distance, pixel_index)
+
+#load image batch from psana2
+@nvtx.annotate("legion/prep.py", is_prefix=True)
+def load_image_batch(run, gen_run, gen_smd, slices_p):
+    # create a new region of full size and load the images
+    assert gen_run is not None
+    n_nodes = Tunable.select(Tunable.NODE_COUNT).get()
+    chunk_i = 0
+    if run is None:
+        run = next(gen_run)
+    if gen_smd is None:
+        gen_smd = smd_chunks_steps(run)
+    while chunk_i < n_nodes:
+        for smd_chunk, step_data in gen_smd:
+            i = chunk_i % n_nodes
+            print(f'slices_p[{i}] = {slices_p[i].ispace.domain.extent}, bounds = {slices_p[i].ispace.bounds}')
+            load_slices_psana2(slices_p[i], i,
+                               settings.N_images_per_rank,
+                               bytearray(smd_chunk),
+                               run,
+                               point=i)
+            chunk_i += 1
+            if chunk_i==n_nodes:
+                break
+        gen_smd = smd_chunks_steps(run)
+    return gen_run, gen_smd, run

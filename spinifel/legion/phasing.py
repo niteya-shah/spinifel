@@ -4,6 +4,7 @@ import pygion
 from pygion import task, Region, RO, RW, WD
 
 from spinifel import settings
+from spinifel.prep import save_mrc
 from spinifel.sequential.phasing import phase as sequential_phase
 from . import utils as lgutils
 
@@ -60,7 +61,7 @@ def phase_gen0_task(solved, phased):
 
 @task(privileges=[RO("ac"), WD("ac") + RW("support_", "rho_")])
 @lgutils.gpu_task_wrapper
-@nvtx.annotate("legion/phasing.py", is_prefix=True)
+@nvtx.annotate("legion/ phasing.py", is_prefix=True)
 def phase_task(solved, phased, generation):
     if settings.verbosity > 0:
         print("Starting phasing", flush=True)
@@ -84,3 +85,16 @@ def phase(generation, solved, phased=None):
         phase_task(solved, phased, generation)
 
     return phased
+
+
+@task(privileges=[RO("ac", "rho_")])
+@nvtx.annotate("legion/phasing.py", is_prefix=True)
+def phased_output_task(phased,generation):
+    rho = np.fft.ifftshift(phased.rho_)
+    save_mrc(settings.out_dir / f"ac-{generation}.mrc", phased.ac)
+    save_mrc(settings.out_dir / f"rho-{generation}.mrc", rho)
+
+# launch the output task
+@nvtx.annotate("legion/phasing.py", is_prefix=True)
+def phased_output(phased,generation):
+    phased_output_task(phased, generation)

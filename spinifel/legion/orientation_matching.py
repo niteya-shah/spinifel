@@ -29,20 +29,21 @@ def match_task(phased, slices, orientations, pixel_position, pixel_distance):
 
 
 @nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
-def match(phased, slices, slices_p, pixel_position, pixel_distance):
+def match(phased, slices_p, pixel_position, pixel_distance, n_images_per_rank):
     # The reference orientations don't have to match exactly between ranks.
     # Each rank aligns its own slices.
     # We can call the sequential function on each rank, provided that the
     # cost of generating the model_slices isn't prohibitive.
     orientations, orientations_p = lgutils.create_distributed_region(
-        settings.N_images_per_rank, {"quaternions": pygion.float32}, (4,))
+        n_images_per_rank, {"quaternions": pygion.float32}, (4,))
 
     N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
-    for i in IndexLaunch([N_procs]):
+    #for i in IndexLaunch([N_procs]):
+    for i in range(N_procs):
         # Ideally, the location (point) should be deduced from the
         # location of the slices.
         match_task(
             phased, slices_p[i], orientations_p[i],
-            pixel_position, pixel_distance)
+            pixel_position, pixel_distance,point=i)
 
     return orientations, orientations_p
