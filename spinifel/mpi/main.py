@@ -23,7 +23,10 @@ def main():
     N_images_per_rank = settings.N_images_per_rank
     batch_size = min(N_images_per_rank, 100)
     N_big_data_nodes = comm.size
-    max_events = min(settings.N_images_max, N_big_data_nodes*N_images_per_rank)
+    max_events = min(
+        settings.N_images_max,
+        N_big_data_nodes *
+        N_images_per_rank)
     writer_rank = 0 # pick writer rank as core 0
 
     # Reading input images using psana2
@@ -31,10 +34,16 @@ def main():
     if settings.use_psana:
         from psana import DataSource
         # BigData cores are those excluding Smd0, EventBuilder, & Server cores.
-        N_big_data_nodes = comm.size - (1 + settings.ps_eb_nodes + settings.ps_srv_nodes)
-        writer_rank = 1 + settings.ps_eb_nodes # pick writer rank as the first BigData core
+        N_big_data_nodes = comm.size - \
+            (1 + settings.ps_eb_nodes + settings.ps_srv_nodes)
+        # pick writer rank as the first BigData core
+        writer_rank = 1 + settings.ps_eb_nodes
         batch_size = min(N_images_per_rank, 100)
-        max_events = min(settings.N_images_max, N_big_data_nodes*N_images_per_rank)
+        max_events = min(
+            settings.N_images_max,
+            N_big_data_nodes *
+            N_images_per_rank)
+
         def destination(timestamp):
             # Return big data node destination, numbered from 1, round-robin
             destination.last = destination.last % N_big_data_nodes + 1
@@ -43,9 +52,9 @@ def main():
         ds = DataSource(exp=settings.exp, run=settings.runnum,
                         dir=settings.data_dir, destination=destination,
                         max_events=max_events)
-    
-    # Setup logger after knowing the writer rank 
-    logger = utils.Logger(comm.rank==writer_rank)
+
+    # Setup logger after knowing the writer rank
+    logger = utils.Logger(comm.rank == writer_rank)
     logger.log("In MPI main")
     if settings.use_psana:
         logger.log("Using psana")
@@ -67,9 +76,11 @@ def main():
 
     if settings.load_gen > 0: # Load input from previous generation
         curr_gen = settings.load_gen
-        print(f"Loading checkpoint: {checkpoint.generate_checkpoint_name(settings.out_dir, settings.load_gen, settings.tag_gen)}", flush=True)
-        myRes = checkpoint.load_checkpoint(settings.out_dir, 
-                                           settings.load_gen, 
+        print(
+            f"Loading checkpoint: {checkpoint.generate_checkpoint_name(settings.out_dir, settings.load_gen, settings.tag_gen)}",
+            flush=True)
+        myRes = checkpoint.load_checkpoint(settings.out_dir,
+                                           settings.load_gen,
                                            settings.tag_gen)
         # Unpack dictionary
         ac_phased = myRes['ac_phased']
@@ -78,33 +89,51 @@ def main():
         orientations = myRes['orientations']
     else:
         curr_gen = 0
-        logger.log(f"#"*27)
+        logger.log(f"#" * 27)
         logger.log(f"##### Generation {curr_gen}/{N_generations} #####")
-        logger.log(f"#"*27)
+        logger.log(f"#" * 27)
         ac = solve_ac(
-            curr_gen, pixel_position_reciprocal, pixel_distance_reciprocal, slices_)
+            curr_gen,
+            pixel_position_reciprocal,
+            pixel_distance_reciprocal,
+            slices_)
         logger.log(f"AC recovered in {timer.lap():.2f}s.")
         if comm.rank == 0:
-            dist_recip_max = np.linalg.norm(f['pixel_position_reciprocal'][:], axis=-1).max()
-            reference = compute_reference(settings.pdb_path, volume.shape[0], dist_recip_max)
-            myRes = { 
+            dist_recip_max = np.linalg.norm(
+                f['pixel_position_reciprocal'][:], axis=-1).max()
+            reference = compute_reference(
+                settings.pdb_path, settings.M, dist_recip_max)
+            myRes = {
                      'pixel_position_reciprocal': pixel_position_reciprocal,
                      'pixel_distance_reciprocal': pixel_distance_reciprocal,
                      'slices_': slices_,
-                     'ac': ac
+                     'ac': ac,
+                     'reference': reference,
+                     'dist_recip_max': dist_recip_max
                     }
-            checkpoint.save_checkpoint(myRes, settings.out_dir, curr_gen, tag="solve_ac", protocol=4)
+            checkpoint.save_checkpoint(
+                myRes,
+                settings.out_dir,
+                curr_gen,
+                tag="solve_ac",
+                protocol=4)
+            logger.log(f"Reference created in {timer.lap():.2f}s.")
 
         ac_phased, support_, rho_ = phase(curr_gen, ac)
         logger.log(f"Problem phased in {timer.lap():.2f}s.")
         if comm.rank == 0:
-            myRes = { 
+            myRes = {**myRes, **{
                      'ac': ac,
                      'ac_phased': ac_phased,
                      'support_': support_,
                      'rho_': rho_
-                    }
-            checkpoint.save_checkpoint(myRes, settings.out_dir, curr_gen, tag="phase",protocol=4)
+                     }}
+            checkpoint.save_checkpoint(
+                myRes,
+                settings.out_dir,
+                curr_gen,
+                tag="phase",
+                protocol=4)
             # Save electron density and intensity
             rho = np.fft.ifftshift(rho_)
             intensity = np.fft.ifftshift(np.abs(np.fft.fftshift(ac_phased)**2))
@@ -118,23 +147,28 @@ def main():
     cov_delta = .05
     curr_gen += 1
 
-    for generation in range(curr_gen, N_generations+1):
-        logger.log(f"#"*27)
+    for generation in range(curr_gen, N_generations + 1):
+        logger.log(f"#" * 27)
         logger.log(f"##### Generation {generation}/{N_generations} #####")
-        logger.log(f"#"*27)
+        logger.log(f"#" * 27)
         # Orientation matching
         orientations = match(
             ac_phased, slices_,
             pixel_position_reciprocal, pixel_distance_reciprocal)
         logger.log(f"Orientations matched in {timer.lap():.2f}s.")
         if comm.rank == 0:
-            myRes = {'ac_phased': ac_phased, 
+            myRes = {**myRes, {'ac_phased': ac_phased,
                      'slices_': slices_,
-                     'pixel_position_reciprocal': pixel_position_reciprocal,
-                     'pixel_distance_reciprocal': pixel_distance_reciprocal,
-                     'orientations': orientations
-                    }
-            checkpoint.save_checkpoint(myRes, settings.out_dir, generation, tag="match",protocol=4)
+                               'pixel_position_reciprocal': pixel_position_reciprocal,
+                               'pixel_distance_reciprocal': pixel_distance_reciprocal,
+                               'orientations': orientations
+                               }}
+            checkpoint.save_checkpoint(
+                myRes,
+                settings.out_dir,
+                generation,
+                tag="match",
+                protocol=4)
 
         # Solve autocorrelation
         ac = solve_ac(
@@ -142,31 +176,41 @@ def main():
             slices_, orientations, ac_phased)
         logger.log(f"AC recovered in {timer.lap():.2f}s.")
         if comm.rank == 0:
-            myRes = { 
+            myRes = {**myRes, {
                      'pixel_position_reciprocal': pixel_position_reciprocal,
                      'pixel_distance_reciprocal': pixel_distance_reciprocal,
                      'slices_': slices_,
                      'orientations': orientations,
                      'ac_phased': ac_phased,
                      'ac': ac
-                    }
-            checkpoint.save_checkpoint(myRes, settings.out_dir, generation, tag="solve_ac",protocol=4)
+                     }}
+            checkpoint.save_checkpoint(
+                myRes,
+                settings.out_dir,
+                generation,
+                tag="solve_ac",
+                protocol=4)
 
-        if comm.rank == 0: 
+        if comm.rank == 0:
             prev_rho_ = rho_[:]
             prev_support_ = support_[:]
         ac_phased, support_, rho_ = phase(generation, ac, support_, rho_)
         logger.log(f"Problem phased in {timer.lap():.2f}s.")
         if comm.rank == 0:
-            myRes = { 
+            myRes = {**myRes, {
                      'ac': ac,
-                     'prev_support_':prev_support_,
+                     'prev_support_': prev_support_,
                      'prev_rho_': prev_rho_,
                      'ac_phased': ac_phased,
                      'support_': support_,
                      'rho_': rho_
-                    }
-            checkpoint.save_checkpoint(myRes, settings.out_dir, generation, tag="phase",protocol=4)
+                     }}
+            checkpoint.save_checkpoint(
+                myRes,
+                settings.out_dir,
+                generation,
+                tag="phase",
+                protocol=4)
 
 
         # Check if density converges
@@ -174,12 +218,13 @@ def main():
             # Calculate correlation coefficient
             if comm.rank == 0:
                 prev_cov_xy = cov_xy
-                cov_xy = np.corrcoef(prev_rho_.flatten(), rho_.flatten())[0,1]
+                cov_xy = np.corrcoef(prev_rho_.flatten(), rho_.flatten())[0, 1]
             else:
                 prev_cov_xy = None
                 cov_xy = None
-            logger.log(f"CC in {timer.lap():.2f}s. cc={cov_xy:.2f} delta={cov_xy-prev_cov_xy:.2f}")
-            
+            logger.log(
+                f"CC in {timer.lap():.2f}s. cc={cov_xy:.2f} delta={cov_xy-prev_cov_xy:.2f}")
+
             # Stop if improvement in cc is less than cov_delta
             prev_cov_xy = comm.bcast(prev_cov_xy, root=0)
             cov_xy = comm.bcast(cov_xy, root=0)
@@ -192,16 +237,23 @@ def main():
             rho = np.fft.ifftshift(rho_)
             intensity = np.fft.ifftshift(np.abs(np.fft.fftshift(ac_phased)**2))
             save_mrc(settings.out_dir / f"ac-{generation}.mrc", ac_phased)
-            save_mrc(settings.out_dir / f"intensity-{generation}.mrc", intensity)
+            save_mrc(
+                settings.out_dir /
+                f"intensity-{generation}.mrc",
+                intensity)
             save_mrc(settings.out_dir / f"rho-{generation}.mrc", rho)
-
+            ali_volume, ali_reference = align_volumes(rho, myRes['reference'], zoom=args['zoom'], sigma=args['sigma'],
+                                                      n_iterations=args['niter'], n_search=args['nsearch'])
+            resolution, rshell, fsc_val = compute_fsc(
+                ali_reference, ali_volume, myRes['dist_recip_max'])
             # Save output
-            myRes = {'ac_phased': ac_phased, 
-                     'support_': support_,
-                     'rho_': rho_,
-                     'orientations': orientations
-                    }
-            checkpoint.save_checkpoint(myRes, settings.out_dir, generation, tag="", protocol=4)
+            myRes = {**myRes, {'ac_phased': ac_phased,
+                                 'support_': support_,
+                               'rho_': rho_,
+                               'orientations': orientations
+                               }}
+            checkpoint.save_checkpoint(
+                myRes, settings.out_dir, generation, tag="", protocol=4)
 
     logger.log(f"Results saved in {settings.out_dir}")
     logger.log(f"Successfully completed in {timer.total():.2f}s.")
