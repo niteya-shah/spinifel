@@ -409,6 +409,11 @@ class SpinifelSettings(metaclass=Singleton):
                 "algorithm", "load_generation",
                 int, 0,
                 "start from output of this generation"
+            ),
+            "_pdb_path": (
+                "runtime", "pdb_path",
+                Path, Path(""),
+                "Path for the PDB File"
             )
         }
 
@@ -418,6 +423,7 @@ class SpinifelSettings(metaclass=Singleton):
             "TEST": ("_test", get_str),
             "VERBOSE": ("_verbose", get_bool),
             "DATA_DIR": ("_data_dir", get_path),
+            "PDB_PATH": ("_pdb_path", get_path),
             "DATA_FILENAME": ("_data_filename", get_str),
             "USE_PSANA": ("_use_psana", get_bool),
             "OUT_DIR": ("_out_dir", get_path),

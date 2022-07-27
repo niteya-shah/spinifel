@@ -9,7 +9,8 @@ from .autocorrelation import solve_ac
 from .phasing import phase
 from .orientation_matching import match
 
-
+from eval.fsc import compute_fsc, compute_reference
+from eval.align import align_volumes
 
 @nvtx.annotate("mpi/main.py", is_prefix=True)
 def main():
@@ -84,6 +85,8 @@ def main():
             curr_gen, pixel_position_reciprocal, pixel_distance_reciprocal, slices_)
         logger.log(f"AC recovered in {timer.lap():.2f}s.")
         if comm.rank == 0:
+            dist_recip_max = np.linalg.norm(f['pixel_position_reciprocal'][:], axis=-1).max()
+            reference = compute_reference(settings.pdb_path, volume.shape[0], dist_recip_max)
             myRes = { 
                      'pixel_position_reciprocal': pixel_position_reciprocal,
                      'pixel_distance_reciprocal': pixel_distance_reciprocal,
