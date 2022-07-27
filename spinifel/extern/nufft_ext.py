@@ -50,7 +50,7 @@ class NUFFT:
         # Save reference rotation matrix so that we dont re-create it every
         # time
         self.ref_rotmat = np.array(
-            [np.linalg.inv(skp.quaternion2rot3d(quat)) for quat in self.ref_orientations])
+            [np.linalg.inv(skp.quaternion2rot3d(quat)) for quat in self.ref_orientations], dtype=f_type)
 
         self.eps = 1e-12
         self.isign = -1
@@ -104,7 +104,7 @@ class NUFFT:
             # Store memory that we have to send to the gpu constantly in pinned
             # memory.
             self.HKL_mat = pycuda.driver.pagelocked_empty(
-                (self.ref_rotmat.shape[1], self.ref_rotmat.shape[0], *pixel_position_reciprocal.shape[1:]), self.ref_rotmat.dtype)
+                (self.ref_rotmat.shape[1], self.ref_rotmat.shape[0], *pixel_position_reciprocal.shape[1:]), f_type)
 
         elif context.finufftpy_available:
             self.H_f = np.empty(
@@ -124,7 +124,7 @@ class NUFFT:
             self.HKL_mat = np.empty((self.ref_rotmat.shape[1],
                                      self.ref_rotmat.shape[0],
                                      *pixel_position_reciprocal.shape[1:]),
-                                    self.ref_rotmat.dtype)
+                                     f_type)
 
         # Cupy Einsum leaks memory so we dont use it
         np.einsum(
@@ -132,14 +132,17 @@ class NUFFT:
             self.ref_rotmat,
             self.pixel_position_reciprocal,
             optimize='greedy',
+            dtype=f_type,
             out=self.HKL_mat)
         self.HKL_mat *= self.mult
         assert np.max(np.abs(self.HKL_mat)) < 3 * np.pi
 
     @staticmethod
     @nvtx.annotate("extern/util.py", is_prefix=True)
-    def transpose(x, y, z):
+    def transpose(x, y, z, dtype=None):
         """Transposes the order of the (x, y, z) coordinates to (z, y, x)"""
+        if dtype:
+            return z.astype(dtype), y.astype(dtype), x.astype(dtype)
         return z, y, x
 
     if settings.use_cuda:
@@ -236,7 +239,7 @@ class NUFFT:
             assert H_.shape == K_.shape == L_.shape
             dev_id = cp.cuda.device.Device().id
 
-            H_, K_, L_ = self.transpose(H_, K_, L_)
+            H_, K_, L_ = self.transpose(H_, K_, L_, dtype=f_type)
             shape = (M, M, M)
     # TODO convert to GPUarray
             nuvect_ga = self.gpuarray_from_cupy(nuvect)

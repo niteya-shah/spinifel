@@ -126,7 +126,7 @@ class SNM:
             return xp.zeros((0, 4))
 
         if not hasattr(self, "dist"):
-            self.dist = xp.empty((self.N_orientations, self.N_slices))
+            self.dist = xp.empty((self.N_orientations, self.N_slices), dtype=f_type)
         ugrid_gpu = gpuarray.to_gpu(ac.astype(c_type))
         slices_time = 0
         match_time = 0
