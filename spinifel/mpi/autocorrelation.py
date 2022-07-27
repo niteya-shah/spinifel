@@ -31,6 +31,13 @@ else:
     from scipy.sparse.linalg import LinearOperator, cg
     xp = np
 
+if settings.use_single_prec:
+    f_type = xp.float32
+    c_type = xp.complex64
+else:
+    f_type = xp.float64
+    c_type = xp.complex128
+
 class MergeMPI(Merge):
 
     def __init__(
