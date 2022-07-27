@@ -18,6 +18,7 @@ source setup/env.sh
 
 export SLURM_CPU_BIND="cores"
 srun legion_python -ll:py 1 -ll:pyomp 8 -ll:csize 16384 legion_main.py --default-settings=cgpu_legion.toml --mode=legion -g 0
+
 t_end=`date +%s`
 echo PSJobCompleted TotalElapsed $((t_end-t_start)) $t_start $t_end
 

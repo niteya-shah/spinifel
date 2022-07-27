@@ -1,8 +1,14 @@
-# this configuration is intended for use at https://code.ornl.gov
-
+# global configuration, applies to all machines
 variables:
+  THREADS: 4 # reduce parallelism to avoid OOM in Legion build
+
+# this configuration is intended for use at Ascent / https://code.ornl.gov
+.ascent_variables: &ascent_variables
   SCHEDULER_PARAMETERS: "-P CHM137 -W 1:30 -nnodes 1 -alloc_flags gpumps"
   EXTERNAL_WORKDIR: /gpfs/wolf/chm137/proj-shared/ci/${CI_PIPELINE_ID}
+
+  # launcher for tests
+  SPINIFEL_TEST_LAUNCHER: "jsrun -n1 -a1 -g1"
 
   # for script test
   DATA_DIR: /gpfs/wolf/chm137/proj-shared/spinifel_data
@@ -13,16 +19,30 @@ variables:
   # for pytest
   test_data_dir: /gpfs/wolf/chm137/proj-shared/spinifel_data/testdata
 
-  THREADS: 4 # reduce parallelism to avoid OOM in Legion build
+  IS_CRUSHER_JOB: 0
 
-stages:
-  - build
-  - unit_test
-  - test
-  - cleanup
+# this configuration is intended for use at Crusher / https://code.olcf.ornl.gov
+.crusher_variables: &crusher_variables
+  SCHEDULER_PARAMETERS: "-A CHM137_crusher -t 1:30:00 -N 1 -p batch"
+  EXTERNAL_WORKDIR: /gpfs/alpine/chm137/proj-shared/ci/${CI_PIPELINE_ID}
 
-build:
-  stage: build
+  # launcher for tests
+  SPINIFEL_TEST_LAUNCHER: "srun -n1"
+
+  # for script test
+  DATA_DIR: /gpfs/alpine/chm137/proj-shared/spinifel_data
+  DATA_FILENAME: 2CEX-10k-2.h5
+  OUT_DIR: /gpfs/alpine/chm137/proj-shared/ci/${CI_PIPELINE_ID}/spinifel_output
+  CUPY_CACHE_DIR: /gpfs/alpine/chm137/proj-shared/ci/${CI_PIPELINE_ID}/cupy_cache
+
+  # for pytest
+  test_data_dir: /gpfs/alpine/chm137/proj-shared/spinifel_data/testdata
+
+  IS_CRUSHER_JOB: 1
+
+
+# scripts for the various test stages
+.build_script: &build_script
   before_script:
     - mkdir -p $(dirname ${EXTERNAL_WORKDIR})
     - cp -r ${CI_PROJECT_DIR} ${EXTERNAL_WORKDIR}
@@ -31,92 +51,227 @@ build:
     - git submodule update --init --recursive
   script:
     - ./setup/build_from_scratch.sh
-  tags:
-    - nobatch
 
-unit_test:
-  stage: unit_test
+.test_before_script: &test_before_script
   before_script:
     - cd ${EXTERNAL_WORKDIR}
+    - mkdir -p ${OUT_DIR}
+    - source ./setup/env.sh
+
+.unit_test_script: &unit_test_script
   script:
     - ./scripts/test.sh
-  tags:
-    - batch
 
-test_mpi:
-  stage: test
-  before_script:
-    - cd ${EXTERNAL_WORKDIR}
-    - mkdir -p ${OUT_DIR}
-    - source ./setup/env.sh
+.mpi_test_script: &mpi_test_script
   script:
-    - jsrun -n1 -a1 -g1 python -m spinifel --default-settings=summit_ci.toml --mode=mpi
-  tags:
-    - batch
+    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=summit_ci.toml --mode=mpi
 
-test_legion:
-  stage: test
-  before_script:
-    - cd ${EXTERNAL_WORKDIR}
-    - mkdir -p ${OUT_DIR}
-    - source ./setup/env.sh
-    - export PYTHONPATH=${PYTHONPATH}:${EXTERNAL_WORKDIR}
+.legion_test_script: &legion_test_script
   script:
-      - PYTHONPATH="$PYTHONPATH:$PWD/mpi4py_poison_wrapper" jsrun -n1 -a1 -g1 legion_python -ll:py 1 -ll:csize 8192 legion_main.py --default-settings=summit_ci.toml --mode=legion
-  tags:
-    - batch
+    - PYTHONPATH="$PYTHONPATH:$EXTERNAL_WORKDIR:$PWD/mpi4py_poison_wrapper" $SPINIFEL_TEST_LAUNCHER legion_python -ll:py 1 -ll:csize 8192 legion_main.py --default-settings=summit_ci.toml --mode=legion
 
-# TODO: suggest deprecating
-#test_sequential:
-#  stage: test
-#  before_script:
-#    - cd ${EXTERNAL_WORKDIR}
-#    - mkdir -p ${OUT_DIR}
-#    - source ./setup/env.sh
-#  script:
-#    - jsrun -n1 -a1 -g1 python -m spinifel --default-settings=summit_ci.toml --mode=sequential
-#  tags:
-#    - batch
-
-# TODO: Skip for now -- runs out of memory -- not sure why though
-# test_large:
-#   stage: test
-#   before_script:
-#     - cd ${EXTERNAL_WORKDIR}
-#     - mkdir -p ${OUT_DIR}
-#     - source ./setup/env.sh
-#   script:
-#     - jsrun -n1 -a1 -g1 python -m spinifel --default-settings=summit_ci.toml --mode=mpi runtime.small_problem=false
-#   tags:
-#     - batch
-
-test_finufft:
-  stage: test
-  before_script:
-    - cd ${EXTERNAL_WORKDIR}
-    - mkdir -p ${OUT_DIR}
-    - source ./setup/env.sh
+.sequential_test_script: &sequential_test_script
   script:
-    - jsrun -n1 -a1 -g1 python -m spinifel --default-settings=summit_ci.toml --mode=mpi runtime.use_cufinufft=false
-  tags:
-    - batch
+    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=summit_ci.toml --mode=sequential
 
-test_nocuda:
-  stage: test
-  before_script:
-    - cd ${EXTERNAL_WORKDIR}
-    - mkdir -p ${OUT_DIR}
-    - source ./setup/env.sh
+.large_test_script: &large_test_script
   script:
-    - jsrun -n1 -a1 -g1 python -m spinifel --default-settings=summit_ci.toml --mode=mpi runtime.use_cufinufft=false runtime.use_cuda=false runtime.use_cupy=false
+    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=summit_ci.toml --mode=mpi runtime.small_problem=false
 
-  tags:
-    - batch
+.finufft_test_script: &finufft_test_script
+  script:
+    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=summit_ci.toml --mode=mpi runtime.use_cufinufft=false
 
-cleanup:
-  stage: cleanup
-  before_script:
+.nocuda_test_script: &nocuda_test_script
+  script:
+    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=summit_ci.toml --mode=mpi runtime.use_cufinufft=false runtime.use_cuda=false runtime.use_cupy=false
+
+.cleanup_script: &cleanup_script
   script:
     - rm -rf ${EXTERNAL_WORKDIR}
+
+
+# rules that determine when each job runs
+.test_rules: &test_rules
+  rules:
+    # run don't run Crusher jobs on Ascent and vice versa
+    - if: '$IS_CRUSHER_JOB == "1" && $RUN_CRUSHER_JOBS != "1"'
+      when: never
+    - if: '$IS_CRUSHER_JOB != "1" && $RUN_CRUSHER_JOBS == "1"'
+      when: never
+    # if no other rule matches, run the job
+    - when: always
+
+
+stages:
+  - build
+  - unit_test
+  - test
+  - cleanup
+
+
+######################################################################
+### CI Configuration for Ascent
+######################################################################
+
+build_ascent:
+  <<: [*test_rules, *build_script]
+  stage: build
   tags:
     - nobatch
+  variables:
+    <<: [*ascent_variables]
+
+unit_test_ascent:
+  <<: [*test_rules, *test_before_script, *unit_test_script]
+  stage: unit_test
+  tags:
+    - batch
+  variables:
+    <<: [*ascent_variables]
+
+test_mpi_ascent:
+  <<: [*test_rules, *test_before_script, *mpi_test_script]
+  stage: test
+  tags:
+    - batch
+  variables:
+    <<: [*ascent_variables]
+
+test_legion_ascent:
+ <<: [*test_rules, *test_before_script, *legion_test_script]
+ stage: test
+ tags:
+   - batch
+ variables:
+   <<: [*ascent_variables]
+
+# TODO: suggest deprecating
+#test_sequential_ascent:
+#  <<: [*test_rules, *test_before_script, *sequential_test_script]
+#  stage: test
+#  tags:
+#    - batch
+#  variables:
+#    <<: [*ascent_variables]
+
+# TODO: Skip for now -- runs out of memory -- not sure why though
+# test_large_ascent:
+#  <<: [*test_rules, *test_before_script, *large_test_script]
+#   stage: test
+#   tags:
+#     - batch
+#  variables:
+#    <<: [*ascent_variables]
+
+test_finufft_ascent:
+  <<: [*test_rules, *test_before_script, *finufft_test_script]
+  stage: test
+  tags:
+    - batch
+  variables:
+    <<: [*ascent_variables]
+
+test_nocuda_ascent:
+  <<: [*test_rules, *test_before_script, *nocuda_test_script]
+  stage: test
+  tags:
+    - batch
+  variables:
+    <<: [*ascent_variables]
+
+cleanup_ascent:
+  <<: [*test_rules, *cleanup_script]
+  stage: cleanup
+  tags:
+    - nobatch
+  variables:
+    <<: [*ascent_variables]
+
+
+######################################################################
+### CI Configuration for Crusher
+######################################################################
+
+build_crusher:
+  <<: [*test_rules, *build_script]
+  stage: build
+  tags:
+    - shell
+    - crusher
+  variables:
+    <<: [*crusher_variables]
+
+unit_test_crusher:
+  <<: [*test_rules, *test_before_script, *unit_test_script]
+  stage: unit_test
+  tags:
+    - slurm
+    - crusher
+  variables:
+    <<: [*crusher_variables]
+
+test_mpi_crusher:
+  <<: [*test_rules, *test_before_script, *mpi_test_script]
+  stage: test
+  tags:
+    - slurm
+    - crusher
+  variables:
+    <<: [*crusher_variables]
+
+test_legion_crusher:
+ <<: [*test_rules, *test_before_script, *legion_test_script]
+ stage: test
+ tags:
+   - slurm
+   - crusher
+ variables:
+   <<: [*crusher_variables]
+
+# TODO: suggest deprecating
+#test_sequential_crusher:
+#  <<: [*test_rules, *test_before_script, *sequential_test_script]
+#  stage: test
+#  tags:
+#    - slurm
+#    - crusher
+#  variables:
+#    <<: [*crusher_variables]
+
+# TODO: Skip for now -- runs out of memory -- not sure why though
+# test_large_crusher:
+#  <<: [*test_rules, *test_before_script, *large_test_script]
+#   stage: test
+#   tags:
+#     - slurm
+#    - crusher
+#  variables:
+#    <<: [*crusher_variables]
+
+test_finufft_crusher:
+  <<: [*test_rules, *test_before_script, *finufft_test_script]
+  stage: test
+  tags:
+    - slurm
+    - crusher
+  variables:
+    <<: [*crusher_variables]
+
+test_nocuda_crusher:
+  <<: [*test_rules, *test_before_script, *nocuda_test_script]
+  stage: test
+  tags:
+    - slurm
+    - crusher
+  variables:
+    <<: [*crusher_variables]
+
+cleanup_crusher:
+  <<: [*test_rules, *cleanup_script]
+  stage: cleanup
+  tags:
+    - shell
+    - crusher
+  variables:
+    <<: [*crusher_variables]

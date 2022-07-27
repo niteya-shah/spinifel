@@ -66,8 +66,8 @@ export CXX=CC
 export CRAYPE_LINK_TYPE=dynamic # allow dynamic linking
 
 # compilers for mpi4py
-export MPI4PY_CC="$(which cc)"
-export MPI4PY_MPICC="$(which cc) --shared"
+export MPI4PY_CC="\$(which cc)"
+export MPI4PY_MPICC="\$(which cc) --shared"
 
 # disable Cori-specific Python environment
 unset PYTHONSTARTUP
@@ -113,8 +113,8 @@ export CXX=CC
 export CRAYPE_LINK_TYPE=dynamic # allow dynamic linking
 
 # compilers for mpi4py
-export MPI4PY_CC="$(which cc)"
-export MPI4PY_MPICC="$(which cc) --shared"
+export MPI4PY_CC="\$(which cc)"
+export MPI4PY_MPICC="\$(which cc) --shared"
 
 # Make sure Cray-FFTW get loaded first to avoid Conda's MKL
 export LD_PRELOAD="\${FFTW_DIR}/libfftw3.so"
@@ -122,23 +122,7 @@ export LD_PRELOAD="\${FFTW_DIR}/libfftw3.so"
 export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
 export GASNET_CONDUIT=ucx
 EOF
-elif [[ ${target} = *"summit"* ]]; then
-    cat >> env.sh <<EOF
-module load gcc fftw cuda gsl
-
-export CC=gcc
-export CXX=g++
-# compilers for mpi4py
-export MPI4PY_CC=\$OMPI_CC
-export MPI4PY_MPICC=mpicc
-
-export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
-export GASNET_CONDUIT=ibv
-
-# for Numba
-export CUDA_HOME=\$OLCF_CUDA_ROOT
-EOF
-elif [[ ${target} = *"ascent"* ]]; then
+elif [[ ${target} = *"summit"* || ${target} = *"ascent"* ]]; then
     cat >> env.sh <<EOF
 module load gcc fftw cuda gsl
 
@@ -207,6 +191,27 @@ elif [[ ${target} = "psbuild"* ]]; then # psana machines
 
 export LEGION_USE_GASNET=${LEGION_USE_GASNET:-0}
 EOF
+elif [[ $(hostname --fqdn) = *".crusher."* ]]; then
+    cat >> env.sh <<EOF
+module load PrgEnv-gnu
+module load rocm/4.5.0
+module load cray-fftw
+
+export CC=cc
+export CXX=CC
+export CRAYPE_LINK_TYPE=dynamic # allow dynamic linking
+
+# compilers for mpi4py
+export MPI4PY_CC="\$(which cc)"
+export MPI4PY_MPICC="\$(which cc) --shared"
+
+# Make sure Cray-FFTW get loaded first to avoid Conda's MKL
+export LD_PRELOAD="\${FFTW_DIR}/libfftw3.so"
+
+export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
+export GASNET_CONDUIT=${GASNET_CONDUIT:-ofi-slingshot11}
+export LEGION_GASNET_CONDUIT=${LEGION_GASNET_CONDUIT:-ofi}
+EOF
 elif [[ $(hostname --fqdn) = *".spock."* ]]; then
     cat >> env.sh <<EOF
 module load wget
@@ -219,8 +224,8 @@ export CXX=CC
 export CRAYPE_LINK_TYPE=dynamic # allow dynamic linking
 
 # compilers for mpi4py
-export MPI4PY_CC="$(which cc)"
-export MPI4PY_MPICC="$(which cc) --shared"
+export MPI4PY_CC="\$(which cc)"
+export MPI4PY_MPICC="\$(which cc) --shared"
 
 # Make sure Cray-FFTW get loaded first to avoid Conda's MKL
 export LD_PRELOAD="\${FFTW_DIR}/libfftw3.so"

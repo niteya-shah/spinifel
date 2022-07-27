@@ -74,7 +74,7 @@ PACKAGE_LIST=(
     cffi  # Legion
     pybind11  # FINUFFT
     numba  # skopi 
-    scikit-learn  # skopi
+    scikit-learn=1.0.2  # skopi # Elliott: version 1.1.1 breaks on Summit because of the glibc version, so pin the last known working version
     tqdm  # convenience
 
     # lcls2
@@ -104,6 +104,23 @@ conda activate "$CONDA_ENV_DIR"
 conda install -y amityping -c lcls-ii
 conda install -y bitstruct krtc -c conda-forge
 
+# Important: install CuPy first, it is now a dependency for mpi4py (at least in some cases)
+(
+    if [[ $(hostname --fqdn) = *".crusher."* ]]; then
+        export CUPY_INSTALL_USE_HIP=1
+        export ROCM_HOME=$ROCM_PATH
+        export HCC_AMDGPU_TARGET=gfx90a
+        pip install --no-cache-dir cupy
+    elif [[ $(hostname --fqdn) = *".spock."* ]]; then
+        export CUPY_INSTALL_USE_HIP=1
+        export ROCM_HOME=$ROCM_PATH
+        export HCC_AMDGPU_TARGET=gfx908
+        pip install --no-cache-dir cupy
+    else
+        pip install --no-cache-dir cupy
+    fi
+)
+
 # Extra deps required for psana machines
 if [[ ${target} = "psbuild"* ]]
 then
@@ -126,30 +143,9 @@ fi
 # Install pip packages
 pip install --no-cache-dir callmonitor
 pip install --no-cache-dir PyNVTX
-(
-    if [[ $(hostname --fqdn) = *".spock."* ]]; then
-        export CUPY_INSTALL_USE_HIP=1
-        export ROCM_HOME=$ROCM_PATH
-        export HCC_AMDGPU_TARGET=gfx908
-        pip install --no-cache-dir --pre cupy
-    else
-        pip install --no-cache-dir cupy
-    fi
-)
 
 #-------------------------------------------------------------------------------
 
-
-#_______________________________________________________________________________
-# Overwrite the conda libraries with system libraries => don't let anaconda
-# provide libraries (like openmp) that are already provided by the system
-
-if [[ ${target} = *"summit"* || ${target} = *"ascent"* ]]
-then
-    ${root_dir}/../scripts/fix_lib_olcf.sh
-fi
-
-#-------------------------------------------------------------------------------
 
 #_______________________________________________________________________________
 # Install UCX
@@ -246,6 +242,29 @@ fi
 #-------------------------------------------------------------------------------
 
 
+#_______________________________________________________________________________
+# Overwrite the conda libraries with system libraries => don't let anaconda
+# provide libraries (like openmp) that are already provided by the system
+
+# FIXME (Elliott): After this point, CMake will be BROKEN. If you try
+# to do any further builds, they will NOT work. The error looks like:
+#
+# cmake: symbol lookup error: cmake: undefined symbol: uv_fs_get_system_error
+#
+# This is probably happening because we're overwriting important
+# libraries from Conda with system ones. Unfortunately, this does not
+# work. I think the long term solution needs to be more precise about
+# exactly what system libraries we're going to get (e.g., OpenMP, but
+# not others). What we've got right now is far too indiscriminant. But
+# as an immediate hack, we'll just put this as late in the build as
+# possible so that we hope we don't mess with anything important.
+
+if [[ ${target} = *"summit"* || ${target} = *"ascent"* ]]
+then
+    ${root_dir}/../scripts/fix_lib_olcf.sh
+fi
+
+#-------------------------------------------------------------------------------
 
 
 
