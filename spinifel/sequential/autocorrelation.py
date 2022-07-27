@@ -64,8 +64,8 @@ class Merge:
 
         data = np.array(slices_.reshape(-1), dtype=f_type)
         weights = np.ones(self.N, dtype=f_type)
-        self.nuvect_Db = xp.array((data * weights).astype(f_type))
-        self.nuvect = xp.ones_like(data, dtype=f_type)
+        self.nuvect_Db = xp.array((data * weights).astype(c_type))
+        self.nuvect = xp.ones_like(data, dtype=c_type)
 
         def callback(xk):
             callback.counter += 1
@@ -177,8 +177,6 @@ class Merge:
             uvect = uvect_ADA + self.rlambda * uvect + self.flambda * uvect_FDF
             return uvect
 
-        # We use double precision here as Conjugated Gradient can be
-        # numberically unstable at lower precision
         W = LinearOperator(
             dtype=c_type,
             shape=(self.M**3, self.M**3),
