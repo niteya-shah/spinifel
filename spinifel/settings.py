@@ -237,7 +237,7 @@ class SpinifelSettings(metaclass=Singleton):
             ),
             "_ps_smd_n_events": (
                 "psana", "ps_smd_n_events",
-                int, 1000,
+                int, 100,
                 "no. of events to be sent to an EventBuilder core"
             ),
             "_ps_eb_nodes": (
@@ -409,6 +409,11 @@ class SpinifelSettings(metaclass=Singleton):
                 "algorithm", "load_generation",
                 int, 0,
                 "start from output of this generation"
+            ),
+            "_N_image_batches_max": (
+                "algorithm", "N_image_batches_max",
+                int, 1,
+                "Maximum number of image batches to load per iteration"
             )
         }
 

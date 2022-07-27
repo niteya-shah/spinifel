@@ -194,10 +194,6 @@ def save_mrc(savename, data, voxel_size=None):
     return
 
 @nvtx.annotate("prep.py", is_prefix=True)
-def load_pixel_position_reciprocal_psana(run, pixel_position, pixel_position_reciprocal):
-    if run.expt == "xpptut15":
+def load_pixel_position_reciprocal_psana(run, pixel_position_reciprocal):
+    if hasattr(run.beginruns[0].scan[0].raw, 'pixel_position_reciprocal'):
         pixel_position_reciprocal[:] = np.moveaxis(run.beginruns[0].scan[0].raw.pixel_position_reciprocal[:], -1, 0)
-    elif run.expt == "amo06516":
-        pixel_position = run.beginruns[0].scan[0].pixel_position
-    else:
-        assert False

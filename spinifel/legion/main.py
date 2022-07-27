@@ -48,7 +48,7 @@ def main_task(pixel_position, pixel_distance, pixel_index, slices, slices_p):
         curr_gen = settings.load_gen
         phased, orientations, orientations_p = checkpoint.load_checkpoint(settings.out_dir, settings.load_gen)
     else:
-        solved = solve_ac(0, pixel_position, pixel_distance, slices, slices_p)
+        solved = solve_ac(0, pixel_position, pixel_distance, slices_p)
         logger.log(f"AC recovered in {timer.lap():.2f}s.")
 
         phased = phase(0, solved)
@@ -72,12 +72,12 @@ def main_task(pixel_position, pixel_distance, pixel_index, slices, slices_p):
 
         # Orientation matching
         orientations, orientations_p = match(
-            phased, slices, slices_p, pixel_position, pixel_distance)
+            phased, slices_p, pixel_position, pixel_distance, settings.N_images_per_rank)
         logger.log(f"Orientations matched in {timer.lap():.2f}s.")
 
         # Solve autocorrelation
         solved = solve_ac(
-            generation, pixel_position, pixel_distance, slices, slices_p,
+            generation, pixel_position, pixel_distance, slices_p,
             orientations, orientations_p, phased)
         logger.log(f"AC recovered in {timer.lap():.2f}s.")
 
