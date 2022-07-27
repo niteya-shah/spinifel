@@ -17,6 +17,12 @@ else:
         print(f"Using NumPy for FFTs.")
     from scipy.ndimage import gaussian_filter
 
+if settings.use_single_prec:
+    f_type = xp.float32
+    c_type = xp.complex64
+else:
+    f_type = xp.float64
+    c_type = xp.complex128
 
 # Convention:
 #   In this module, trailing underscores are used to refer to numpy
@@ -299,5 +305,5 @@ def phase(generation, ac, support_=None, rho_=None):
     ac_phased = np.fft.fftshift(ac_phased_)
     #image.show_volume(ac_phased, Mquat, f"autocorrelation_phased_{generation}.png")
 
-    # Ac Phased is kept at double precision
+    ac_phased = ac_phased.astype(f_type)
     return ac_phased, support_, rho_

@@ -62,10 +62,10 @@ class Merge:
         self.rlambda = 1 / self.N / 1000
         self.flambda = 1e3
 
-        data = np.array(slices_.reshape(-1), dtype=c_type)
-        weights = np.ones(self.N)
-        self.nuvect_Db = xp.array((data * weights).astype(c_type))
-        self.nuvect = xp.ones_like(data, dtype=c_type)
+        data = np.array(slices_.reshape(-1), dtype=f_type)
+        weights = np.ones(self.N, dtype=f_type)
+        self.nuvect_Db = xp.array((data * weights).astype(f_type))
+        self.nuvect = xp.ones_like(data, dtype=f_type)
 
         def callback(xk):
             callback.counter += 1
