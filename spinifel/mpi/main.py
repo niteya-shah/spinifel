@@ -100,7 +100,7 @@ def main():
         logger.log(f"AC recovered in {timer.lap():.2f}s.")
         if comm.rank == 0:
             dist_recip_max = np.linalg.norm(
-                f['pixel_position_reciprocal'][:], axis=-1).max()
+                pixel_position_reciprocal[:], axis=-1).max()
             reference = compute_reference(
                 settings.pdb_path, settings.M, dist_recip_max)
             myRes = {
@@ -157,7 +157,7 @@ def main():
             pixel_position_reciprocal, pixel_distance_reciprocal)
         logger.log(f"Orientations matched in {timer.lap():.2f}s.")
         if comm.rank == 0:
-            myRes = {**myRes, {'ac_phased': ac_phased,
+            myRes = {**myRes, **{'ac_phased': ac_phased,
                      'slices_': slices_,
                                'pixel_position_reciprocal': pixel_position_reciprocal,
                                'pixel_distance_reciprocal': pixel_distance_reciprocal,
@@ -176,7 +176,7 @@ def main():
             slices_, orientations, ac_phased)
         logger.log(f"AC recovered in {timer.lap():.2f}s.")
         if comm.rank == 0:
-            myRes = {**myRes, {
+            myRes = {**myRes, **{
                      'pixel_position_reciprocal': pixel_position_reciprocal,
                      'pixel_distance_reciprocal': pixel_distance_reciprocal,
                      'slices_': slices_,
@@ -197,7 +197,7 @@ def main():
         ac_phased, support_, rho_ = phase(generation, ac, support_, rho_)
         logger.log(f"Problem phased in {timer.lap():.2f}s.")
         if comm.rank == 0:
-            myRes = {**myRes, {
+            myRes = {**myRes, **{
                      'ac': ac,
                      'prev_support_': prev_support_,
                      'prev_rho_': prev_rho_,
@@ -242,16 +242,17 @@ def main():
                 f"intensity-{generation}.mrc",
                 intensity)
             save_mrc(settings.out_dir / f"rho-{generation}.mrc", rho)
-            ali_volume, ali_reference = align_volumes(rho, myRes['reference'], zoom=args['zoom'], sigma=args['sigma'],
-                                                      n_iterations=args['niter'], n_search=args['nsearch'])
+            ali_volume, ali_reference = align_volumes(rho, myRes['reference'], zoom=settings.fsc_zoom, sigma=settings.fsc_sigma,
+                                                      n_iterations=settings.fsc_niter, n_search=settings.fsc_nsearch)
             resolution, rshell, fsc_val = compute_fsc(
                 ali_reference, ali_volume, myRes['dist_recip_max'])
             # Save output
-            myRes = {**myRes, {'ac_phased': ac_phased,
+            myRes = {**myRes, **{'ac_phased': ac_phased,
                                  'support_': support_,
                                'rho_': rho_,
                                'orientations': orientations
                                }}
+
             checkpoint.save_checkpoint(
                 myRes, settings.out_dir, generation, tag="", protocol=4)
 

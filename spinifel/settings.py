@@ -411,10 +411,30 @@ class SpinifelSettings(metaclass=Singleton):
                 "start from output of this generation"
             ),
             "_pdb_path": (
-                "runtime", "pdb_path",
+                "fsc", "pdb_path",
                 Path, Path(""),
                 "Path for the PDB File"
-            )
+            ),
+            "_fsc_zoom": (
+            "fsc", "fsc_zoom",
+            float, 1.0,
+            "Zoom factor during alignment"
+            ),
+            "_fsc_sigma": (
+            "fsc", "fsc_sigma",
+            float, 0,
+            "Sigma for Gaussian filtering during alignment"
+            ),
+            "_fsc_niter": (
+            "fsc", "fsc_niter",
+            int, 10,
+            "Number of alignment iterations to run"
+            ),
+            "_fsc_nsearch": (
+            "fsc", "fsc_nsearch",
+            int, 360,
+            "Number of quaternions to score per iteration"
+            ),
         }
 
         self.__init_internals()
