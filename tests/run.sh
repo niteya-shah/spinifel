@@ -11,10 +11,6 @@
 
 
 set -xe
-root_dir="$PWD"
-echo "[spinifel/test] root_dir: $root_dir"
-source "$root_dir"/setup/env.sh
-export PYTHONPATH="$PYTHONPATH:$root_dir"
 
 
 ## Clone test data and save them to test_data_dir
