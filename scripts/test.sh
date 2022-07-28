@@ -12,7 +12,7 @@ export PYTHONPATH="$PYTHONPATH:$root_dir"
 set -x
 
 # Pickup all tests in root and spinifel modules
-pytest -s tests
+#pytest -s tests
 pytest -s spinifel/tests
 
 # Pickup tests as specified in init file in root/tests
