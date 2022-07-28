@@ -7,12 +7,11 @@ verbosity = 0
 use_callmonitor = false
 
 [data]
-in_dir = "${CFS}/m2859/data/3iyf/clean"
-out_dir = "${SCRATCH}/spinifel_output/"
-name = "3iyf_sim_400k.h5"
+out_dir = "${test_out_dir}/${CI_PIPELINE_ID}/spinifel_output"
 
 [detector]
-shape = [4, 512, 512]
+#shape = [4, 512, 512]
+shape = [1, 128, 128]
 
 [psana]
 enable = true 
@@ -20,7 +19,8 @@ ps_smd_n_events = 10000
 ps_eb_nodes = 1
 ps_srv_nodes = 0
 #ps_batch_size = 1000
-ps_dir = "/global/cfs/cdirs/m2859/data/amo06516"
+#ps_dir = "/global/cfs/cdirs/m2859/data/amo06516"
+ps_dir = "${test_data_dir}/3IYF/xtc2"       # This tests mpi/main using xtc2 w/o streaming
 exp = "xpptut15"
 runnum = 1
 
