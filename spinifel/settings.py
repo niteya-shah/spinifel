@@ -537,6 +537,8 @@ class SpinifelSettings(metaclass=Singleton):
 
             setting, val = param.split("=")
             c, k         = setting.split(".")
+            if not c in toml_settings:
+                toml_settings[c] = {}
             toml_settings[c][k] = val
 
         for attr in self.__properties:

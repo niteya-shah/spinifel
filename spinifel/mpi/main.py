@@ -99,10 +99,15 @@ def main():
             slices_)
         logger.log(f"AC recovered in {timer.lap():.2f}s.")
         if comm.rank == 0:
-            dist_recip_max = np.linalg.norm(
-                pixel_position_reciprocal[:], axis=-1).max()
-            reference = compute_reference(
-                settings.pdb_path, settings.M, dist_recip_max)
+            reference = None
+            dist_recip_max = None
+            if settings.pdb_path.is_file():
+                dist_recip_max = np.linalg.norm(
+                    pixel_position_reciprocal[:], axis=-1).max()
+                reference = compute_reference(
+                    settings.pdb_path, settings.M, dist_recip_max)
+                logger.log(f"Reference created in {timer.lap():.2f}s.")
+
             myRes = {
                      'pixel_position_reciprocal': pixel_position_reciprocal,
                      'pixel_distance_reciprocal': pixel_distance_reciprocal,
@@ -117,7 +122,6 @@ def main():
                 curr_gen,
                 tag="solve_ac",
                 protocol=4)
-            logger.log(f"Reference created in {timer.lap():.2f}s.")
 
         ac_phased, support_, rho_ = phase(curr_gen, ac)
         logger.log(f"Problem phased in {timer.lap():.2f}s.")
@@ -242,10 +246,11 @@ def main():
                 f"intensity-{generation}.mrc",
                 intensity)
             save_mrc(settings.out_dir / f"rho-{generation}.mrc", rho)
-            ali_volume, ali_reference = align_volumes(rho, myRes['reference'], zoom=settings.fsc_zoom, sigma=settings.fsc_sigma,
-                                                      n_iterations=settings.fsc_niter, n_search=settings.fsc_nsearch)
-            resolution, rshell, fsc_val = compute_fsc(
-                ali_reference, ali_volume, myRes['dist_recip_max'])
+            if "reference" in myRes and myRes["reference"] is not None:
+                ali_volume, ali_reference = align_volumes(rho, myRes['reference'], zoom=settings.fsc_zoom, sigma=settings.fsc_sigma,
+                                                        n_iterations=settings.fsc_niter, n_search=settings.fsc_nsearch)
+                resolution, rshell, fsc_val = compute_fsc(
+                    ali_reference, ali_volume, myRes['dist_recip_max'])
             # Save output
             myRes = {**myRes, **{'ac_phased': ac_phased,
                                  'support_': support_,
