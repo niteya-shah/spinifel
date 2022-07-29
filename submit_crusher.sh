@@ -13,7 +13,7 @@ t_start=`date +%s`
 source setup/env.sh
 
 #export SLURM_CPU_BIND="cores"
-srun -N1 -c64 --gpus=1 python -m spinifel --default-settings=crusher_quickstart_small.toml --mode=mpi
+srun -N1 -n8 -c8 --gpus=4 python -m spinifel --default-settings=crusher_quickstart_small.toml --mode=mpi
 ##srun python -m spinifel --default-settings=cgpu_legion.toml --mode=legion -g 0
 #srun legion_python -ll:py 1 -ll:pyomp 8 -ll:csize 16384 legion_main.py --default-settings=cgpu_legion.toml --mode=legion -g 0
 
