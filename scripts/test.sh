@@ -9,7 +9,10 @@ echo "root_dir: $root_dir"
 source "$root_dir"/setup/env.sh
 
 export PYTHONPATH="$PYTHONPATH:$root_dir"
-echo "PYTHONPAHT: $PYTHONPATH"
+
+ls ${root_dir}
+ls ${root_dir}/setup/install/lib/python3.8/site-packages
+ls ${root_dir}/setup/lcls2/install/lib/python3.8/site-packages
 
 #set -x
 
