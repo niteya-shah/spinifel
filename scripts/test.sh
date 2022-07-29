@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -e
+set -x
 
 root_dir="$PWD"
 echo "root_dir: $root_dir"
@@ -8,8 +9,9 @@ echo "root_dir: $root_dir"
 source "$root_dir"/setup/env.sh
 
 export PYTHONPATH="$PYTHONPATH:$root_dir"
+echo "PYTHONPAHT: $PYTHONPATH"
 
-set -x
+#set -x
 
 # Pickup all tests in root and spinifel modules
 #pytest -s tests
