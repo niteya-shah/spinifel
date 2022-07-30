@@ -17,6 +17,8 @@ t_start=`date +%s`
 source setup/env.sh
 
 export SLURM_CPU_BIND="cores"
+export PYTHONPATH=/global/u1/p/petermc/spiral-python-mine:/opt/mods/lib/python3.8/site-packages
+# Hm, I had "-g 0" at end of this srun command. Does it do anything?
 srun python -m spinifel --default-settings=cgpu_mpi.toml --mode=mpi
 
 t_end=`date +%s`

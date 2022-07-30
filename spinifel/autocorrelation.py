@@ -5,13 +5,13 @@
 """Define the Forward and Ajoint Operators"""
 
 
-
 import numpy     as np
 import skopi     as skp
 import PyNVTX    as nvtx
 from   spinifel  import SpinifelSettings, SpinifelContexts, Profiler, settings
 from   .extern   import nufft_3d_t1, nufft_3d_t2
 
+import time
 
 #______________________________________________________________________________
 # Load global settings, and contexts
@@ -27,6 +27,13 @@ if settings.use_cupy:
     if settings.verbose:
         print(f"Using CuPy for FFTs.")
     import cupy as xp
+
+if settings.use_fftx:
+    if settings.verbose:
+        print(f"Using FFTX for FFTs.")
+    import fftx as fftxp
+    # fftx_options_cuda = {'cuda' : True}
+    # fftx_options_nocuda = {'cuda' : False}
 
 
 def forward(ugrid, H_, K_, L_, support, use_recip_sym, N):
@@ -55,8 +62,12 @@ def forward(ugrid, H_, K_, L_, support, use_recip_sym, N):
         
     # Allocate space in memory and solve NUFFT
     #nuvect = np.zeros(H_.shape, dtype=np.complex64)
-    #nfft.nufft3d2(H_, K_, L_, ugrid, out=nuvect, eps=1.0e-12, isign=-1)    
+    #nfft.nufft3d2(H_, K_, L_, ugrid, out=nuvect, eps=1.0e-12, isign=-1)
+    start_time = time.time()
     nuvect = nufft_3d_t2(H_, K_, L_, ugrid, -1, 1e-12, N)
+    end_time = time.time()
+    nufft_time = end_time - start_time
+    print(f"NUFFT2 time {nufft_time} on shape={H_.shape} dtype={H_.dtype} K {K_.dtype} L {L_.dtype} ugrid shape={ugrid.shape} dtype={ugrid.dtype} N={N}")
 
     return nuvect 
 
@@ -76,7 +87,11 @@ def forward_spinifel(ugrid, H_, K_, L_, support, M, N, recip_extent, use_recip_s
         ugrid = np.fft.fftshift(np.fft.ifftn(np.fft.fftn(np.fft.ifftshift(ugrid.reshape((M,)*3))).real)).real
 
     # Solve NUFFT2-
+    start_time = time.time()
     nuvect = nufft_3d_t2(H_, K_, L_, ugrid, -1, 1e-12, N)
+    end_time = time.time()
+    nufft_time = end_time - start_time
+    print(f"NUFFT2 time {nufft_time} on shape={H_.shape} dtype={H_.dtype} K {K_.dtype} L {L_.dtype} ugrid shape={ugrid.shape} dtype={ugrid.dtype} N={N}")
 
     return nuvect / M**3
 
@@ -101,7 +116,11 @@ def adjoint(nuvect, H_, K_, L_, M, use_recip_sym=True, support=None):
     # Allocating space in memory and sovling NUFFT
     #ugrid = np.zeros((M,)*3, dtype=np.complex64)
     #nfft.nufft3d1(H_, K_, L_, nuvect, out=ugrid, eps=1.0e-15, isign=1)
+    start_time = time.time()
     ugrid = nufft_3d_t1(H_, K_, L_, nuvect, 1, 1e-12, M, M, M)
+    end_time = time.time()
+    nufft_time = end_time - start_time
+    print(f"NUFFT1 time {nufft_time} on shape={H_.shape} dtype={H_.dtype} K {K_.dtype} L {L_.dtype} nuvect shape={nuvect.shape} dtype={nuvect.dtype} M={M}")
 
     # Apply support if given
     if support is not None:
@@ -122,7 +141,11 @@ def adjoint_spinifel(nuvect, H_, K_, L_, support, M, recip_extent, use_recip_sym
     assert H_.shape == K_.shape == L_.shape
 
     # Solve the NUFFT
+    start_time = time.time()
     ugrid = nufft_3d_t1(H_, K_, L_, nuvect, 1, 1e-12, M, M, M)
+    end_time = time.time()
+    nufft_time = end_time - start_time
+    print(f"NUFFT1 time {nufft_time} on shape={H_.shape} dtype={H_.dtype} K {K_.dtype} L {L_.dtype} nuvect shape={nuvect.shape} dtype={nuvect.dtype} M={M}")
 
     # Apply support
     ugrid *= support
@@ -167,6 +190,11 @@ def core_problem_convolution(uvect, M, F_ugrid_conv_, M_ups, ac_support, use_rec
         assert np.all(np.isreal(uvect))
     # Upsample
     ugrid = uvect.reshape((M,)*3) * ac_support
+    if settings.use_fftx:
+        fftxp.utils.print_array_info(np, ac_support, "DATA ac_support")
+        fftxp.utils.print_array_info(np, uvect, "DATA uvect")
+        fftxp.utils.print_array_info(np, ugrid, "DATA ugrid")
+    start_time = time.time()
     ugrid_ups = np.zeros((M_ups,)*3, dtype=uvect.dtype)
     ugrid_ups[:M, :M, :M] = ugrid
     # Convolution = Fourier multiplication
@@ -175,6 +203,17 @@ def core_problem_convolution(uvect, M, F_ugrid_conv_, M_ups, ac_support, use_rec
     ugrid_conv_out_ups = np.fft.fftshift(np.fft.ifftn(F_ugrid_conv_out_ups))
     # Downsample
     ugrid_conv_out = ugrid_conv_out_ups[:M, :M, :M]
+    end_time = time.time()
+    np_time = end_time - start_time
+    if settings.use_fftx:
+        start_time = time.time()
+        ugrid_conv_out_fftx = fftxp.kernels.core_problem_convolution_kernel(np, ugrid, M,  F_ugrid_conv_, M_ups)
+        end_time = time.time()
+        fftxp_time = end_time - start_time
+        fftxp.utils.print_diff(np, ugrid_conv_out, ugrid_conv_out_fftx,
+                               "core_problem_convolution ugrid_conv_out")
+        print(f"FULL TIME core_problem_convolution: np {np_time} fftxp {fftxp_time}")
+
     ugrid_conv_out *= ac_support
     if use_recip_sym:
         # Both ugrid_conv and ugrid are real, so their convolution
@@ -194,6 +233,12 @@ def core_problem_convolution_spinifel(uvect, M, F_ugrid_conv_, M_ups, ac_support
     # Upsample
     uvect = np.fft.fftshift(np.fft.ifftn(np.fft.fftn(np.fft.ifftshift(uvect.reshape((M,)*3))).real)).real
     ugrid = uvect * ac_support
+    ugrid = uvect.reshape((M,) * 3) * ac_support
+    if settings.use_fftx:
+        fftxp.utils.print_array_info(xp, ac_support, "DATA ac_support")
+        fftxp.utils.print_array_info(xp, uvect, "DATA uvect")
+        fftxp.utils.print_array_info(xp, ugrid, "DATA ugrid")
+    start_time = time.time()
     ugrid_ups = xp.zeros((M_ups,) * 3, dtype=uvect.dtype)            
     ugrid_ups[:M, :M, :M] = ugrid
     
@@ -204,6 +249,17 @@ def core_problem_convolution_spinifel(uvect, M, F_ugrid_conv_, M_ups, ac_support
     
     # Downsample
     ugrid_conv_out = ugrid_conv_out_ups[:M, :M, :M]
+    end_time = time.time()
+    xp_time = end_time - start_time
+    if settings.use_fftx:
+        start_time = time.time()
+        ugrid_conv_out_fftx = fftxp.kernels.core_problem_convolution_kernel(xp, ugrid, M,  F_ugrid_conv_, M_ups) / M**3 * (M_ups/M)**3
+        end_time = time.time()
+        fftxp_time = end_time - start_time
+        fftxp.utils.print_diff(xp, ugrid_conv_out, ugrid_conv_out_fftx,
+                               "core_problem_convolution_spinifel ugrid_conv_out")
+        print(f"FULL TIME core_problem_convolution_spinifel: xp {xp_time} fftxp {fftxp_time}")
+    
     ugrid_conv_out *= ac_support
 
     # Apply recip symmetry
@@ -230,9 +286,36 @@ def fourier_reg(uvect, support, F_antisupport, M, use_recip_sym):
         support = xp.asarray(support)
         F_antisupport = xp.asarray(F_antisupport)
 
+    start_time = time.time()
     F_ugrid = xp.fft.fftn(xp.fft.ifftshift(ugrid)) #/ M**3
+    end_time = time.time()
+    xp_time = end_time - start_time
+    if settings.use_fftx:
+        print(f"ORDER fftn xp.fft.ifftshift(ugrid) is {xp.fft.ifftshift(ugrid).flags.c_contiguous}")
+        start_time = time.time()
+        F_ugrid_fftx = fftxp.fft.fftn(xp.fft.ifftshift(ugrid))
+        end_time = time.time()
+        fftxp_time = end_time - start_time
+        fftxp.utils.print_diff(xp, F_ugrid, F_ugrid_fftx,
+                               "F_ugrid")
+        print(f"FULL TIME F_ugrid_fftx: xp {xp_time} fftxp {fftxp_time}")
+        fftxp.utils.print_array_info(xp, xp.fft.ifftshift(ugrid), "DATA shifted ugrid")
+
     F_reg = F_ugrid * xp.fft.ifftshift(F_antisupport)
+    start_time = time.time()
     reg = xp.fft.fftshift(xp.fft.ifftn(F_reg))
+    end_time = time.time()
+    xp_time = end_time - start_time
+    if settings.use_fftx:
+        print(f"ORDER ifftn F_reg is {F_reg.flags.c_contiguous}")
+        start_time = time.time()
+        reg_fftx = xp.fft.fftshift(fftxp.fft.ifftn(F_reg))
+        end_time = time.time()
+        fftxp_time = end_time - start_time
+        fftxp.utils.print_diff(xp, reg, reg_fftx, "reg")
+        print(f"FULL TIME reg: xp {xp_time} fftxp {fftxp_time}")
+        fftxp.utils.print_array_info(xp, F_reg, "DATA F_reg")
+
     uvect = (reg * support).flatten()
     if use_recip_sym:
         uvect = uvect.real

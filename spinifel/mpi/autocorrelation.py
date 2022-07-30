@@ -13,7 +13,13 @@ from scipy.sparse.linalg import LinearOperator, cg
 
 from spinifel import settings, utils, image, autocorrelation, contexts
 
-        
+import time
+
+if settings.use_fftx:
+    if settings.verbose:
+        print(f"mpi/autocorrelation.py Using FFTX for FFTs.")
+    import fftx as fftxp
+
 @nvtx.annotate("mpi/autocorrelation.py", is_prefix=True)
 def reduce_bcast(comm, vect):
     vect = np.ascontiguousarray(vect)
@@ -73,9 +79,42 @@ def fourier_reg(uvect, support, F_antisupport, M, use_recip_sym):
     ugrid = uvect.reshape((M,)*3) * support
     if use_recip_sym:
         assert np.all(np.isreal(ugrid))
-    F_ugrid = np.fft.fftn(np.fft.ifftshift(ugrid))
+    # F_ugrid = np.fft.fftn(np.fft.ifftshift(ugrid))
+    ugrid_shifted = np.fft.ifftshift(ugrid)
+    print(f'calling fftn in fourier_reg in mpi/autocorrelation.py');
+    start_time = time.time()
+    F_ugrid = np.fft.fftn(ugrid_shifted)
+    end_time = time.time()
+    np_time = end_time - start_time
+    if settings.use_fftx:
+        print(f"ORDER fftn np.fft.fftn(ugrid_shifted) is {ugrid_shifted.flags.c_contiguous}")
+        start_time = time.time()
+        F_ugrid_fftx = fftxp.fft.fftn(ugrid_shifted)
+        end_time = time.time()
+        fftxp_time = end_time - start_time
+        fftxp.utils.print_diff(np, F_ugrid, F_ugrid_fftx,
+                               "F_ugrid")
+        print(f"FULL TIME F_ugrid_fftx: np {np_time} fftxp {fftxp_time}")
+        fftxp.utils.print_array_info(np, np.fft.ifftshift(ugrid), "DATA shifted ugrid")
+    
+
     F_reg = F_ugrid * np.fft.ifftshift(F_antisupport)
-    reg = np.fft.fftshift(np.fft.ifftn(F_reg))
+    # reg = np.fft.fftshift(np.fft.ifftn(F_reg))
+    start_time = time.time()
+    reg_shifted = np.fft.ifftn(F_reg)
+    end_time = time.time()
+    np_time = end_time - start_time
+    if settings.use_fftx:
+        print(f"ORDER ifftn F_reg is {F_reg.flags.c_contiguous}")
+        start_time = time.time()
+        reg_shifted_fftx = fftxp.fft.ifftn(F_reg)
+        end_time = time.time()
+        fftxp_time = end_time - start_time
+        fftxp.utils.print_diff(np, reg_shifted, reg_shifted_fftx, "reg_shifted")
+        print(f"FULL TIME reg_shifted: np {np_time} fftxp {fftxp_time}")
+        fftxp.utils.print_array_info(np, F_reg, "DATA F_reg")
+    
+    reg = np.fft.fftshift(reg_shifted)
     uvect = (reg * support).flatten()
     if use_recip_sym:
         uvect = uvect.real
@@ -112,12 +151,13 @@ def setup_linops(comm, H, K, L, data,
         np.ones_like(data), H_, K_, L_, M_ups,
         use_reciprocal_symmetry, support=None)
     #ugrid_conv = reduce_bcast(comm, ugrid_conv)
+    print(f'calling fftn in setup_linops in mpi/autocorrelation.py');
     F_ugrid_conv_ = np.fft.fftn(np.fft.ifftshift(ugrid_conv)) #/ M**3
 
     def W_matvec(uvect):
         """Define W part of the W @ x = d problem."""
-        uvect_ADA = autocorrelation.core_problem_convolution(
-            uvect, M, F_ugrid_conv_, M_ups, ac_support)
+        uvect_ADA = autocorrelation.core_problem_convolution_spinifel(
+            uvect, M, F_ugrid_conv_, M_ups, ac_support, True)
         uvect_FDF = fourier_reg(uvect, ac_support, F_antisupport, M, use_recip_sym=use_reciprocal_symmetry)
         uvect = alambda*uvect_ADA + rlambda*uvect + flambda*uvect_FDF
         return uvect

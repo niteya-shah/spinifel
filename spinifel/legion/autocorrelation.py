@@ -239,8 +239,8 @@ def solve(uregion, uregion_ups, ac, result, summary,
         assert use_reciprocal_symmetry, "Complex AC are not supported."
         assert np.all(np.isreal(uvect))
 
-        uvect_ADA = autocorrelation.core_problem_convolution(
-            uvect, M, uregion_ups.F_conv_, M_ups, ac.support, use_reciprocal_symmetry)
+        uvect_ADA = autocorrelation.core_problem_convolution_spinifel(
+            uvect, M, uregion_ups.F_conv_, M_ups, ac.support, use_reciprocal_symmetry, True)
         uvect_FDF = autocorrelation.fourier_reg(
             uvect, ac.support, uregion.F_antisupport, M, use_reciprocal_symmetry)
         uvect = alambda*uvect_ADA + rlambda*uvect + flambda*uvect_FDF

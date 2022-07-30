@@ -235,6 +235,11 @@ class SpinifelSettings(metaclass=Singleton):
                 parse_bool, False,
                 "use cupy wherever possible"
             ),
+            "_use_fftx": (
+                "runtime", "use_fftx",
+                parse_bool, False,
+                "use fftx wherever possible"
+            ),
             "_ps_smd_n_events": (
                 "psana", "ps_smd_n_events",
                 int, 1000,
@@ -427,6 +432,7 @@ class SpinifelSettings(metaclass=Singleton):
             "DEVICES_PER_RS": ("_devices_per_node", get_int),
             "USE_CUFINUFFT": ("_use_cufinufft", get_bool),
             "USE_CUPY": ("_use_cupy", get_bool),
+            "USE_FFTX": ("_use_fftx", get_bool),
             "PS_SMD_N_EVENTS": ("_ps_smd_n_events", get_int),
             "PS_EB_NODES": ("_ps_eb_nodes", get_int),
             "PS_SRV_NODES": ("_ps_srv_nodes", get_int),

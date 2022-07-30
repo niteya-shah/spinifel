@@ -51,12 +51,13 @@ def setup_linops(H, K, L, data,
     ugrid_conv = autocorrelation.adjoint(
         np.ones_like(data), H_, K_, L_, 1, M_ups,
         reciprocal_extent, use_reciprocal_symmetry)
+    print(f'calling fftn in setup_linops in sequential/autocorrelation.py')
     F_ugrid_conv_ = np.fft.fftn(np.fft.ifftshift(ugrid_conv)) / M**3
 
     def W_matvec(uvect):
         """Define W part of the W @ x = d problem."""
-        uvect_ADA = autocorrelation.core_problem_convolution(
-            uvect, M, F_ugrid_conv_, M_ups, ac_support, use_reciprocal_symmetry)
+        uvect_ADA = autocorrelation.core_problem_convolution_spinifel(
+            uvect, M, F_ugrid_conv_, M_ups, ac_support, use_reciprocal_symmetry, True)
         uvect_FDF = autocorrelation.fourier_reg(
             uvect, ac_support, F_antisupport, M, use_reciprocal_symmetry)
         uvect = uvect_ADA + rlambda*uvect + flambda*uvect_FDF

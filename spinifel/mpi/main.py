@@ -172,10 +172,11 @@ def main():
             if comm.rank == 0:
                 prev_cov_xy = cov_xy
                 cov_xy = np.corrcoef(prev_rho_.flatten(), rho_.flatten())[0,1]
+                logger.log(f"CC in {timer.lap():.2f}s. cc={cov_xy:.2f} delta={cov_xy-prev_cov_xy:.2f}")
             else:
                 prev_cov_xy = None
                 cov_xy = None
-            logger.log(f"CC in {timer.lap():.2f}s. cc={cov_xy:.2f} delta={cov_xy-prev_cov_xy:.2f}")
+                logger.log(f"CC in {timer.lap():.2f}s.")
             
             # Stop if improvement in cc is less than cov_delta
             prev_cov_xy = comm.bcast(prev_cov_xy, root=0)
