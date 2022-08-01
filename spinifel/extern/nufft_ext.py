@@ -22,7 +22,7 @@ if settings.use_cufinufft:
 
 elif context.finufftpy_available:
     from . import nfft as finufft
-    mode = "finufft" + version("finufft")
+    mode = "finufft" + version("finufftpy")
 
 if settings.use_single_prec:
     f_type = np.float32
