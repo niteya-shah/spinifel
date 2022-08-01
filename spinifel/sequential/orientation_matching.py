@@ -128,7 +128,8 @@ class SNM:
             return xp.zeros((0, 4))
 
         if not hasattr(self, "dist"):
-            self.dist = xp.empty((self.N_orientations, self.N_slices), dtype=f_type)
+            self.dist = xp.empty(
+                (self.N_orientations, self.N_slices), dtype=f_type)
         ugrid_gpu = gpuarray.to_gpu(ac.astype(c_type))
         slices_time = 0
         match_time = 0
@@ -172,20 +173,20 @@ class SNM:
 
 @nvtx.annotate("sequential/orientation_matching.py", is_prefix=True)
 def match(slices_, model_slices, ref_orientations, batch_size=None):
-    """ 
-    Determine orientations of the data images (slices_) by minimizing the euclidean distance 
+    """
+    Determine orientations of the data images (slices_) by minimizing the euclidean distance
     with the reference images (model_slices) and return orientations which give the best match.
-   
+
     :param slice_: data images
     :param mode_slices: reference images
     :param ref_orientations: referene orientations
     :param batch_size: batch size
     :return ref_orientations: array of quaternions matched to slices_
     """
-    
+
     if batch_size is None:
         batch_size = model_slices.shape[0]
-    
+
     N_slices = slices_.shape[0]
     # TODO move this up to main level
     #assert slices_.shape == (N_slices,) + settings.reduced_det_shape
@@ -202,11 +203,15 @@ def match(slices_, model_slices, ref_orientations, batch_size=None):
 
 
 @nvtx.annotate("sequential/orientation_matching.py", is_prefix=True)
-def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_reciprocal):
+def slicing_and_match(
+        ac,
+        slices_,
+        pixel_position_reciprocal,
+        pixel_distance_reciprocal):
     """
-    Determine orientations of the data images by minimizing the euclidean distance with the reference images 
+    Determine orientations of the data images by minimizing the euclidean distance with the reference images
     computed by randomly slicing through the autocorrelation.
-    MONA: This is a current hack to support Legion. For MPI, slicing is done separately 
+    MONA: This is a current hack to support Legion. For MPI, slicing is done separately
     from orientation matching.
 
     :param ac: autocorrelation of the current electron density estimate
@@ -230,20 +235,22 @@ def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_rec
         return np.zeros((0, 4))
 
     ref_orientations = skp.get_uniform_quat(N_orientations, True)
-    ref_rotmat = np.array([np.linalg.inv(skp.quaternion2rot3d(quat)) for quat in ref_orientations])
+    ref_rotmat = np.array([np.linalg.inv(skp.quaternion2rot3d(quat))
+                          for quat in ref_orientations])
     reciprocal_extent = pixel_distance_reciprocal.max()
 
     # Calulate Model Slices in batch
     assert N_orientations % N_batch_size == 0, "N_orientations must be divisible by N_batch_size"
     slices_ = slices_.reshape((N_slices, N_pixels))
     model_slices_new = np.zeros((N,))
-    
+
     st_slice = time.monotonic()
 
-    for i in range(N_orientations//N_batch_size):
+    for i in range(N_orientations // N_batch_size):
         st = i * N_batch_size
         en = st + N_batch_size
-        H, K, L = np.einsum("ijk,klmn->jilmn", ref_rotmat[st:en], pixel_position_reciprocal)
+        H, K, L = np.einsum("ijk,klmn->jilmn",
+                            ref_rotmat[st:en], pixel_position_reciprocal)
         H_ = H.flatten() / reciprocal_extent * np.pi / settings.oversampling
         K_ = K.flatten() / reciprocal_extent * np.pi / settings.oversampling
         L_ = L.flatten() / reciprocal_extent * np.pi / settings.oversampling
@@ -253,13 +260,13 @@ def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_rec
         model_slices_new[st_m:en_m] = autocorrelation.forward(
                 ac, H_, K_, L_, 1, reciprocal_extent, N_batch).real
     en_slice = time.monotonic()
-    
+
     # Imaginary part ~ numerical error
     model_slices_new = model_slices_new.reshape((N_orientations, N_pixels))
     data_model_scaling_ratio = slices_.std() / model_slices_new.std()
     print(f"Data/Model std ratio: {data_model_scaling_ratio}.", flush=True)
     model_slices_new *= data_model_scaling_ratio
-    
+
     # Calculate Euclidean distance in batch to avoid running out of GPU Memory
     st_match = time.monotonic()
     index = nn.nearest_neighbor(model_slices_new, slices_, N_batch_size)

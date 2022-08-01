@@ -49,8 +49,8 @@ class NUFFT:
         self.ref_orientations = skp.get_uniform_quat(self.N_orientations, True)
         # Save reference rotation matrix so that we dont re-create it every
         # time
-        self.ref_rotmat = np.array(
-            [np.linalg.inv(skp.quaternion2rot3d(quat)) for quat in self.ref_orientations], dtype=f_type)
+        self.ref_rotmat = np.array([np.linalg.inv(skp.quaternion2rot3d(
+            quat)) for quat in self.ref_orientations], dtype=f_type)
 
         self.eps = 1e-12
         self.isign = -1
@@ -358,10 +358,13 @@ class NUFFT:
             ugrid_gpu /= M**3
             return self.gpuarray_to_cupy(ugrid_gpu)
 
-    elif mode in ("finufft2.1.0", "finufft1.1.2"):
+    elif mode == "finufft2.1.0":
 
         @nvtx.annotate("NUFFT/finufft/forward", is_prefix=True)
         def forward(self, ugrid, st, en, support, use_recip_sym, N):
+            """
+            Version 1 of fiNUFFT 3D type 2
+            """
             H_ = self.HKL_mat[0, st:en, :].reshape(-1)
             K_ = self.HKL_mat[1, st:en, :].reshape(-1)
             L_ = self.HKL_mat[2, st:en, :].reshape(-1)
@@ -402,9 +405,69 @@ class NUFFT:
             #__________________________________________________________________
             # Solve the NUFFT
             #
+            if not isinstance(nuvect, np.ndarray):
+                nuvect = nuvect.get()
 
-            finufft.nufft3d1(H_, K_, L_, nuvect.get(), n_modes=(
+            assert not finufft.nufft3d1(H_, K_, L_, nuvect, n_modes=(
                 M, M, M), isign=self.isign, eps=self.eps, out=ugrid)
+
+            #
+            #------------------------------------------------------------------
+
+            return ugrid
+
+    elif mode == "finufft1.1.2":
+
+        @nvtx.annotate("NUFFT/finufft/forward", is_prefix=True)
+        def forward(self, ugrid, st, en, support, use_recip_sym, N):
+            """
+            Version 1 of fiNUFFT 3D type 2
+            """
+            H_ = self.HKL_mat[0, st:en, :].reshape(-1)
+            K_ = self.HKL_mat[1, st:en, :].reshape(-1)
+            L_ = self.HKL_mat[2, st:en, :].reshape(-1)
+            assert H_.shape == K_.shape == L_.shape
+
+            # Allocate space in memory
+            nuvect = np.zeros(N, dtype=c_type)
+
+            #__________________________________________________________________
+            # Solve the NUFFT
+            #
+
+            assert not finufft.nufft3d2(
+                H_, K_, L_, nuvect, self.isign, self.eps, *N, ugrid)
+
+            return nuvect
+
+
+        @nvtx.annotate("NUFFT/finufft/adjoint", is_prefix=True)
+        def adjoint(
+                self,
+                nuvect,
+                H_,
+                K_,
+                L_,
+                support,
+                use_reciprocal_symmetry,
+                M):
+            """
+            Version 1 of fiNUFFT 3D type 1
+            """
+
+            # Ensure that H, K, and L have the same shape
+            assert H_.shape == K_.shape == L_.shape
+
+            ugrid = np.zeros((M, M, M), dtype=c_type, order='F')
+
+            #__________________________________________________________________
+            # Solve the NUFFT
+            #
+            if not isinstance(nuvect, np.ndarray):
+                nuvect = nuvect.get()
+
+            assert not finufft.nufft3d1(
+                H_, K_, L_, nuvect, self.isign, self.eps, M, M, M, ugrid)
 
             #
             #------------------------------------------------------------------
