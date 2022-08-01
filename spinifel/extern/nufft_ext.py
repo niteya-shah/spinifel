@@ -23,6 +23,8 @@ if settings.use_cufinufft:
 elif context.finufftpy_available:
     from . import nfft as finufft
     mode = "finufft" + version("finufftpy")
+    if settings.use_cupy:
+        import cupy as cp
 
 if settings.use_single_prec:
     f_type = np.float32
@@ -414,6 +416,9 @@ class NUFFT:
             #
             #------------------------------------------------------------------
 
+            if settings.use_cupy:
+                ugrid = cp.array(ugrid)
+
             return ugrid
 
     elif mode == "finufft1.1.2":
@@ -471,5 +476,7 @@ class NUFFT:
 
             #
             #------------------------------------------------------------------
+            if settings.use_cupy:
+                ugrid = cp.array(ugrid)
 
             return ugrid
