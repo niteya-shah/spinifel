@@ -358,7 +358,7 @@ class NUFFT:
             ugrid_gpu /= M**3
             return self.gpuarray_to_cupy(ugrid_gpu)
 
-    elif mode == "finufft2.1.0":
+    elif mode in ("finufft2.1.0", "finufft1.1.2"):
 
         @nvtx.annotate("NUFFT/finufft/forward", is_prefix=True)
         def forward(self, ugrid, st, en, support, use_recip_sym, N):
