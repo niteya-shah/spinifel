@@ -21,7 +21,7 @@ if settings.use_cufinufft:
     mode = "cufinufft" + version("cufinufft")
 
 elif context.finufftpy_available:
-    import finufft
+    from . import nfft as finufft
     mode = "finufft" + version("finufft")
 
 if settings.use_single_prec:
