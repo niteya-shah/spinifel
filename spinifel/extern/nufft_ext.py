@@ -415,6 +415,10 @@ class NUFFT:
 
             #
             #------------------------------------------------------------------
+            ugrid *= support
+            if use_reciprocal_symmetry:
+                ugrid = ugrid.real
+            ugrid /= M**3
 
             if settings.use_cupy:
                 ugrid = cp.array(ugrid)
@@ -476,6 +480,11 @@ class NUFFT:
 
             #
             #------------------------------------------------------------------
+            ugrid *= support
+            if use_reciprocal_symmetry:
+                ugrid = ugrid.real
+            ugrid /= M**3
+
             if settings.use_cupy:
                 ugrid = cp.array(ugrid)
 
