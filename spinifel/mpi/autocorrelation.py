@@ -171,8 +171,12 @@ class MergeMPI(Merge):
         if info != 0:
             print(f'WARNING: CG did not converge at rlambda = {self.rlambda}')
 
-        v1 = norm(ret).get()
-        v2 = norm(W * ret - d).get()
+        v1 = norm(ret)
+        v2 = norm(W * ret - d)
+
+        if not isinstance(v1, np.ndarray) and not isinstance(v1, float):
+            v1 = v1.get()
+            v2 = v2.get()
 
         # Rank0 gathers rlambda, solution norm, residual norm from all ranks
         summary = self.comm.gather(
@@ -195,7 +199,9 @@ class MergeMPI(Merge):
             self.ref_rank = -1
         self.ref_rank = self.comm.bcast(self.ref_rank, root=0)
 
-        ac = ret.reshape((self.M,) * 3).get()
+        ac = ret.reshape((self.M,) * 3)
+        if not isinstance(ac, np.ndarray):
+            ac = ac.get()
         if self.use_reciprocal_symmetry:
             assert np.all(np.isreal(ac))
         ac = np.ascontiguousarray(ac.real)

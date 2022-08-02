@@ -445,7 +445,7 @@ class NUFFT:
             #
 
             assert not finufft.nufft3d2(
-                H_, K_, L_, nuvect, self.isign, self.eps, *N, ugrid)
+                H_, K_, L_, nuvect, self.isign, self.eps, ugrid)
 
             return nuvect
 
@@ -473,19 +473,19 @@ class NUFFT:
             # Solve the NUFFT
             #
             if not isinstance(nuvect, np.ndarray):
-                nuvect = nuvect.get()
+                nuvect = nuvect.get().astype(c_type)
 
             assert not finufft.nufft3d1(
                 H_, K_, L_, nuvect, self.isign, self.eps, M, M, M, ugrid)
 
             #
             #------------------------------------------------------------------
+            if settings.use_cupy:
+                ugrid = cp.array(ugrid)
+
             ugrid *= support
             if use_reciprocal_symmetry:
                 ugrid = ugrid.real
             ugrid /= M**3
-
-            if settings.use_cupy:
-                ugrid = cp.array(ugrid)
 
             return ugrid

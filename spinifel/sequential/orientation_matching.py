@@ -19,11 +19,17 @@ if settings.use_cupy:
     from cupyx.scipy.sparse.linalg import LinearOperator, cg
     from cupy.linalg import norm
     import cupy as xp
+
+    from cupy.cublas import gemm
 else:
     from scipy.linalg        import norm
     from scipy.sparse.linalg import LinearOperator, cg
-    from scipy.linalg.blas import dgemm
+    from scipy.linalg.blas import dgemm as gemm
     xp = np
+
+if settings.use_cufinufft:
+    from pycuda import gpuarray
+    import pycuda.autoinit    
 
 if settings.use_single_prec:
     f_type = xp.float32
@@ -81,13 +87,13 @@ class SNM:
         """
         Thin wrapper for the GEMM function to support both scipy blas routines and cublas gemm
         """
-        if settings.use_cuda:
-            return xp.cublas.gemm(
+        if settings.use_cupy:
+            return gemm(
                 'N', 'T', x, y, out=out, alpha=-2.0, beta=1.0)
         else:
             # This will not overwrite out as we dont use fortran order for our
             # C.
-            return dgemm(-2.0, x, y, 1.0, out, 0, 1)
+            return gemm(-2.0, x, y, 1.0, out, 0, 1)
 
 
     @nvtx.annotate("sequential/orientation_matching.py::modified",
@@ -100,6 +106,7 @@ class SNM:
         ||y||^2 can be pre-computed and stored.
         -2 <x,y> can be written in blas notation as dgemm.
         """
+        x = xp.array(x)
         x_2 = xp.square(x).sum(axis=1)
         xp.add(x_2[:, xp.newaxis], y_2[xp.newaxis, :], out=dist[start:end])
         return self.euclidean_gemm(x, y, dist[start:end])
@@ -130,7 +137,10 @@ class SNM:
         if not hasattr(self, "dist"):
             self.dist = xp.empty(
                 (self.N_orientations, self.N_slices), dtype=f_type)
-        ugrid_gpu = gpuarray.to_gpu(ac.astype(c_type))
+        if settings.use_cufinufft:
+            ugrid = gpuarray.to_gpu(ac.astype(c_type))
+        else:
+            ugrid = ac.astype(c_type)
         slices_time = 0
         match_time = 0
         match_oth_time = 0
@@ -144,13 +154,10 @@ class SNM:
             en_m = st_m + self.N_batch_size
 
             forward_result = self.nufft.forward(
-                ugrid_gpu, st, en, 1, self.reciprocal_extent, N_batch)
+                ugrid, st, en, 1, self.reciprocal_extent, N_batch)
             data_images = forward_result.real.reshape(self.N_batch_size, -1)
             slices_time += time.monotonic() - slice_start
             match_start = time.monotonic()
-            #TODO Approximate data model scaling? Are we doing this or not?
-            # We don't send data back to the CPU, we process it in-situ
-            data_images *= self.slices_std / data_images.std()
             match_middle = time.monotonic()
             match_oth_time += match_middle - match_start
             self.euclidean_dist(
@@ -164,7 +171,9 @@ class SNM:
 
         match_start = time.monotonic()
         # We rely on cub with its faster tree reduce algorithm
-        index = self.dist.argmin(axis=0).get()
+        index = self.dist.argmin(axis=0)
+        if not isinstance(index, np.ndarray):
+            index = index.get()
         en_match = time.monotonic()
         match_time += en_match - match_start
 
