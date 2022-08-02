@@ -74,7 +74,7 @@ PACKAGE_LIST=(
     cffi  # Legion
     pybind11  # FINUFFT
     numba  # skopi 
-    scikit-learn=1.0.2  # skopi # Elliott: version 1.1.1 breaks on Summit because of the glibc version, so pin the last known working version
+    scikit-learn  # skopi
     tqdm  # convenience
 
     # lcls2
