@@ -367,13 +367,20 @@ class NUFFT:
             """
             Version 1 of fiNUFFT 3D type 2
             """
+
             H_ = self.HKL_mat[0, st:en, :].reshape(-1)
             K_ = self.HKL_mat[1, st:en, :].reshape(-1)
             L_ = self.HKL_mat[2, st:en, :].reshape(-1)
             assert H_.shape == K_.shape == L_.shape
 
+            if use_recip_sym:
+                assert xp.all(xp.isreal(ugrid))
+            if support is not None:
+                ugrid *= support 
+
             # Allocate space in memory
             nuvect = np.zeros(N, dtype=c_type)
+
 
             #__________________________________________________________________
             # Solve the NUFFT

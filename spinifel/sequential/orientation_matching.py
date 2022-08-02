@@ -77,7 +77,6 @@ class SNM:
                  self.N_pixels)),
             dtype=f_type)
         self.slices_2 = xp.square(self.slices_).sum(axis=1)
-        self.slices_std = self.slices_.std()
 
         self.nufft = nufft
 
@@ -206,9 +205,6 @@ def match(slices_, model_slices, ref_orientations, batch_size=None):
     index = nn.nearest_neighbor(model_slices, slices_, batch_size)
 
     return ref_orientations[index]
-
-
-
 
 
 @nvtx.annotate("sequential/orientation_matching.py", is_prefix=True)
