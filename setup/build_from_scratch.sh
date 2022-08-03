@@ -144,6 +144,10 @@ fi
 pip install --no-cache-dir callmonitor
 pip install --no-cache-dir PyNVTX
 
+# Pin sckit-learn to 1.0.2 w/o breaking psana (see issue #51)
+conda remove --force -y scikit-learn
+conda install --freeze-installed -y scikit-learn=1.0.2
+
 #-------------------------------------------------------------------------------
 
 
