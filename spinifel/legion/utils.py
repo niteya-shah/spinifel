@@ -1,11 +1,10 @@
 from functools import wraps
 import numpy  as np
 import PyNVTX as nvtx
-
-from pygion import task, Region, Partition, Tunable, R, Ipartition, WD, Ispace
+from pygion import task, Region, Partition, Tunable, R, Ipartition, WD, Ispace, fill
 
 from spinifel import SpinifelContexts, settings
-
+from . import utils as lgutils
 
 def gpu_task_wrapper(thunk):
     @wraps(thunk)
@@ -22,6 +21,7 @@ def gpu_task_wrapper(thunk):
 
 
 @task(privileges=[R])
+@lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/utils.py", is_prefix=True)
 def print_region(region):
     for field in region.keys():
@@ -69,6 +69,14 @@ def create_partition_with_offset(region, secShape, nImagesPerRank, maxImagesPerR
         region_p = Partition(region, pending_p)
     return region_p
 
+
+@nvtx.annotate("legion/utils.py", is_prefix=True)
+def dump_partitions(p):
+    for i,p1 in enumerate(p):
+        p1 = p[i]
+        for j, p2 in enumerate(p1):
+            print(f' init_parts i={i},  p2[{j}] = {p2.ispace.bounds}')
+
 # create a set of partitions to be used for filling in subregions
 @nvtx.annotate("legion/utils.py", is_prefix=True)
 def init_partitions(slices, nPoints, batchSize, maxBatchSize,curBatchSize,secShape):
@@ -81,10 +89,6 @@ def init_partitions(slices, nPoints, batchSize, maxBatchSize,curBatchSize,secSha
         p1 = create_partition_with_offset(slices, secShape, batchSize,maxBatchSize, maxBatchSize, nPoints, offset)
         curBatchSize = curBatchSize+batchSize
         p.append(p1)
-
-    if settings.verbose:
-        for j in range(nPoints):
-            print(f' init_parts {i}: p1[{j}] = {p1[j].ispace.bounds}')
     return p
 
 def create_region(shape, fieldsDict):
@@ -94,14 +98,18 @@ def create_region(shape, fieldsDict):
 def create_fill_region(shape,fieldsDict,val):
     r = create_region(shape, fieldsDict)
     for field_name in fieldsDict.keys():
-        pygion.fill(r, field_name, val)
+        fill(r, field_name, val)
     return r
 
 @task(inner=True, privileges=[WD])
-def fill_region(merged, val):
+@lgutils.gpu_task_wrapper
+def fill_region_task(merged, val):
     for field_name in merged.keys():
-        pygion.fill(merged, field_name, val)
+        fill(merged, field_name, val)
 
+
+def fill_region(r,val):
+    fill_region_task(r,val)
 
 # create a region containing maxImagesPerRank*nPoints*secShape
 def create_max_region(maxImagesPerRank,

@@ -9,8 +9,7 @@ from spinifel.sequential.phasing import phase as sequential_phase
 from . import utils as lgutils
 
 
-
-@task(privileges=[WD("prev_rho_"), RO("rho_")])
+@task(leaf=True, privileges=[WD("prev_rho_"), RO("rho_")])
 @lgutils.gpu_task_wrapper
 def prev_phase_task(prev_phased, phased):
     prev_phased.prev_rho_[:] = phased.rho_[:]
@@ -28,7 +27,7 @@ def prev_phase(generation, phased, prev_phased=None):
     return prev_phased
 
 
-@task(privileges=[RO("prev_rho_"), RO("rho_")])
+@task(leaf=True, privileges=[RO("prev_rho_"), RO("rho_")])
 @lgutils.gpu_task_wrapper
 def cov_task(prev_phased, phased, cov_xy, cov_delta):
     cc_matrix = np.corrcoef(prev_phased.prev_rho_.flatten(),
@@ -42,11 +41,9 @@ def cov(prev_phased, phased, cov_xy, cov_delta):
     fval = cov_task(prev_phased, phased, cov_xy, cov_delta)
     val = fval.get()
     is_cov = val - cov_xy < cov_delta
-
-
     return val, is_cov
 
-@task(privileges=[RO("ac"), WD("ac", "support_", "rho_")])
+@task(leaf=True, privileges=[RO("ac"), WD("ac", "support_", "rho_")])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/phasing.py", is_prefix=True)
 def phase_gen0_task(solved, phased):
@@ -59,7 +56,7 @@ def phase_gen0_task(solved, phased):
 
 
 
-@task(privileges=[RO("ac"), WD("ac") + RW("support_", "rho_")])
+@task(leaf=True, privileges=[RO("ac"), WD("ac") + RW("support_", "rho_")])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/ phasing.py", is_prefix=True)
 def phase_task(solved, phased, generation):
@@ -87,7 +84,8 @@ def phase(generation, solved, phased=None):
     return phased
 
 
-@task(privileges=[RO("ac", "rho_")])
+@task(leaf=True, privileges=[RO("ac", "rho_")])
+@lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/phasing.py", is_prefix=True)
 def phased_output_task(phased,generation):
     rho = np.fft.ifftshift(phased.rho_)

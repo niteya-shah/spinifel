@@ -11,9 +11,10 @@ from spinifel.prep import save_mrc
 from .prep import get_data
 from .autocorrelation import solve_ac
 from .phasing import phase, prev_phase, cov
-from .orientation_matching import match
+from .orientation_matching import match, create_orientations_rp
 from . import mapper
 from . import checkpoint
+from . import utils as lgutils
 
 @nvtx.annotate("legion/main.py", is_prefix=True)
 def load_psana():
@@ -40,6 +41,7 @@ def load_psana():
     return pixel_position, pixel_distance, pixel_index, slices, slices_p
 
 @task(privileges=[RO, RO, RO, RO])
+@lgutils.gpu_task_wrapper
 def main_task(pixel_position, pixel_distance, pixel_index, slices, slices_p):
     logger = utils.Logger(True)
     timer = utils.Timer()
@@ -48,6 +50,7 @@ def main_task(pixel_position, pixel_distance, pixel_index, slices, slices_p):
         curr_gen = settings.load_gen
         phased, orientations, orientations_p = checkpoint.load_checkpoint(settings.out_dir, settings.load_gen)
     else:
+        orientations, orientations_p = create_orientations_rp(settings.N_images_per_rank)
         solved = solve_ac(0, pixel_position, pixel_distance, slices_p)
         logger.log(f"AC recovered in {timer.lap():.2f}s.")
 
@@ -71,8 +74,8 @@ def main_task(pixel_position, pixel_distance, pixel_index, slices, slices_p):
         logger.log(f"#"*27)
 
         # Orientation matching
-        orientations, orientations_p = match(
-            phased, slices_p, pixel_position, pixel_distance, settings.N_images_per_rank)
+        match(
+            phased, slices_p, pixel_position, pixel_distance, orientations_p, settings.N_images_per_rank)
         logger.log(f"Orientations matched in {timer.lap():.2f}s.")
 
         # Solve autocorrelation

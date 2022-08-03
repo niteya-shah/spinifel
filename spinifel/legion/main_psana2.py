@@ -9,10 +9,10 @@ from spinifel import settings, utils, contexts, checkpoint
 from spinifel.prep import save_mrc
 
 from .prep import get_data, init_partitions_regions_psana2, load_image_batch, load_pixel_data, process_data
-from .utils import union_partitions_with_stride
+from .utils import union_partitions_with_stride, fill_region
 from .autocorrelation import solve_ac
 from .phasing import phase, prev_phase, cov, phased_output
-from .orientation_matching import match
+from .orientation_matching import match, create_orientations_rp
 from . import mapper
 from . import checkpoint
 
@@ -82,7 +82,6 @@ def load_psana_subset(gen_run, gen_smd, batch_size, cur_batch_size, slices, all_
     assert cur_batch_size%batch_size == 0
     slices_p = all_partitions[cur_batch_size//batch_size]
     slices_images_p = slices_images_all_p[idx]
-    #gen_run, gen_smd, run = load_image_batch(run, gen_run, gen_smd, slices_p)
     gen_run, gen_smd, run = load_image_batch(run, gen_run, gen_smd, slices_images_p)
 
     # bin data
@@ -95,18 +94,19 @@ def main_spinifel(pixel_position, pixel_distance, pixel_index, slices_p, n_image
     logger = utils.Logger(True)
     timer = utils.Timer()
     curr_gen = 0
-    if settings.load_gen > 0: # Load input from previous generation
-        curr_gen = settings.load_gen
-        phased, orientations, orientations_p = checkpoint.load_checkpoint(settings.out_dir, settings.load_gen)
-    else:
-        solved = solve_ac(0, pixel_position, pixel_distance, slices_p)
-        logger.log(f"AC recovered in {timer.lap():.2f}s.")
 
-        phased = phase(0, solved)
-        rho = np.fft.ifftshift(phased.rho_)
-        logger.log(f"Problem phased in {timer.lap():.2f}s.")
-        save_mrc(settings.out_dir / f"ac-0.mrc", phased.ac)
-        save_mrc(settings.out_dir / f"rho-0.mrc", rho)
+    # not supported for streaming/psana mode since image data grows
+    assert(settings.load_gen == 0)
+
+    orientations, orientations_p = create_orientations_rp(n_images_per_rank)
+    solved = solve_ac(0, pixel_position, pixel_distance, slices_p)
+    logger.log(f"AC recovered in {timer.lap():.2f}s.")
+
+    phased = phase(0, solved)
+    phased_output(phased, 0)
+
+    #not valid since tasks are async
+    #logger.log(f"Problem phased in {timer.lap():.2f}s.")
 
     # Use improvement of cc(prev_rho, cur_rho) to determine if we should
     # terminate the loop
@@ -121,8 +121,8 @@ def main_spinifel(pixel_position, pixel_distance, pixel_index, slices_p, n_image
         logger.log(f"#"*27)
 
         # Orientation matching
-        orientations, orientations_p = match(
-            phased, slices_p, pixel_position, pixel_distance, n_images_per_rank)
+        match(
+            phased, slices_p, pixel_position, pixel_distance, orientations_p, n_images_per_rank)
         logger.log(f"Orientations matched in {timer.lap():.2f}s.")
 
         # Solve autocorrelation
@@ -134,7 +134,7 @@ def main_spinifel(pixel_position, pixel_distance, pixel_index, slices_p, n_image
         prev_phased = prev_phase(generation, phased, prev_phased)
 
         phased = phase(generation, solved, phased)
-        logger.log(f"Problem phased in {timer.lap():.2f}s.")
+        #logger.log(f"Problem phased in {timer.lap():.2f}s.")
 
         # Check if density converges
         if settings.chk_convergence:
@@ -145,13 +145,11 @@ def main_spinifel(pixel_position, pixel_distance, pixel_index, slices_p, n_image
                 break;
 
         phased_output(phased, generation)
-        #rho = np.fft.ifftshift(phased.rho_)
-        #save_mrc(settings.out_dir / f"ac-{generation}.mrc", phased.ac)
-        #save_mrc(settings.out_dir / f"rho-{generation}.mrc", rho)
 
-    #execution_fence(block=True)
-    #logger.log(f"Results saved in {settings.out_dir}")
-    #logger.log(f"Successfully completed in {timer.total():.2f}s.")
+    #fill regions so they get garbage collected
+    fill_region(orientations, 0.0)
+    fill_region(phased, 0.0)
+    fill_region(prev_phased, 0.0)
 
 # read the data and run the main algorithm. This can be repeated
 @nvtx.annotate("legion/main.py", is_prefix=True)
@@ -187,11 +185,13 @@ def main():
         if cur_batch_size == max_batch_size:
             done = True
         if not done:
-            idx = 0 # index into image slices partition (0..max_batches_per_iter)
-            slices_p, gen_run, gen_smd, run, pixel_distance, pixel_index, pixel_position = load_psana_subset(gen_run, gen_smd, batch_size, cur_batch_size, slices, all_partitions, run, slices_images, slices_images_p, idx, pixel_position, pixel_distance, pixel_index)
-            cur_batch_size = cur_batch_size + batch_size
-            if settings.verbose:
-                print(f'cur_batch_size = {cur_batch_size}, batch_size = {batch_size}')
+            for i in range(settings.N_image_batches_max):
+                slices_p, gen_run, gen_smd, run, pixel_distance, pixel_index, pixel_position = load_psana_subset(gen_run, gen_smd, batch_size, cur_batch_size, slices, all_partitions, run, slices_images, slices_images_p, i, pixel_position, pixel_distance, pixel_index)
+                cur_batch_size = cur_batch_size + batch_size
+                if settings.verbose:
+                    print(f'cur_batch_size = {cur_batch_size}, batch_size = {batch_size}, N_image_batches_max={settings.N_image_batches_max}, max_batch_size={max_batch_size}')
+                if cur_batch_size==max_batch_size:
+                    break
 
     execution_fence(block=True)
     logger.log(f"Results saved in {settings.out_dir}")

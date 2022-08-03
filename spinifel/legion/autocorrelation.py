@@ -15,7 +15,7 @@ from . import utils as lgutils
 
 
 
-@task(privileges=[WD])
+@task(leaf=True, privileges=[WD])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def gen_random_orientations(orientations, N_images_per_rank):
@@ -25,20 +25,18 @@ def gen_random_orientations(orientations, N_images_per_rank):
 
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def get_random_orientations(N_images_per_rank):
-#    N_images_per_rank = settings.N_images_per_rank
     fields_dict = {"quaternions": pygion.float32}
     sec_shape = (4,)
     orientations, orientations_p = lgutils.create_distributed_region(
         N_images_per_rank, fields_dict, sec_shape)
     N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
-    #for i in IndexLaunch([N_procs]):
     for i in range(N_procs):
         gen_random_orientations(orientations_p[i], N_images_per_rank, point=i)
     return orientations, orientations_p
 
 
 
-@task(privileges=[RO, WD])
+@task(leaf=True, privileges=[RO, WD])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def gen_nonuniform_positions_v(nonuniform, nonuniform_v, reciprocal_extent):
@@ -62,7 +60,6 @@ def get_nonuniform_positions_v(nonuniform, nonuniform_p, reciprocal_extent, N_im
     nonuniform_v, nonuniform_v_p = lgutils.create_distributed_region(
         N_vals_per_rank, fields_dict, sec_shape)
     N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
-    #for i in IndexLaunch([N_procs]):
     for i in range(N_procs):
         gen_nonuniform_positions_v(nonuniform_p[i], nonuniform_v_p[i],
                                    reciprocal_extent, point=i)
@@ -70,7 +67,7 @@ def get_nonuniform_positions_v(nonuniform, nonuniform_p, reciprocal_extent, N_im
 
 
 
-@task(privileges=[RO, WD, RO])
+@task(leaf=True, privileges=[RO, WD, RO])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def gen_nonuniform_positions(orientations, nonuniform, pixel_position):
@@ -91,7 +88,6 @@ def get_nonuniform_positions(orientations, orientations_p, pixel_position):
     nonuniform, nonuniform_p = lgutils.create_distributed_region(
         N_images_per_rank, fields_dict, sec_shape)
     N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
-    #for i in IndexLaunch([N_procs]):
     for i in range(N_procs):
         gen_nonuniform_positions(
             orientations_p[i], nonuniform_p[i], pixel_position, point=i)
@@ -128,7 +124,7 @@ def right_hand(slices_p, uregion, uregion_p, nonuniform_v, nonuniform_v_p,
                ac, weights, M,
                reciprocal_extent, use_reciprocal_symmetry):
     N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
-    #for i in IndexLaunch([N_procs]):
+
     for i in range(N_procs):
         right_hand_ADb_task(slices_p[i], uregion_p[i], nonuniform_v_p[i],
                             ac, weights, M,
@@ -136,7 +132,7 @@ def right_hand(slices_p, uregion, uregion_p, nonuniform_v, nonuniform_v_p,
 
 
 #@task(privileges=[Reduce('+', 'F_conv_'), RO, RO])
-@task(privileges=[WD, RO, RO])
+@task(leaf=True, privileges=[WD, RO, RO])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def prep_Fconv_task(uregion_ups, nonuniform_v, ac, weights, M_ups, Mtot, N,
@@ -156,7 +152,6 @@ def prep_Fconv_task(uregion_ups, nonuniform_v, ac, weights, M_ups, Mtot, N,
         print(f"{socket.gethostname()} computed Fconv.", flush=True)
 
 
-
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def prep_Fconv(uregion_ups, nonuniform_v, nonuniform_v_p,
                ac, weights, M_ups, Mtot, N,
@@ -169,7 +164,7 @@ def prep_Fconv(uregion_ups, nonuniform_v, nonuniform_v_p,
                         reciprocal_extent, use_reciprocal_symmetry, point=i)
 
 
-@task(privileges=[WD("F_antisupport")])
+@task(leaf=True, privileges=[WD("F_antisupport")])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def prep_Fantisupport(uregion, M):
@@ -211,13 +206,15 @@ def prepare_solve(slices_p, nonuniform, nonuniform_p,
                ac, weights, M,
                reciprocal_extent, use_reciprocal_symmetry)
     N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
-    for i in IndexLaunch([N_procs]):
-        prep_Fantisupport(uregion_p[i], M)
+
+    #for i in IndexLaunch([N_procs]):
+    for i in range(N_procs):
+        prep_Fantisupport(uregion_p[i], M, point=i)
     return uregion, uregion_p, uregion_ups, uregion_ups_p
 
 
 
-@task(privileges=[RO("ac"), WD("support", "estimate")])
+@task(leaf=True, privileges=[RO("ac"), WD("support", "estimate")])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def phased_to_constrains(phased, ac):
@@ -227,7 +224,7 @@ def phased_to_constrains(phased, ac):
 
 
 
-@task(privileges=[RO, RO, RO, WD, WD])
+@task(leaf=True, privileges=[RO, RO, RO, WD, WD])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def solve(uregion, uregion_ups, ac, result, summary,
@@ -250,6 +247,7 @@ def solve(uregion, uregion_ups, ac, result, summary,
         x0 the initial guess (ac_estimate)
     """
     def W_matvec(uvect):
+
         """Define W part of the W @ x = d problem."""
         assert use_reciprocal_symmetry, "Complex AC are not supported."
         assert np.all(np.isreal(uvect))
@@ -282,11 +280,9 @@ def solve(uregion, uregion_ups, ac, result, summary,
     it_number = callback.counter
 
     if settings.verbosity > 0:
-        print(f"{socket.gethostname()} - ", end='')
-    print(f"Rank {rank} recovered AC in {it_number} iterations.", flush=True)
+        print(f"Rank {rank} recovered AC in {it_number} iterations.", flush=True)
     image.show_volume(result.ac[:], settings.Mquat,
                       f"autocorrelation_{generation}_{rank}.png")
-
     v1 = norm(ret)
     v2 = norm(W*ret-d)
 
@@ -297,7 +293,7 @@ def solve(uregion, uregion_ups, ac, result, summary,
 
 
 
-@task(privileges=[None, RO])
+@task(leaf=True, privileges=[None, RO])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def select_ac(generation, summary):
@@ -314,6 +310,12 @@ def select_ac(generation, summary):
     print(f"Keeping result from rank {ref_rank}.", flush=True)
     return iref
 
+
+@task(leaf=True, privileges=[WD("ac"), RO])
+@lgutils.gpu_task_wrapper
+@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
+def ac_result_task(results_p0, results, iref):
+    results_p0.ac[:] = results.ac[iref.get(),:]
 
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def solve_ac(generation,
@@ -335,11 +337,17 @@ def solve_ac(generation,
     reciprocal_extent = pixel_distance.reciprocal.max()
     use_reciprocal_symmetry = True
     maxiter = settings.solve_ac_maxiter
+    fill_orientations = False
 
     if orientations is None:
+        fill_orientations = True
         orientations, orientations_p = get_random_orientations(N_images_per_rank)
     nonuniform, nonuniform_p = get_nonuniform_positions(
         orientations, orientations_p, pixel_position)
+
+    # orientations region can be garbage collected
+    if fill_orientations:
+        pygion.fill(orientations, "quaternions", 0.)
 
     ac = Region((M,)*3,
                 {"support": pygion.float32, "estimate": pygion.float32})
@@ -358,6 +366,9 @@ def solve_ac(generation,
     N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
     results = Region((N_procs * M, M, M), {"ac": pygion.float32})
     results_p = Partition.restrict(results, (N_procs,), [[M], [0], [0]], [M, M, M])
+    results_r = Region((M, M, M), {"ac": pygion.float32})
+    results_rp = Partition.equal(results_r, (1,))
+    results_p0 = Partition.equal(results, (1,))
 
     alambda = 1
     # rlambdas = Mtot/Ntot * 1e2**(np.arange(N_procs) - N_procs/2)
@@ -368,7 +379,6 @@ def solve_ac(generation,
                 {"rank": pygion.int32, "rlambda": pygion.float32, "v1": pygion.float32, "v2": pygion.float32})
     summary_p = Partition.equal(summary, (N_procs,))
 
-    #for i in IndexLaunch((N_procs,)):
     for i in range(N_procs):
         solve(
             uregion_p[i], uregion_ups_p[i], ac, results_p[i], summary_p[i],
@@ -380,5 +390,13 @@ def solve_ac(generation,
     # At this point, I just want to chose one of the results as reference.
     # I tried to have `results` as a partition and copy into a region,
     # but I couldn't get it to work.
-    return results_p[iref.get()]
+
+    ac_result_task(results_rp[0], results_p0[0], iref)
+
+    pygion.fill(results, "ac", 0.)
+
+    #remove blocking call
+    #return results_p[iref.get()]
+
+    return results_rp[0]
 
