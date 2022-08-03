@@ -53,6 +53,9 @@ class SpinifelContexts(metaclass=Singleton):
         self._cuda_initialized = False
         self.ctx = None
 
+        self._shared_comm = None
+        self._shared_rank = 0
+
     def init_mpi(self):
         """
         does nothing if already initialized
@@ -72,6 +75,9 @@ class SpinifelContexts(metaclass=Singleton):
         self._comm = MPI.COMM_WORLD
         self._rank = self.comm.Get_rank()
 
+        self._shared_comm = self._comm.Split_type(MPI.COMM_TYPE_SHARED)
+        self._shared_rank = self._shared_comm.Get_rank()
+        
         register(MPI.Finalize)
 
         settings = SpinifelSettings()

@@ -20,6 +20,9 @@ if settings.use_cufinufft:
     from cufinufft import cufinufft
     mode = "cufinufft" + version("cufinufft")
 
+    if context._mpi_initialized:
+        from mpi4py import MPI 
+
 elif context.finufftpy_available:
     from . import nfft as finufft
     mode = "finufft" + version("finufftpy")
@@ -48,12 +51,6 @@ class NUFFT:
         self.N_images = settings._N_images_per_rank
 
         self.pixel_position_reciprocal = pixel_position_reciprocal
-        self.ref_orientations = skp.get_uniform_quat(self.N_orientations, True)
-        # Save reference rotation matrix so that we dont re-create it every
-        # time
-        self.ref_rotmat = np.array([np.linalg.inv(skp.quaternion2rot3d(
-            quat)) for quat in self.ref_orientations], dtype=f_type)
-
         self.eps = 1e-12
         self.isign = -1
 
@@ -102,11 +99,44 @@ class NUFFT:
                     self.N_images,
                 ),
                 dtype=f_type)
-
+            size = (3, self.N_orientations, *pixel_position_reciprocal.shape[1:])
+            itemsize = np.dtype(f_type).itemsize
             # Store memory that we have to send to the gpu constantly in pinned
             # memory.
-            self.HKL_mat = pycuda.driver.pagelocked_empty(
-                (self.ref_rotmat.shape[1], self.ref_rotmat.shape[0], *pixel_position_reciprocal.shape[1:]), f_type)
+            if context._shared_rank == 0:
+                ref_orientations = skp.get_uniform_quat(self.N_orientations, True)
+                # Save reference rotation matrix so that we dont re-create it every
+                # time
+                ref_rotmat = np.array([np.linalg.inv(skp.quaternion2rot3d(
+                    quat)) for quat in ref_orientations], dtype=f_type)
+                nbytes = np.prod(size) * itemsize
+            else:
+                nbytes = 0
+            context._shared_comm.Barrier()
+            win = MPI.Win.Allocate_shared(nbytes, itemsize, comm=context._shared_comm)
+            assert itemsize == np.dtype(f_type).itemsize
+            buf, itemsize = win.Shared_query(0)
+            context._shared_comm.Barrier()
+            if settings.use_cupy and context._shared_rank == 0:
+                cp.cuda.runtime.hostRegister(buf.address, buf.nbytes, 0x2)
+            context._shared_comm.Barrier()
+
+            self.HKL_mat = np.ndarray(buffer=buf, dtype=f_type, shape=size)
+            if context._shared_rank == 0:
+                self.win = win
+                self.buf = buf
+                # Cupy Einsum leaks memory so we dont use it
+                np.einsum(
+                    "ijk,klmn->jilmn",
+                    ref_rotmat,
+                    self.pixel_position_reciprocal,
+                    optimize='greedy',
+                    dtype=f_type,
+                    out=self.HKL_mat)
+                self.HKL_mat *= self.mult
+            context._shared_comm.Barrier()
+            assert np.max(np.abs(self.HKL_mat)) < 3 * np.pi
+
 
         elif context.finufftpy_available:
             self.H_f = np.empty(
@@ -123,21 +153,17 @@ class NUFFT:
             self.L_a = np.empty(
                 (self.N_pixels * self.N_images,), dtype=f_type)
 
-            self.HKL_mat = np.empty((self.ref_rotmat.shape[1],
-                                     self.ref_rotmat.shape[0],
+            self.HKL_mat = np.empty((ref_rotmat.shape[1],
+                                     ref_rotmat.shape[0],
                                      *pixel_position_reciprocal.shape[1:]),
                                      f_type)
 
-        # Cupy Einsum leaks memory so we dont use it
-        np.einsum(
-            "ijk,klmn->jilmn",
-            self.ref_rotmat,
-            self.pixel_position_reciprocal,
-            optimize='greedy',
-            dtype=f_type,
-            out=self.HKL_mat)
-        self.HKL_mat *= self.mult
-        assert np.max(np.abs(self.HKL_mat)) < 3 * np.pi
+    def __del__(self):
+        if context._shared_rank == 0:
+            cp.cuda.runtime.hostUnregister(self.buf.address)
+            del self.HKL_mat
+            # self.win.Free()
+
 
     @staticmethod
     @nvtx.annotate("extern/util.py", is_prefix=True)
