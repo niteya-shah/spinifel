@@ -81,7 +81,7 @@ def center_volume(vol):
     cen_vol : numpy.ndarray, shape (n,n,n)
         centered volume
     """
-    old_center = xp.array(ndimage.measurements.center_of_mass(vol))
+    old_center = xp.array(ndimage.center_of_mass(vol))
     new_center = xp.array(xp.array(vol.shape) / 2).astype(int)
     cen_vol = ndimage.shift(vol, -1 * (old_center - new_center))
     return cen_vol
