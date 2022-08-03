@@ -104,11 +104,6 @@ class NUFFT:
             # Store memory that we have to send to the gpu constantly in pinned
             # memory.
             if context._shared_rank == 0:
-                ref_orientations = skp.get_uniform_quat(self.N_orientations, True)
-                # Save reference rotation matrix so that we dont re-create it every
-                # time
-                ref_rotmat = np.array([np.linalg.inv(skp.quaternion2rot3d(
-                    quat)) for quat in ref_orientations], dtype=f_type)
                 nbytes = np.prod(size) * itemsize
             else:
                 nbytes = 0
@@ -122,9 +117,14 @@ class NUFFT:
             context._shared_comm.Barrier()
 
             self.HKL_mat = np.ndarray(buffer=buf, dtype=f_type, shape=size)
+            self.win = win
+            self.buf = buf
             if context._shared_rank == 0:
-                self.win = win
-                self.buf = buf
+                ref_orientations = skp.get_uniform_quat(self.N_orientations, True)
+                # Save reference rotation matrix so that we dont re-create it every
+                # time
+                ref_rotmat = np.array([np.linalg.inv(skp.quaternion2rot3d(
+                    quat)) for quat in ref_orientations], dtype=f_type)
                 # Cupy Einsum leaks memory so we dont use it
                 np.einsum(
                     "ijk,klmn->jilmn",
@@ -161,8 +161,7 @@ class NUFFT:
     def __del__(self):
         if context._shared_rank == 0:
             cp.cuda.runtime.hostUnregister(self.buf.address)
-            del self.HKL_mat
-            # self.win.Free()
+        self.win.Free()
 
 
     @staticmethod
