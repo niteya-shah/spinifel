@@ -77,6 +77,7 @@ class SNM:
                  self.N_pixels)),
             dtype=f_type)
         self.slices_2 = xp.square(self.slices_).sum(axis=1)
+        self.slices_std = self.slices_.std()
 
         self.nufft = nufft
 
@@ -157,6 +158,7 @@ class SNM:
             data_images = forward_result.real.reshape(self.N_batch_size, -1)
             slices_time += time.monotonic() - slice_start
             match_start = time.monotonic()
+            data_images *= self.slices_std / data_images.std()
             match_middle = time.monotonic()
             match_oth_time += match_middle - match_start
             self.euclidean_dist(
