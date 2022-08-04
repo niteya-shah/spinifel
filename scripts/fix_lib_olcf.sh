@@ -6,7 +6,7 @@ fix_lib () {
 
     __fix_lib_link () {
 
-        blacklist=(openjp2) # ssl crypto krb5 stdc++
+        blacklist=(openjp2 libuv) # ssl crypto krb5 stdc++
         fn=$(basename -- $1)
 
         safe=true
