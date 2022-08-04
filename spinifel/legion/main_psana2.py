@@ -30,11 +30,6 @@ def load_psana():
     from psana.psexp.tools import mode
     from psana import DataSource
     total_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
-
-    #min_batch_size = N_images_per_rank
-    #batch_size = min(settings.N_images_per_rank, 100)
-    #max_events = min(settings.N_images_max, total_procs*settings.N_images_per_rank)
-    
     # minimum images to load per batch
     min_batch_size = settings.N_images_per_rank
 
@@ -49,16 +44,8 @@ def load_psana():
     # max_images_per_iter
     max_images_per_iter = settings.N_image_batches_max*min_batch_size
     
-    # max_batches = settings.N_batches_max
-    # max_batches to load each time
-    # logger.log(f'Using psana: exp={settings.ps_exp}, run={settings.ps_runnum}, dir={settings.ps_dir}, batch_size={batch_size}, max_events={max_events}, mode={mode}')
-
     logger.log(f'Using psana: exp={settings.ps_exp}, run={settings.ps_runnum}, dir={settings.ps_dir}, max_batches_per_iter={max_batches_per_iter}, max_batches={max_batches}, mode={mode}')
     assert mode == 'legion'
-    #ds = DataSource(exp=settings.ps_exp, run=settings.ps_runnum,
-    #dir=settings.ps_dir, batch_size=batch_size,
-    #               max_events=max_events)
-
     ds = DataSource(exp=settings.ps_exp, run=settings.ps_runnum,
                     dir=settings.ps_dir)
     
@@ -67,7 +54,6 @@ def load_psana():
     # load pixel_position, pixel_distance, pixel_index
     pixel_position, pixel_distance, pixel_index, run = load_pixel_data(ds)
     gen_run = ds.runs()
-    #gen_run, gen_smd, run = load_image_batch(run,gen_run,None,all_partitions[0])
     gen_run, gen_smd, run = load_image_batch(run,gen_run,None,slices_images_p[0])
 
     pixel_position, pixel_distance, pixel_index = process_data(slices_images, slices_images_p[0], slices, all_partitions[0], pixel_distance, pixel_index, pixel_position,0)
