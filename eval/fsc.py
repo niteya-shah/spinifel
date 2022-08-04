@@ -71,8 +71,7 @@ def compute_fsc(
         volume1,
         volume2,
         distance_reciprocal_max,
-        spacing=0.01,
-        output=None):
+        spacing=0.01):
     """
     Compute the Fourier shell correlation (FSC) curve, with the
     estimated resolution based on a threshold of 0.5.
@@ -87,8 +86,6 @@ def compute_fsc(
         maximum voxel resolution in inverse Angstrom
     spacing : float
         spacing for evaluating FSC in inverse Angstrom
-    output : string, optional
-        directory to which to save png of FSC curve
 
     Returns
     -------
@@ -135,6 +132,17 @@ def compute_fsc(
     return resolution, rshell, fsc
 
 def plot(rshell, fsc, output):
+    """
+    Plot the results of FSC
+    Parameters
+    ----------
+    rshell : ndarray
+
+    fsc : ndarray
+        
+    output : string
+        directory to which to save png of FSC curve
+    """
     f, ax1 = plt.subplots(figsize=(5, 3))
     ax1.plot(rshell, fsc, c='black')
     ax1.scatter(rshell, fsc, c='black')
