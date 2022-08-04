@@ -40,6 +40,7 @@ def get_random_orientations(N_images_per_rank):
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def gen_nonuniform_positions_v(nonuniform, nonuniform_v, reciprocal_extent):
+    reciprocal_extent = reciprocal_extent.get()
     nonuniform_v.H[:] = (nonuniform.H.flatten()
         / reciprocal_extent * np.pi / settings.oversampling)
     nonuniform_v.K[:] = (nonuniform.K.flatten()
@@ -102,6 +103,7 @@ def right_hand_ADb_task(slices, uregion, nonuniform_v, ac, weights, M,
                         reciprocal_extent, use_reciprocal_symmetry):
     if settings.verbosity > 0:
         print(f"{socket.gethostname()} started ADb.", flush=True)
+
     data = slices.data.flatten()
     nuvect_Db = data * weights
     pygion.fill(uregion, "ADb", 0.)
@@ -317,6 +319,12 @@ def select_ac(generation, summary):
 def ac_result_task(results_p0, results, iref):
     results_p0.ac[:] = results.ac[iref.get(),:]
 
+@task(leaf=True, privileges=[RO("reciprocal")])
+@lgutils.gpu_task_wrapper
+@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
+def  pixel_distance_rp_max_task(pixel_distance):
+    return pixel_distance.reciprocal.max()
+
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def solve_ac(generation,
              pixel_position,
@@ -334,7 +342,7 @@ def solve_ac(generation,
     N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
     N_images_tot = N_images_per_rank * N_procs
     Ntot = N * N_procs
-    reciprocal_extent = pixel_distance.reciprocal.max()
+    reciprocal_extent = pixel_distance_rp_max_task(pixel_distance)
     use_reciprocal_symmetry = True
     maxiter = settings.solve_ac_maxiter
     fill_orientations = False
