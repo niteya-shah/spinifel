@@ -17,7 +17,7 @@ from . import utils as lgutils
 @nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
 def match_task(phased, slices, orientations, pixel_position, pixel_distance):
     if settings.verbosity > 0:
-        print(f"{socket.gethostname()} starts Orientation Matching for {orientations.ispace.bounds}.", flush=True)
+        print(f"{socket.gethostname()} starts Orientation Matching.", flush=True)
     orientations.quaternions[:] = sequential_match(
         phased.ac, slices.data, pixel_position.reciprocal, pixel_distance.reciprocal)
     if settings.verbosity > 0:
