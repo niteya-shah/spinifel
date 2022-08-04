@@ -16,7 +16,7 @@ if settings.use_psana:
     from psana.psexp.legion_node import smd_chunks, smd_batches, batch_events
     from psana.psexp.legion_node import smd_batches_without_transitions, smd_chunks_steps
 
-@task(privileges=[WD])
+@task(leaf=True, privileges=[WD])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def load_pixel_position(pixel_position):
@@ -42,14 +42,14 @@ def get_pixel_position(run=None):
         load_pixel_position_psana(pixel_position, run)
     return pixel_position
 
-@task(privileges=[WD])
+@task(leaf=True, privileges=[WD])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def load_pixel_index(pixel_index):
     prep.load_pixel_index_map(pixel_index.map)
 
 
-@task(privileges=[WD])
+@task(leaf=True, privileges=[WD])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def load_pixel_index_psana(pixel_index, run):
@@ -69,7 +69,7 @@ def get_pixel_index(run=None):
 
 
 # this is the equivalent of big data (the loop around batch_events)
-@task(privileges=[WD])
+@task(leaf=True, privileges=[WD])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def load_slices_psana(slices, rank, N_images_per_rank, smd_chunk, run):
@@ -91,7 +91,7 @@ def load_slices_psana(slices, rank, N_images_per_rank, smd_chunk, run):
         print(f"{socket.gethostname()} loaded slices.", flush=True)
 
 
-@task(privileges=[WD])
+@task(leaf=True, privileges=[WD])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def load_slices_psana2(slices, rank, N_images_per_rank, smd_chunk, run):
@@ -111,7 +111,7 @@ def load_slices_psana2(slices, rank, N_images_per_rank, smd_chunk, run):
     if settings.verbosity > 0:
         print(f"{socket.gethostname()} loaded {i} slices.", flush=True)
 
-@task(privileges=[WD])
+@task(leaf=True, privileges=[WD])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def load_slices_hdf5(slices, rank, N_images_per_rank):
@@ -154,7 +154,7 @@ def get_slices(ds):
     return slices, slices_p, pixel_position, pixel_index
 
 
-@task(privileges=[WD])
+@task(leaf=True, privileges=[WD])
 @lgutils.gpu_task_wrapper
 def load_orientations_prior(orientations_prior, rank, N_images_per_rank):
     if settings.verbosity > 0:
@@ -177,12 +177,11 @@ def get_orientations_prior():
     return orientations_prior, orientations_prior_p
 
 
-@task(privileges=[RO, Reduce('+')])
+@task(leaf=True, privileges=[RO, Reduce('+')])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/prep.py", is_prefix=True)
-def reduce_mean_image(slices, mean_image):
-    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
-    mean_image.data[:] += slices.data.mean(axis=0) / N_procs
+def reduce_mean_image(slices, mean_image, nprocs):
+    mean_image.data[:] += slices.data.mean(axis=0) / nprocs
 
 
 
@@ -191,13 +190,15 @@ def compute_mean_image(slices, slices_p):
     mean_image = Region(lgutils.get_region_shape(slices)[1:],
                         {'data': pygion.float32})
     pygion.fill(mean_image, 'data', 0.)
+    nprocs = Tunable.select(Tunable.GLOBAL_PYS).get()
+
     for i, slices in enumerate(slices_p):
-        reduce_mean_image(slices, mean_image, point=i)
+        reduce_mean_image(slices, mean_image, nprocs, point=i)
     return mean_image
 
 
 
-@task(privileges=[RO, WD])
+@task(leaf=True, privileges=[RO, WD])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def calculate_pixel_distance(pixel_position, pixel_distance):
@@ -214,7 +215,7 @@ def compute_pixel_distance(pixel_position):
 
 
 
-@task(privileges=[RO, WD])
+@task(leaf=True, privileges=[RO, WD])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def apply_pixel_position_binning(old_pixel_position, new_pixel_position):
@@ -233,7 +234,7 @@ def bin_pixel_position(old_pixel_position):
 
 
 
-@task(privileges=[RO, WD])
+@task(leaf=True, privileges=[RO, WD])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def apply_pixel_index_binning(old_pixel_index, new_pixel_index):
@@ -252,7 +253,7 @@ def bin_pixel_index(old_pixel_index):
 
 
 
-@task(privileges=[RO, WD])
+@task(leaf=True, privileges=[RO, WD])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def apply_slices_binning(old_slices, new_slices):
@@ -272,7 +273,7 @@ def bin_slices(old_slices, old_slices_p):
     return new_slices, new_slices_p
 
 #perform binning by copying the old data without creating a new region
-@task(privileges=[RW])
+@task(leaf=True, privileges=[RW])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def apply_slices_binning_new(slices):
@@ -280,13 +281,13 @@ def apply_slices_binning_new(slices):
     slices.data[:] = prep.binning_sum(data)
 
 
-@task(privileges=[RO, RO])
+@task(leaf=True, privileges=[RO, RO])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def show_image(pixel_index, images, image_index, name):
     image.show_image(pixel_index.map, images.data[image_index], name)
 
-@task(privileges=[RO, RO])
+@task(leaf=True, privileges=[RO, RO])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def export_saxs(pixel_distance, mean_image, name):
