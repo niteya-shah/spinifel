@@ -34,3 +34,10 @@ setup/legion
 legion_build_dir.sh
 
 *@neomake*
+
+setup/spack/
+setup/spack_machine_config.yaml
+setup/spack.lock
+setup/.spack-env/
+setup/Makefile
+setup/str

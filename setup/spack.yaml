@@ -1,0 +1,47 @@
+spack:
+  # We keep machine-specific settings in a per-machine file under machines/*.yaml
+  include:
+  - spack_machine_config.yaml
+
+  specs:
+  - python@3.8
+  - py-matplotlib
+  - py-numpy
+  - py-scipy
+  - py-cupy
+  - py-mpi4py
+  - py-pytest
+  - py-h5py
+  - py-mrcfile
+  - py-pynvtx
+  - fftw ~mpi +openmp
+
+  - py-cffi    # Legion
+  - py-pybind11    # FINUFFT
+  - py-scikit-learn    # skopi
+  - py-tqdm    # convenience
+
+  # lcls2
+  - cmake
+  - py-cython
+  - mongo-c-driver   # FIXME: not sure what Spack's name for Conda's mongodb is
+  - mongo-cxx-driver   # FIXME: not sure what Spack's name for Conda's mongodb is
+  - py-pymongo
+  - curl
+  - rapidjson
+  - py-ipython
+  - py-requests
+  - py-mypy
+  - py-prometheus-client
+  - py-amityping
+  - py-bitstruct
+  - py-lcls-krtc
+
+  # For now, still install pip so that we can bootstrap remaining dependencies.
+  - py-pip
+
+  # make sure we install exactly one copy of each dependency (i.e., no multiple copies of Python)
+  concretizer:
+    unify: true
+
+  view: true

@@ -9,5 +9,5 @@ source "$root_dir"/env.sh
 
 mkdir -p build
 cd build
-cmake -DCMAKE_PREFIX_PATH="$LEGION_INSTALL_DIR" ..
+cmake -DCMAKE_PREFIX_PATH="$LOCAL_INSTALL_DIR" ..
 make -j8

@@ -65,15 +65,8 @@ export CC=cc
 export CXX=CC
 export CRAYPE_LINK_TYPE=dynamic # allow dynamic linking
 
-# compilers for mpi4py
-export MPI4PY_CC="\$(which cc)"
-export MPI4PY_MPICC="\$(which cc) --shared"
-
 # disable Cori-specific Python environment
 unset PYTHONSTARTUP
-
-# Make sure Cray-FFTW get loaded first to avoid Conda's MKL
-export LD_PRELOAD="\${FFTW_DIR}/libfftw3.so"
 
 export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
 export GASNET_CONDUIT=aries
@@ -89,11 +82,6 @@ module load fftw
 
 export CC=gcc
 export CXX=g++
-# compilers for mpi4py
-export MPI4PY_CC=gcc
-export MPI4PY_MPICC=\$(which mpicc)
-
-export CUPY_LDFLAGS=-L\${CUDA_ROOT}/lib64/stubs
 
 export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
 # NOTE: not sure if this is the best choice -- investigate further if this
@@ -104,9 +92,6 @@ EOF
 elif [[ ${target} = "perlmutter" ]]; then
     cat >> env.sh <<EOF
 module load PrgEnv-gnu
-module load cudatoolkit
-module load cpe-cuda
-module load cray-fftw
 module load cray-pmi # for GASNet
 module load evp-patch # workaround for recent Perlmutter issue
 
@@ -114,32 +99,28 @@ export CC=cc
 export CXX=CC
 export CRAYPE_LINK_TYPE=dynamic # allow dynamic linking
 
-# compilers for mpi4py
-export MPI4PY_CC="\$(which cc)"
-export MPI4PY_MPICC="\$(which cc) --shared"
-
-# Make sure Cray-FFTW get loaded first to avoid Conda's MKL
-export LD_PRELOAD="\${FFTW_DIR}/libfftw3.so"
-
 export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
 export GASNET_CONDUIT=${GASNET_CONDUIT:-ofi-slingshot11}
 export LEGION_GASNET_CONDUIT=${LEGION_GASNET_CONDUIT:-ofi}
+
+export SPACK_BUILD_CACHE=/global/cfs/cdirs/m2859/spack_build_cache
+export SPACK_TARGET_MACHINE=perlmutter
 EOF
 elif [[ ${target} = *"summit"* || ${target} = *"ascent"* ]]; then
     cat >> env.sh <<EOF
-module load gcc fftw cuda gsl
+module load gcc/11.1.0
 
 export CC=gcc
 export CXX=g++
-# compilers for mpi4py
-export MPI4PY_CC=\$OMPI_CC
-export MPI4PY_MPICC=mpicc
 
 export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
 export GASNET_CONDUIT=ibv
 
 # for Numba
 export CUDA_HOME=\$OLCF_CUDA_ROOT
+
+export SPACK_BUILD_CACHE=/gpfs/wolf/chm137/proj-shared/spack_build_cache
+export SPACK_TARGET_MACHINE=ascent
 EOF
 elif [[ ${target} = *"jlse"* ]]; then # iris, yarrow
     cat >> env.sh <<EOF
@@ -147,10 +128,6 @@ module load oneapi # just get some sort of a compiler loaded
 module load mpi
 export CC=icx
 export CXX=icpx
-
-# compilers for mpi4py
-export MPI4PY_CC=clang
-export MPI4PY_MPICC=mpicc
 
 export LEGION_USE_GASNET=${LEGION_USE_GASNET:-0} # FIXME: GASNet on iris is currently broken
 export GASNET_CONDUIT=ibv
@@ -164,10 +141,6 @@ module load ompi/4.1.0/llvm/rocm/4.1.0
 export CC=gcc
 export CXX=g++
 
-# compilers for mpi4py
-export MPI4PY_CC=gcc
-export MPI4PY_MPICC=mpicc
-
 export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
 export GASNET_CONDUIT=ibv
 EOF
@@ -177,9 +150,6 @@ module load cuda mpi slurm
 
 export CC=gcc
 export CXX=g++
-# compilers for mpi4py
-export MPI4PY_CC=gcc
-export MPI4PY_MPICC=\$(which mpicc)
 
 export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
 export GASNET_CONDUIT=ibv
@@ -188,9 +158,6 @@ elif [[ ${target} = "psbuild"* ]]; then # psana machines
     cat >> env.sh <<EOF
 #export CC=gcc
 #export CXX=g++
-# compilers for mpi4py
-#export MPI4PY_CC=gcc
-#export MPI4PY_MPICC=mpicc
 
 export LEGION_USE_GASNET=${LEGION_USE_GASNET:-0}
 EOF
@@ -225,13 +192,6 @@ export CC=cc
 export CXX=CC
 export CRAYPE_LINK_TYPE=dynamic # allow dynamic linking
 
-# compilers for mpi4py
-export MPI4PY_CC="\$(which cc)"
-export MPI4PY_MPICC="\$(which cc) --shared"
-
-# Make sure Cray-FFTW get loaded first to avoid Conda's MKL
-export LD_PRELOAD="\${FFTW_DIR}/libfftw3.so"
-
 export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
 export GASNET_CONDUIT=${GASNET_CONDUIT:-ofi-slingshot11}
 export LEGION_GASNET_CONDUIT=${LEGION_GASNET_CONDUIT:-ofi}
@@ -247,13 +207,6 @@ export CC=cc
 export CXX=CC
 export CRAYPE_LINK_TYPE=dynamic # allow dynamic linking
 
-# compilers for mpi4py
-export MPI4PY_CC="\$(which cc)"
-export MPI4PY_MPICC="\$(which cc) --shared"
-
-# Make sure Cray-FFTW get loaded first to avoid Conda's MKL
-export LD_PRELOAD="\${FFTW_DIR}/libfftw3.so"
-
 export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
 export GASNET_CONDUIT=${GASNET_CONDUIT:-ofi-slingshot10}
 export LEGION_GASNET_CONDUIT=${LEGION_GASNET_CONDUIT:-ofi}
@@ -266,11 +219,6 @@ module load openmpi
 
 export CC=gcc
 export CXX=g++
-# compilers for mpi4py
-export MPI4PY_CC=gcc
-export MPI4PY_MPICC=\$(which mpicc)
-
-export CUPY_LDFLAGS=-L\${CUDA_ROOT}/lib64/stubs
 EOF
 else
     echo "I don't know how to build it on this machine..."
@@ -286,26 +234,30 @@ export LEGION_DEBUG=0
 export PYVER=3.8
 export PYVER_FULL=3.8.13
 
-export LEGION_INSTALL_DIR="${root_dir}/install"
-pathappend \${LEGION_INSTALL_DIR}/bin
-ldpathappend \${LEGION_INSTALL_DIR}/lib
-pythonpathappend \${LEGION_INSTALL_DIR}/lib/python\${PYVER}/site-packages
+export SPACK_ROOT="${root_dir}/spack"
 
-export CONDA_ROOT="${root_dir}/conda"
-export CONDA_ENV_DIR="\${CONDA_ROOT}/envs/myenv"
+# Do not look in either $HOME/.spack or any system files. This is to avoid
+# issues where the user's preexiting configuration interferes with Spinifel.
+export SPACK_DISABLE_LOCAL_CONFIG=1
+
+export LOCAL_INSTALL_DIR="${root_dir}/install"
+
+pathappend \${LOCAL_INSTALL_DIR}/bin
+ldpathappend \${LOCAL_INSTALL_DIR}/lib
+pythonpathappend \${LOCAL_INSTALL_DIR}/lib/python\${PYVER}/site-packages
 
 export LCLS2_DIR="${root_dir}/lcls2"
 
 # settings for finufft
 if [[ -z \${FFTW_INC+x} ]]; then
-    export FINUFFT_CFLAGS="-I\${CONDA_ENV_DIR}/include"
+    export FINUFFT_CFLAGS="-I\${LOCAL_INSTALL_DIR}/include"
 else
-    export FINUFFT_CFLAGS="-I\$FFTW_INC -I\${CONDA_ENV_DIR}/include"
+    export FINUFFT_CFLAGS="-I\$FFTW_INC -I\${LOCAL_INSTALL_DIR}/include"
 fi
 if [[ -z \${FFTW_DIR+x} ]]; then
-    export FINUFFT_LDFLAGS="-L\${CONDA_ENV_DIR}/lib"
+    export FINUFFT_LDFLAGS="-L\${LOCAL_INSTALL_DIR}/lib"
 else
-    export FINUFFT_LDFLAGS="-L\$FFTW_DIR -L\${CONDA_ENV_DIR}/lib"
+    export FINUFFT_LDFLAGS="-L\$FFTW_DIR -L\${LOCAL_INSTALL_DIR}/lib"
 fi
 
 #cufinufft library dir
@@ -316,15 +268,14 @@ pathappend \${LCLS2_DIR}/install/bin
 
 pythonpathappend \${LCLS2_DIR}/install/lib/python\${PYVER}/site-packages
 
-if [[ -d \$CONDA_ROOT ]]; then
-  source "\${CONDA_ROOT}/etc/profile.d/conda.sh"
-  conda activate "\${CONDA_ENV_DIR}"
+if [[ -d \$SPACK_ROOT ]]; then
+  source "\${SPACK_ROOT}/share/spack/setup-env.sh"
 fi
 EOF
 
 # Build unenv script
 cat > unenv.sh <<EOF
-conda deactivate
+spack deactivate
 if [[ -e $root_dir/saved-env.sh ]]; then
     for i in \$(env | awk -F"=" '{print \$1}') ; do unset \$i 2> /dev/null ; done
     source $root_dir/saved-env.sh

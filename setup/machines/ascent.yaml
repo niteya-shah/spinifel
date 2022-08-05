@@ -1,0 +1,30 @@
+compilers:
+- compiler:
+    spec: gcc@=11.1.0
+    paths:
+      cc: gcc
+      cxx: g++
+      f77: gfortran
+      fc: gfortran
+    flags: {}
+    operating_system: rhel8
+    target: any
+    modules:
+    - gcc/11.1.0
+
+packages:
+  all:
+    require: "%gcc@11.1.0"
+    compiler: [gcc@11.1.0]
+    variants: "+cuda cuda_arch=70"
+    providers:
+      mpi: [spectrum-mpi]
+  mpi:
+    require: spectrum-mpi
+  spectrum-mpi:
+    buildable: false
+    externals:
+    - spec: spectrum-mpi@10.4.0.3-20210112
+      prefix: /sw/ascent/spack-envs/base/opt/linux-rhel8-ppc64le/gcc-11.1.0/spectrum-mpi-10.4.0.3-20210112-6kg6anupjriji6pnvijebfn7ha5vsqp2
+      modules:
+      - spectrum-mpi/10.4.0.3-20210112

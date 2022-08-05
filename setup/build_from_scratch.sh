@@ -4,6 +4,24 @@
 set -e
 
 
+if (return 0 2>/dev/null); then
+    echo "Please do not source this script. That is:"
+    echo
+    echo "DO NOT:"
+    echo "    source setup/build_from_scratch.sh"
+    echo
+    echo "DO:"
+    echo "    ./setup/build_from_scratch.sh"
+    echo
+    echo "Sourcing causes many issues, so we don't support it."
+    echo "Once this script is done, it will produce a file env.sh"
+    echo "that you can source like:"
+    echo
+    echo "    source env.sh"
+    return 0
+fi
+
+
 root_dir=$(readlink -f $(dirname "${BASH_SOURCE[0]}"))
 pushd $root_dir
 
@@ -22,7 +40,8 @@ fi
 #_______________________________________________________________________________
 # Make clean environment
 
-rm -rf conda
+rm -rf conda # Note: we don't use conda any more, but clean it up if it exists
+rm -rf spack
 rm -rf install
 mkdir -p install/bin
 mkdir -p install/include
@@ -43,131 +62,58 @@ rm -rf ~/.cache/pip
 
 source env.sh
 
-# sometimes LD_PRELOAD can inverfere with other scripts here -- temporarily
+# sometimes LD_PRELOAD can interfere with other scripts here -- temporarily
 # disable it (it is re-enabled at the end of this script)
-__LD_PRELOAD=$LD_PRELOAD
+__LD_PRELOAD="$LD_PRELOAD"
 unset LD_PRELOAD
 
 #-------------------------------------------------------------------------------
 
 
 #_______________________________________________________________________________
-# Install conda and set up local environment
+# Install spack and set up local environment
 
-# Clean up any previous installs.
+git clone -c feature.manyFiles=true -b develop https://github.com/spack/spack.git $SPACK_ROOT
+source $SPACK_ROOT/share/spack/setup-env.sh
 
-# Get and run the miniconda installer
-wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-$(uname -p).sh -O conda-installer.sh
-bash ./conda-installer.sh -b -p $CONDA_ROOT
-rm conda-installer.sh
+# Link the desired machine config
+if [[ -z $SPACK_TARGET_MACHINE ]]; then
+    echo "Please modify mk_env.sh to set SPACK_TARGET_MACHINE for this machine"
+    exit 1
+fi
+ln -sf ./machines/$SPACK_TARGET_MACHINE.yaml ./spack_machine_config.yaml
+ln -sf ./machines/$SPACK_TARGET_MACHINE.lock ./spack.lock
 
-source $CONDA_ROOT/etc/profile.d/conda.sh
-
-# Unfortunately, some packages need to be pinned to specific hashes
-# (not merely versions) because these break on Summit/Ascent. This is
-# inherently unportable (the hash relies on the architecture), so we
-# have to make sure we specify this only for the affected architectures.
-if [[ $(uname -p) = "ppc64le" ]]; then
-    ppc64le_target=1
+# Set up local build cache
+if [[ -z $SPACK_BUILD_CACHE ]]; then
+    echo "Please modify mk_env.sh to set SPACK_BUILD_CACHE for this machine"
+    exit 1
+fi
+if mkdir $SPACK_BUILD_CACHE 2>/dev/null; then
+    # Make sure the group always has access to this directory.
+    chmod g+rwxs $SPACK_BUILD_CACHE
 fi
 
-# IMPORTANT: We pin ALL of our dependencies, otherwise we see repeated
-# issues like https://gitlab.osti.gov/mtip/spinifel/-/issues/61 .
-PACKAGE_LIST=(
-    python=$PYVER
-    matplotlib=3.5.1 # https://gitlab.osti.gov/mtip/spinifel/-/issues/54
-    numpy=1.22.3
-    scipy=1.7.3${ppc64le_target+=py38he743248_0} # https://gitlab.osti.gov/mtip/spinifel/-/issues/54
-    pytest=7.1.2
-    h5py=3.7.0
+spack mirror add local_build_cache $SPACK_BUILD_CACHE
+spack buildcache keys -it # FIXME (Elliott): do we still need this?
 
-    cffi=1.15.1  # Legion
-    pybind11=2.9.2  # FINUFFT
-    scikit-learn=1.1.3  # skopi
-    tqdm=4.64.1  # convenience
+# Important: Spack can only install out of a build cache if the path is LONGER
+# than where it was originally built. This option asks Spack to pad the
+# install directory so that we avoid issues in the future.
+spack config add config:install_tree:padded_length:512
 
-    # lcls2
-    setuptools=46.4.0
-    cmake=3.22.1
-    cython=0.29.32
-    mongodb=4.0.3
-    pymongo=3.12.0
-    curl=7.85.0
-    rapidjson=1.1.0
-    ipython=8.6.0
-    requests=2.28.1
-    mypy=0.910
-    prometheus_client=0.14.1
+spack -e . concretize ${SPACK_FORCE_CONCRETIZE:+-f -U}
+spack -e . env depfile -o Makefile
+# Note: --no-check-signature is required for unsigned build cache.
+make SPACK_INSTALL_ARGS=--no-check-signature -j${THREADS:-8}
 
-    # transitive dependencies
-    kiwisolver=1.4.2 # from matplotlib # https://gitlab.osti.gov/mtip/spinifel/-/issues/61
-    cryptography=38.0.4 # https://gitlab.osti.gov/mtip/spinifel/-/issues/63
-)
+spack -e . buildcache push --unsigned --allow-root --update-index $SPACK_BUILD_CACHE $(spack find --format /{hash})
 
-
-if [[ ${target} = "psbuild"* ]]; then
-    conda create -y -p "$CONDA_ENV_DIR" "${PACKAGE_LIST[@]}" -c conda-forge
-else
-   conda create -y -p "$CONDA_ENV_DIR" "${PACKAGE_LIST[@]}" -c defaults -c anaconda
-fi
-
-conda activate "$CONDA_ENV_DIR"
-
-# Extra lcls2 deps
-conda install -y amityping -c lcls-ii
-conda install -y bitstruct krtc -c conda-forge
-
-# Important: install CuPy first, it is now a dependency for mpi4py (at least in some cases)
-(
-    if [[ $(hostname --fqdn) = *".crusher."* || $(hostname --fqdn) = *".frontier."* ]]; then
-        export CUPY_INSTALL_USE_HIP=1
-        export ROCM_HOME=$ROCM_PATH
-        export HCC_AMDGPU_TARGET=gfx90a
-        pip install --no-cache-dir cupy
-    elif [[ $(hostname --fqdn) = *".spock."* ]]; then
-        export CUPY_INSTALL_USE_HIP=1
-        export ROCM_HOME=$ROCM_PATH
-        export HCC_AMDGPU_TARGET=gfx908
-        pip install --no-cache-dir cupy
-    else
-        pip install --no-cache-dir cupy
-    fi
-)
-
-# Extra deps required for psana machines
-if [[ ${target} = "psbuild"* ]]
-then
-    conda install -y -c conda-forge \
-        compilers                   \
-        openmpi                     \
-        cudatoolkit=11.4            \
-        cudatoolkit-dev=11.4        \
-        cmake                       \
-        make                        \
-        cupy                        \
-        mpi4py                      \
-        mrcfile
-else
-    CC=$MPI4PY_CC MPICC=$MPI4PY_MPICC pip install -v --no-binary mpi4py mpi4py
-    pip install --no-cache-dir mrcfile
-    LDFLAGS=$CUPY_LDFLAGS pip install --no-cache-dir cupy
-fi
+spack env activate .
 
 # Install pip packages
 pip install --no-cache-dir callmonitor
-pip install --no-cache-dir PyNVTX
 pip install --no-cache-dir gdown
-
-# Pin sckit-learn to 1.0.2 w/o breaking psana (see issue #51)
-conda remove --force -y scikit-learn
-conda install --freeze-installed -y scikit-learn=1.0.2
-
-# Extra for frontier/crusher new unsolved issue
-if [[ ${target} = *".crusher."* || ${target} = *".frontier."* ]]
-then
-    conda install -y -c conda-forge libssh
-    conda install -y -c conda-forge libssh=0.10.4
-fi
 
 #-------------------------------------------------------------------------------
 
@@ -269,42 +215,5 @@ fi
 #-------------------------------------------------------------------------------
 
 
-#_______________________________________________________________________________
-# Overwrite the conda libraries with system libraries => don't let anaconda
-# provide libraries (like openmp) that are already provided by the system
-
-# FIXME (Elliott): After this point, CMake will be BROKEN. If you try
-# to do any further builds, they will NOT work. The error looks like:
-#
-# cmake: symbol lookup error: cmake: undefined symbol: uv_fs_get_system_error
-#
-# This is probably happening because we're overwriting important
-# libraries from Conda with system ones. Unfortunately, this does not
-# work. I think the long term solution needs to be more precise about
-# exactly what system libraries we're going to get (e.g., OpenMP, but
-# not others). What we've got right now is far too indiscriminant. But
-# as an immediate hack, we'll just put this as late in the build as
-# possible so that we hope we don't mess with anything important.
-#
-# *Only required for Summit and not Ascent.
-
-if [[ ${target} = *"summit"* ]]
-then
-    ${root_dir}/../scripts/fix_lib_olcf.sh
-fi
-
-#-------------------------------------------------------------------------------
-
-
-
-# pip check # FIXME (Elliott): this seems to be failing
-
-
 echo
 echo "Done. Please run 'source setup/env.sh' to use this build."
-
-# Restore the LD_PRELOAD variable
-export LD_PRELOAD=$__LD_PRELOAD
-
-
-export popd

@@ -1,0 +1,101 @@
+compilers:
+- compiler:
+    spec: gcc@11.2.0
+    paths:
+      cc: gcc
+      cxx: g++
+      f77: gfortran
+      fc: gfortran
+    flags: {}
+    operating_system: sles15
+    target: any
+    modules:
+    - PrgEnv-gnu
+    - gcc/11.2.0
+    - craype-x86-milan
+    - libfabric
+
+packages:
+  all:
+    require: "%gcc@11.2.0"
+    compiler: [gcc@11.2.0]
+    variants: "+cuda cuda_arch=80"
+    providers:
+      # FIXME (Elliott): prevents py-scipy from building
+      # blas: [cray-libsci]
+      mpi: [cray-mpich]
+  cuda:
+    require: "@:11.7.1"
+  binutils:
+    variants: +ld +gold +headers +libiberty ~nls
+  elfutils:
+    variants: +bzip2 ~nls +xz
+  libunwind:
+    variants: +pic +xz
+  ncurses:
+    require: "@6.3 +termlib"
+  openblas:
+    variants: threads=openmp
+
+  # EXTERNALS
+  cray-libsci:
+    buildable: false
+    externals:
+    - spec: cray-libsci@23.02.1.1
+      modules:
+      - cray-libsci/23.02.1.1
+  cray-mpich:
+    buildable: false
+    externals:
+    - spec: cray-mpich@8.1.25 %gcc
+      prefix: /opt/cray/pe/mpich/8.1.25/ofi/gnu/9.1
+      modules:
+      - cray-mpich/8.1.25
+  libfabric:
+    buildable: false
+    variants: fabrics=sockets,tcp,udp,rxm
+    externals:
+    - spec: libfabric@1.15.2.0
+      prefix: /opt/cray/libfabric/1.15.2.0
+      modules:
+      - libfabric/1.15.2.0
+  openssl:
+    buildable: false
+    externals:
+    - spec: openssl@1.1.1s
+      prefix: /global/common/software/nersc/pm-2022q4/sw/evp-patch
+  openssh:
+    buildable: false
+    externals:
+    - spec: openssh@8.4p1
+      prefix: /global/common/software/nersc/pm-2022q4/sw/evp-patch
+  slurm:
+    buildable: false
+    externals:
+    - spec: slurm@23.02.1
+      prefix: /usr
+
+modules:
+  prefix_inspections:
+    lib: [LD_LIBRARY_PATH]
+    lib64: [LD_LIBRARY_PATH]
+  default:
+    'enable:': [lmod]
+    lmod:
+      defaults: [cray-mpich@8.1.25]
+      core_compilers: [gcc@=11.2.0]
+      verbose: true
+      hash_length: 4
+      hierarchy: [mpi]
+      projections: {}
+      core_specs: []
+      exclude_implicits: false
+      include: [cray-mpich]
+      all:
+        autoload: direct
+        environment:
+          set:
+            ${PACKAGE}_ROOT: ${PREFIX}
+        suffixes:
+          +cuda cuda_arch=80: cuda80
+          +openmp: openmp
