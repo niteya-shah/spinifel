@@ -159,9 +159,10 @@ class NUFFT:
                                      f_type)
 
     def __del__(self):
-        if context._shared_rank == 0:
-            cp.cuda.runtime.hostUnregister(self.buf.address)
-        self.win.Free()
+        if settings.use_cufinufft:
+            if context._shared_rank == 0:
+                cp.cuda.runtime.hostUnregister(self.buf.address)
+            self.win.Free()
 
 
     @staticmethod
