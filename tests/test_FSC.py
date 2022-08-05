@@ -31,7 +31,7 @@ class TestFSC(object):
         q_tar = skp.get_random_quat(1)
         R_inv = np.linalg.inv(skp.quaternion2rot3d(q_tar[0]))
         q_tar_inv = np.expand_dims(skp.rotmat_to_quaternion(R_inv), axis=0)
-        tar_density = rotate_volume(self.ref_density, q_tar_inv)
+        tar_density = rotate_volume(self.ref_density, q_tar_inv)[0]
         self.inv_density = rotate_volume(tar_density, q_tar)
 
         self.args = args
@@ -44,6 +44,6 @@ class TestFSC(object):
 
     def test_compute_fsc(self):
         """ Check volume aligntment and FSC """
-        rs, fsc, res = compute_fsc(
+        res, _, _ = compute_fsc(
             self.ref_density, self.inv_density, 1e10 / self.args['resolution'], self.args['spacing'])
         assert res < self.args['resolution'] * 1.25
