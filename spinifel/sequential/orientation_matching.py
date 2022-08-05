@@ -75,11 +75,7 @@ class SNM:
                  self.N_pixels)),
             dtype=f_type)
         self.slices_2 = xp.square(self.slices_).sum(axis=1)
-        if settings.use_cufinufft:
-            self.slices_std = self.slices_.std()
-        else:
-            self.slices_std = self.slices_.std().get()
-
+        self.slices_std = self.slices_.std()
         self.nufft = nufft
 
     @nvtx.annotate("sequential/orientation_matching.py::modified",
@@ -159,6 +155,10 @@ class SNM:
             data_images = forward_result.real.reshape(self.N_batch_size, -1)
             slices_time += time.monotonic() - slice_start
             match_start = time.monotonic()
+            if settings.use_cupy and not settings.use_cufinufft:
+                data_images = xp.array(data_images)
+            if not settings.use_cupy and settings.use_cufinufft:
+                data_images = data_images.get()
             data_images *= self.slices_std / data_images.std()
             match_middle = time.monotonic()
             match_oth_time += match_middle - match_start
