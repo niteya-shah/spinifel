@@ -14,7 +14,7 @@ profiler = Profiler()
 if settings.use_cufinufft:
     import pycuda.gpuarray as gpuarray
     import pycuda.driver as cuda
-    import pycuda.autoinit
+    import pycuda
 
     import cupy as cp
     from cufinufft import cufinufft
