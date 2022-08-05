@@ -75,7 +75,10 @@ class SNM:
                  self.N_pixels)),
             dtype=f_type)
         self.slices_2 = xp.square(self.slices_).sum(axis=1)
-        self.slices_std = self.slices_.std()
+        if settings.use_cufinufft:
+            self.slices_std = self.slices_.std()
+        else:
+            self.slices_std = self.slices_.std().get()
 
         self.nufft = nufft
 
