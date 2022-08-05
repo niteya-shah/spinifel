@@ -78,7 +78,7 @@ PACKAGE_LIST=(
     tqdm  # convenience
 
     # lcls2
-    setuptools=46.4.0  # temp need specific version
+    setuptools
     cmake
     cython
     mongodb
@@ -263,10 +263,10 @@ fi
 # as an immediate hack, we'll just put this as late in the build as
 # possible so that we hope we don't mess with anything important.
 
-if [[ ${target} = *"summit"* || ${target} = *"ascent"* ]]
-then
-    ${root_dir}/../scripts/fix_lib_olcf.sh
-fi
+#if [[ ${target} = *"summit"* || ${target} = *"ascent"* ]]
+#then
+#    ${root_dir}/../scripts/fix_lib_olcf.sh
+#fi
 
 #-------------------------------------------------------------------------------
 
@@ -280,4 +280,14 @@ echo "Done. Please run 'source setup/env.sh' to use this build."
 
 # Restore the LD_PRELOAD variable
 export LD_PRELOAD=$__LD_PRELOAD
+
+
+#_______________________________________________________________________________
+# Install LCLS2 (aka PSANA2)
+
+./psana_clean_build.sh
+
+#-------------------------------------------------------------------------------
+
+
 export popd
