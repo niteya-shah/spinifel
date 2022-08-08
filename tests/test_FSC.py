@@ -11,9 +11,6 @@ config.ndimage = ndimage
 from eval.align import rotate_volume
 from eval.fsc import compute_fsc, compute_reference
 
-
-
-
 class TestFSC(object):
     """
     Test the FSC calculation by rotating a volume and then testing FSC to be within margin of error
@@ -22,7 +19,7 @@ class TestFSC(object):
     @classmethod
     def setup_class(self):
         args = {}
-        args['pdb_file'] = "/pscratch/sd/n/niteya56/run/3iyf.pdb"
+        args['pdb_file'] = f"{os.environ['PWD']}/setup/skopi/examples/input/pdb/3iyf.pdb"
         args['resolution'] = 9.0 # in Angstrom
         args['M'] = 81
         args['spacing'] = 0.01
