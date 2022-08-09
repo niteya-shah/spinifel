@@ -12,10 +12,13 @@ from spinifel import settings
 @nvtx.annotate("image.py", is_prefix=True)
 def show_image(pixel_index_map, image, filename):
     # load image data
-    buffer = np.zeros((pixel_index_map[0].max()+1, pixel_index_map[1].max()+1),
-                      dtype=image.dtype)
+    buffer = np.zeros(
+        (pixel_index_map[0].max() + 1,
+         pixel_index_map[1].max() + 1),
+        dtype=image.dtype)
     buffer[pixel_index_map[0], pixel_index_map[1]] = image
-    # set all values that equal 0 to NaN => will render as white on the log plot
+    # set all values that equal 0 to NaN => will render as white on the log
+    # plot
     buffer[buffer == 0] = np.nan
 
     # plot image data
@@ -32,9 +35,9 @@ def show_volume(ac, Mquat, filename):
     if ac.dtype == np.bool_:
         ac = ac.astype(np.float)
 
-    ac_midx = ac[2*Mquat, :, :]
-    ac_midy = ac[:, 2*Mquat, :]
-    ac_midz = ac[:, :, 2*Mquat]
+    ac_midx = ac[2 * Mquat, :, :]
+    ac_midy = ac[:, 2 * Mquat, :]
+    ac_midz = ac[:, :, 2 * Mquat]
 
     vmin = 0
     vmax = ac.max()

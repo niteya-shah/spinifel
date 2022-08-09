@@ -36,8 +36,8 @@ def get_pixel_index_map(comm):
 def get_orientations_prior(comm, N_images_per_rank):
     """Each rank loads correct orientations for data images from input file."""
     data_type = getattr(np, settings.data_type_str)
-    orientations_prior = np.zeros((N_images_per_rank,4),
-                       dtype=data_type)
+    orientations_prior = np.zeros((N_images_per_rank, 4),
+                                  dtype=data_type)
     i_start = comm.rank * N_images_per_rank
     i_end = i_start + N_images_per_rank
     print(f"get_orientations_prior rank={comm.rank} st={i_start} en={i_end}")
@@ -54,7 +54,9 @@ def get_slices(comm, N_images_per_rank, ds):
     if ds is None:
         i_start = comm.rank * N_images_per_rank
         i_end = i_start + N_images_per_rank
-        print(f"get_slices rank={comm.rank} st={i_start} en={i_end}",flush=True)
+        print(
+            f"get_slices rank={comm.rank} st={i_start} en={i_end}",
+            flush=True)
         prep.load_slices(slices_, i_start, i_end)
         return slices_
     else:
@@ -90,7 +92,7 @@ def compute_mean_image(comm, slices_):
 def get_data(N_images_per_rank, ds):
     """
     Load intensity slices, reciprocal pixel position, index map
-    Perform binning 
+    Perform binning
     """
     comm = contexts.comm
     rank = comm.rank

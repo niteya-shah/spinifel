@@ -19,6 +19,9 @@ elif [[ ${target} = *"summit"* || ${target} = *"ascent"* ]]; then
 elif [[ ${target} = "psbuild"* ]]; then
     export NVCCFLAGS="-std=c++17 -ccbin=${CXX} -O3 ${NVARCH} -Wno-deprecated-gpu-targets --default-stream per-thread -Xcompiler "\"${CXXFLAGS}\"
     make -j${THREADS:-8} site=psbuild lib
+elif [[ ${target} = "darwin"* ]]; then
+    export NVCCFLAGS="-std=c++17 -ccbin=${CXX} -O3 ${NVARCH} -Wno-deprecated-gpu-targets --compiler-options=-fPIC --default-stream per-thread -Xcompiler "\"${CXXFLAGS}\"
+    make -j
 else
     echo "Cannot build cuFINUFFT for this architecture"
     exit

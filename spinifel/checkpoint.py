@@ -11,11 +11,16 @@ def generate_checkpoint_name(outdir: str, gen_num: int, tag='') -> str:
     return os.path.join(outdir, fname)
 
 
-def save_checkpoint(res: dict, outdir: str, gen_num: int, tag='', protocol=4) -> None:
+def save_checkpoint(
+        res: dict,
+        outdir: str,
+        gen_num: int,
+        tag='',
+        protocol=4) -> None:
     """Save results as pickle"""
     # create outdir if does not exist
     Path(outdir).mkdir(parents=True, exist_ok=True)
-    
+
     # save pickle
     fname = generate_checkpoint_name(outdir, gen_num, tag)
     with open(fname, 'wb') as handle:
@@ -27,5 +32,3 @@ def load_checkpoint(outdir: str, gen_num: int, tag='') -> dict:
     fname = generate_checkpoint_name(outdir, gen_num, tag)
     with open(fname, 'rb') as handle:
         return pickle.load(handle)
-
-
