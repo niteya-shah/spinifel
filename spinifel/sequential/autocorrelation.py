@@ -16,7 +16,6 @@ if settings.use_cupy:
     os.environ['CUPY_ACCELERATORS'] = "cub"
 
     from pycuda import gpuarray
-    import pycuda.autoinit
 
     from cupyx.scipy.sparse.linalg import LinearOperator, cg
     from cupy.linalg import norm
