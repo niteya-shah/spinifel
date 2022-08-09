@@ -1,4 +1,5 @@
-import h5py, sys
+import h5py
+import sys
 import matplotlib.pyplot as plt
 import numpy             as np
 import mrcfile
@@ -14,11 +15,11 @@ def get_saxs(pixel_distance_reciprocal, mean_image):
     qs = pixel_distance_reciprocal.flatten()
     N = 100
     q_max = qs.max()
-    idx = (N*qs/q_max).astype(np.int)
+    idx = (N * qs / q_max).astype(np.int)
     saxs_acc = np.bincount(idx, mean_image.flatten(), N)
     saxs_wgt = np.bincount(idx, None, N)
     saxs = saxs_acc / saxs_wgt
-    return np.linspace(0, q_max, N+1), saxs
+    return np.linspace(0, q_max, N + 1), saxs
 
 
 
@@ -88,18 +89,21 @@ def clipping(arr, n):
     """
     n = 2**n
     sa, sb = arr.shape[-2:]
-    narr = np.zeros(arr.shape[:-2] + (sa//n, sb//n), dtype=arr.dtype)
+    narr = np.zeros(arr.shape[:-2] + (sa // n, sb // n), dtype=arr.dtype)
     if narr.shape[1] == 4: # valid for earlier PnCCD, possibly not current
-        narr[..., 0, :, :] = arr[..., 0, -sa//n:, -sb//n:]
-        narr[..., 1, :, :] = arr[..., 1, -sa//n:, :sb//n]
-        narr[..., 2, :, :] = arr[..., 2, -sa//n:, -sb//n:]
-        narr[..., 3, :, :] = arr[..., 3, -sa//n:, :sb//n]
+        narr[..., 0, :, :] = arr[..., 0, -sa // n:, -sb // n:]
+        narr[..., 1, :, :] = arr[..., 1, -sa // n:, :sb // n]
+        narr[..., 2, :, :] = arr[..., 2, -sa // n:, -sb // n:]
+        narr[..., 3, :, :] = arr[..., 3, -sa // n:, :sb // n]
     elif narr.shape[1] == 1: # valid for monolithic
-        n*=2
+        n *= 2
         #narr[..., 0, :, :] = arr[..., n_panel,sa//2-sa//n:sa//2+sa//n,sb//2-sb//n:sb//2+sb//n]
-        narr[..., 0, :, :] = arr[..., 0,sa//2-sa//n:sa//2+sa//n,sb//2-sb//n:sb//2+sb//n]
+        narr[..., 0, :, :] = arr[..., 0, sa // 2 - sa // n:sa //
+                                 2 + sa // n, sb // 2 - sb // n:sb // 2 + sb // n]
     else:
-        print("Clipping function doesn't currently accept a detector with %i panels" %narr.shape[1])
+        print(
+            "Clipping function doesn't currently accept a detector with %i panels" %
+            narr.shape[1])
     return narr
 
 
@@ -113,11 +117,11 @@ def clipping_index(arr, n):
     return arr
 
 
-binning_sum = lambda arr: bin2nx2n_sum(
+def binning_sum(arr): return bin2nx2n_sum(
     clipping(arr, settings.N_clipping), settings.N_binning)
-binning_mean = lambda arr: bin2nx2n_mean(
+def binning_mean(arr): return bin2nx2n_mean(
     clipping(arr, settings.N_clipping), settings.N_binning)
-binning_index = lambda arr: bin2nx2n_index(
+def binning_index(arr): return bin2nx2n_index(
     clipping_index(arr, settings.N_clipping), settings.N_binning)
 
 
@@ -145,7 +149,8 @@ def load_slices(slices, i_start, i_end):
         if h5f['intensities'].shape[0] >= i_end:
             slices[:] = h5f['intensities'][i_start:i_end]
         else:
-            sys.exit(f"Error: Not enough intensity slices (max:{h5f['intensities'].shape[0]:d})")
+            sys.exit(
+                f"Error: Not enough intensity slices (max:{h5f['intensities'].shape[0]:d})")
 
 @nvtx.annotate("prep.py", is_prefix=True)
 def load_orientations(orientations, i_start, i_end):
@@ -171,7 +176,8 @@ def compute_pixel_distance(pixel_position_reciprocal):
 def load_orientations_prior(orientations_prior, i_start, i_end):
     with h5py.File(settings.data_path, 'r') as h5f:
         orientations = h5f['orientations'][i_start:i_end]
-        orientations_prior[:] = np.reshape(orientations, (orientations.shape[0], 4))
+        orientations_prior[:] = np.reshape(
+            orientations, (orientations.shape[0], 4))
 
 
 
@@ -179,7 +185,7 @@ def load_orientations_prior(orientations_prior, i_start, i_end):
 def save_mrc(savename, data, voxel_size=None):
     """
     Save Nd numpy array to path savename in mrc format.
-    
+
     :param savename: path to which to save mrc file
     :param data: input numpy array
     :param voxel_size: voxel size for header, optional
@@ -194,9 +200,11 @@ def save_mrc(savename, data, voxel_size=None):
     return
 
 @nvtx.annotate("prep.py", is_prefix=True)
-def load_pixel_position_reciprocal_psana(run, pixel_position, pixel_position_reciprocal):
+def load_pixel_position_reciprocal_psana(
+        run, pixel_position, pixel_position_reciprocal):
     if run.expt == "xpptut15":
-        pixel_position_reciprocal[:] = np.moveaxis(run.beginruns[0].scan[0].raw.pixel_position_reciprocal[:], -1, 0)
+        pixel_position_reciprocal[:] = np.moveaxis(
+            run.beginruns[0].scan[0].raw.pixel_position_reciprocal[:], -1, 0)
     elif run.expt == "amo06516":
         pixel_position = run.beginruns[0].scan[0].pixel_position
     else:

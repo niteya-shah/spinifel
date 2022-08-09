@@ -28,8 +28,6 @@ class FINUFFTPYRequiredButNotFound(Exception):
 class FINUFFTPYVersionUnsupported(Exception):
     """The detected version of fiNUFFT, is unsupported"""
 
-
-
 @nvtx.annotate("extern/util.py", is_prefix=True)
 def transpose(x, y, z):
     """Transposes the order of the (x, y, z) coordinates to (z, y, x)"""
