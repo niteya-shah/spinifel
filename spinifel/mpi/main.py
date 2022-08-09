@@ -141,20 +141,12 @@ def main():
         ac_phased, support_, rho_ = phase(curr_gen, ac)
         logger.log(f"Problem phased in {timer.lap():.2f}s.")
         if comm.rank == 0:
-<<<<<<< spinifel/mpi/main.py
             myRes = {**myRes, **{
-=======
-            myRes = {
->>>>>>> spinifel/mpi/main.py
                      'ac': ac,
                      'ac_phased': ac_phased,
                      'support_': support_,
                      'rho_': rho_
-<<<<<<< spinifel/mpi/main.py
                      }}
-=======
-                    }
->>>>>>> spinifel/mpi/main.py
             checkpoint.save_checkpoint(
                 myRes,
                 settings.out_dir,
@@ -182,21 +174,13 @@ def main():
         orientations = snm.slicing_and_match(ac_phased)
         logger.log(f"Orientations matched in {timer.lap():.2f}s.")
         if comm.rank == 0:
-<<<<<<< spinifel/mpi/main.py
             myRes = {**myRes,
                      **{'ac_phased': ac_phased,
                         'slices_': slices_,
                         'pixel_position_reciprocal': pixel_position_reciprocal,
                         'pixel_distance_reciprocal': pixel_distance_reciprocal,
                         'orientations': orientations}}
-=======
-            myRes = {'ac_phased': ac_phased,
-                     'slices_': slices_,
-                     'pixel_position_reciprocal': pixel_position_reciprocal,
-                     'pixel_distance_reciprocal': pixel_distance_reciprocal,
-                     'orientations': orientations
-                     }
->>>>>>> spinifel/mpi/main.py
+
             checkpoint.save_checkpoint(
                 myRes,
                 settings.out_dir,
@@ -208,22 +192,14 @@ def main():
         ac = mg.solve_ac(generation, orientations, ac_phased)
         logger.log(f"AC recovered in {timer.lap():.2f}s.")
         if comm.rank == 0:
-<<<<<<< spinifel/mpi/main.py
             myRes = {**myRes, **{
-=======
-            myRes = {
->>>>>>> spinifel/mpi/main.py
                      'pixel_position_reciprocal': pixel_position_reciprocal,
                      'pixel_distance_reciprocal': pixel_distance_reciprocal,
                      'slices_': slices_,
                      'orientations': orientations,
                      'ac_phased': ac_phased,
                      'ac': ac
-<<<<<<< spinifel/mpi/main.py
                      }}
-=======
-                    }
->>>>>>> spinifel/mpi/main.py
             checkpoint.save_checkpoint(
                 myRes,
                 settings.out_dir,
@@ -237,22 +213,14 @@ def main():
         ac_phased, support_, rho_ = phase(generation, ac, support_, rho_)
         logger.log(f"Problem phased in {timer.lap():.2f}s.")
         if comm.rank == 0:
-<<<<<<< spinifel/mpi/main.py
             myRes = {**myRes, **{
-=======
-            myRes = {
->>>>>>> spinifel/mpi/main.py
                      'ac': ac,
                      'prev_support_': prev_support_,
                      'prev_rho_': prev_rho_,
                      'ac_phased': ac_phased,
                      'support_': support_,
                      'rho_': rho_
-<<<<<<< spinifel/mpi/main.py
                      }}
-=======
-                    }
->>>>>>> spinifel/mpi/main.py
             checkpoint.save_checkpoint(
                 myRes,
                 settings.out_dir,
@@ -296,20 +264,11 @@ def main():
                 resolution, rshell, fsc_val = compute_fsc(
                     ali_reference, ali_volume, myRes['dist_recip_max'])
             # Save output
-<<<<<<< spinifel/mpi/main.py
             myRes = {**myRes, **{'ac_phased': ac_phased,
                                  'support_': support_,
                                  'rho_': rho_,
                                  'orientations': orientations
                                  }}
-
-=======
-            myRes = {'ac_phased': ac_phased,
-                     'support_': support_,
-                     'rho_': rho_,
-                     'orientations': orientations
-                     }
->>>>>>> spinifel/mpi/main.py
             checkpoint.save_checkpoint(
                 myRes, settings.out_dir, generation, tag="", protocol=4)
 
