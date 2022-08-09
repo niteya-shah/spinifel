@@ -78,7 +78,7 @@ PACKAGE_LIST=(
     tqdm  # convenience
 
     # lcls2
-    setuptools
+    setuptools=46.4.0
     cmake
     cython
     mongodb
@@ -280,14 +280,6 @@ echo "Done. Please run 'source setup/env.sh' to use this build."
 
 # Restore the LD_PRELOAD variable
 export LD_PRELOAD=$__LD_PRELOAD
-
-
-#_______________________________________________________________________________
-# Install LCLS2 (aka PSANA2)
-
-./psana_clean_build.sh
-
-#-------------------------------------------------------------------------------
 
 
 export popd
