@@ -10,7 +10,8 @@ from spinifel.sequential.orientation_matching import SNM
 from .autocorrelation import MergeMPI
 from spinifel.extern.nufft_ext import NUFFT
 
-
+from eval.fsc import compute_fsc, compute_reference
+from eval.align import align_volumes
 
 @nvtx.annotate("mpi/main.py", is_prefix=True)
 def main():
@@ -109,14 +110,26 @@ def main():
         logger.log(f"#" * 27)
         logger.log(f"##### Generation {curr_gen}/{N_generations} #####")
         logger.log(f"#" * 27)
+
         ac = mg.solve_ac(curr_gen)
         logger.log(f"AC recovered in {timer.lap():.2f}s.")
         if comm.rank == 0:
+            reference = None
+            dist_recip_max = None
+            if settings.pdb_path.is_file():
+                dist_recip_max = np.linalg.norm(
+                    pixel_position_reciprocal[:], axis=-1).max()
+                reference = compute_reference(
+                    settings.pdb_path, settings.M, dist_recip_max)
+                logger.log(f"Reference created in {timer.lap():.2f}s.")
+
             myRes = {
                      'pixel_position_reciprocal': pixel_position_reciprocal,
                      'pixel_distance_reciprocal': pixel_distance_reciprocal,
                      'slices_': slices_,
-                     'ac': ac
+                     'ac': ac,
+                     'reference': reference,
+                     'dist_recip_max': dist_recip_max
                     }
             checkpoint.save_checkpoint(
                 myRes,
@@ -128,12 +141,12 @@ def main():
         ac_phased, support_, rho_ = phase(curr_gen, ac)
         logger.log(f"Problem phased in {timer.lap():.2f}s.")
         if comm.rank == 0:
-            myRes = {
+            myRes = {**myRes, **{
                      'ac': ac,
                      'ac_phased': ac_phased,
                      'support_': support_,
                      'rho_': rho_
-                    }
+                     }}
             checkpoint.save_checkpoint(
                 myRes,
                 settings.out_dir,
@@ -161,12 +174,13 @@ def main():
         orientations = snm.slicing_and_match(ac_phased)
         logger.log(f"Orientations matched in {timer.lap():.2f}s.")
         if comm.rank == 0:
-            myRes = {'ac_phased': ac_phased,
-                     'slices_': slices_,
-                     'pixel_position_reciprocal': pixel_position_reciprocal,
-                     'pixel_distance_reciprocal': pixel_distance_reciprocal,
-                     'orientations': orientations
-                     }
+            myRes = {**myRes,
+                     **{'ac_phased': ac_phased,
+                        'slices_': slices_,
+                        'pixel_position_reciprocal': pixel_position_reciprocal,
+                        'pixel_distance_reciprocal': pixel_distance_reciprocal,
+                        'orientations': orientations}}
+
             checkpoint.save_checkpoint(
                 myRes,
                 settings.out_dir,
@@ -178,14 +192,14 @@ def main():
         ac = mg.solve_ac(generation, orientations, ac_phased)
         logger.log(f"AC recovered in {timer.lap():.2f}s.")
         if comm.rank == 0:
-            myRes = {
+            myRes = {**myRes, **{
                      'pixel_position_reciprocal': pixel_position_reciprocal,
                      'pixel_distance_reciprocal': pixel_distance_reciprocal,
                      'slices_': slices_,
                      'orientations': orientations,
                      'ac_phased': ac_phased,
                      'ac': ac
-                    }
+                     }}
             checkpoint.save_checkpoint(
                 myRes,
                 settings.out_dir,
@@ -199,14 +213,14 @@ def main():
         ac_phased, support_, rho_ = phase(generation, ac, support_, rho_)
         logger.log(f"Problem phased in {timer.lap():.2f}s.")
         if comm.rank == 0:
-            myRes = {
+            myRes = {**myRes, **{
                      'ac': ac,
                      'prev_support_': prev_support_,
                      'prev_rho_': prev_rho_,
                      'ac_phased': ac_phased,
                      'support_': support_,
                      'rho_': rho_
-                    }
+                     }}
             checkpoint.save_checkpoint(
                 myRes,
                 settings.out_dir,
@@ -244,13 +258,17 @@ def main():
                 f"intensity-{generation}.mrc",
                 intensity)
             save_mrc(settings.out_dir / f"rho-{generation}.mrc", rho)
-
+            if "reference" in myRes and myRes["reference"] is not None:
+                ali_volume, ali_reference = align_volumes(rho, myRes['reference'], zoom=settings.fsc_zoom, sigma=settings.fsc_sigma,
+                                                          n_iterations=settings.fsc_niter, n_search=settings.fsc_nsearch)
+                resolution, rshell, fsc_val = compute_fsc(
+                    ali_reference, ali_volume, myRes['dist_recip_max'])
             # Save output
-            myRes = {'ac_phased': ac_phased,
-                     'support_': support_,
-                     'rho_': rho_,
-                     'orientations': orientations
-                     }
+            myRes = {**myRes, **{'ac_phased': ac_phased,
+                                 'support_': support_,
+                                 'rho_': rho_,
+                                 'orientations': orientations
+                                 }}
             checkpoint.save_checkpoint(
                 myRes, settings.out_dir, generation, tag="", protocol=4)
 

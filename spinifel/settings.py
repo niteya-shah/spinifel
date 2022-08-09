@@ -409,7 +409,32 @@ class SpinifelSettings(metaclass=Singleton):
                 "algorithm", "load_generation",
                 int, 0,
                 "start from output of this generation"
-            )
+            ),
+            "_pdb_path": (
+                "fsc", "pdb_path",
+                Path, Path(""),
+                "Path for the PDB File"
+            ),
+            "_fsc_zoom": (
+                "fsc", "fsc_zoom",
+                float, 1.0,
+                "Zoom factor during alignment"
+            ),
+            "_fsc_sigma": (
+                "fsc", "fsc_sigma",
+                float, 0,
+                "Sigma for Gaussian filtering during alignment"
+            ),
+            "_fsc_niter": (
+                "fsc", "fsc_niter",
+                int, 10,
+                "Number of alignment iterations to run"
+            ),
+            "_fsc_nsearch": (
+                "fsc", "fsc_nsearch",
+                int, 360,
+                "Number of quaternions to score per iteration"
+            ),
         }
 
         self.__init_internals()
@@ -418,6 +443,7 @@ class SpinifelSettings(metaclass=Singleton):
             "TEST": ("_test", get_str),
             "VERBOSE": ("_verbose", get_bool),
             "DATA_DIR": ("_data_dir", get_path),
+            "PDB_PATH": ("_pdb_path", get_path),
             "DATA_FILENAME": ("_data_filename", get_str),
             "USE_PSANA": ("_use_psana", get_bool),
             "OUT_DIR": ("_out_dir", get_path),
@@ -511,6 +537,8 @@ class SpinifelSettings(metaclass=Singleton):
 
             setting, val = param.split("=")
             c, k         = setting.split(".")
+            if c not in toml_settings:
+                toml_settings[c] = {}
             toml_settings[c][k] = val
 
         for attr in self.__properties:
