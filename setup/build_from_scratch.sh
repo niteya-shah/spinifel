@@ -230,18 +230,6 @@ fi
 
 #-------------------------------------------------------------------------------
 
-
-#_______________________________________________________________________________
-# Install CUDA KNN implmentation
-
-if [[ ${cuda_build} == true ]]
-then
-    ./rebuild_knn.sh
-fi
-
-#-------------------------------------------------------------------------------
-
-
 #_______________________________________________________________________________
 # Overwrite the conda libraries with system libraries => don't let anaconda
 # provide libraries (like openmp) that are already provided by the system
