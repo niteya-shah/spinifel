@@ -330,7 +330,7 @@ class SpinifelSettings(metaclass=Singleton):
                 parse_strvec_int, (3,),
                 "pixel_position_shape = pixel_position_shape_0 + det_shape"
             ),
-            "_pixel_position_type_str":(
+            "_pixel_position_type_str": (
                 "algorithm", "pixel_position_type_str",
                 str, "float32",
                 "type string (numpy) for the pixel_position array"
@@ -419,7 +419,32 @@ class SpinifelSettings(metaclass=Singleton):
                 "algorithm", "load_generation",
                 int, 0,
                 "start from output of this generation"
-            )
+            ),
+            "_pdb_path": (
+                "fsc", "pdb_path",
+                Path, Path(""),
+                "Path for the PDB File"
+            ),
+            "_fsc_zoom": (
+                "fsc", "fsc_zoom",
+                float, 1.0,
+                "Zoom factor during alignment"
+            ),
+            "_fsc_sigma": (
+                "fsc", "fsc_sigma",
+                float, 0,
+                "Sigma for Gaussian filtering during alignment"
+            ),
+            "_fsc_niter": (
+                "fsc", "fsc_niter",
+                int, 10,
+                "Number of alignment iterations to run"
+            ),
+            "_fsc_nsearch": (
+                "fsc", "fsc_nsearch",
+                int, 360,
+                "Number of quaternions to score per iteration"
+            ),
         }
 
         self.__init_internals()
@@ -428,6 +453,7 @@ class SpinifelSettings(metaclass=Singleton):
             "TEST": ("_test", get_str),
             "VERBOSE": ("_verbose", get_bool),
             "DATA_DIR": ("_data_dir", get_path),
+            "PDB_PATH": ("_pdb_path", get_path),
             "DATA_FILENAME": ("_data_filename", get_str),
             "USE_PSANA": ("_use_psana", get_bool),
             "OUT_DIR": ("_out_dir", get_path),
@@ -449,8 +475,8 @@ class SpinifelSettings(metaclass=Singleton):
         p.add_argument("--settings", type=str, nargs=1, default=None)
         p.add_argument("--default-settings", type=str, nargs=1, default=None)
         p.add_argument("--mode", type=str, nargs=1, required=True)
-        p.add_argument("-t","--tag-generation", type=str, default=None)
-        p.add_argument("-g","--load-generation", type=int, default=0)
+        p.add_argument("-t", "--tag-generation", type=str, default=None)
+        p.add_argument("-g", "--load-generation", type=int, default=0)
 
         self.__args, self.__params = p.parse_known_args()
 
@@ -459,11 +485,11 @@ class SpinifelSettings(metaclass=Singleton):
         self.load_gen = self.__args.load_generation
 
         if (self.__args.settings is None) \
-        and (self.__args.default_settings is None):
+                and (self.__args.default_settings is None):
             raise CannotProcessSettingsFile
 
         if (self.__args.settings is not None) \
-        and (self.__args.default_settings is not None):
+                and (self.__args.default_settings is not None):
             raise CannotProcessSettingsFile
 
         if self.__args.default_settings is not None:
@@ -521,6 +547,8 @@ class SpinifelSettings(metaclass=Singleton):
 
             setting, val = param.split("=")
             c, k         = setting.split(".")
+            if c not in toml_settings:
+                toml_settings[c] = {}
             toml_settings[c][k] = val
 
         for attr in self.__properties:
@@ -730,7 +758,7 @@ class SpinifelSettings(metaclass=Singleton):
         """
         4*Mquat + 1
         """
-        return 4*self.Mquat + 1
+        return 4 * self.Mquat + 1
 
 
     @property
@@ -738,7 +766,7 @@ class SpinifelSettings(metaclass=Singleton):
         """
         Upsampled grid for AC convolution technique
         """
-        return 2*self.M
+        return 2 * self.M
 
 
     @property

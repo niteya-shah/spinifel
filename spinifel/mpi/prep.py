@@ -66,7 +66,7 @@ def get_slices_and_pixel_info(N_images_per_rank, ds):
                        dtype=data_type)
     pixel_position_reciprocal = None
     pixel_index_map = None
-    i = 0
+    N_images_loaded = 0
 
     # TODO: Legion - we can make callback works for spinifel
     # ds.analyze(callback, N_images_per_rank)
@@ -98,10 +98,10 @@ def get_slices_and_pixel_info(N_images_per_rank, ds):
 
         assert pixel_position_reciprocal is not None or pixel_position is not None
         
-        for evt in run.events():
+        for i_evt, evt in enumerate(run.events()):
             # A quick hack to allow psana2 to exit the loop by throwing
             # all images after N_images_per_rank away.
-            if i >= N_images_per_rank: 
+            if i_evt >= N_images_per_rank: 
                 continue
 
             raw = det.raw.calib(evt)
@@ -121,18 +121,14 @@ def get_slices_and_pixel_info(N_images_per_rank, ds):
                 pixel_position_reciprocal = np.moveaxis(
                     _pixel_position_reciprocal[:], -1, 0)
 
-            try:
-                slices_[i] = raw
-            except IndexError:
-                # TODO: Find way to include rank no. in the message below
-                raise RuntimeError(
-                    f"received too many events.")
-            i += 1
-    
+            slices_[i_evt] = raw
+            N_images_loaded = i_evt
+
     pixel_info = {}
     pixel_info['pixel_position_reciprocal'] = pixel_position_reciprocal
     pixel_info['pixel_index_map'] = pixel_index_map
-    return slices_[:i], pixel_info
+    print(f'N_images_loaded:{N_images_loaded}')
+    return slices_[:N_images_loaded+1], pixel_info
 
 
 @nvtx.annotate("mpi/prep.py", is_prefix=True)
@@ -209,4 +205,5 @@ def bin_data(pixel_position_reciprocal=None, pixel_index_map=None, slices_=None)
     return (pixel_position_reciprocal,
             pixel_index_map,
             slices_)
+
 

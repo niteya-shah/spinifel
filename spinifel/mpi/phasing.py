@@ -13,7 +13,7 @@ def phase(generation, ac, support_=None, rho_=None):
     comm = contexts.comm_compute
 
     Mquat = settings.Mquat
-    M = 4*Mquat + 1
+    M = 4 * Mquat + 1
     Mtot = M**3
 
     ac_phased, support_, rho_ = sequential_phase(
@@ -24,4 +24,3 @@ def phase(generation, ac, support_=None, rho_=None):
     comm.Bcast(rho_, root=0)
 
     return ac_phased, support_, rho_
-

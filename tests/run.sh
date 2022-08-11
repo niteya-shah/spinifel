@@ -43,21 +43,22 @@ if [[ ${target} = "cgpu"* ]]; then
     srun -n 3 python -u -m spinifel --settings=./settings/test_mpi.toml --mode=test
 
 elif [[ ${target} = *"summit"* || ${target} = *"ascent"* ]]; then
+    export PYCUDA_CACHE_DIR="/tmp"
     if [[ ${target} = *"ascent"* ]]; then
-	export all_proxy=socks://proxy.ccs.ornl.gov:3128/
-	export ftp_proxy=ftp://proxy.ccs.ornl.gov:3128/
-	export http_proxy=http://proxy.ccs.ornl.gov:3128/
-	export https_proxy=http://proxy.ccs.ornl.gov:3128/
-	export no_proxy='localhost,127.0.0.0/8,*.ccs.ornl.gov'
-	export test_data_dir="/gpfs/wolf/chm137/proj-shared/testdata"
-	export test_out_dir="/gpfs/wolf/chm137/proj-shared/ci"
+        export all_proxy=socks://proxy.ccs.ornl.gov:3128/
+        export ftp_proxy=ftp://proxy.ccs.ornl.gov:3128/
+        export http_proxy=http://proxy.ccs.ornl.gov:3128/
+        export https_proxy=http://proxy.ccs.ornl.gov:3128/
+        export no_proxy='localhost,127.0.0.0/8,*.ccs.ornl.gov'
+        export test_data_dir="/gpfs/wolf/chm137/proj-shared/testdata"
+        export test_out_dir="/gpfs/wolf/chm137/proj-shared/ci"
     else
-	export test_data_dir="/gpfs/alpine/proj-shared/chm137/data/testdata"
-	export test_out_dir="/gpfs/alpine/proj-shared/chm137/ci"
+	    export test_data_dir="/gpfs/alpine/proj-shared/chm137/data/testdata"
+	    export test_out_dir="/gpfs/alpine/proj-shared/chm137/ci"
     fi
 
-    export SPINIFEL_TEST_MODULE="ORIENTATION_MATCHING"
-    jsrun -n1 -g1 python -u -m spinifel --settings=./settings/test_mpi.toml --mode=test
+    #export SPINIFEL_TEST_MODULE="ORIENTATION_MATCHING"
+    #jsrun -n1 -g1 python -u -m spinifel --settings=./settings/test_mpi.toml --mode=test
 
     export SPINIFEL_TEST_MODULE="MAIN_PSANA2"
     jsrun -n3 -g1 python -u -m spinifel --settings=./settings/test_mpi.toml --mode=test

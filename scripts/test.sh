@@ -11,9 +11,11 @@ export PYTHONPATH="$PYTHONPATH:$root_dir"
 
 set -x
 
-# Pickup all tests in root and spinifel modules
-#pytest -s tests
-pytest -s spinifel/tests
+# Pickup all tests spinifel modules
+#pytest -s tests            # This will not work [my guess: pytest/spinifel settings conflict]
+                            # - see issue#50 for more detail.
+#pytest -s tests/test_FSC.py
+#pytest -s spinifel/tests
 
 # Pickup tests as specified in init file in root/tests
 # See documentation on Wiki page.
