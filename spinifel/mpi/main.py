@@ -187,23 +187,29 @@ def main():
     # Generation 0: solve_ac and phase
     N_generations = settings.N_generations
 
+    # Intitilize merge class - must be done before get_known_answers (mg needed)
     nufft = NUFFT(settings, pixel_position_reciprocal, pixel_distance_reciprocal)
     mg = MergeMPI(
         settings, slices_, pixel_position_reciprocal, pixel_distance_reciprocal, nufft
     )
-    snm = SNM(
-        settings, slices_, pixel_position_reciprocal, pixel_distance_reciprocal, nufft
-    )
-
 
     # For unit test [DO NOT REMOVE]
     flag_test = False
+    ref_orientations = None
     if os.environ.get("SPINIFEL_TEST_MODULE", "") == "MAIN_PSANA2":
         flag_test = True
         test_accept_thres = 0.75
         ref_orientations, known_ac_phased, known_rho = get_known_answers(
             logger, mg, pixel_position_reciprocal, pixel_distance_reciprocal, slices_
         )
+
+    # Initialize orientation matching class - must be done after get_known_answers 
+    # to obtain ref_orientations
+    snm = SNM(
+        settings, slices_, pixel_position_reciprocal, pixel_distance_reciprocal, nufft,
+        ref_orientations=ref_orientations
+    )
+
 
     # Skip this data saving and ac calculation in test mode
     if flag_test:
