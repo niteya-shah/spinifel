@@ -17,6 +17,12 @@ else:
         print(f"Using NumPy for FFTs.")
     from scipy.ndimage import gaussian_filter
 
+if settings.use_single_prec:
+    f_type = xp.float32
+    c_type = xp.complex64
+else:
+    f_type = xp.float64
+    c_type = xp.complex128
 
 # Convention:
 #   In this module, trailing underscores are used to refer to numpy
@@ -40,7 +46,7 @@ else:
 def center_of_mass(rho_, hkl_, M):
     """
     Compute the object's center of mass.
-    
+
     :param rho_: electron density (fftshifted)
     :param hkl_: coordinates
     :param M: cubic length of electron density volume
@@ -49,7 +55,7 @@ def center_of_mass(rho_, hkl_, M):
     rho_ = np.abs(rho_)
     num = (rho_ * hkl_).sum(axis=(1, 2, 3))
     den = rho_.sum()
-    return np.round(num/den * M/2)
+    return np.round(num / den * M / 2)
 
 
 
@@ -57,13 +63,13 @@ def center_of_mass(rho_, hkl_, M):
 def recenter(rho_, support_, M):
     """
     Shift center of the electron density and support to origin.
-    
+
     :param rho_: electron density (fftshifted)
     :param support_: object's support
     :param M: cubic length of electron density volume
     """
-    ls = np.linspace(-1, 1, M+1)
-    ls = (ls[:-1] + ls[1:])/2
+    ls = np.linspace(-1, 1, M + 1)
+    ls = (ls[:-1] + ls[1:]) / 2
 
     hkl_list = np.meshgrid(ls, ls, ls, indexing='ij')
     hkl_ = np.stack([np.fft.ifftshift(coord) for coord in hkl_list])
@@ -81,7 +87,7 @@ def create_support_(ac_, M, Mquat, generation):
     """
     Generate a support based on the region of high ACF signal (thresh_support_)
     inside the central quarter region of the full ACF volume (square_support_).
-    
+
     :param ac_: autocorrelation volume, fftshifted
     :param M: cubic length of autocorrelation volume
     :param Mquat: cubic length of region of interest
@@ -132,7 +138,8 @@ def ER(rho_, amplitudes_, amp_mask_, support_, rho_max):
     :param support_: binary mask for object's support
     :param rho_mask: maximum permitted electron density value
     """
-    rho_mod_, support_star_ = step_phase(rho_, amplitudes_, amp_mask_, support_)
+    rho_mod_, support_star_ = step_phase(
+        rho_, amplitudes_, amp_mask_, support_)
     rho_[:] = xp.where(support_star_, rho_mod_, 0)
     i_overmax = rho_mod_ > rho_max
     rho_[i_overmax] = rho_max
@@ -143,9 +150,9 @@ def ER(rho_, amplitudes_, amp_mask_, support_, rho_max):
 def HIO(beta, rho_, amplitudes_, amp_mask_, support_, rho_max):
     """
     Perform Hybrid-Input-Output (HIO) operation by updating the amplitudes from the current electron density estimtate
-    with those computed from the autocorrelation, and using negative feedback in Fourier space in order to progressively 
-    force the solution to conform to the Fourier domain constraints (support). 
-    
+    with those computed from the autocorrelation, and using negative feedback in Fourier space in order to progressively
+    force the solution to conform to the Fourier domain constraints (support).
+
     :param beta: feedback constant
     :param rho_: electron density estimate
     :param amplitudes_: amplitudes computed from the autocorrelation
@@ -153,36 +160,37 @@ def HIO(beta, rho_, amplitudes_, amp_mask_, support_, rho_max):
     :param support_: binary mask for object's support
     :param rho_mask: maximum permitted electron density value
     """
-    rho_mod_, support_star_ = step_phase(rho_, amplitudes_, amp_mask_, support_)
-    rho_[:] = xp.where(support_star_, rho_mod_, rho_-beta*rho_mod_)
+    rho_mod_, support_star_ = step_phase(
+        rho_, amplitudes_, amp_mask_, support_)
+    rho_[:] = xp.where(support_star_, rho_mod_, rho_ - beta * rho_mod_)
     i_overmax = rho_mod_ > rho_max
-    rho_[i_overmax] += 2*beta*rho_mod_[i_overmax] - rho_max
+    rho_[i_overmax] += 2 * beta * rho_mod_[i_overmax] - rho_max
 
 
 
 @nvtx.annotate("sequential/phasing.py", is_prefix=True)
 def step_phase(rho_, amplitudes_, amp_mask_, support_):
     """
-    Replace the amplitudes computed from the electron density estimate with those computed from 
+    Replace the amplitudes computed from the electron density estimate with those computed from
     the autocorrelation function, except for the amplitude of the central/max peak of the Fourier domain.
-    Then recalculate the estimated electron density and update the support, with positivity of 
+    Then recalculate the estimated electron density and update the support, with positivity of
     the density enforced for the latter.
-    
+
     :param rho_: electron density estimate
     :param amplitudes_: amplitudes computed from the autocorrelation
     :param amp_mask_: amplitude mask
     :param support_: binary mask for object's support
-    :return rho_mod_: updated density estimate 
+    :return rho_mod_: updated density estimate
     :return support_star_: updated support
     """
     rho_hat_ = xp.fft.fftn(rho_)
     phases_ = xp.angle(rho_hat_)
     rho_hat_mod_ = xp.where(
         amp_mask_,
-        amplitudes_ * xp.exp(1j*phases_),
+        amplitudes_ * xp.exp(1j * phases_),
         rho_hat_)
     rho_mod_ = xp.fft.ifftn(rho_hat_mod_).real
-    support_star_ = xp.logical_and(support_, rho_mod_>0)
+    support_star_ = xp.logical_and(support_, rho_mod_ > 0)
     return rho_mod_, support_star_
 
 
@@ -237,7 +245,7 @@ def phase(generation, ac, support_=None, rho_=None, method=None, weight=1.):
     """
 
     Mquat = settings.Mquat
-    M = 4*Mquat + 1
+    M = 4 * Mquat + 1
     Mtot = M**3
 
     ac = xp.array(ac)
@@ -259,7 +267,7 @@ def phase(generation, ac, support_=None, rho_=None, method=None, weight=1.):
     if rho_ is None:
         rho_ = support_ * xp.random.rand(*support_.shape)
     rho_ = xp.array(rho_)
-    
+
     rho_max = xp.infty
 
     nER = settings.nER
@@ -267,14 +275,21 @@ def phase(generation, ac, support_=None, rho_=None, method=None, weight=1.):
 
     for i in range(settings.N_phase_loops):
         ER_loop(nER, rho_, amplitudes_, amp_mask_, support_, rho_max)
-        HIO_loop(nHIO, settings.beta, rho_, amplitudes_, amp_mask_, support_, rho_max)
+        HIO_loop(
+            nHIO,
+            settings.beta,
+            rho_,
+            amplitudes_,
+            amp_mask_,
+            support_,
+            rho_max)
         ER_loop(nER, rho_, amplitudes_, amp_mask_, support_, rho_max)
         shrink_wrap(1, rho_, support_, method=method, weight=weight)
     ER_loop(nER, rho_, amplitudes_, amp_mask_, support_, rho_max)
 
     if settings.use_cupy:
         if settings.verbose:
-            print(f"Converting CuPy arrays to NumPy arrays.")    
+            print(f"Converting CuPy arrays to NumPy arrays.")
         rho_ = xp.asnumpy(rho_)
         amplitudes_ = xp.asnumpy(amplitudes_)
         amp_mask_ = xp.asnumpy(amp_mask_)
@@ -282,15 +297,18 @@ def phase(generation, ac, support_=None, rho_=None, method=None, weight=1.):
 
     recenter(rho_, support_, M)
 
-    image.show_volume(np.fft.fftshift(rho_), Mquat, f"rho_phased_{generation}.png")
+    image.show_volume(
+        np.fft.fftshift(rho_),
+        Mquat,
+        f"rho_phased_{generation}.png")
 
     intensities_phased_ = np.abs(np.fft.fftn(rho_))**2
-    image.show_volume(np.fft.fftshift(intensities_phased_), Mquat, f"intensities_phased_{generation}.png")
+    image.show_volume(np.fft.fftshift(intensities_phased_),
+                      Mquat, f"intensities_phased_{generation}.png")
 
     ac_phased_ = np.abs(np.fft.ifftn(intensities_phased_))
     ac_phased = np.fft.fftshift(ac_phased_)
     #image.show_volume(ac_phased, Mquat, f"autocorrelation_phased_{generation}.png")
 
-    ac_phased = ac_phased.astype(np.float32)
-
+    ac_phased = ac_phased.astype(f_type)
     return ac_phased, support_, rho_
