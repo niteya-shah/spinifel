@@ -10,14 +10,15 @@ def generate_checkpoint_name(outdir: str, gen_num: int, tag='') -> str:
     fname += '.pickle'
     return os.path.join(outdir, fname)
 
-
 def save_checkpoint(
         res: dict,
         outdir: str,
         gen_num: int,
         tag='',
         protocol=4) -> None:
-    """Save results as pickle"""
+    """Save results as pickle
+       protocol=4 is the highest supported on psana nodes
+    """
     # create outdir if does not exist
     Path(outdir).mkdir(parents=True, exist_ok=True)
 

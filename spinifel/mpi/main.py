@@ -113,7 +113,7 @@ def main():
 
         ac = mg.solve_ac(curr_gen)
         logger.log(f"AC recovered in {timer.lap():.2f}s.")
-        if comm.rank == 0:
+        if comm.rank == 0 and settings.checkpoint:
             reference = None
             dist_recip_max = None
             if settings.pdb_path.is_file():
@@ -140,6 +140,7 @@ def main():
 
         ac_phased, support_, rho_ = phase(curr_gen, ac)
         logger.log(f"Problem phased in {timer.lap():.2f}s.")
+
         if comm.rank == 0:
             myRes = {**myRes, **{
                      'ac': ac,
@@ -210,7 +211,9 @@ def main():
         if comm.rank == 0:
             prev_rho_ = rho_[:]
             prev_support_ = support_[:]
+ 
         ac_phased, support_, rho_ = phase(generation, ac, support_, rho_)
+
         logger.log(f"Problem phased in {timer.lap():.2f}s.")
         if comm.rank == 0:
             myRes = {**myRes, **{
