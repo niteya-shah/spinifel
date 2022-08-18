@@ -90,7 +90,9 @@ class SNM:
         else:
             # This will not overwrite out as we dont use fortran order for our
             # C.
-            return gemm(-2.0, x, y, 1.0, out, 0, 1)
+            twoxy = gemm(-2.0, x, y, beta=1.0, trans_a=0, trans_b=1)
+            np.add(out, twoxy, out=out)
+            return out
 
 
     @nvtx.annotate("sequential/orientation_matching.py::modified",

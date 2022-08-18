@@ -251,6 +251,7 @@ def main():
                 print("Stopping criteria met!")
                 break
 
+        if comm.rank == 0:
             # Save electron density and intensity
             rho = np.fft.ifftshift(rho_)
             intensity = np.fft.ifftshift(np.abs(np.fft.fftshift(ac_phased)**2))
