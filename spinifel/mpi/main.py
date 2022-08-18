@@ -212,7 +212,7 @@ def main():
             prev_rho_ = rho_[:]
             prev_support_ = support_[:]
  
-        ac_phased, support_, rho_ = phase(curr_gen, ac, support_, rho_)
+        ac_phased, support_, rho_ = phase(generation, ac, support_, rho_)
 
         logger.log(f"Problem phased in {timer.lap():.2f}s.")
         if comm.rank == 0:
