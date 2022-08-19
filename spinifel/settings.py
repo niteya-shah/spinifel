@@ -419,7 +419,7 @@ class SpinifelSettings(metaclass=Singleton):
                 "algorithm", "N_image_batches_max",
                 int, 1,
                 "Maximum number of image batches to load per iteration"
-            )
+            ),
             "_pdb_path": (
                 "fsc", "pdb_path",
                 Path, Path(""),
