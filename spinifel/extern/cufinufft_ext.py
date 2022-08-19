@@ -10,7 +10,7 @@ from   sys      import getsizeof
 import numpy    as np
 import PyNVTX   as nvtx
 from   spinifel import SpinifelSettings, SpinifelContexts, Profiler
-from   .        import transpose, CUFINUFFTRequiredButNotFound
+from   .util        import transpose, CUFINUFFTRequiredButNotFound
 
 
 
@@ -54,7 +54,7 @@ def pts_to_gpu(data, H_, K_, L_, logger):
                     f"gpu_free={gpu_free/1e9:.2f}GB ",
                     f"gpu_total={gpu_total/1e9:.2f}GB"
                 )
-            )
+        )
 
         K_gpu = to_gpu(K_)
         gpu_free, gpu_total = context.cuda_mem_info()
@@ -64,7 +64,7 @@ def pts_to_gpu(data, H_, K_, L_, logger):
                     f"gpu_free={gpu_free/1e9:.2f}GB ",
                     f"gpu_total={gpu_total/1e9:.2f}GB"
                 )
-            )
+        )
 
         L_gpu = to_gpu(L_)
         gpu_free, gpu_total = context.cuda_mem_info()
@@ -74,7 +74,7 @@ def pts_to_gpu(data, H_, K_, L_, logger):
                     f"gpu_free={gpu_free/1e9:.2f}GB ",
                     f"gpu_total={gpu_total/1e9:.2f}GB"
                 )
-            )
+        )
         data_gpu = to_gpu(data)
     else:
         H_gpu = H_
@@ -83,8 +83,6 @@ def pts_to_gpu(data, H_, K_, L_, logger):
         data_gpu = data
 
     return data_gpu, H_gpu, K_gpu, L_gpu
-
-
 
 @profiler.intercept
 @nvtx.annotate("extern/cufinufft_ext.py", is_prefix=True)
@@ -99,8 +97,6 @@ def result_to_cpu(data_gpu, H_):
         data = data_gpu
 
     return data
-
-
 
 @profiler.intercept
 @nvtx.annotate("extern/cufinufft_ext.py", is_prefix=True)
@@ -128,7 +124,7 @@ def nufft_3d_t1_cufinufft_v1(H_, K_, L_, nuvect, sign, eps, nx, ny, nz):
     # Copy input data to Device (if not already there)
     nuvect_gpu, H_gpu, K_gpu, L_gpu = pts_to_gpu(
             nuvect.astype(complex_dtype), H_, K_, L_, logger
-        )
+    )
 
     # Allocate space on Device
     nvtx.RangePushA("extern.nufft_3d_t1_cufinufft_v1:GPUArray")
@@ -183,7 +179,7 @@ def nufft_3d_t2_cufinufft_v1(H_, K_, L_, ugrid, sign, eps, N):
                 f"init gpu_free={gpu_free/1e9:.2f}GB ",
                 f"gpu_total={gpu_total/1e9:.2f}GB"
             )
-        )
+    )
 
     # Ensure that H_, K_, and L_ have the same shape
     assert H_.shape == K_.shape == L_.shape
@@ -194,7 +190,7 @@ def nufft_3d_t2_cufinufft_v1(H_, K_, L_, ugrid, sign, eps, N):
     # Copy input data to Device (if not already there)
     ugrid_gpu, H_gpu, K_gpu, L_gpu = pts_to_gpu(
             ugrid.astype(complex_dtype), H_, K_, L_, logger
-        )
+    )
 
     # Allocate space on Device
     nvtx.RangePushA("extern.nufft_3d_t2_cufinufft_v1:GPUArray")
@@ -207,7 +203,7 @@ def nufft_3d_t2_cufinufft_v1(H_, K_, L_, ugrid, sign, eps, N):
                 f"allocated gpu_free={gpu_free/1e9:.2f}GB ",
                 f"gpu_total={gpu_total/1e9:.2f}GB"
             )
-        )
+    )
     nvtx.RangePop()
 
     #__________________________________________________________________________
@@ -260,7 +256,7 @@ def nufft_3d_t1_cufinufft_v2(H_, K_, L_, nuvect, sign, eps, nx, ny, nz):
     # Copy input data to Device (if not already there)
     nuvect_gpu, H_gpu, K_gpu, L_gpu = pts_to_gpu(
             nuvect.astype(complex_dtype), H_, K_, L_, logger
-        )
+    )
 
     # Allocate space on Device
     nvtx.RangePushA("extern.nufft_3d_t1_cufinufft_v2:GPUArray")
@@ -275,7 +271,7 @@ def nufft_3d_t1_cufinufft_v2(H_, K_, L_, nuvect, sign, eps, nx, ny, nz):
     plan = cufinufft(
             1, shape, 1, eps, isign=sign, dtype=dtype,
             gpu_method=1, gpu_device_id=dev_id
-        )
+    )
     plan.set_pts(H_gpu, K_gpu, L_gpu)
     plan.execute(nuvect_gpu, ugrid_gpu)
     nvtx.RangePop()
@@ -310,7 +306,7 @@ def nufft_3d_t2_cufinufft_v2(H_, K_, L_, ugrid, sign, eps, N):
                 f"init gpu_free={gpu_free/1e9:.2f}GB ",
                 f"gpu_total={gpu_total/1e9:.2f}GB"
             )
-        )
+    )
 
     # Ensure that H_, K_, and L_ have the same shape
     assert H_.shape == K_.shape == L_.shape
@@ -321,7 +317,7 @@ def nufft_3d_t2_cufinufft_v2(H_, K_, L_, ugrid, sign, eps, N):
     # Copy input data to Device (if not already there)
     ugrid_gpu, H_gpu, K_gpu, L_gpu = pts_to_gpu(
             ugrid.astype(complex_dtype), H_, K_, L_, logger
-        )
+    )
 
     # Allocate space on Device
     nvtx.RangePushA("extern.nufft_3d_t2_cufinufft_v2:GPUArray")
@@ -334,7 +330,7 @@ def nufft_3d_t2_cufinufft_v2(H_, K_, L_, ugrid, sign, eps, N):
                 f"allocated gpu_free={gpu_free/1e9:.2f}GB ",
                 f"gpu_total={gpu_total/1e9:.2f}GB"
             )
-        )
+    )
     nvtx.RangePop()
 
     #__________________________________________________________________________
