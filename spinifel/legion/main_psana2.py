@@ -11,7 +11,7 @@ from spinifel.prep import save_mrc
 from .prep import get_data, init_partitions_regions_psana2, load_image_batch, load_pixel_data, process_data
 from .utils import union_partitions_with_stride, fill_region
 from .autocorrelation import solve_ac
-from .phasing import phase, prev_phase, cov, phased_output
+from .phasing import phase, prev_phase, cov, phased_output, new_phase, fill_phase_regions
 from .orientation_matching import match, create_orientations_rp
 from . import mapper
 from . import checkpoint
@@ -88,7 +88,8 @@ def main_spinifel(pixel_position, pixel_distance, pixel_index, slices_p, n_image
     solved = solve_ac(0, pixel_position, pixel_distance, slices_p)
     logger.log(f"AC recovered in {timer.lap():.2f}s.")
 
-    phased = phase(0, solved)
+    #phased = phase(0, solved)
+    phased, phased_regions_dict = new_phase(0, solved)
     phased_output(phased, 0)
 
     #not valid since tasks are async
@@ -119,7 +120,8 @@ def main_spinifel(pixel_position, pixel_distance, pixel_index, slices_p, n_image
 
         prev_phased = prev_phase(generation, phased, prev_phased)
 
-        phased = phase(generation, solved, phased)
+        #phased = phase(generation, solved, phased)
+        phased, phased_regions_dict = new_phase(generation, solved, phased_regions_dict)
         #logger.log(f"Problem phased in {timer.lap():.2f}s.")
 
         # Check if density converges
@@ -136,6 +138,7 @@ def main_spinifel(pixel_position, pixel_distance, pixel_index, slices_p, n_image
     fill_region(orientations, 0.0)
     fill_region(phased, 0.0)
     fill_region(prev_phased, 0.0)
+    fill_phase_regions(phased_regions_dict)
 
 # read the data and run the main algorithm. This can be repeated
 @nvtx.annotate("legion/main.py", is_prefix=True)

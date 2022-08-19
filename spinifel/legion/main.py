@@ -10,7 +10,7 @@ from spinifel.prep import save_mrc
 
 from .prep import get_data
 from .autocorrelation import solve_ac
-from .phasing import phase, prev_phase, cov
+from .phasing import phase, prev_phase, cov, new_phase, create_phased_regions
 from .orientation_matching import match, create_orientations_rp
 from . import mapper
 from . import checkpoint
@@ -49,14 +49,16 @@ def main_task(pixel_position, pixel_distance, pixel_index, slices, slices_p):
     if settings.load_gen > 0: # Load input from previous generation
         curr_gen = settings.load_gen
         phased, orientations, orientations_p = checkpoint.load_checkpoint(settings.out_dir, settings.load_gen)
+        phased_region_dict = create_phased_regions(phased)
     else:
         orientations, orientations_p = create_orientations_rp(settings.N_images_per_rank)
         solved = solve_ac(0, pixel_position, pixel_distance, slices_p)
-        logger.log(f"AC recovered in {timer.lap():.2f}s.")
+        # async tasks logger.log(f"AC recovered in {timer.lap():.2f}s.")
 
-        phased = phase(0, solved)
+        #phased = phase(0, solved)
+        phased, phased_regions_dict = new_phase(0, solved)
         rho = np.fft.ifftshift(phased.rho_)
-        logger.log(f"Problem phased in {timer.lap():.2f}s.")
+        logger.log(f"Problem phased and AC recovered in {timer.lap():.2f}s.")
         save_mrc(settings.out_dir / f"ac-0.mrc", phased.ac)
         save_mrc(settings.out_dir / f"rho-0.mrc", rho)
 
@@ -76,18 +78,19 @@ def main_task(pixel_position, pixel_distance, pixel_index, slices, slices_p):
         # Orientation matching
         match(
             phased, slices_p, pixel_position, pixel_distance, orientations_p, settings.N_images_per_rank)
-        logger.log(f"Orientations matched in {timer.lap():.2f}s.")
+        #logger.log(f"Orientations matched in {timer.lap():.2f}s.")
 
         # Solve autocorrelation
         solved = solve_ac(
             generation, pixel_position, pixel_distance, slices_p,
             orientations, orientations_p, phased)
-        logger.log(f"AC recovered in {timer.lap():.2f}s.")
+        # async tasks logger.log(f"AC recovered in {timer.lap():.2f}s.")
 
         prev_phased = prev_phase(generation, phased, prev_phased)
 
-        phased = phase(generation, solved, phased)
-        logger.log(f"Problem phased in {timer.lap():.2f}s.")
+        #phased = phase(generation, solved, phased)
+        phased, phased_regions_dict = new_phase(generation, solved, phased_regions_dict)
+        # async tasks logger.log(f"Problem phased in {timer.lap():.2f}s.")
 
         # Check if density converges
         if settings.chk_convergence:
@@ -100,7 +103,7 @@ def main_task(pixel_position, pixel_distance, pixel_index, slices, slices_p):
         rho = np.fft.ifftshift(phased.rho_)
         save_mrc(settings.out_dir / f"ac-{generation}.mrc", phased.ac)
         save_mrc(settings.out_dir / f"rho-{generation}.mrc", rho)
-
+        logger.log(f"Generation: {generation} completed in {timer.lap():.2f}s.")
     execution_fence(block=True)
 
     logger.log(f"Results saved in {settings.out_dir}")
