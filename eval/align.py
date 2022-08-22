@@ -322,9 +322,9 @@ def align_volumes(
     final_cc = pearson_cc(
         xp.expand_dims(
             r_vol.flatten(), axis=0), xp.expand_dims(
-             mrc2_original.flatten(), axis=0))
+             mrc2_original.flatten(), axis=0))[0]
     print(
-        f"Final CC between unzoomed / unfiltered volumes is: {float(final_cc):.3f}")
+        f"Final CC between unzoomed / unfiltered volumes is: {final_cc:.3f}")
 
     # Convert CuPy array to NumPy
     if not isinstance(r_vol, np.ndarray):
@@ -333,7 +333,7 @@ def align_volumes(
     if output is not None:
         save_mrc(output, np.array(r_vol), voxel_size=voxel_size)
 
-    return r_vol, mrc2_original
+    return r_vol, mrc2_original, final_cc
 
 # Work around for bug in cupy flip and its normalize axis indicies
 def flip(arr, orien):

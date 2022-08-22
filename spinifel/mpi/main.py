@@ -161,8 +161,9 @@ def main():
 
     # Use improvement of cc(prev_rho, cur_rho) to dertemine if we should
     # terminate the loop
-    cov_xy = 0
-    cov_delta = .05
+    min_cc, min_change_cc = 0.80, 0.001
+    final_cc, delta_cc = 0.0, 1.0
+    resolution = 0.0
     curr_gen += 1
 
     for generation in range(curr_gen, N_generations + 1):
@@ -230,25 +231,6 @@ def main():
                 protocol=4)
 
 
-        # Check if density converges
-        if settings.chk_convergence:
-            # Calculate correlation coefficient
-            if comm.rank == 0:
-                prev_cov_xy = cov_xy
-                cov_xy = np.corrcoef(prev_rho_.flatten(), rho_.flatten())[0, 1]
-            else:
-                prev_cov_xy = None
-                cov_xy = None
-            logger.log(
-                f"CC in {timer.lap():.2f}s. cc={cov_xy:.2f} delta={cov_xy-prev_cov_xy:.2f}")
-
-            # Stop if improvement in cc is less than cov_delta
-            prev_cov_xy = comm.bcast(prev_cov_xy, root=0)
-            cov_xy = comm.bcast(cov_xy, root=0)
-            if cov_xy - prev_cov_xy < cov_delta:
-                print("Stopping criteria met!")
-                break
-
         if comm.rank == 0:
             # Save electron density and intensity
             rho = np.fft.ifftshift(rho_)
@@ -259,11 +241,7 @@ def main():
                 f"intensity-{generation}.mrc",
                 intensity)
             save_mrc(settings.out_dir / f"rho-{generation}.mrc", rho)
-            if "reference" in myRes and myRes["reference"] is not None:
-                ali_volume, ali_reference = align_volumes(rho, myRes['reference'], zoom=settings.fsc_zoom, sigma=settings.fsc_sigma,
-                                                          n_iterations=settings.fsc_niter, n_search=settings.fsc_nsearch)
-                resolution, rshell, fsc_val = compute_fsc(
-                    ali_reference, ali_volume, myRes['dist_recip_max'])
+
             # Save output
             myRes = {**myRes, **{'ac_phased': ac_phased,
                                  'support_': support_,
@@ -272,6 +250,24 @@ def main():
                                  }}
             checkpoint.save_checkpoint(
                 myRes, settings.out_dir, generation, tag="", protocol=4)
+
+            # Check convergence w.r.t reference electron density
+            if "reference" in myRes and myRes["reference"] is not None:
+                prev_cc = final_cc
+                ali_volume, ali_reference, final_cc = align_volumes(rho, myRes['reference'], zoom=settings.fsc_zoom, sigma=settings.fsc_sigma,
+                                                          n_iterations=settings.fsc_niter, n_search=settings.fsc_nsearch)
+                resolution, rshell, fsc_val = compute_fsc(
+                    ali_reference, ali_volume, myRes['dist_recip_max'])
+                delta_cc = final_cc - prev_cc
+
+        if settings.chk_convergence:
+            resolution = comm.bcast(resolution, root=0)
+            final_cc = comm.bcast(final_cc, root=0)
+            delta_cc = comm.bcast(delta_cc, root=0)
+            if final_cc > min_cc and delta_cc < min_change_cc:
+                logger.log(f"Stopping criteria met! Algorithm converged at resolution: {resolution:.2f} with cc: {final_cc:.3f}.")
+                break
+
 
     logger.log(f"Results saved in {settings.out_dir}")
     logger.log(f"Successfully completed in {timer.total():.2f}s.")
