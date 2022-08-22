@@ -117,12 +117,10 @@ def main():
             reference = None
             dist_recip_max = None
             if settings.pdb_path.is_file():
-                dist_recip_max = np.linalg.norm(
-                    pixel_position_reciprocal[:], axis=-1).max()
+                dist_recip_max = np.max(pixel_distance_reciprocal)
                 reference = compute_reference(
                     settings.pdb_path, settings.M, dist_recip_max)
                 logger.log(f"Reference created in {timer.lap():.2f}s.")
-
             myRes = {
                      'pixel_position_reciprocal': pixel_position_reciprocal,
                      'pixel_distance_reciprocal': pixel_distance_reciprocal,
