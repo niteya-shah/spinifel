@@ -141,8 +141,7 @@ def new_phase_gen0_task(solved, phased_part, summary, generation, idx, num_procs
     # shrinkwrap weight range: 0.5 to 1.5
     weight = 0.5 + idx/num_procs
     method = 'std'
-    #TODO after the merge -> pick up the new sequential_phase method
-    phased_part.ac[:], phased_part.support_[:], phased_part.rho_[:] = sequential_phase(generation, solved.ac, None, None)
+    phased_part.ac[:], phased_part.support_[:], phased_part.rho_[:] = sequential_phase(generation, solved.ac, None, None, method, weight)
     #TODO mpi/legion to reuse the function
     ydata, fit_c = new_phase_gauss(phased_part.rho_)
     summary.rank[0] = idx
@@ -160,9 +159,7 @@ def new_phase_gen_task(solved, phased, summary, phased_part, generation, idx, nu
     #shrinkwrap weight range: 0.5 to 1.5
     weight = 0.5 + idx/num_procs
     method = 'std'
-    #TODO after the merge since to pick up the new sequential_phase method
-    #ac_phased, support_, rho_ = sequential_phase(generation, ac, support_, rho_, method, weight)
-    phased_part.ac[:], phased_part.support_[:], phased_part.rho_[:] = sequential_phase(generation, solved.ac, phased.support_, phased.rho_)
+    phased_part.ac[:], phased_part.support_[:], phased_part.rho_[:] = sequential_phase(generation, solved.ac, phased.support_, phased.rho_, method, weight)
     ydata, fit_c = new_phase_gauss(phased_part.rho_)
     summary.rank[0] = idx
     summary.height[0] = np.max(ydata)
