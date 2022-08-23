@@ -247,8 +247,10 @@ def fill_phase_regions(phased_regions_dict):
 @nvtx.annotate("legion/phasing.py", is_prefix=True)
 def phased_output_task(phased,generation):
     rho = np.fft.ifftshift(phased.rho_)
+    intensity = np.fft.ifftshift(np.abs(np.fft.fftshift(phased.ac)**2))
     save_mrc(settings.out_dir / f"ac-{generation}.mrc", phased.ac)
     save_mrc(settings.out_dir / f"rho-{generation}.mrc", rho)
+    save_mrc(settings.out_dir / f"intensity-{generation}.mrc", intensity)
 
 # launch the output task
 @nvtx.annotate("legion/phasing.py", is_prefix=True)

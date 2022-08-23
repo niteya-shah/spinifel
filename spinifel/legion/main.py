@@ -15,6 +15,7 @@ from .orientation_matching import match, create_orientations_rp
 from . import mapper
 from . import checkpoint
 from . import utils as lgutils
+from .fsc import init_fsc_task, compute_fsc_task
 
 @nvtx.annotate("legion/main.py", is_prefix=True)
 def load_psana():
@@ -46,6 +47,11 @@ def main_task(pixel_position, pixel_distance, pixel_index, slices, slices_p):
     logger = utils.Logger(True)
     timer = utils.Timer()
     curr_gen = 0
+    fsc = {}
+
+    if settings.checkpoint and settings.pdb_path.is_file():
+        fsc = init_fsc_task(pixel_distance)
+        print(f"initialized FSC", flush=True)
     if settings.load_gen > 0: # Load input from previous generation
         curr_gen = settings.load_gen
         phased, orientations, orientations_p = checkpoint.load_checkpoint(settings.out_dir, settings.load_gen)
@@ -55,18 +61,14 @@ def main_task(pixel_position, pixel_distance, pixel_index, slices, slices_p):
         solved = solve_ac(0, pixel_position, pixel_distance, slices_p)
         # async tasks logger.log(f"AC recovered in {timer.lap():.2f}s.")
 
-        #phased = phase(0, solved)
         phased, phased_regions_dict = new_phase(0, solved)
         rho = np.fft.ifftshift(phased.rho_)
+        intensity = np.fft.ifftshift(np.abs(np.fft.fftshift(phased.ac)**2))
         logger.log(f"Problem phased and AC recovered in {timer.lap():.2f}s.")
         save_mrc(settings.out_dir / f"ac-0.mrc", phased.ac)
         save_mrc(settings.out_dir / f"rho-0.mrc", rho)
+        save_mrc(settings.out_dir / f"intensity-0.mrc", intensity)
 
-    # Use improvement of cc(prev_rho, cur_rho) to dertemine if we should
-    # terminate the loop
-    prev_phased = None
-    cov_xy = 0
-    cov_delta = .05
     curr_gen +=1
 
     N_generations = settings.N_generations
@@ -78,32 +80,33 @@ def main_task(pixel_position, pixel_distance, pixel_index, slices, slices_p):
         # Orientation matching
         match(
             phased, slices_p, pixel_position, pixel_distance, orientations_p, settings.N_images_per_rank)
-        #logger.log(f"Orientations matched in {timer.lap():.2f}s.")
 
         # Solve autocorrelation
         solved = solve_ac(
             generation, pixel_position, pixel_distance, slices_p,
             orientations, orientations_p, phased)
-        # async tasks logger.log(f"AC recovered in {timer.lap():.2f}s.")
 
-        prev_phased = prev_phase(generation, phased, prev_phased)
-
-        #phased = phase(generation, solved, phased)
         phased, phased_regions_dict = new_phase(generation, solved, phased_regions_dict)
         # async tasks logger.log(f"Problem phased in {timer.lap():.2f}s.")
 
         # Check if density converges
-        if settings.chk_convergence:
-            cov_xy, is_cov =  cov(prev_phased, phased, cov_xy, cov_delta)
-        
-            if is_cov:
-                print("Stopping criteria met!")
-                break;
-
         rho = np.fft.ifftshift(phased.rho_)
+        intensity = np.fft.ifftshift(np.abs(np.fft.fftshift(phased.ac)**2))
         save_mrc(settings.out_dir / f"ac-{generation}.mrc", phased.ac)
         save_mrc(settings.out_dir / f"rho-{generation}.mrc", rho)
+        save_mrc(settings.out_dir / f"intensity-{generation}.mrc", intensity)
         logger.log(f"Generation: {generation} completed in {timer.lap():.2f}s.")
+
+        # check for convergence
+        if settings.chk_convergence:
+            print(f"checking convergence: FSC calculation", flush=True)
+            fsc = compute_fsc_task(phased, fsc)
+            fsc_dict = fsc.get()
+            if fsc_dict['converge'] == True:
+                res = fsc_dict['res']
+                final_cc = fsc_dict['final']
+                logger.log(f"Stopping criteria met! Algorithm converged at resolution: {res:.2f} with cc: {final_cc:.3f}.")
+                break;
     execution_fence(block=True)
 
     logger.log(f"Results saved in {settings.out_dir}")
