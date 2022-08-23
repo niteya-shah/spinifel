@@ -252,7 +252,7 @@ def main():
                 myRes, settings.out_dir, generation, tag="", protocol=4)
 
             # Check convergence w.r.t reference electron density
-            if "reference" in myRes and myRes["reference"] is not None:
+            if myRes["reference"] is not None:
                 prev_cc = final_cc
                 ali_volume, ali_reference, final_cc = align_volumes(rho, myRes['reference'], zoom=settings.fsc_zoom, sigma=settings.fsc_sigma,
                                                           n_iterations=settings.fsc_niter, n_search=settings.fsc_nsearch)
