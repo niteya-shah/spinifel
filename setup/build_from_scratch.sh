@@ -65,7 +65,7 @@ source $CONDA_ROOT/etc/profile.d/conda.sh
 
 PACKAGE_LIST=(
     python=$PYVER
-    matplotlib
+    matplotlib=3.5.1 # https://gitlab.osti.gov/mtip/spinifel/-/issues/54
     numpy
     scipy=1.7.3=py38he743248_0 # https://gitlab.osti.gov/mtip/spinifel/-/issues/54
     pytest
