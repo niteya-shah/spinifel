@@ -67,7 +67,7 @@ PACKAGE_LIST=(
     python=$PYVER
     matplotlib
     numpy
-    scipy
+    scipy=1.7.3=py38he743248_0 # https://gitlab.osti.gov/mtip/spinifel/-/issues/54
     pytest
     h5py
 
