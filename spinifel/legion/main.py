@@ -10,7 +10,7 @@ from spinifel.prep import save_mrc
 
 from .prep import get_data
 from .autocorrelation import solve_ac
-from .phasing import phase, prev_phase, cov, new_phase, create_phased_regions
+from .phasing import new_phase, create_phased_regions
 from .orientation_matching import match, create_orientations_rp
 from . import mapper
 from . import checkpoint
@@ -58,7 +58,8 @@ def main_task(pixel_position, pixel_distance, pixel_index, slices, slices_p):
         phased_region_dict = create_phased_regions(phased)
     else:
         orientations, orientations_p = create_orientations_rp(settings.N_images_per_rank)
-        solved = solve_ac(0, pixel_position, pixel_distance, slices_p)
+        #solved = solve_ac(0, pixel_position, pixel_distance, slices_p)
+        solved, solve_ac_dict  = solve_ac(None, 0, pixel_position, pixel_distance, slices_p)
         # async tasks logger.log(f"AC recovered in {timer.lap():.2f}s.")
 
         phased, phased_regions_dict = new_phase(0, solved)
@@ -82,9 +83,9 @@ def main_task(pixel_position, pixel_distance, pixel_index, slices, slices_p):
             phased, slices_p, pixel_position, pixel_distance, orientations_p, settings.N_images_per_rank)
 
         # Solve autocorrelation
-        solved = solve_ac(
-            generation, pixel_position, pixel_distance, slices_p,
-            orientations, orientations_p, phased)
+        solved,solve_ac_dict = solve_ac(solve_ac_dict,
+                                        generation, pixel_position, pixel_distance, slices_p,
+                                        orientations, orientations_p, phased)
 
         phased, phased_regions_dict = new_phase(generation, solved, phased_regions_dict)
         # async tasks logger.log(f"Problem phased in {timer.lap():.2f}s.")
@@ -98,7 +99,7 @@ def main_task(pixel_position, pixel_distance, pixel_index, slices, slices_p):
         logger.log(f"Generation: {generation} completed in {timer.lap():.2f}s.")
 
         # check for convergence
-        if settings.chk_convergence:
+        if settings.checkpoint and settings.pdb_path.is_file() and setting.chk_convergence:
             print(f"checking convergence: FSC calculation", flush=True)
             fsc = compute_fsc_task(phased, fsc)
             fsc_dict = fsc.get()

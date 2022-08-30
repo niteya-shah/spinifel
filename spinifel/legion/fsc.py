@@ -47,7 +47,7 @@ def compute_fsc_task(phased, fsc):
     min_cc = fsc_dict['min_cc']
     delta_cc = final_cc - prev_cc
     min_change_cc = fsc_dict['min_change_cc']
-    fsc_dict['delta_cc'] = delta_cc
+    fsc_dict['delta'] = delta_cc
     fsc_dict['res'] = resolution
     # no change in vals
     if math.isclose(final_cc, min_cc) and math.isclose(delta_cc, min_change_cc):

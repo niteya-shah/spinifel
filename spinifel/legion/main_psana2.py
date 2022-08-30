@@ -11,10 +11,11 @@ from spinifel.prep import save_mrc
 from .prep import get_data, init_partitions_regions_psana2, load_image_batch, load_pixel_data, process_data
 from .utils import union_partitions_with_stride, fill_region
 from .autocorrelation import solve_ac
-from .phasing import phase, prev_phase, cov, phased_output, new_phase, fill_phase_regions
+from .phasing import phased_output, new_phase, fill_phase_regions
 from .orientation_matching import match, create_orientations_rp
 from . import mapper
 from . import checkpoint
+from .fsc import init_fsc_task, compute_fsc_task
 
 @nvtx.annotate("legion/main.py", is_prefix=True)
 def load_psana():
@@ -80,15 +81,19 @@ def main_spinifel(pixel_position, pixel_distance, pixel_index, slices_p, n_image
     logger = utils.Logger(True)
     timer = utils.Timer()
     curr_gen = 0
+    fsc = {}
+
+    if settings.checkpoint and settings.pdb_path.is_file():
+        fsc = init_fsc_task(pixel_distance)
+        print(f"initialized FSC", flush=True)
 
     # not supported for streaming/psana mode since image data grows
-    assert(settings.load_gen == 0)
+    assert(settings.load_gen == -1)
 
     orientations, orientations_p = create_orientations_rp(n_images_per_rank)
-    solved = solve_ac(0, pixel_position, pixel_distance, slices_p)
+    solved, solve_ac_dict = solve_ac(None, 0, pixel_position, pixel_distance, slices_p)
     logger.log(f"AC recovered in {timer.lap():.2f}s.")
 
-    #phased = phase(0, solved)
     phased, phased_regions_dict = new_phase(0, solved)
     phased_output(phased, 0)
 
@@ -97,9 +102,6 @@ def main_spinifel(pixel_position, pixel_distance, pixel_index, slices_p, n_image
 
     # Use improvement of cc(prev_rho, cur_rho) to determine if we should
     # terminate the loop
-    prev_phased = None
-    cov_xy = 0
-    cov_delta = .05
     curr_gen +=1
     N_generations = settings.N_generations
     for generation in range(curr_gen, N_generations+1):
@@ -113,31 +115,28 @@ def main_spinifel(pixel_position, pixel_distance, pixel_index, slices_p, n_image
         logger.log(f"Orientations matched in {timer.lap():.2f}s.")
 
         # Solve autocorrelation
-        solved = solve_ac(
-            generation, pixel_position, pixel_distance, slices_p,
-            orientations, orientations_p, phased)
+        solved, solve_ac_dict = solve_ac(solve_ac_dict,
+                                         generation, pixel_position,
+                                         pixel_distance, slices_p,
+                                         orientations, orientations_p,
+                                         phased)
         logger.log(f"AC recovered in {timer.lap():.2f}s.")
 
-        prev_phased = prev_phase(generation, phased, prev_phased)
-
-        #phased = phase(generation, solved, phased)
         phased, phased_regions_dict = new_phase(generation, solved, phased_regions_dict)
-        #logger.log(f"Problem phased in {timer.lap():.2f}s.")
-
-        # Check if density converges
-        if settings.chk_convergence:
-            cov_xy, is_cov =  cov(prev_phased, phased, cov_xy, cov_delta)
-        
-            if is_cov:
-                print("Stopping criteria met!")
-                break;
-
         phased_output(phased, generation)
 
+        if settings.checkpoint and settings.pdb_path.is_file() and setting.chk_convergence:
+            print(f"checking convergence: FSC calculation", flush=True)
+            fsc = compute_fsc_task(phased, fsc)
+            fsc_dict = fsc.get()
+            if fsc_dict['converge'] == True:
+                res = fsc_dict['res']
+                final_cc = fsc_dict['final']
+                logger.log(f"Stopping criteria met! Algorithm converged at resolution: {res:.2f} with cc: {final_cc:.3f}.")
+                break;
     #fill regions so they get garbage collected
-    fill_region(orientations, 0.0)
-    fill_region(phased, 0.0)
-    fill_region(prev_phased, 0.0)
+    fill_region(orientations, 0)
+    fill_region(phased, 0)
     fill_phase_regions(phased_regions_dict)
 
 # read the data and run the main algorithm. This can be repeated
