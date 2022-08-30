@@ -14,21 +14,25 @@ from . import utils as lgutils
 @nvtx.annotate("legion/phasing.py", is_prefix=True)
 def create_phased_regions(N_procs, phased=None):
     summary_phase = Region((N_procs,),
-                     {"rank": pygion.int32, "skews": pygion.float32,
-                      "height": pygion.int32,
-                      "width": pygion.int32})
+                           {"rank": pygion.int32, "skews": pygion.float64,
+                            "height": pygion.float64,
+                            "width": pygion.float64})
 
     summary_phase_p = Partition.equal(summary_phase, (N_procs,))
     M = settings.M
-    multi_phased = Region((N_procs * M, M, M), {"ac": pygion.float32,
-                                                "support_":pygion.float32,
-                                                "rho_": pygion.float32})
+    if settings.use_single_prec:
+        ftype = pygion.float32
+    else:
+        ftype = pygion.float64
+    multi_phased = Region((N_procs * M, M, M), {"ac": ftype,
+                                                "support_":pygion.bool_,
+                                                "rho_": pygion.float64})
     multi_phased_p = Partition.restrict(multi_phased, (N_procs,), [[M], [0], [0]], [M, M, M])
     if phased is None:
         phased = Region((settings.M,)*3, {
             "ac": pygion.float32,
-            "support_": pygion.float32,
-            "rho_": pygion.float32 }
+            "support_": pygion.bool_,
+            "rho_": pygion.float64 }
         )
     return {'summary': summary_phase,
             'summary_part': summary_phase_p,
@@ -36,41 +40,10 @@ def create_phased_regions(N_procs, phased=None):
             'multi_phase_part': multi_phased_p,
             'phased': phased }
 
-
 @task(leaf=True, privileges=[WD("prev_rho_"), RO("rho_")])
 @lgutils.gpu_task_wrapper
 def prev_phase_task(prev_phased, phased):
     prev_phased.prev_rho_[:] = phased.rho_[:]
-
-def prev_phase(generation, phased, prev_phased=None):
-    assert phased is not None
-    if generation == 1:
-        assert prev_phased is None
-        prev_phased = Region((settings.M,)*3, {
-            "prev_rho_": pygion.float32,})
-        prev_phase_task(prev_phased, phased)
-    else:
-        assert prev_phased is not None
-        prev_phase_task(prev_phased, phased)
-    return prev_phased
-
-
-@task(leaf=True, privileges=[RO("prev_rho_"), RO("rho_")])
-@lgutils.gpu_task_wrapper
-def cov_task(prev_phased, phased, cov_xy, cov_delta):
-    cc_matrix = np.corrcoef(prev_phased.prev_rho_.flatten(),
-                            phased.rho_.flatten())
-    val = cc_matrix[0,1]
-    return val
-
-def cov(prev_phased, phased, cov_xy, cov_delta):
-    assert prev_phased is not None
-    assert phased is not None
-    fval = cov_task(prev_phased, phased, cov_xy, cov_delta)
-    val = fval.get()
-    is_cov = val - cov_xy < cov_delta
-    return val, is_cov
-
 
 #select the partition index with the best result
 @task(leaf=True, privileges=[RO])
@@ -80,9 +53,6 @@ def new_phase_select(summary):
     iref = np.argmin(summary.skews)
     ref_rank = summary.rank[iref]
     if settings.verbosity > 0:
-        print(f"height: {summary.height[ref_rank]}", flush=True)
-        print(f"width: {summary.width[ref_rank]}", flush=True)
-        print(f"skews: {summary.skews[ref_rank]}", flush=True)
         print(f"Keeping result from rank {ref_rank}: skew={summary.skews[ref_rank]:.2f}", flush=True)
     return ref_rank
 
@@ -146,7 +116,7 @@ def new_phase_gen0_task(solved, phased_part, summary, generation, idx, num_procs
     ydata, fit_c = new_phase_gauss(phased_part.rho_)
     summary.rank[0] = idx
     summary.height[0] = np.max(ydata)
-    summary.width[0] = fit_c
+    summary.width[0] = float(fit_c)
     summary.skews[0] = skew(ydata)
     if settings.verbosity > 0:
         print("Finishing phasing", flush=True)
@@ -163,7 +133,7 @@ def new_phase_gen_task(solved, phased, summary, phased_part, generation, idx, nu
     ydata, fit_c = new_phase_gauss(phased_part.rho_)
     summary.rank[0] = idx
     summary.height[0] = np.max(ydata)
-    summary.width[0] = fit_c
+    summary.width[0] = float(fit_c)
     summary.skews[0] = skew(ydata)
     if settings.verbosity > 0:
         print("Finishing phasing", flush=True)
@@ -179,33 +149,6 @@ def phase_gen0_task(solved, phased):
     if settings.verbosity > 0:
         print("Finishing phasing", flush=True)
 
-
-@task(leaf=True, privileges=[RO("ac"), WD("ac") + RW("support_", "rho_")])
-@lgutils.gpu_task_wrapper
-@nvtx.annotate("legion/ phasing.py", is_prefix=True)
-def phase_task(solved, phased, generation):
-    if settings.verbosity > 0:
-        print("Starting phasing", flush=True)
-    phased.ac[:] , phased.support_[:], phased.rho_[:] = sequential_phase(
-            generation, solved.ac, phased.support_, phased.rho_)
-    if settings.verbosity > 0:
-        print("Finishing phasing", flush=True)
-
-
-@nvtx.annotate("legion/phasing.py", is_prefix=True)
-def phase(generation, solved, phased=None):
-    if generation == 0:
-        assert phased is None
-        phased = Region((settings.M,)*3, {
-            "ac": pygion.float32, "support_": pygion.float32,
-            "rho_": pygion.float32})
-        phase_gen0_task(solved, phased)
-    else:
-        assert phased is not None
-        phase_task(solved, phased, generation)
-
-    return phased
-
 @nvtx.annotate("legion/phasing.py", is_prefix=True)
 def new_phase(generation, solved, phased_regions_dict=None):
     num_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
@@ -215,7 +158,8 @@ def new_phase(generation, solved, phased_regions_dict=None):
         multi_phased = phased_regions_dict['multi_phase_part']
         summary = phased_regions_dict['summary_part']
         phased_region = phased_regions_dict['phased']
-        for i in range(num_procs):
+        for idx in range(num_procs):
+            i = num_procs-idx-1
             new_phase_gen0_task(solved, multi_phased[i], summary[i], generation, i, num_procs,point=i)
     else:
         assert phased_regions_dict is not None
@@ -223,7 +167,8 @@ def new_phase(generation, solved, phased_regions_dict=None):
         summary = phased_regions_dict['summary_part']
         phased_region = phased_regions_dict['phased']
 
-        for i in range(num_procs):
+        for idx in range(num_procs):
+            i = num_procs-idx-1
             new_phase_gen_task(solved, phased_region, summary[i],  multi_phased[i], generation, i, num_procs, point=i)
 
     summary_phase = phased_regions_dict['summary']
@@ -238,9 +183,9 @@ def new_phase(generation, solved, phased_regions_dict=None):
 
 @nvtx.annotate("legion/phasing.py", is_prefix=True)
 def fill_phase_regions(phased_regions_dict):
-    lgutils.fill_region(phased_regions_dict['summary'])
-    lgutils.fill_region(phased_regions_dict['multi_phase'])
-    lgutils.fill_region(phased_regions_dict['phased'])
+    lgutils.fill_region(phased_regions_dict['summary'], 0)
+    lgutils.fill_region(phased_regions_dict['multi_phase'],0)
+    lgutils.fill_region(phased_regions_dict['phased'], 0)
 
 @task(leaf=True, privileges=[RO("ac", "rho_")])
 @lgutils.gpu_task_wrapper

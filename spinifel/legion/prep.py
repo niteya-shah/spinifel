@@ -267,9 +267,10 @@ def bin_slices(old_slices, old_slices_p):
     sec_shape = settings.reduced_det_shape
     new_slices, new_slices_p = lgutils.create_distributed_region(
         N_images_per_rank, fields_dict, sec_shape)
-
+    i=0
     for old_slices_subr, new_slices_subr in zip(old_slices_p, new_slices_p):
-        apply_slices_binning(old_slices_subr, new_slices_subr)
+        apply_slices_binning(old_slices_subr, new_slices_subr, point=i)
+        i = i+1
     return new_slices, new_slices_p
 
 #perform binning by copying the old data without creating a new region
