@@ -30,7 +30,7 @@ def create_phased_regions(N_procs, phased=None):
     multi_phased_p = Partition.restrict(multi_phased, (N_procs,), [[M], [0], [0]], [M, M, M])
     if phased is None:
         phased = Region((settings.M,)*3, {
-            "ac": pygion.float32,
+            "ac": ftype,
             "support_": pygion.bool_,
             "rho_": pygion.float64 }
         )
@@ -64,7 +64,6 @@ def phased_result_task(results_p0, results, iref):
     results_p0.ac[:] = results.ac[iref.get(),:]
     results_p0.support_[:] = results.support_[iref.get(),:]
     results_p0.rho_[:] = results.rho_[iref.get(),:]
-
 
 @task(leaf=True, privileges=[WD, RO])
 @lgutils.gpu_task_wrapper

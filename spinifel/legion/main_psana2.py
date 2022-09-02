@@ -8,7 +8,7 @@ from pygion import acquire, attach_hdf5, execution_fence, task, Partition, Regio
 from spinifel import settings, utils, contexts, checkpoint
 from spinifel.prep import save_mrc
 
-from .prep import get_data, init_partitions_regions_psana2, load_image_batch, load_pixel_data, process_data
+from .prep import get_data, init_partitions_regions_psana2, load_image_batch, load_pixel_data, process_data, prep_objects
 from .utils import union_partitions_with_stride, fill_region
 from .autocorrelation import solve_ac
 from .phasing import phased_output, new_phase, fill_phase_regions
@@ -82,6 +82,8 @@ def main_spinifel(pixel_position, pixel_distance, pixel_index, slices_p, n_image
     timer = utils.Timer()
     curr_gen = 0
     fsc = {}
+    total_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
+    ready_objs = prep_objects(pixel_position, pixel_distance, slices_p, total_procs)
 
     if settings.checkpoint and settings.pdb_path.is_file():
         fsc = init_fsc_task(pixel_distance)
@@ -91,8 +93,8 @@ def main_spinifel(pixel_position, pixel_distance, pixel_index, slices_p, n_image
     assert(settings.load_gen == -1)
 
     orientations, orientations_p = create_orientations_rp(n_images_per_rank)
-    solved, solve_ac_dict = solve_ac(None, 0, pixel_position, pixel_distance, slices_p)
-    logger.log(f"AC recovered in {timer.lap():.2f}s.")
+    solved, solve_ac_dict = solve_ac(None, 0, pixel_position, pixel_distance, slices_p, ready_objs)
+    #logger.log(f"AC recovered in {timer.lap():.2f}s.")
 
     phased, phased_regions_dict = new_phase(0, solved)
     phased_output(phased, 0)
@@ -100,8 +102,6 @@ def main_spinifel(pixel_position, pixel_distance, pixel_index, slices_p, n_image
     #not valid since tasks are async
     #logger.log(f"Problem phased in {timer.lap():.2f}s.")
 
-    # Use improvement of cc(prev_rho, cur_rho) to determine if we should
-    # terminate the loop
     curr_gen +=1
     N_generations = settings.N_generations
     for generation in range(curr_gen, N_generations+1):
@@ -112,16 +112,12 @@ def main_spinifel(pixel_position, pixel_distance, pixel_index, slices_p, n_image
         # Orientation matching
         match(
             phased, slices_p, pixel_position, pixel_distance, orientations_p, n_images_per_rank)
-        logger.log(f"Orientations matched in {timer.lap():.2f}s.")
-
         # Solve autocorrelation
         solved, solve_ac_dict = solve_ac(solve_ac_dict,
                                          generation, pixel_position,
-                                         pixel_distance, slices_p,
+                                         pixel_distance, slices_p, ready_objs,
                                          orientations, orientations_p,
                                          phased)
-        logger.log(f"AC recovered in {timer.lap():.2f}s.")
-
         phased, phased_regions_dict = new_phase(generation, solved, phased_regions_dict)
         phased_output(phased, generation)
 
@@ -134,10 +130,12 @@ def main_spinifel(pixel_position, pixel_distance, pixel_index, slices_p, n_image
                 final_cc = fsc_dict['final']
                 logger.log(f"Stopping criteria met! Algorithm converged at resolution: {res:.2f} with cc: {final_cc:.3f}.")
                 break;
+
     #fill regions so they get garbage collected
     fill_region(orientations, 0)
     fill_region(phased, 0)
     fill_phase_regions(phased_regions_dict)
+
 
 # read the data and run the main algorithm. This can be repeated
 @nvtx.annotate("legion/main.py", is_prefix=True)

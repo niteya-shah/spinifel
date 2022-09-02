@@ -8,7 +8,7 @@ from pygion import acquire, attach_hdf5, execution_fence, task, Partition, Regio
 from spinifel import settings, utils, contexts, checkpoint
 from spinifel.prep import save_mrc
 
-from .prep import get_data
+from .prep import get_data, prep_objects
 from .autocorrelation import solve_ac
 from .phasing import new_phase, create_phased_regions
 from .orientation_matching import match, create_orientations_rp
@@ -48,6 +48,8 @@ def main_task(pixel_position, pixel_distance, pixel_index, slices, slices_p):
     timer = utils.Timer()
     curr_gen = 0
     fsc = {}
+    total_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
+    ready_objs = prep_objects(pixel_position, pixel_distance, slices_p, total_procs)
 
     if settings.checkpoint and settings.pdb_path.is_file():
         fsc = init_fsc_task(pixel_distance)
@@ -58,8 +60,7 @@ def main_task(pixel_position, pixel_distance, pixel_index, slices, slices_p):
         phased_region_dict = create_phased_regions(phased)
     else:
         orientations, orientations_p = create_orientations_rp(settings.N_images_per_rank)
-        #solved = solve_ac(0, pixel_position, pixel_distance, slices_p)
-        solved, solve_ac_dict  = solve_ac(None, 0, pixel_position, pixel_distance, slices_p)
+        solved, solve_ac_dict  = solve_ac(None, 0, pixel_position, pixel_distance, slices_p, ready_objs)
         # async tasks logger.log(f"AC recovered in {timer.lap():.2f}s.")
 
         phased, phased_regions_dict = new_phase(0, solved)
@@ -85,6 +86,7 @@ def main_task(pixel_position, pixel_distance, pixel_index, slices, slices_p):
         # Solve autocorrelation
         solved,solve_ac_dict = solve_ac(solve_ac_dict,
                                         generation, pixel_position, pixel_distance, slices_p,
+                                        ready_objs,
                                         orientations, orientations_p, phased)
 
         phased, phased_regions_dict = new_phase(generation, solved, phased_regions_dict)

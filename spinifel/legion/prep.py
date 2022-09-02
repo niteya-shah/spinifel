@@ -9,6 +9,11 @@ from pygion import task, Tunable, Partition, Region, WD, RO, RW, Reduce, IndexLa
 from spinifel import settings, prep, image
 
 from . import utils as lgutils
+from spinifel.extern.nufft_ext import NUFFT
+from spinifel.sequential.orientation_matching import SNM
+from spinifel.sequential.autocorrelation import Merge
+
+all_objs  = {}
 
 psana = None
 if settings.use_psana:
@@ -460,3 +465,35 @@ def load_image_batch(run, gen_run, gen_smd, slices_p):
                 break
         gen_smd = smd_chunks_steps(run)
     return gen_run, gen_smd, run
+
+
+@task(leaf=True, privileges=[RO, RO, RO])
+@lgutils.gpu_task_wrapper
+@nvtx.annotate("legion/prep.py", is_prefix=True)
+def setup_objects_task(pixel_position, pixel_distance, slices):
+    global all_objs
+    all_objs['nufft'] = NUFFT(settings, pixel_position.reciprocal,
+                              pixel_distance.reciprocal)
+    all_objs['snm'] = SNM(
+        settings,
+        slices.data,
+        pixel_position.reciprocal,
+        pixel_distance.reciprocal,
+        all_objs['nufft'])
+
+    all_objs['mg'] = Merge(
+        settings,
+        slices.data,
+        pixel_position.reciprocal,
+        pixel_distance.reciprocal,
+        all_objs['nufft'])
+    done = True
+    return done
+
+@nvtx.annotate("legion/prep.py", is_prefix=True)
+def prep_objects(pixel_position, pixel_distance, slices, N_procs):
+    done_list = []
+    for i in range(N_procs):
+        done = setup_objects_task(pixel_position, pixel_distance, slices[i], point=i)
+        done_list.append(done)
+    return done_list
