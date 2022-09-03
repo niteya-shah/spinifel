@@ -3,7 +3,7 @@
 
 
 from . import settings
-from tests import run_tests
+from spinifel.tests import run_tests
 
 
 if __name__ == "__main__":

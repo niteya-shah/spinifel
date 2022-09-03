@@ -63,11 +63,19 @@ rm conda-installer.sh
 
 source $CONDA_ROOT/etc/profile.d/conda.sh
 
+# Unfortunately, some packages need to be pinned to specific hashes
+# (not merely versions) because these break on Summit/Ascent. This is
+# inherently unportable (the hash relies on the architecture), so we
+# have to make sure we specify this only for the affected architectures.
+if [[ $(uname -p) = "ppc64le" ]]; then
+    ppc64le_target=1
+fi
+
 PACKAGE_LIST=(
     python=$PYVER
-    matplotlib
+    matplotlib=3.5.1 # https://gitlab.osti.gov/mtip/spinifel/-/issues/54
     numpy
-    scipy
+    scipy=1.7.3${ppc64le_target+=py38he743248_0} # https://gitlab.osti.gov/mtip/spinifel/-/issues/54
     pytest
     h5py
 

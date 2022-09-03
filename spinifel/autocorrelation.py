@@ -151,8 +151,7 @@ def adjoint_spinifel(
 
     # Apply recip symmetry
     if use_recip_sym:
-        #ugrid = np.fft.fftshift(np.fft.ifftn(np.fft.fftn(np.fft.ifftshift(ugrid.reshape((M,)*3))).real)).real
-        ugrid = ugrid.real
+        ugrid = np.fft.fftshift(np.fft.ifftn(np.fft.fftn(np.fft.ifftshift(ugrid.reshape((M,)*3))).real)).real
 
     return ugrid / M**3
 

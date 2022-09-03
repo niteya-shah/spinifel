@@ -196,25 +196,36 @@ def step_phase(rho_, amplitudes_, amp_mask_, support_):
 
 
 @nvtx.annotate("sequential/phasing.py", is_prefix=True)
-def shrink_wrap(cutoff, sigma, rho_, support_):
+def shrink_wrap(sigma, rho_, support_, method=None, weight=1., cutoff=0.05):
     """
     Perform shrinkwrap operation to update the support for convergence.
 
-    :param cutoff: threshold as a fraction of maximum density value
     :param sigma: Gaussian standard deviation to low-pass filter density with
     :param rho_: electron density estimate
     :param support_: object support
+    :param method: {'max', 'std'}, default: std
+    kwargs:
+    :param cutoff: method='max', threshold as a fraction of maximum density value
+    :param weight: method='std', threshold as standard deviation of density times a weight factor
     """
     rho_abs_ = xp.absolute(rho_)
     # By using 'wrap', we don't need to fftshift it back and forth
     rho_gauss_ = gaussian_filter(
         rho_abs_, mode='wrap', sigma=sigma, truncate=2)
-    support_[:] = rho_gauss_ > rho_abs_.max() * cutoff
+    if method == None:
+        method = 'std'
+    if method == 'std':
+        threshold = xp.std(rho_gauss_) * weight
+    elif method == 'max':
+        threshold = rho_abs_.max() * cutoff * weight
+    else:
+        raise ValueError(f"Invalid method: {method}. Options are 'std' or 'max'.")
+    support_[:] = rho_gauss_ > threshold 
 
 
 
 @nvtx.annotate("sequential/phasing.py", is_prefix=True)
-def phase(generation, ac, support_=None, rho_=None):
+def phase(generation, ac, support_=None, rho_=None, method=None, weight=1.):
     """
     Solve phase retrieval from the autocorrelation of the current electron density estimate
     by performing cycles of ER/HIO/shrinkwrap combination.
@@ -240,27 +251,21 @@ def phase(generation, ac, support_=None, rho_=None):
     ac = xp.array(ac)
     ac_filt = gaussian_filter(xp.maximum(ac.real, 0), mode='constant',
                               sigma=1, truncate=2)
-    #image.show_volume(ac_filt, Mquat, f"autocorrelation_filtered_{generation}.png")
     ac_filt_ = xp.fft.ifftshift(ac_filt)
 
     intensities_ = xp.abs(xp.fft.fftn(ac_filt_))
-    #image.show_volume(xp.fft.fftshift(intensities_), Mquat, f"intensities_{generation}.png")
 
     amplitudes_ = xp.sqrt(intensities_)
-    #image.show_volume(xp.fft.fftshift(amplitudes_), Mquat, f"amplitudes_{generation}.png")
 
     amp_mask_ = xp.ones((M, M, M), dtype=xp.bool_)
     amp_mask_[0, 0, 0] = 0  # Mask out central peak
-    #image.show_volume(xp.fft.fftshift(amp_mask_), Mquat, f"amp_mask_{generation}.png")
 
     if support_ is None:
         support_ = create_support_(ac_filt_, M, Mquat, generation)
-    #image.show_volume(xp.fft.fftshift(support_), Mquat, f"support_{generation}.png")
     support_ = xp.array(support_)
 
     if rho_ is None:
         rho_ = support_ * xp.random.rand(*support_.shape)
-    #image.show_volume(xp.fft.fftshift(rho_), Mquat, f"rho_{generation}.png")
     rho_ = xp.array(rho_)
 
     rho_max = xp.infty
@@ -279,7 +284,7 @@ def phase(generation, ac, support_=None, rho_=None):
             support_,
             rho_max)
         ER_loop(nER, rho_, amplitudes_, amp_mask_, support_, rho_max)
-        shrink_wrap(settings.cutoff, 1, rho_, support_)
+        shrink_wrap(1, rho_, support_, method=method, weight=weight)
     ER_loop(nER, rho_, amplitudes_, amp_mask_, support_, rho_max)
 
     if settings.use_cupy:

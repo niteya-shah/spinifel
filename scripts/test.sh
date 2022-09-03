@@ -14,8 +14,7 @@ set -x
 # Pickup all tests spinifel modules
 #pytest -s tests            # This will not work [my guess: pytest/spinifel settings conflict]
                             # - see issue#50 for more detail.
-#pytest -s tests/test_FSC.py
-#pytest -s spinifel/tests
+pytest -s tests/test_FSC.py
 
 # Pickup tests as specified in init file in root/tests
 # See documentation on Wiki page.

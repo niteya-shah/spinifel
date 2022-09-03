@@ -5,7 +5,7 @@ contexts.init_mpi()
 import os
 
 # Import all the main tests here
-from .orientation_matching import run_match
+#from .orientation_matching import run_match
 from spinifel.mpi import main as mpi_main
 
 

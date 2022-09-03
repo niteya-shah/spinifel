@@ -57,14 +57,11 @@ def compute_reference(pdb_file, M, distance_reciprocal_max):
     # set up Particle object
     particle = sk.Particle()
     particle.read_pdb(pdb_file, ff='WK')
-
     # compute ideal diffraction volume and take FT for density map
     mesh = get_reciprocal_mesh(M, distance_reciprocal_max, np)
     cfield = pg.calculate_diffraction_pattern_gpu(
         mesh, particle, return_type='complex_field')
-    ivol = np.square(np.abs(cfield))
     density = np.fft.fftshift(np.fft.ifftn(np.fft.ifftshift(cfield))).real
-
     return density
 
 def compute_fsc(
@@ -96,7 +93,7 @@ def compute_fsc(
     smags = xp.linalg.norm(xp.array(mesh), axis=-1).reshape(-1) * 1e-10
     volume1 = xp.array(volume1)
     volume2 = xp.array(volume2)
-    r_spacings = xp.arange(0, smags.max() / np.sqrt(3), spacing)
+    r_spacings = xp.arange(0, smags.max() / xp.sqrt(3), spacing)
 
     ft1 = xp.fft.fftshift(xp.fft.fftn(volume1)).reshape(-1)
     ft2 = xp.conjugate(xp.fft.fftshift(xp.fft.fftn(volume2)).reshape(-1))
