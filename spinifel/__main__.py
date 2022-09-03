@@ -3,8 +3,6 @@
 
 
 from . import settings
-from spinifel.tests import run_tests
-
 
 if __name__ == "__main__":
 
@@ -25,8 +23,6 @@ if __name__ == "__main__":
     elif settings.mode == "psana2":
         from .mpi import main_psana2
         main_psana2()
-    elif settings.mode == "test":
-        run_tests()
     elif settings.mode == "legion":
         from .legion import main
         main()

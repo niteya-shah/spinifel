@@ -8,7 +8,7 @@ verbosity = 0
 use_callmonitor = false
 
 [data]
-out_dir = "${test_out_dir}/${CI_PIPELINE_ID}/spinifel_output"
+out_dir = "${OUT_DIR}"
 
 [detector]
 shape = [1, 128, 128]
@@ -34,7 +34,7 @@ chk_convergence = false
 devices_per_node = 1
 
 [algorithm]
-N_generations = 3
+N_generations =3 
 nER = 50
 nHIO = 25
 beta = 0.3
@@ -44,3 +44,4 @@ N_clipping = 0
 N_binning = 0
 N_orientations = 10000  # model_slices
 N_batch_size = 1000
+
