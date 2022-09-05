@@ -57,7 +57,7 @@ def get_known_answers(
     )
 
     # ISSUE_51: Uncomment below for the old solve ac prior to the mg use above
-    #known_ac = work_solve_ac(
+    # known_ac = work_solve_ac(
     #    generation, pixel_position_reciprocal, pixel_distance_reciprocal,
     #    slices, ref_orientations[:slices.shape[0]])
 
@@ -99,8 +99,11 @@ def main():
         batch_size = min(N_images_per_rank, 100)
 
         # Calculate total no. of images that will be processed (limit by max)
-        # The + 2 at the end is there to include BeginStep and Enable transtions.
-        max_events = min(settings.N_images_max, (N_big_data_nodes * N_images_per_rank) + 2)
+        # The +2 per rank is to cover special transitions for xtc2
+        max_events = min(
+            (N_big_data_nodes * settings.N_images_max),
+            (N_big_data_nodes * N_images_per_rank) + 2,
+        )
 
         def destination(timestamp):
             # Return big data node destination, numbered from 1, round-robin
@@ -140,6 +143,7 @@ def main():
     (pixel_position_reciprocal, pixel_index_map, slices_) = get_data(
         N_images_per_rank, ds
     )
+    logger.log(f"slices_: {slices_.shape}")
 
     # Hacky way to allow only worker ranks for computation tasks
     if not contexts.is_worker:
@@ -148,19 +152,21 @@ def main():
     # Computes reciprocal distance and mean image then save to .png
     pixel_distance_reciprocal = compute_pixel_distance(pixel_position_reciprocal)
     mean_image = compute_mean_image(slices_)
-    show_image(
-        image,
-        ds,
-        contexts.rank,
-        slices_,
-        pixel_index_map,
-        pixel_position_reciprocal,
-        pixel_distance_reciprocal,
-        mean_image,
-        "image_0.png",
-        "mean_image.png",
-        "saxs.png",
-    )
+    # This is only done on first worker rank - other ranks will see None for mean_image
+    if mean_image is not None:
+        show_image(
+            image,
+            ds,
+            contexts.rank,
+            slices_,
+            pixel_index_map,
+            pixel_position_reciprocal,
+            pixel_distance_reciprocal,
+            mean_image,
+            "image_0.png",
+            "mean_image.png",
+            "saxs.png",
+        )
 
     # Bins data and save to .png files
     (pixel_position_reciprocal, pixel_index_map, slices_) = bin_data(
@@ -168,19 +174,20 @@ def main():
     )
     pixel_distance_reciprocal = compute_pixel_distance(pixel_position_reciprocal)
     mean_image = compute_mean_image(slices_)
-    show_image(
-        image,
-        ds,
-        contexts.rank,
-        slices_,
-        pixel_index_map,
-        pixel_position_reciprocal,
-        pixel_distance_reciprocal,
-        mean_image,
-        "image_binned_0.png",
-        "mean_image_binned.png",
-        "saxs_binned.png",
-    )
+    if mean_image is not None:
+        show_image(
+            image,
+            ds,
+            contexts.rank,
+            slices_,
+            pixel_index_map,
+            pixel_position_reciprocal,
+            pixel_distance_reciprocal,
+            mean_image,
+            "image_binned_0.png",
+            "mean_image_binned.png",
+            "saxs_binned.png",
+        )
 
     logger.log(f"Loaded in {timer.lap():.2f}s.")
 
@@ -203,85 +210,83 @@ def main():
             logger, mg, pixel_position_reciprocal, pixel_distance_reciprocal, slices_
         )
 
-    # Initialize orientation matching class - must be done after get_known_answers 
+    # Initialize orientation matching class - must be done after get_known_answers
     # to obtain ref_orientations
     snm = SNM(
-        settings, slices_, pixel_position_reciprocal, pixel_distance_reciprocal, nufft,
-        ref_orientations=ref_orientations
+        settings,
+        slices_,
+        pixel_position_reciprocal,
+        pixel_distance_reciprocal,
+        nufft,
+        ref_orientations=ref_orientations,
     )
 
-
     # Skip this data saving and ac calculation in test mode
-    if flag_test:
-        curr_gen = 0
+    if settings.load_gen > 0:  # Load input from previous generation
+        curr_gen = settings.load_gen
+        print(
+            f"Loading checkpoint: {checkpoint.generate_checkpoint_name(settings.out_dir, settings.load_gen, settings.tag_gen)}",
+            flush=True,
+        )
+        myRes = checkpoint.load_checkpoint(
+            settings.out_dir, settings.load_gen, settings.tag_gen
+        )
+        # Unpack dictionary
+        ac_phased = myRes["ac_phased"]
+        support_ = myRes["support_"]
+        rho_ = myRes["rho_"]
+        orientations = myRes["orientations"]
     else:
-        if settings.load_gen > 0:  # Load input from previous generation
-            curr_gen = settings.load_gen
-            print(
-                f"Loading checkpoint: {checkpoint.generate_checkpoint_name(settings.out_dir, settings.load_gen, settings.tag_gen)}",
-                flush=True,
+        curr_gen = 0
+        logger.log(f"#" * 27)
+        logger.log(f"##### Generation {curr_gen}/{N_generations} #####")
+        logger.log(f"#" * 27)
+
+        ac = mg.solve_ac(curr_gen)
+        logger.log(f"AC recovered in {timer.lap():.2f}s.")
+        if comm.rank == writer_rank and settings.checkpoint:
+            reference = None
+            dist_recip_max = None
+            if settings.pdb_path.is_file():
+                dist_recip_max = np.max(pixel_distance_reciprocal)
+                reference = compute_reference(
+                    settings.pdb_path, settings.M, dist_recip_max
+                )
+                logger.log(f"Reference created in {timer.lap():.2f}s.")
+            myRes = {
+                "pixel_position_reciprocal": pixel_position_reciprocal,
+                "pixel_distance_reciprocal": pixel_distance_reciprocal,
+                "slices_": slices_,
+                "ac": ac,
+                "reference": reference,
+                "dist_recip_max": dist_recip_max,
+            }
+            checkpoint.save_checkpoint(
+                myRes, settings.out_dir, curr_gen, tag="solve_ac", protocol=4
             )
-            myRes = checkpoint.load_checkpoint(
-                settings.out_dir, settings.load_gen, settings.tag_gen
+
+        ac_phased, support_, rho_ = phase(curr_gen, ac)
+        logger.log(f"Problem phased in {timer.lap():.2f}s.")
+
+        if comm.rank == writer_rank:
+            myRes = {
+                **myRes,
+                **{
+                    "ac": ac,
+                    "ac_phased": ac_phased,
+                    "support_": support_,
+                    "rho_": rho_,
+                },
+            }
+            checkpoint.save_checkpoint(
+                myRes, settings.out_dir, curr_gen, tag="phase", protocol=4
             )
-            # Unpack dictionary
-            ac_phased = myRes["ac_phased"]
-            support_ = myRes["support_"]
-            rho_ = myRes["rho_"]
-            orientations = myRes["orientations"]
-        else:
-            curr_gen = 0
-            logger.log(f"#" * 27)
-            logger.log(f"##### Generation {curr_gen}/{N_generations} #####")
-            logger.log(f"#" * 27)
-
-            ac = mg.solve_ac(curr_gen)
-            logger.log(f"AC recovered in {timer.lap():.2f}s.")
-            if comm.rank == 0 and settings.checkpoint:
-                reference = None
-                dist_recip_max = None
-                if settings.pdb_path.is_file():
-                    dist_recip_max = np.max(pixel_distance_reciprocal)
-                    reference = compute_reference(
-                        settings.pdb_path, settings.M, dist_recip_max)
-                    logger.log(f"Reference created in {timer.lap():.2f}s.")
-                myRes = {
-                         'pixel_position_reciprocal': pixel_position_reciprocal,
-                         'pixel_distance_reciprocal': pixel_distance_reciprocal,
-                         'slices_': slices_,
-                         'ac': ac,
-                         'reference': reference,
-                         'dist_recip_max': dist_recip_max
-                        }
-                checkpoint.save_checkpoint(
-                    myRes,
-                    settings.out_dir,
-                    curr_gen,
-                    tag="solve_ac",
-                    protocol=4)
-
-            ac_phased, support_, rho_ = phase(curr_gen, ac)
-            logger.log(f"Problem phased in {timer.lap():.2f}s.")
-
-            if comm.rank == 0:
-                myRes = {**myRes, **{
-                         'ac': ac,
-                         'ac_phased': ac_phased,
-                         'support_': support_,
-                         'rho_': rho_
-                         }}
-                checkpoint.save_checkpoint(
-                    myRes,
-                    settings.out_dir,
-                    curr_gen,
-                    tag="phase",
-                    protocol=4)
-                # Save electron density and intensity
-                rho = np.fft.ifftshift(rho_)
-                intensity = np.fft.ifftshift(np.abs(np.fft.fftshift(ac_phased)**2))
-                save_mrc(settings.out_dir / f"ac-{curr_gen}.mrc", ac_phased)
-                save_mrc(settings.out_dir / f"intensity-{curr_gen}.mrc", intensity)
-                save_mrc(settings.out_dir / f"rho-{curr_gen}.mrc", rho)
+            # Save electron density and intensity
+            rho = np.fft.ifftshift(rho_)
+            intensity = np.fft.ifftshift(np.abs(np.fft.fftshift(ac_phased) ** 2))
+            save_mrc(settings.out_dir / f"ac-{curr_gen}.mrc", ac_phased)
+            save_mrc(settings.out_dir / f"intensity-{curr_gen}.mrc", intensity)
+            save_mrc(settings.out_dir / f"rho-{curr_gen}.mrc", rho)
 
     # Use improvement of cc(prev_rho, cur_rho) to dertemine if we should
     # terminate the loop
@@ -299,10 +304,10 @@ def main():
             # Test A: this tests that given a set of orientations (with correct ones mixed in),
             # we can recover the orientations to some degree of certainty.
             orientations = snm.slicing_and_match(known_ac_phased)
-            
-            # ISSUE52: Uncomment below and rerun the test to see the 85.8% success rate 
+
+            # ISSUE52: Uncomment below and rerun the test to see the 85.8% success rate
             # calculated below.
-            #orientations = work_match(
+            # orientations = work_match(
             #    known_ac_phased, slices_,
             #    pixel_position_reciprocal,
             #    pixel_distance_reciprocal,
@@ -320,12 +325,12 @@ def main():
             logger.log(
                 f"[Warning] test mode N_slices:{slices_.shape[0]} Pass:{cn_pass} Success Rate:{success_rate*100:.2f}% !! assert disabled !!"
             )
-            #assert success_rate > test_accept_thres
+            # assert success_rate > test_accept_thres
         else:
             orientations = snm.slicing_and_match(ac_phased)
 
         logger.log(f"Orientations matched in {timer.lap():.2f}s.")
-        if comm.rank == writer_rank and not flag_test:
+        if comm.rank == writer_rank:
             myRes = {
                 **myRes,
                 **{
@@ -346,14 +351,14 @@ def main():
             # Test B: this tests that we can calculate good autocorrelation from the
             # recovered orientations (see test A).
             ac = mg.solve_ac(generation, orientations)
-            #ac = work_solve_ac(
+            # ac = work_solve_ac(
             #    generation, pixel_position_reciprocal, pixel_distance_reciprocal,
             #    slices_, orientations)
         else:
             ac = mg.solve_ac(generation, orientations, ac_phased)
 
         logger.log(f"AC recovered in {timer.lap():.2f}s.")
-        if comm.rank == writer_rank and not flag_test:
+        if comm.rank == writer_rank:
             myRes = {
                 **myRes,
                 **{
@@ -382,11 +387,13 @@ def main():
         # Conclude ABC tests:
         if flag_test:
             cc_test_rho = np.corrcoef(known_rho.flatten(), rho_.flatten())[0, 1]
-            logger.log(f"[Warning] test mode cc(known_rho, rho_):{cc_test_rho} !! assert disabled !!")
-            #assert cc_test_rho > test_accept_thres
+            logger.log(
+                f"[Warning] test mode cc(known_rho, rho_):{cc_test_rho} !! assert disabled !!"
+            )
+            # assert cc_test_rho > test_accept_thres
 
         logger.log(f"Problem phased in {timer.lap():.2f}s.")
-        if comm.rank == writer_rank and not flag_test:
+        if comm.rank == writer_rank:
             myRes = {
                 **myRes,
                 **{
@@ -402,14 +409,14 @@ def main():
                 myRes, settings.out_dir, generation, tag="phase", protocol=4
             )
 
-        if comm.rank == writer_rank and not flag_test:
+        if comm.rank == writer_rank:
             # Save electron density and intensity
             rho = np.fft.ifftshift(rho_)
             intensity = np.fft.ifftshift(np.abs(np.fft.fftshift(ac_phased) ** 2))
             save_mrc(settings.out_dir / f"ac-{generation}.mrc", ac_phased)
             save_mrc(settings.out_dir / f"intensity-{generation}.mrc", intensity)
             save_mrc(settings.out_dir / f"rho-{generation}.mrc", rho)
-            
+
             # Save output
             myRes = {
                 **myRes,
@@ -427,21 +434,32 @@ def main():
             # Check convergence w.r.t reference electron density
             if myRes["reference"] is not None:
                 prev_cc = final_cc
-                ali_volume, ali_reference, final_cc = align_volumes(rho, myRes['reference'], zoom=settings.fsc_zoom, sigma=settings.fsc_sigma,
-                                                          n_iterations=settings.fsc_niter, n_search=settings.fsc_nsearch)
+                ali_volume, ali_reference, final_cc = align_volumes(
+                    rho,
+                    myRes["reference"],
+                    zoom=settings.fsc_zoom,
+                    sigma=settings.fsc_sigma,
+                    n_iterations=settings.fsc_niter,
+                    n_search=settings.fsc_nsearch,
+                )
                 resolution, rshell, fsc_val = compute_fsc(
-                    ali_reference, ali_volume, myRes['dist_recip_max'])
+                    ali_reference, ali_volume, myRes["dist_recip_max"]
+                )
                 delta_cc = final_cc - prev_cc
 
         if settings.chk_convergence:
-            resolution = comm.bcast(resolution, root=0)
-            final_cc = comm.bcast(final_cc, root=0)
-            delta_cc = comm.bcast(delta_cc, root=0)
+            comm_compute = contexts.comm_compute
+            resolution = comm_compute.bcast(resolution, root=0)
+            final_cc = comm_compute.bcast(final_cc, root=0)
+            delta_cc = comm_compute.bcast(delta_cc, root=0)
+            logger.log(
+                f"Checking convergence at resolution: {resolution:.2f} cc: {final_cc:.3f}."
+            )
             if final_cc > min_cc and delta_cc < min_change_cc:
-                logger.log(f"Stopping criteria met! Algorithm converged at resolution: {resolution:.2f} with cc: {final_cc:.3f}.")
+                logger.log(
+                    f"Stopping criteria met! Algorithm converged at resolution: {resolution:.2f} with cc: {final_cc:.3f}."
+                )
                 break
-
 
     logger.log(f"Results saved in {settings.out_dir}")
     logger.log(f"Successfully completed in {timer.total():.2f}s.")
-

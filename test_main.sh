@@ -14,7 +14,7 @@ export SPINIFEL_TEST_LAUNCHER="jsrun -n1 -a1 -g1"
 
 
 export SPINIFEL_TEST_MODULE="MAIN_PSANA2"
-export SPINIFEL_TEST_LAUNCHER="jsrun -n3 -g1"
+export SPINIFEL_TEST_LAUNCHER="jsrun -n4 -g1"
 target=${SPINIFEL_TARGET:-${NERSC_HOST:-$(hostname --fqdn)}}
 export PYCUDA_CACHE_DIR="/tmp"
 if [[ ${target} = *"ascent"* ]]; then
@@ -25,9 +25,12 @@ if [[ ${target} = *"ascent"* ]]; then
     export no_proxy='localhost,127.0.0.0/8,*.ccs.ornl.gov'
     export test_data_dir="/gpfs/wolf/chm137/proj-shared/spinifel_data/testdata"
     export OUT_DIR="/gpfs/wolf/chm137/proj-shared/ci/${CI_PIPELINE_ID}/spinifel_output"
+    #export PS_SMD_CHUNKSIZE=64000000       # for amo06516
 else
     export test_data_dir="/gpfs/alpine/proj-shared/chm137/data/testdata"
     export test_out_dir="/gpfs/alpine/proj-shared/chm137/ci"
 fi
 $SPINIFEL_TEST_LAUNCHER python -u -m spinifel --settings=./settings/test_mpi.toml --mode=mpi
+#$SPINIFEL_TEST_LAUNCHER python -u -m spinifel --settings=./settings/test_mpi.toml --mode=psana2
+#$SPINIFEL_TEST_LAUNCHER python -u $HOME/spinifel/test_mpi.py
 
