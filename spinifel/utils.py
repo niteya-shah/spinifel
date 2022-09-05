@@ -1,7 +1,6 @@
 import numpy as np
 import time
 import PyNVTX as nvtx
-import subprocess
 
 
 
@@ -66,30 +65,3 @@ class Singleton(type):
                 *args, **kwargs)
         return cls._instances[cls]
 
-
-
-def getWorkloadManager():
-    """Returns workload manager (slurm, jsrun, None).
-
-    Use simple subprocess to check if we can use workload
-    manager (depends on the supercomputing cluster). Return
-    the correct one, if we can.
-    """
-    class WorkloadManager():
-        def __init__(self, software=None, job_cmd=''):
-            self.software = software
-            self.job_cmd = job_cmd
-        
-    wl_man = WorkloadManager()
-    try:
-        subprocess.check_call(['jsrun','-n1', 'echo','found jsrun'])
-        wl_man.software = 'lsf'
-        wl_man.job_cmd = 'jsrun'
-    except FileNotFoundError as e:
-        try: 
-            subprocess.check_call(['srun','-n1', 'echo','found srun'])
-            wl_man.software = 'slurm'
-            wl_man.job_cmd = 'srun'
-        except FileNotFoundError as e:
-            pass
-    return wl_man

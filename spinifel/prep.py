@@ -11,37 +11,9 @@ from spinifel import settings
 
 
 @nvtx.annotate("prep.py", is_prefix=True)
-def get_saxs(pixel_distance_reciprocal, mean_image, mask=1,
-             filter=False, filter_order=2, filter_threshold=0.25,
-            threshold=10):
-    """
-    Compute the radial intensity profile of an image.
-    
-    Parameters
-    ----------
-    pixel_distance_reciprocal: numpy.ndarray
-    mean_image : numpy.ndarray, shape (n,m)
-        detector image
-    mask : numpy.ndarray, shape (n,m)
-        detector mask, with zeros corresponding to pixels to mask
-    filter : bool
-        if True, apply a lowpass Butterworth filter to the radial intensity profile
-    filter_order : int
-        order of the Butterworth filter
-    filter_threshold : float
-        critical frequency for the bandpass Butterworth filter
-    threshold : float
-        below this intensity, set the radial intensity profile to zero
-        
-    Returns
-    -------
-    np.linspace(0, q_max, N+1): numpy.ndarray, 1d
-        q range
-    saxs : numpy.ndarray, 1d
-        radial intensity profile of input image
-    """
-    qs = pixel_distance_reciprocal[mask!=0].flatten()
-    N = 1000
+def get_saxs(pixel_distance_reciprocal, mean_image):
+    qs = pixel_distance_reciprocal.flatten()
+    N = 100
     q_max = qs.max()
     idx = (N * qs / q_max).astype(np.int)
     saxs_acc = np.bincount(idx, mean_image.flatten(), N)
@@ -196,10 +168,7 @@ def load_volume(volume):
 
 @nvtx.annotate("prep.py", is_prefix=True)
 def compute_pixel_distance(pixel_position_reciprocal):
-    """pixel_position_reciprocal is of shape [q, # of panels, # of rows, # of columns], 
-    where the first two dimensions of q corresponds to qx and qy."""
-    return np.sqrt((pixel_position_reciprocal[:2,:,:,:]**2).sum(axis=0))
-    #return np.sqrt((pixel_position_reciprocal[:2]**2).sum(axis=0))
+    return np.sqrt((pixel_position_reciprocal**2).sum(axis=0))
 
 
 
