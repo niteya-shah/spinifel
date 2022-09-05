@@ -12,6 +12,7 @@ out_dir = "${OUT_DIR}"
 
 [detector]
 shape = [1, 128, 128]
+#shape = [4, 512, 512]
 
 [psana]
 enable = true 
@@ -19,6 +20,7 @@ ps_smd_n_events = 10000
 ps_eb_nodes = 1
 ps_srv_nodes = 0
 ps_dir = "${test_data_dir}/3IYF/xtc2"       # This tests mpi/main using xtc2 w/o streaming
+#ps_dir = "${test_data_dir}/amo06516"       
 exp = "xpptut15"
 runnum = 1
 
@@ -28,13 +30,13 @@ use_cuda = true
 use_cufinufft = true
 use_cupy = true
 use_single_prec = true
-chk_convergence = false
+chk_convergence = true
 
 [gpu]
 devices_per_node = 1
 
 [algorithm]
-N_generations =3 
+N_generations = 3
 nER = 50
 nHIO = 25
 beta = 0.3
@@ -44,4 +46,8 @@ N_clipping = 0
 N_binning = 0
 N_orientations = 10000  # model_slices
 N_batch_size = 1000
+N_images_max = 2000
 
+[fsc]
+#pdb_path="setup/skopi/examples/input/pdb/3iyf.pdb"
+zoom=0.6
