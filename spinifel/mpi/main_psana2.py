@@ -283,7 +283,7 @@ def main():
 
             # Intitilize merge class - must be done before get_known_answers (mg needed)
             nufft = NUFFT(
-                settings, pixel_position_reciprocal, pixel_distance_reciprocal
+                settings, pixel_position_reciprocal, pixel_distance_reciprocal, cn_processed_events
             )
             mg = MergeMPI(
                 settings,
