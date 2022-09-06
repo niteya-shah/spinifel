@@ -8,7 +8,7 @@ import socket
 from pygion import task, IndexLaunch, Partition, Region, RO, WD, RW, Reduce, Tunable
 from scipy.ndimage       import gaussian_filter
 
-from spinifel import settings, autocorrelation, utils, image
+from spinifel import settings, utils, image
 from . import utils as lgutils
 from . import prep as gprep
 

@@ -80,8 +80,7 @@ def main_task(pixel_position, pixel_distance, pixel_index, slices, slices_p):
         logger.log(f"#"*27)
 
         # Orientation matching
-        match(
-            phased, slices_p, pixel_position, pixel_distance, orientations_p, settings.N_images_per_rank)
+        match(phased,orientations_p, settings.N_images_per_rank)
 
         # Solve autocorrelation
         solved,solve_ac_dict = solve_ac(solve_ac_dict,
@@ -101,7 +100,7 @@ def main_task(pixel_position, pixel_distance, pixel_index, slices, slices_p):
         logger.log(f"Generation: {generation} completed in {timer.lap():.2f}s.")
 
         # check for convergence
-        if settings.checkpoint and settings.pdb_path.is_file() and setting.chk_convergence:
+        if settings.checkpoint and settings.pdb_path.is_file() and settings.chk_convergence:
             print(f"checking convergence: FSC calculation", flush=True)
             fsc = compute_fsc_task(phased, fsc)
             fsc_dict = fsc.get()

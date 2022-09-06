@@ -110,8 +110,7 @@ def main_spinifel(pixel_position, pixel_distance, pixel_index, slices_p, n_image
         logger.log(f"#"*27)
 
         # Orientation matching
-        match(
-            phased, slices_p, pixel_position, pixel_distance, orientations_p, n_images_per_rank)
+        match(phased, orientations_p, n_images_per_rank)
         # Solve autocorrelation
         solved, solve_ac_dict = solve_ac(solve_ac_dict,
                                          generation, pixel_position,
@@ -121,7 +120,7 @@ def main_spinifel(pixel_position, pixel_distance, pixel_index, slices_p, n_image
         phased, phased_regions_dict = new_phase(generation, solved, phased_regions_dict)
         phased_output(phased, generation)
 
-        if settings.checkpoint and settings.pdb_path.is_file() and setting.chk_convergence:
+        if settings.checkpoint and settings.pdb_path.is_file() and settings.chk_convergence:
             print(f"checking convergence: FSC calculation", flush=True)
             fsc = compute_fsc_task(phased, fsc)
             fsc_dict = fsc.get()
