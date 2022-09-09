@@ -472,8 +472,9 @@ def load_image_batch(run, gen_run, gen_smd, slices_p):
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def setup_objects_task(pixel_position, pixel_distance, slices):
     global all_objs
+    N_images_per_rank = slices.ispace.domain.extent[0]
     all_objs['nufft'] = NUFFT(settings, pixel_position.reciprocal,
-                              pixel_distance.reciprocal)
+                              pixel_distance.reciprocal, N_images_per_rank)
     all_objs['snm'] = SNM(
         settings,
         slices.data,
