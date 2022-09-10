@@ -38,14 +38,17 @@ class NUFFT:
             self,
             settings,
             pixel_position_reciprocal,
-            pixel_distance_reciprocal, images_per_rank) -> None:
+            pixel_distance_reciprocal, images_per_rank=None) -> None:
         self.N_orientations = settings.N_orientations
 
         self.N_batch_size = settings.N_batch_size
         self.reduced_det_shape = settings.reduced_det_shape
         self.oversampling = settings.oversampling
         self.N_pixels = np.prod(self.reduced_det_shape)
-        self.N_images = images_per_rank
+        if images_per_rank is None:
+            self.N_images = settings.N_images_per_rank
+        else:
+            self.N_images = images_per_rank
 
         self.pixel_position_reciprocal = pixel_position_reciprocal
         self.ref_orientations = skp.get_uniform_quat(self.N_orientations, True)
