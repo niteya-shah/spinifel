@@ -103,6 +103,7 @@ def load_slices_psana2(slices, rank, N_images_per_rank, smd_chunk, run):
     i = 0
     if settings.verbosity > 0:
         print(f'{socket.gethostname()} load_slices_psana2, rank = {rank}',flush=True)
+
     det = run.Detector("amopnccd")
     for smd_batch in smd_batches_without_transitions(smd_chunk, run):
         for evt in batch_events(smd_batch,run):
@@ -113,6 +114,10 @@ def load_slices_psana2(slices, rank, N_images_per_rank, smd_chunk, run):
                 raise RuntimeError(
                     f"Task received too many events.")
             i = i+1
+    # FIXME:
+    if i < N_images_per_rank:
+        for j in range(N_images_per_rank - i):
+            slices.data[j+i] = slices.data[j+i-1]
     if settings.verbosity > 0:
         print(f"{socket.gethostname()} loaded {i} slices.", flush=True)
 
@@ -148,11 +153,19 @@ def get_slices(ds):
                 pixel_index = get_pixel_index(run)
                 pixel_position = get_pixel_position(run)
             val= val+1
-            for smd_chunk, step_data in smd_chunks_steps(run):
-                i = chunk_i % n_nodes
-                load_slices_psana2(slices_p[i], i, N_images_per_rank, bytearray(smd_chunk), run, point=i)
-                chunk_i += 1
-        pygion.execution_fence(block=True)
+            gen_smd = smd_chunks_steps(run)
+            while chunk_i < n_nodes:
+                for smd_chunk, step_data in gen_smd:
+                    i = chunk_i % n_nodes
+                    load_slices_psana2(slices_p[i], i,
+                                       settings.N_images_per_rank,
+                                       bytearray(smd_chunk),
+                                       run,
+                                       point=i)
+                    chunk_i += 1
+                    if chunk_i==n_nodes:
+                        break
+                gen_smd = smd_chunks_steps(run)
     else:
         for i, slices_subr in enumerate(slices_p):
             load_slices_hdf5(slices_subr, i, N_images_per_rank, point=i)
@@ -186,9 +199,11 @@ def get_orientations_prior():
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def reduce_mean_image(slices, mean_image, nprocs):
+    if settings.verbosity > 0:
+        print(f"{socket.gethostname()} reduce_mean_image", flush=True)
     mean_image.data[:] += slices.data.mean(axis=0) / nprocs
-
-
+    if settings.verbosity > 0:
+        print(f"{socket.gethostname()} finished reduce_mean_image", flush=True)
 
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def compute_mean_image(slices, slices_p):
@@ -197,8 +212,8 @@ def compute_mean_image(slices, slices_p):
     pygion.fill(mean_image, 'data', 0.)
     nprocs = Tunable.select(Tunable.GLOBAL_PYS).get()
 
-    for i, slices in enumerate(slices_p):
-        reduce_mean_image(slices, mean_image, nprocs, point=i)
+    for i, sl in enumerate(slices_p):
+        reduce_mean_image(sl, mean_image, nprocs, point=i)
     return mean_image
 
 
@@ -371,7 +386,28 @@ def get_data(ds):
     show_image(pixel_index, mean_image, ..., "mean_image_binned.png")
     pixel_distance = compute_pixel_distance(pixel_position)
     export_saxs(pixel_distance, mean_image, "saxs_binned.png")
+
+    for i, sl in enumerate(slices_p):
+        fluctuation_task(pixel_distance,mean_image,sl,point=i)
+
     return (pixel_position, pixel_distance, pixel_index, slices, slices_p)
+
+
+# Fluctuation
+@task(leaf=True, privileges=[RO, RO, RW])
+@lgutils.gpu_task_wrapper
+@nvtx.annotate("legion/prep.py", is_prefix=True)
+def fluctuation_task(pixel_distance, mean_image, slices_p):
+    N_images_per_rank = slices_p.ispace.domain.extent[0]
+    saxs_qs, mean_saxs = prep.get_saxs(pixel_distance.reciprocal, mean_image.data)
+    numQ = len(saxs_qs)
+    fracQ = 4 # only use fraction of the saxs curve to compute fluctuation
+    intensity_thr = 0.1 # avoid dividing by small intensity
+    for i in range(N_images_per_rank):
+        _, single_saxs = prep.get_saxs(pixel_distance.reciprocal, slices_p.data[i])
+        ind = np.where(single_saxs[:numQ//fracQ] > intensity_thr)
+        factor = np.mean(mean_saxs[:numQ//fracQ][ind] / (single_saxs[:numQ//fracQ][ind]) )
+        slices_p.data[i] = slices_p.data[i] * factor
 
 #load pixel data from psana2
 @nvtx.annotate("legion/prep.py", is_prefix=True)
@@ -403,7 +439,6 @@ def bin_slices_new(old_slices_p, new_slices_p):
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def process_data(slices, slices_p, slices_bin, slices_bin_p,
                  pixel_distance, pixel_index, pixel_position, iteration):
-
     #returns a region that contains the mean of images
     mean_image = compute_mean_image(slices,slices_p)
 
@@ -421,7 +456,6 @@ def process_data(slices, slices_p, slices_bin, slices_bin_p,
     # and the slices_bin partition to copy the binned
     # slices into
     bin_slices_new(slices_p, slices_bin_p)
-
     # get the mean of the binned slices
     mean_image = compute_mean_image(slices_bin, slices_bin_p)
     show_image(pixel_index, slices_bin_p[0], 0, "image_binned_{iteration}.png")
@@ -433,6 +467,9 @@ def process_data(slices, slices_p, slices_bin, slices_bin_p,
         pixel_distance = compute_pixel_distance(pixel_position)
 
     export_saxs(pixel_distance, mean_image, "saxs_binned_{iteration}.png")
+
+    for i, sl in enumerate(slices_bin_p):
+        fluctuation_task(pixel_distance, mean_image, sl, point=i)
 
     # mean_image region is no longer needed
     pygion.fill(mean_image, 'data', 0)
@@ -454,7 +491,6 @@ def load_image_batch(run, gen_run, gen_smd, slices_p):
     while chunk_i < n_nodes:
         for smd_chunk, step_data in gen_smd:
             i = chunk_i % n_nodes
-            print(f'slices_p[{i}] = {slices_p[i].ispace.domain.extent}, bounds = {slices_p[i].ispace.bounds}')
             load_slices_psana2(slices_p[i], i,
                                settings.N_images_per_rank,
                                bytearray(smd_chunk),

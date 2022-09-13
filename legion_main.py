@@ -10,4 +10,5 @@ if __name__ == '__main__':
         from spinifel.legion import main_psana2
         main_psana2()
     else:
+        assert settings.mode == "legion"
         main()
