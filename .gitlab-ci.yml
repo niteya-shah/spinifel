@@ -83,7 +83,7 @@ variables:
 
 .psana2_stream_test_script: &psana2_stream_test_script
   script:
-    - $SPINIFEL_PSANA2_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=psana2
+    - $SPINIFEL_PSANA2_LAUNCHER python -u -m spinifel --default-settings=test_mpi.toml --mode=psana2 runtime.chk_convergence=false
 
 .legion_test_script: &legion_test_script
   script:
