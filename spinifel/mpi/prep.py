@@ -124,7 +124,6 @@ def get_slices_and_pixel_info(N_images_per_rank, ds):
 
             slices_[i_evt] = raw
             N_images_loaded = i_evt
-            print(f"i_evt: {i_evt} loaded")
 
     pixel_info = {}
     pixel_info["pixel_position_reciprocal"] = pixel_position_reciprocal
