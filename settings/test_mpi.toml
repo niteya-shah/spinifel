@@ -8,7 +8,9 @@ verbosity = 0
 use_callmonitor = false
 
 [data]
+in_dir = "${test_data_dir}/3IYF"
 out_dir = "${OUT_DIR}"
+name = "3iyf_sim_10k.h5"
 
 [detector]
 shape = [1, 128, 128]
@@ -27,7 +29,7 @@ N_images_per_rank = 1000
 use_cuda = true 
 use_cufinufft = true
 use_cupy = true
-use_single_prec = true
+use_single_prec = false 
 chk_convergence = true
 
 [gpu]
@@ -50,5 +52,5 @@ N_images_max = 2000
 pdb_path="setup/skopi/examples/input/pdb/3iyf.pdb"
 fsc_zoom=0.6
 fsc_nsearch=420
-fsc_min_cc=0.65         # see https://gitlab.osti.gov/mtip/spinifel/-/wikis/Perlmutter-Baseline-Convergence
+fsc_min_cc=0.8         # see https://gitlab.osti.gov/mtip/spinifel/-/wikis/Perlmutter-Baseline-Convergence
 fsc_min_change_cc=0.01
