@@ -22,11 +22,11 @@ target=${SPINIFEL_TARGET:-${NERSC_HOST:-$(hostname --fqdn)}}
 echo "[spinifel/tests/withmpi] target: $target"
 
 if [[ ${target} = "cgpu"* ]]; then
-    SPINIFEL_TEST_LAUNCHER="srun"
+    SPINIFEL_TEST_LAUNCHER="srun -n1 -G1"
 elif [[ ${target} = *"summit"* || ${target} = *"ascent"* ]]; then
-    SPINIFEL_TEST_LAUNCHER="jsrun"
+    SPINIFEL_TEST_LAUNCHER="jsrun -n1 -g1"
 fi
     
-$SPINIFEL_TEST_LAUNCHER -n1 -g1 pytest -s tests/withmpi
-$SPINIFEL_TEST_LAUNCHER -n1 -g1 pytest -s spinifel/tests/withmpi
+$SPINIFEL_TEST_LAUNCHER pytest -s tests/withmpi
+$SPINIFEL_TEST_LAUNCHER pytest -s spinifel/tests/withmpi
 
