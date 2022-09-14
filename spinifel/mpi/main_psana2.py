@@ -19,55 +19,13 @@ from eval.align import align_volumes
 from .work_autocorrelation import solve_ac as work_solve_ac
 from .work_orientation_matching import match as work_match
 
+if settings.use_cuda:
+    import pycuda.driver as cuda
 
-def get_known_answers(
-    logger, mg, pixel_position_reciprocal, pixel_distance_reciprocal, slices
-):
-    """Returns known answers For unit-test [DO NOT REMOVE]
-
-    This main is also called directly by Spinifel's main test.
-    The test is done only for 3iyf (see settings/test_mpi.toml)
-    and we get the known orientations and ac_phased directly
-    from test_data_dir folder for comparisons.
-    """
-    test_data_dir = os.environ.get("test_data_dir", "")
-    N_test_orientations = settings.N_orientations
-
-    # Open data file with correct answers
-    import h5py
-
-    test_data = h5py.File(os.path.join(test_data_dir, "3IYF", "3iyf_sim_10k.h5"), "r")
-
-    # Get known orientations
-    ref_orientations = test_data["orientations"][:N_test_orientations]
-    ref_orientations = np.reshape(ref_orientations, [N_test_orientations, 4])
-
-    # Calculate ac_phased
-    # Here volume (in test_data) is the fourier amplitudes. The ivol is
-    # the intensity.
-
-    ivol = np.square(np.abs(test_data["volume"]))
-    known_ac_phased = np.fft.fftshift(np.abs(np.fft.ifftn(ivol))).astype(np.float32)
-
-    # Calculate rho from correct orientations (as known rho)
-    generation = 0
-    known_ac = mg.solve_ac(
-        generation,
-        orientations=ref_orientations[: slices.shape[0]],
-    )
-
-    # ISSUE_51: Uncomment below for the old solve ac prior to the mg use above
-    # known_ac = work_solve_ac(
-    #    generation, pixel_position_reciprocal, pixel_distance_reciprocal,
-    #    slices, ref_orientations[:slices.shape[0]])
-
-    _, _, known_rho = phase(generation, known_ac)
-
-    logger.log(
-        f"[Warning] - test mode ref_orientations:{ref_orientations.shape} known_ac_phased:{known_ac_phased.shape} known_rho:{known_rho.shape}"
-    )
-    return ref_orientations, known_ac_phased, known_rho
-
+def log_cuda_mem_info(logger):
+    if settings.use_cuda:
+        (free,total)=cuda.mem_get_info()
+        logger.log(f"Global memory occupancy: {free*100/total:.2f}% free ({free/1e9:.2f}/{total/1e9:.2f} GB)")
 
 @nvtx.annotate("mpi/main.py", is_prefix=True)
 def main():
@@ -124,7 +82,7 @@ def main():
 
     # Use improvement of cc(prev_rho, cur_rho) to dertemine if we should
     # terminate the loop
-    min_cc, min_change_cc = 0.80, 0.001
+    min_cc, min_change_cc = settings.fsc_min_cc, settings.fsc_min_change_cc
     final_cc, delta_cc = 0.0, 1.0
     resolution = 0.0
 
@@ -167,7 +125,12 @@ def main():
     # We also count no. of processed and new images separately from i_evt
     cn_processed_events = 0
     cn_new_events = 0
-    flag_test = False
+    
+    # For checking if we need to reinitialize nuftt et al.
+    nufft = None
+    log_cuda_mem_info(logger)
+
+    flag_converged = False
 
     # Looping over events and run spinifel when receive enough events
     for i_evt, evt in enumerate(run.events()):
@@ -281,41 +244,28 @@ def main():
             )
             logger.log(f"#" * 42)
 
-            # Intitilize merge class - must be done before get_known_answers (mg needed)
-            nufft = NUFFT(
-                settings, pixel_position_reciprocal, pixel_distance_reciprocal, cn_processed_events
-            )
-            mg = MergeMPI(
-                settings,
-                slices_,
-                pixel_position_reciprocal,
-                pixel_distance_reciprocal,
-                nufft,
-            )
+            # Intitilize merge and orientation matching 
+            if nufft is None:
+                logger.log(f"Initialize nufft")
+                nufft = NUFFT(
+                    settings, pixel_position_reciprocal, pixel_distance_reciprocal, cn_processed_events
+                )
+                mg = MergeMPI(
+                    settings,
+                    slices_,
+                    pixel_position_reciprocal,
+                    pixel_distance_reciprocal,
+                    nufft,
+                )
 
-            # For unit test [DO NOT REMOVE]
-            if generation == 0:
-                ref_orientations = None
-                if os.environ.get("SPINIFEL_TEST_MODULE", "") == "MAIN_PSANA2":
-                    flag_test = True
-                    test_accept_thres = 0.75
-                    ref_orientations, known_ac_phased, known_rho = get_known_answers(
-                        logger,
-                        mg,
-                        pixel_position_reciprocal,
-                        pixel_distance_reciprocal,
-                        slices_,
-                    )
-
-            # Initialize orientation matching class must be done after get_known_answers
-            # to obtain ref_orientations
-            snm = SNM(
-                settings,
-                slices_,
-                pixel_position_reciprocal,
-                pixel_distance_reciprocal,
-                nufft,
-            )
+                snm = SNM(
+                    settings,
+                    slices_,
+                    pixel_position_reciprocal,
+                    pixel_distance_reciprocal,
+                    nufft,
+                )
+                log_cuda_mem_info(logger)
 
             # Solve autocorrelation first for generation 0
             if generation == 0:
@@ -404,7 +354,6 @@ def main():
             #    generation, pixel_position_reciprocal, pixel_distance_reciprocal,
             #    slices_, orientations, ac_phased)
             ac = mg.solve_ac(generation, orientations, ac_phased)
-
             logger.log(f"AC recovered in {timer.lap():.2f}s.")
 
             if comm.rank == writer_rank:
@@ -429,15 +378,8 @@ def main():
 
             ac_phased, support_, rho_ = phase(generation, ac, support_, rho_)
 
-            # Test correlation of the known vs calculated electron density
-            if flag_test:
-                cc_test_rho = np.corrcoef(known_rho.flatten(), rho_.flatten())[0, 1]
-                logger.log(
-                    f"[Warning] test mode cc(known_rho, rho_):{cc_test_rho} !! assert disabled !!"
-                )
-                # assert cc_test_rho > test_accept_thres
-
             logger.log(f"Problem phased in {timer.lap():.2f}s.")
+
             if comm.rank == writer_rank:
                 myRes = {
                     **myRes,
@@ -491,6 +433,8 @@ def main():
                         ali_reference, ali_volume, myRes["dist_recip_max"]
                     )
                     delta_cc = final_cc - prev_cc
+                    logger.log("Align volumes")
+                    log_cuda_mem_info(logger)
 
             # Check if density converges
             if settings.chk_convergence:
@@ -499,18 +443,33 @@ def main():
                 final_cc = comm_compute.bcast(final_cc, root=0)
                 delta_cc = comm_compute.bcast(delta_cc, root=0)
                 logger.log(
-                    f"Check convergence resolution: {resolution:.2f} with cc: {final_cc:.3f}."
+                        f"Check convergence resolution: {resolution:.2f} with cc: {final_cc:.3f} delta_cc:{delta_cc:.5f}."
                 )
                 if final_cc > min_cc and delta_cc < min_change_cc:
                     logger.log(
                         f"Stopping criteria met! Algorithm converged at resolution: {resolution:.2f} with cc: {final_cc:.3f}."
                     )
+                    flag_converged = True
                     ds.terminate()
 
             # Keeps record of last seen slice and reset processed event counter
             # (will be updated when N_images_per_rank is met)
             last_seen_slice = cn_processed_events - 1
             cn_processed_events = 0
+            
+            # A hack to free gpu memory at the end of a generation. Note that we only
+            # need to recreate all these objects when no. of max images hasn't been reached.
+            logger.log("Done")
+            log_cuda_mem_info(logger)
+            if settings.use_cuda:
+                if last_seen_slice + 1 < N_images_max:
+                    logger.log("Free up some gpu memory")
+                    del nufft
+                    del mg
+                    del snm
+                    nufft = None
+                    log_cuda_mem_info(logger)
+
 
             # Update generation
             generation += 1
@@ -519,5 +478,8 @@ def main():
 
     # end for i_evt, evt in ...
 
+    if settings.chk_convergence:
+        msg = f"chk_convergence flag was set and the algorithm did no converge ({settings.fsc_min_cc=}, {settings.fsc_min_change_cc=})."
+        assert flag_converged, msg
     logger.log(f"Results saved in {settings.out_dir}")
     logger.log(f"Successfully completed in {timer.total():.2f}s.")
