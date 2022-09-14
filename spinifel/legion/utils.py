@@ -75,7 +75,7 @@ def dump_partitions(p):
     for i,p1 in enumerate(p):
         p1 = p[i]
         for j, p2 in enumerate(p1):
-            print(f' init_parts i={i},  p2[{j}] = {p2.ispace.bounds}')
+            print(f' init_parts i={i},  p2[{j}] = {p2.ispace.bounds}', flush=True)
 
 # create a set of partitions to be used for filling in subregions
 @nvtx.annotate("legion/utils.py", is_prefix=True)
@@ -120,7 +120,7 @@ def create_max_region(maxImagesPerRank,
     region = Region(shape_total, fieldsDict)
 
     if settings.verbose:
-        print(f' region = {region.ispace.bounds}, max_images_per_rank = {maxImagesPerRank}, n_points={nPoints}')
+        print(f' region = {region.ispace.bounds}, max_images_per_rank = {maxImagesPerRank}, n_points={nPoints}', flush=True)
     return region
 
 
@@ -136,7 +136,7 @@ def union_partitions_with_stride(region, secShape, nImagesPerRank, maxImagesPerR
 
     if settings.verbose:
         for i in range(nPoints):
-            print(f'Union: region_p[{i}] = {region_p[i].ispace.domain.extent}, {region_p[i].ispace.bounds}')
+            print(f'Union: region_p[{i}] = {region_p[i].ispace.domain.extent}, {region_p[i].ispace.bounds}', flush=True)
 
     return region_p
 

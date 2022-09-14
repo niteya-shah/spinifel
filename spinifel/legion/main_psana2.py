@@ -77,7 +77,7 @@ def load_psana_subset(gen_run, gen_smd, batch_size, cur_batch_size, slices, all_
     return slices_p, gen_run, gen_smd, run, pixel_distance, pixel_index, pixel_position
 
 
-def main_spinifel(pixel_position, pixel_distance, pixel_index, slices_p, n_images_per_rank):
+def main_spinifel(pixel_position, pixel_distance, pixel_index, slices_p, n_images_per_rank, solve_dict=None):
     logger = utils.Logger(True)
     timer = utils.Timer()
     curr_gen = 0
@@ -93,7 +93,7 @@ def main_spinifel(pixel_position, pixel_distance, pixel_index, slices_p, n_image
     assert(settings.load_gen == -1)
 
     orientations, orientations_p = create_orientations_rp(n_images_per_rank)
-    solved, solve_ac_dict = solve_ac(None, 0, pixel_position, pixel_distance, slices_p, ready_objs)
+    solved, solve_ac_dict = solve_ac(solve_dict, 0, pixel_position, pixel_distance, slices_p, ready_objs)
     #logger.log(f"AC recovered in {timer.lap():.2f}s.")
 
     phased, phased_regions_dict = new_phase(0, solved)
@@ -134,6 +134,7 @@ def main_spinifel(pixel_position, pixel_distance, pixel_index, slices_p, n_image
     fill_region(orientations, 0)
     fill_region(phased, 0)
     fill_phase_regions(phased_regions_dict)
+    return solve_ac_dict
 
 
 # read the data and run the main algorithm. This can be repeated
@@ -155,6 +156,7 @@ def main():
     cur_batch_size = batch_size
     max_batch_size = settings.N_images_max
     n_points = Tunable.select(Tunable.GLOBAL_PYS).get()
+    solve_ac_dict = None
     while not done:
         # slices_p reflects union of new images that have been loaded
         # and earlier images in the previous partition
@@ -165,7 +167,7 @@ def main():
                                                     max_batch_size,
                                                     max_batch_size,
                                                     n_points)
-        main_spinifel(pixel_position, pixel_distance, pixel_index, slices_p, cur_batch_size)
+        solve_ac_dict = main_spinifel(pixel_position, pixel_distance, pixel_index, slices_p, cur_batch_size,solve_ac_dict)
 
         if cur_batch_size == max_batch_size:
             done = True

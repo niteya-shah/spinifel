@@ -6,17 +6,18 @@ import pygion
 import socket
 
 from pygion import task, IndexLaunch, Partition, Region, RO, WD, RW, Reduce, Tunable
-from scipy.ndimage       import gaussian_filter
+
 
 from spinifel import settings, utils, image
 from . import utils as lgutils
 from . import prep as gprep
-
+from scipy.ndimage       import gaussian_filter
 if settings.use_cupy:
     import os
     os.environ['CUPY_ACCELERATORS'] = "cub"
     from pycuda import gpuarray
     from cupyx.scipy.sparse.linalg import LinearOperator, cg
+    #from cupyx.scipy.ndimage import gaussian_filter
     from cupy.linalg import norm
     import cupy as xp
 else:
@@ -129,10 +130,10 @@ def right_hand(slices_p, uregion_p, nonuniform_v_p,
                             use_reciprocal_symmetry, ready_objs[i], point=i)
 
 
-@task(leaf=True, privileges=[WD, RO, RO])
+@task(leaf=True, privileges=[WD, RO])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
-def prep_Fconv_task(uregion_ups, nonuniform_v, ac,
+def prep_Fconv_task(uregion_ups, nonuniform_v,
                     weights, M_ups, Mtot, N,
                     reciprocal_extent, use_reciprocal_symmetry, ready_obj):
     ready = ready_obj.get()
@@ -152,12 +153,12 @@ def prep_Fconv_task(uregion_ups, nonuniform_v, ac,
 
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def prep_Fconv(uregion_ups, nonuniform_v, nonuniform_v_p,
-               ac, weights, M_ups, Mtot, N,
+               weights, M_ups, Mtot, N,
                reciprocal_extent, use_reciprocal_symmetry, ready_objs):
     N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
     for i in range(N_procs):
         prep_Fconv_task(uregion_ups[i], nonuniform_v_p[i],
-                        ac, weights, M_ups, Mtot, N,
+                        weights, M_ups, Mtot, N,
                         reciprocal_extent, use_reciprocal_symmetry, ready_objs[i], point=i)
 
 
@@ -191,9 +192,10 @@ def prep_Fantisupport(uregion, M):
 # create all the region
 # initialize regions
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
-def prepare_solve_all_gens(slices_p):
+def prepare_solve_all_gens(slices_p, solve_dict):
 
-    solve_dict = {}
+    if solve_dict is None:
+        solve_dict = {}
     N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
     N_images_per_rank = slices_p[0].ispace.domain.extent[0]
     M = settings.M
@@ -214,6 +216,12 @@ def prepare_solve_all_gens(slices_p):
     fields_dict = {"ADb": float_type, "F_antisupport": pygion.bool_}
     uregion, uregion_p = lgutils.create_distributed_region(
         M, fields_dict, (M,M,))
+
+    # garbage collect all regions
+    if 'uregion' in solve_dict:
+        pygion.fill(solve_dict['uregion'], "ADb", 0.0)
+        pygion.fill(solve_dict['uregion'], "F_antisupport", True)
+
     solve_dict['uregion'] = uregion
     solve_dict['uregion_p'] = uregion_p
 
@@ -222,6 +230,10 @@ def prepare_solve_all_gens(slices_p):
     fields_dict =  {"F_conv_": cmpx_type}
     uregion_ups, uregion_ups_p = lgutils.create_distributed_region(
         M_ups, fields_dict, (M_ups,M_ups,))
+
+    if 'uregion_ups' in solve_dict:
+        lgutils.fill_region_task(solve_dict['uregion_ups'], complex(0,0))
+
     solve_dict['uregion_ups'] = uregion_ups
     solve_dict['uregion_ups_p'] = uregion_ups_p
 
@@ -231,6 +243,13 @@ def prepare_solve_all_gens(slices_p):
     # nonuniform_v
     nonuniform_v, nonuniform_v_p = lgutils.create_distributed_region(
         N_vals_per_rank, fields_dict, sec_shape)
+
+    if 'nonuniform_v' in solve_dict:
+        print(f' nonuniform_v in solve_dict ')
+        lgutils.fill_region_task(solve_dict['nonuniform_v'], 0.0)
+    else:
+        print(f' nonuniform_v NOT in solve_dict ')
+
     solve_dict['nonuniform_v'] = nonuniform_v
     solve_dict['nonuniform_v_p'] = nonuniform_v_p
 
@@ -240,6 +259,10 @@ def prepare_solve_all_gens(slices_p):
     sec_shape = settings.reduced_det_shape
     nonuniform, nonuniform_p = lgutils.create_distributed_region(
         N_images_per_rank, fields_dict, sec_shape)
+
+    if 'nonuniform' in solve_dict:
+        lgutils.fill_region_task(solve_dict['nonuniform'], 0.0)
+
     solve_dict['nonuniform'] = nonuniform
     solve_dict['nonuniform_p'] = nonuniform_p
 
@@ -247,12 +270,23 @@ def prepare_solve_all_gens(slices_p):
     ac = Region((M,)*3,
                 {"support": pygion.bool_,
                  "estimate": pygion.float64})
+
+    if 'ac' in solve_dict:
+        pygion.fill(solve_dict['ac'], "support", True)
+        pygion.fill(solve_dict['ac'], "estimate", 0.0)
+
     solve_dict['ac'] = ac
 
     # summary
     summary = Region((N_procs,),
                      {"rank": pygion.int32, "rlambda": pygion.float64, "v1": pygion.float64, "v2": pygion.float64})
     summary_p = Partition.equal(summary, (N_procs,))
+
+    if 'summary' in solve_dict:
+        pygion.fill(solve_dict['summary'], "rank", 0)
+        pygion.fill(solve_dict['summary'], "rlambda", 0.0)
+        pygion.fill(solve_dict['summary'], "v1", 0.0)
+        pygion.fill(solve_dict['summary'], "v2", 0.0)
 
     solve_dict['summary'] = summary
     solve_dict['summary_p'] = summary_p
@@ -261,9 +295,15 @@ def prepare_solve_all_gens(slices_p):
     results_p = Partition.restrict(results, (N_procs,), [[M], [0], [0]], [M, M, M])
     results_r = Region((M, M, M), {"ac": pygion.float64})
 
+    if 'results' in solve_dict:
+        pygion.fill(solve_dict['results'], "ac", 0.0)
+    if 'results_r' in solve_dict:
+        pygion.fill(solve_dict['results_r'], "ac", 0.0)
+
     solve_dict['results'] = results
     solve_dict['results_p'] = results_p
     solve_dict['results_r'] = results_r
+
 
     # create a dictionary of regions/partitions
     return solve_dict
@@ -288,7 +328,7 @@ def prepare_solve(solve_ac_dict, slices_p,
                                reciprocal_extent, N_procs)
 
     prep_Fconv(uregion_ups_p, nonuniform_v, nonuniform_v_p,
-               ac, weights, M_ups, Mtot, N,
+               weights, M_ups, Mtot, N,
                reciprocal_extent, use_reciprocal_symmetry, ready_objs)
 
     right_hand(slices_p, uregion_p,
@@ -421,7 +461,7 @@ def solve_ac(solve_ac_dict,
         fill_orientations = True
 
         orientations, orientations_p = get_random_orientations(N_images_per_rank)
-        solve_ac_dict = prepare_solve_all_gens(slices_p)
+        solve_ac_dict = prepare_solve_all_gens(slices_p, solve_ac_dict)
         solve_ac_dict['reciprocal_extent'] = pixel_distance_rp_max_task(pixel_distance)
         solve_ac_dict['orientations'] = orientations
         solve_ac_dict['orientations_p'] = orientations_p
