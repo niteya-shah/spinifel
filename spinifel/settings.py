@@ -450,6 +450,16 @@ class SpinifelSettings(metaclass=Singleton):
                 int, 360,
                 "Number of quaternions to score per iteration"
             ),
+            "_fsc_min_cc": (
+                "fsc", "fsc_min_cc",
+                float, 0.8,
+                "Minimum correlation used in convergence test"
+            ),
+            "_fsc_min_change_cc": (
+                "fsc", "fsc_min_change_cc",
+                float, 0.001,
+                "Minimum change in correlation used in convergence test"
+            ),
         }
 
         self.__init_internals()
