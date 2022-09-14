@@ -12,7 +12,7 @@ variables:
   SPINIFEL_PSANA2_LAUNCHER: "jsrun -n4 -g1"
 
   # for psana2 tests
-  SPINIFEL_TEST_MODULE: MAIN_PSANA2
+  SPINIFEL_TEST_FLAG: 1
   all_proxy: "socks://proxy.ccs.ornl.gov:3128/"
   ftp_proxy: "ftp://proxy.ccs.ornl.gov:3128/"
   http_proxy: "http://proxy.ccs.ornl.gov:3128/"
@@ -75,7 +75,7 @@ variables:
 
 .mpi_test_script: &mpi_test_script
   script:
-    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=summit_ci.toml --mode=mpi
+    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi psana.enable=false
 
 .psana2_test_script: &psana2_test_script
   script:
@@ -87,23 +87,23 @@ variables:
 
 .legion_test_script: &legion_test_script
   script:
-    - PYTHONPATH="$PYTHONPATH:$EXTERNAL_WORKDIR:$PWD/mpi4py_poison_wrapper" $SPINIFEL_TEST_LAUNCHER legion_python -ll:py 1 -ll:csize 8192 legion_main.py --default-settings=summit_ci.toml --mode=legion
+    - PYTHONPATH="$PYTHONPATH:$EXTERNAL_WORKDIR:$PWD/mpi4py_poison_wrapper" $SPINIFEL_TEST_LAUNCHER legion_python -ll:py 1 -ll:csize 8192 legion_main.py --default-settings=test_mpi.toml --mode=legion psana.enable=false
 
 .sequential_test_script: &sequential_test_script
   script:
-    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=summit_ci.toml --mode=sequential
+    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=sequential
 
 .large_test_script: &large_test_script
   script:
-    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=summit_ci.toml --mode=mpi runtime.small_problem=false
+    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi runtime.small_problem=false
 
 .finufft_test_script: &finufft_test_script
   script:
-    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=summit_ci.toml --mode=mpi runtime.use_cufinufft=false
+    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi runtime.use_cufinufft=false psana.enable=false
 
 .nocuda_test_script: &nocuda_test_script
   script:
-    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=summit_ci.toml --mode=mpi runtime.use_cufinufft=false runtime.use_cuda=false runtime.use_cupy=false
+    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi runtime.use_cufinufft=false runtime.use_cuda=false runtime.use_cupy=false psana.enable=false
 
 .cleanup_script: &cleanup_script
   script:
