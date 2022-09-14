@@ -20,8 +20,6 @@ variables:
   no_proxy: "localhost,127.0.0.0/8,*.ccs.ornl.gov"
 
   # for script test
-  DATA_DIR: /gpfs/wolf/chm137/proj-shared/spinifel_data
-  DATA_FILENAME: 2CEX-10k-2.h5
   OUT_DIR: /gpfs/wolf/chm137/proj-shared/ci/${CI_PIPELINE_ID}/spinifel_output
   CUPY_CACHE_DIR: /gpfs/wolf/chm137/proj-shared/ci/${CI_PIPELINE_ID}/cupy_cache
   PYCUDA_CACHE_DIR: /gpfs/wolf/chm137/proj-shared/ci/${CI_PIPELINE_ID}
