@@ -52,6 +52,7 @@ class NUFFT:
 
         self.pixel_position_reciprocal = pixel_position_reciprocal
         self.ref_orientations = skp.get_uniform_quat(self.N_orientations, True)
+
         # Save reference rotation matrix so that we dont re-create it every
         # time
         self.ref_rotmat = np.array([np.linalg.inv(skp.quaternion2rot3d(
@@ -141,6 +142,43 @@ class NUFFT:
             out=self.HKL_mat)
         self.HKL_mat *= self.mult
         assert np.max(np.abs(self.HKL_mat)) < 3 * np.pi
+
+    @nvtx.annotate("extern/util.py", is_prefix=True)
+    def update_fields(self, n_images_per_rank):
+
+        if self.N_images == n_images_per_rank: #nothing to update
+            return
+
+        self.N_images = n_images_per_rank
+        if settings.use_cufinufft:
+            # Store resused datastructures in memory so that we don't
+            # constantly deallocate and realloate them
+            self.H_a = gpuarray.empty(
+                shape=(
+                    self.N_pixels *
+                    self.N_images,
+                ),
+                dtype=f_type)
+            self.K_a = gpuarray.empty(
+                shape=(
+                    self.N_pixels *
+                    self.N_images,
+                ),
+                dtype=f_type)
+            self.L_a = gpuarray.empty(
+                shape=(
+                    self.N_pixels *
+                    self.N_images,
+                ),
+                dtype=f_type)
+
+        elif context.finufftpy_available:
+            self.H_a = np.empty(
+                (self.N_pixels * self.N_images,), dtype=f_type)
+            self.K_a = np.empty(
+                (self.N_pixels * self.N_images,), dtype=f_type)
+            self.L_a = np.empty(
+                (self.N_pixels * self.N_images,), dtype=f_type)
 
     @staticmethod
     @nvtx.annotate("extern/util.py", is_prefix=True)

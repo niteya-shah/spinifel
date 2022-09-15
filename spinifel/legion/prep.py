@@ -509,8 +509,12 @@ def load_image_batch(run, gen_run, gen_smd, slices_p):
 def setup_objects_task(pixel_position, pixel_distance, slices):
     global all_objs
     N_images_per_rank = slices.ispace.domain.extent[0]
-    all_objs['nufft'] = NUFFT(settings, pixel_position.reciprocal,
-                              pixel_distance.reciprocal, N_images_per_rank)
+    # update nufft
+    if 'nufft' in all_objs:
+        all_objs['nufft'].update_fields(N_images_per_rank)
+    else:
+        all_objs['nufft'] = NUFFT(settings, pixel_position.reciprocal,
+                                  pixel_distance.reciprocal, N_images_per_rank)
     all_objs['snm'] = SNM(
         settings,
         slices.data,

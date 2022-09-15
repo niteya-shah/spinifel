@@ -67,7 +67,7 @@ class SNM:
 
         self.reciprocal_extent = pixel_distance_reciprocal.max()
         self.pixel_position_reciprocal = pixel_position_reciprocal
-        self.ref_orientations = skp.get_uniform_quat(self.N_orientations, True)
+        #self.ref_orientations = skp.get_uniform_quat(self.N_orientations, True)
 
         self.slices_ = xp.array(
             slices_.reshape(
@@ -182,7 +182,7 @@ class SNM:
         match_time += en_match - match_start
 
         print(f"Match tot:{en_match-st_init:.2f}s. slice={slices_time:.2f}s. match={match_time:.2f}s. slice_oh={slice_init-st_init:.2f}s. match_oh={match_oth_time:.2f}s.")
-        return self.ref_orientations[index]
+        return self.nufft.ref_orientations[index]
 
 @nvtx.annotate("sequential/orientation_matching.py", is_prefix=True)
 def match(slices_, model_slices, ref_orientations, batch_size=None):
