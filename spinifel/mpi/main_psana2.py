@@ -22,13 +22,22 @@ from .work_orientation_matching import match as work_match
 # For main and unit tests
 from .test_util import get_known_orientations
 
+# For making sure that gpu memory is released.
+import gc
+
 if settings.use_cuda:
     import pycuda.driver as cuda
+    import cupy
+    mempool = cupy.get_default_memory_pool()
+    pinned_mempool = cupy.get_default_pinned_memory_pool()
 
 def log_cuda_mem_info(logger):
     if settings.use_cuda:
         (free,total)=cuda.mem_get_info()
         logger.log(f"Global memory occupancy: {free*100/total:.2f}% free ({free/1e9:.2f}/{total/1e9:.2f} GB)")
+        mempool_used = mempool.used_bytes()*1e-9
+        mempool_total= mempool.total_bytes()*1e-9
+        logger.log(f"|-->Cupy: {mempool_used=:.2f}GB {mempool_total=:.2f}GB {pinned_mempool.n_free_blocks()=:d}")
 
 @nvtx.annotate("mpi/main.py", is_prefix=True)
 def main():
@@ -472,12 +481,20 @@ def main():
             log_cuda_mem_info(logger)
             if settings.use_cuda:
                 if last_seen_slice + 1 < N_images_max:
-                    logger.log("Free up some gpu memory")
+                    logger.log("Free GPUArrays and cufinufft plans")
+                    nufft.free_gpuarrays_and_cufinufft_plans()
+                    log_cuda_mem_info(logger)
+                    logger.log("Free cupy memory pools") 
                     del nufft
                     del mg
                     del snm
-                    nufft = None
+                    gc.collect()
+                    mempool.free_all_blocks()
+                    pinned_mempool.free_all_blocks()
                     log_cuda_mem_info(logger)
+                    # Set nufft to None since we haven't reached maximum no. of images so
+                    # new nufft, etc. can be reallocated in the next generation.
+                    nufft = None
 
 
             # Update generation

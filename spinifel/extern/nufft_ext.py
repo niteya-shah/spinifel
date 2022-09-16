@@ -189,10 +189,23 @@ class NUFFT:
                 order = 'F'
             else:
                 raise ValueError('arr order cannot be determined')
+
             return gpuarray.GPUArray(shape=shape,
                                      dtype=arr_dtype,
                                      allocator=alloc,
                                      order=order)
+
+        def free_gpuarrays_and_cufinufft_plans(self):
+            self.H_f.gpudata.free()
+            self.K_f.gpudata.free()
+            self.L_f.gpudata.free()
+            self.H_a.gpudata.free()
+            self.K_a.gpudata.free()
+            self.L_a.gpudata.free()
+            if hasattr(self, "plan_f"): del self.plan_f
+            if hasattr(self, "plan_a"): del self.plan_a
+            if hasattr(self, "plan"): del self.plan
+
 
     if mode == "cufinufft1.2":
         @nvtx.annotate("NUFFT/cufinufft/forward", is_prefix=True)
@@ -318,6 +331,8 @@ class NUFFT:
 
             self.plan.set_pts(self.H_f.shape[0], self.H_f, self.K_f, self.L_f)
             self.plan.execute(nuvect, ugrid)
+
+            nuvect.gpudata.free()
             return self.gpuarray_to_cupy(nuvect)
 
 
@@ -364,7 +379,9 @@ class NUFFT:
             if use_reciprocal_symmetry:
                 ugrid_gpu = ugrid_gpu.real
             ugrid_gpu /= M**3
-            return self.gpuarray_to_cupy(ugrid_gpu)
+
+            nuvect_ga.gpudata.free()
+            return ugrid_gpu
 
     elif mode == "finufft2.1.0":
 
