@@ -54,3 +54,4 @@ fsc_zoom=0.6
 fsc_nsearch=420
 fsc_min_cc=0.8         # see https://gitlab.osti.gov/mtip/spinifel/-/wikis/Perlmutter-Baseline-Convergence
 fsc_min_change_cc=0.01
+fsc_fraction_known_orientations=0.75

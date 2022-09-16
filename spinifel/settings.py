@@ -460,6 +460,11 @@ class SpinifelSettings(metaclass=Singleton):
                 float, 0.001,
                 "Minimum change in correlation used in convergence test"
             ),
+            "_fsc_fraction_known_orientations": (
+                "fsc", "fsc_fraction_known_orientations",
+                float, 0.75,
+                "Amount of correct orientations in main and unit tests"
+            ),
         }
 
         self.__init_internals()
