@@ -51,7 +51,7 @@ def main_task(pixel_position, pixel_distance, pixel_index, slices, slices_p):
     total_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
     ready_objs = prep_objects(pixel_position, pixel_distance, slices_p, total_procs)
 
-    if settings.checkpoint and settings.pdb_path.is_file():
+    if settings.pdb_path.is_file() and settings.chk_convergence:
         fsc = init_fsc_task(pixel_distance)
         print(f"initialized FSC", flush=True)
     if settings.load_gen > 0: # Load input from previous generation
@@ -100,7 +100,7 @@ def main_task(pixel_position, pixel_distance, pixel_index, slices, slices_p):
         logger.log(f"Generation: {generation} completed in {timer.lap():.2f}s.")
 
         # check for convergence
-        if settings.checkpoint and settings.pdb_path.is_file() and settings.chk_convergence:
+        if settings.pdb_path.is_file() and settings.chk_convergence:
             print(f"checking convergence: FSC calculation", flush=True)
             fsc = compute_fsc_task(phased, fsc)
             fsc_dict = fsc.get()

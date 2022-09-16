@@ -144,7 +144,7 @@ def prep_Fconv_task(uregion_ups, nonuniform_v,
                                       nonuniform_v.H,
                                       nonuniform_v.K,
                                       nonuniform_v.L, 1, use_reciprocal_symmetry, M_ups)
-    f_conv = xp.fft.fftn(xp.fft.ifftshift(conv_ups))
+    f_conv = xp.fft.fftn(xp.fft.ifftshift(xp.array(conv_ups)))
     if not isinstance(f_conv, np.ndarray):
         f_conv = f_conv.get()
     uregion_ups.F_conv_[:] = f_conv
@@ -245,7 +245,6 @@ def prepare_solve_all_gens(slices_p, solve_dict):
         N_vals_per_rank, fields_dict, sec_shape)
 
     if 'nonuniform_v' in solve_dict:
-        print(f' nonuniform_v in solve_dict ')
         lgutils.fill_region_task(solve_dict['nonuniform_v'], 0.0)
     else:
         print(f' nonuniform_v NOT in solve_dict ')

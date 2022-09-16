@@ -7,6 +7,8 @@ from spinifel import settings
 from . import utils as lgutils
 from eval.fsc import compute_fsc, compute_reference
 from eval.align import align_volumes
+if settings.use_cupy:
+    import cupy
 
 @task(privileges=[RO])
 @lgutils.gpu_task_wrapper
@@ -46,6 +48,11 @@ def compute_fsc_task(phased, fsc):
                                                         n_iterations=settings.fsc_niter,
                                                         n_search=settings.fsc_nsearch)
     resolution, rshell, fsc_val = compute_fsc(ali_reference, ali_volume, fsc_dict['dist_recip_max'])
+    # uses a lot of memory - release it asap
+    if settings.use_cupy:
+        mempool = cupy.get_default_memory_pool()
+        mempool.free_all_blocks()
+
     min_cc = fsc_dict['min_cc']
     delta_cc = final_cc - prev_cc
     min_change_cc = fsc_dict['min_change_cc']

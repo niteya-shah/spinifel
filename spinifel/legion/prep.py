@@ -12,6 +12,8 @@ from . import utils as lgutils
 from spinifel.extern.nufft_ext import NUFFT
 from spinifel.sequential.orientation_matching import SNM
 from spinifel.sequential.autocorrelation import Merge
+if settings.use_cupy:
+    import cupy
 
 all_objs  = {}
 
@@ -502,19 +504,23 @@ def load_image_batch(run, gen_run, gen_smd, slices_p):
         gen_smd = smd_chunks_steps(run)
     return gen_run, gen_smd, run
 
-
 @task(leaf=True, privileges=[RO, RO, RO])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def setup_objects_task(pixel_position, pixel_distance, slices):
     global all_objs
     N_images_per_rank = slices.ispace.domain.extent[0]
+    # release all memory used by cupy aggressively
+    if settings.use_cupy:
+        mempool = cupy.get_default_memory_pool()
+        mempool.free_all_blocks()
+
     # update nufft
     if 'nufft' in all_objs:
         all_objs['nufft'].update_fields(N_images_per_rank)
     else:
-        all_objs['nufft'] = NUFFT(settings, pixel_position.reciprocal,
-                                  pixel_distance.reciprocal, N_images_per_rank)
+        all_objs['nufft'] = NUFFT(settings, pixel_position.reciprocal,pixel_distance.reciprocal, N_images_per_rank)
+
     all_objs['snm'] = SNM(
         settings,
         slices.data,
@@ -529,6 +535,7 @@ def setup_objects_task(pixel_position, pixel_distance, slices):
         pixel_distance.reciprocal,
         all_objs['nufft'])
     done = True
+
     return done
 
 @nvtx.annotate("legion/prep.py", is_prefix=True)

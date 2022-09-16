@@ -47,8 +47,9 @@ def load_psana():
     
     logger.log(f'Using psana: exp={settings.ps_exp}, run={settings.ps_runnum}, dir={settings.ps_dir}, max_batches_per_iter={max_batches_per_iter}, max_batches={max_batches}, mode={mode}')
     assert mode == 'legion'
+    max_events = settings.N_images_max*total_procs
     ds = DataSource(exp=settings.ps_exp, run=settings.ps_runnum,
-                    dir=settings.ps_dir)
+                    dir=settings.ps_dir, max_events=max_events)
     
     slices, all_partitions, slices_images, slices_images_p = init_partitions_regions_psana2()
 
@@ -85,7 +86,7 @@ def main_spinifel(pixel_position, pixel_distance, pixel_index, slices_p, n_image
     total_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
     ready_objs = prep_objects(pixel_position, pixel_distance, slices_p, total_procs)
 
-    if settings.checkpoint and settings.pdb_path.is_file():
+    if settings.chk_convergence and settings.pdb_path.is_file():
         fsc = init_fsc_task(pixel_distance)
         print(f"initialized FSC", flush=True)
 
@@ -120,7 +121,7 @@ def main_spinifel(pixel_position, pixel_distance, pixel_index, slices_p, n_image
         phased, phased_regions_dict = new_phase(generation, solved, phased_regions_dict)
         phased_output(phased, generation)
 
-        if settings.checkpoint and settings.pdb_path.is_file() and settings.chk_convergence:
+        if settings.pdb_path.is_file() and settings.chk_convergence:
             print(f"checking convergence: FSC calculation", flush=True)
             fsc = compute_fsc_task(phased, fsc)
             fsc_dict = fsc.get()
@@ -167,6 +168,7 @@ def main():
                                                     max_batch_size,
                                                     max_batch_size,
                                                     n_points)
+        execution_fence(block=True)
         solve_ac_dict = main_spinifel(pixel_position, pixel_distance, pixel_index, slices_p, cur_batch_size,solve_ac_dict)
 
         if cur_batch_size == max_batch_size:

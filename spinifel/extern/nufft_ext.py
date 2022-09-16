@@ -111,7 +111,6 @@ class NUFFT:
             # memory.
             self.HKL_mat = pycuda.driver.pagelocked_empty(
                 (self.ref_rotmat.shape[1], self.ref_rotmat.shape[0], *pixel_position_reciprocal.shape[1:]), f_type)
-
         elif context.finufftpy_available:
             self.H_f = np.empty(
                 (self.N_pixels * self.N_batch_size,), dtype=f_type)
@@ -145,13 +144,15 @@ class NUFFT:
 
     @nvtx.annotate("extern/util.py", is_prefix=True)
     def update_fields(self, n_images_per_rank):
-
         if self.N_images == n_images_per_rank: #nothing to update
             return
-
         self.N_images = n_images_per_rank
         if settings.use_cufinufft:
-            # Store resused datastructures in memory so that we don't
+            # force deletion of H_a, K_a, L_a
+            self.H_a.gpudata.free()
+            self.K_a.gpudata.free()
+            self.L_a.gpudata.free()
+            # Store reused datastructures in memory so that we don't
             # constantly deallocate and realloate them
             self.H_a = gpuarray.empty(
                 shape=(
@@ -171,7 +172,6 @@ class NUFFT:
                     self.N_images,
                 ),
                 dtype=f_type)
-
         elif context.finufftpy_available:
             self.H_a = np.empty(
                 (self.N_pixels * self.N_images,), dtype=f_type)
@@ -207,7 +207,7 @@ class NUFFT:
                        is_prefix=True)
         def gpuarray_from_cupy(arr):
             """
-            Convert from GPUarray(pycuda) to cupy. The conversion is zero-cost.
+            Convert from cupy to GPUarray(pycuda). The conversion is zero-cost.
             :param arr
             :return arr
             """
@@ -284,9 +284,8 @@ class NUFFT:
 
             H_, K_, L_ = self.transpose(H_, K_, L_, dtype=f_type)
             shape = (M, M, M)
-    # TODO convert to GPUarray
+            # TODO convert to GPUarray
             nuvect_ga = self.gpuarray_from_cupy(nuvect)
-
             ugrid = gpuarray.GPUArray(
                 shape=shape, dtype=c_type, order="F")
             self.H_a.set(H_)
@@ -373,7 +372,7 @@ class NUFFT:
 
             H_, K_, L_ = self.transpose(H_, K_, L_)
             shape = (M, M, M)
-    # TODO convert to GPUarray
+            # TODO convert to GPUarray
             nuvect_ga = self.gpuarray_from_cupy(nuvect)
 
             ugrid = gpuarray.GPUArray(
