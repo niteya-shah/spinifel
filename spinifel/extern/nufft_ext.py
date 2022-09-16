@@ -331,8 +331,6 @@ class NUFFT:
 
             self.plan.set_pts(self.H_f.shape[0], self.H_f, self.K_f, self.L_f)
             self.plan.execute(nuvect, ugrid)
-
-            nuvect.gpudata.free()
             return self.gpuarray_to_cupy(nuvect)
 
 
@@ -379,8 +377,6 @@ class NUFFT:
             if use_reciprocal_symmetry:
                 ugrid_gpu = ugrid_gpu.real
             ugrid_gpu /= M**3
-
-            nuvect_ga.gpudata.free()
             return ugrid_gpu
 
     elif mode == "finufft2.1.0":
