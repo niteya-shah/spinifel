@@ -415,10 +415,20 @@ class SpinifelSettings(metaclass=Singleton):
                 int, -1,
                 "start from output of this generation"
             ),
+            "_fluctuation_analysis": (
+                "algorithm", "fluctuation_analysis",
+                parse_bool, False,
+                "Perform Fluctuation analysis"
+            ),
             "_N_image_batches_max": (
                 "algorithm", "N_image_batches_max",
                 int, 1,
                 "Maximum number of image batches to load per iteration"
+            ),
+            "_must_converge": (
+                "runtime", "must_converge",
+                parse_bool, False,
+                "Algorithm is expected to converge"
             ),
             "_pdb_path": (
                 "fsc", "pdb_path",

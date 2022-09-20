@@ -388,9 +388,9 @@ def get_data(ds):
     show_image(pixel_index, mean_image, ..., "mean_image_binned.png")
     pixel_distance = compute_pixel_distance(pixel_position)
     export_saxs(pixel_distance, mean_image, "saxs_binned.png")
-
-    for i, sl in enumerate(slices_p):
-        fluctuation_task(pixel_distance,mean_image,sl,point=i)
+    if settings.fluctuation_analysis:
+        for i, sl in enumerate(slices_p):
+            fluctuation_task(pixel_distance,mean_image,sl,point=i)
 
     return (pixel_position, pixel_distance, pixel_index, slices, slices_p)
 
@@ -469,9 +469,9 @@ def process_data(slices, slices_p, slices_bin, slices_bin_p,
         pixel_distance = compute_pixel_distance(pixel_position)
 
     export_saxs(pixel_distance, mean_image, "saxs_binned_{iteration}.png")
-
-    for i, sl in enumerate(slices_bin_p):
-        fluctuation_task(pixel_distance, mean_image, sl, point=i)
+    if settings.fluctuation_analysis:
+        for i, sl in enumerate(slices_bin_p):
+            fluctuation_task(pixel_distance, mean_image, sl, point=i)
 
     # mean_image region is no longer needed
     pygion.fill(mean_image, 'data', 0)

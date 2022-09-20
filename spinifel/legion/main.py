@@ -111,6 +111,12 @@ def main_task(pixel_position, pixel_distance, pixel_index, slices, slices_p):
                 break;
     execution_fence(block=True)
 
+    if settings.must_converge:
+        assert settings.pdb_path.is_file() and settings.chk_convergence
+        assert fsc_dict is not None
+        fsc_dict = fsc.get()
+        assert fsc_dict['converge'] == True
+
     logger.log(f"Results saved in {settings.out_dir}")
     logger.log(f"Successfully completed in {timer.total():.2f}s.")
 
