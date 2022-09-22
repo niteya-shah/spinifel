@@ -73,19 +73,19 @@ variables:
 
 .mpi_test_script: &mpi_test_script
   script:
-    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi psana.enable=false
+    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi
 
 .psana2_test_script: &psana2_test_script
   script:
-    - $SPINIFEL_PSANA2_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi
+    - $SPINIFEL_PSANA2_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi psana.enable=true
 
 .psana2_stream_test_script: &psana2_stream_test_script
   script:
-    - $SPINIFEL_PSANA2_LAUNCHER python -u -m spinifel --default-settings=test_mpi.toml --mode=psana2 runtime.chk_convergence=false
+    - $SPINIFEL_PSANA2_LAUNCHER python -u -m spinifel --default-settings=test_mpi.toml --mode=psana2 psana.enable=true runtime.N_images_per_rank=3000 fsc.fsc_fraction_known_orientations=0.0 algorithm.N_generations=10 runtime.chk_convergence=false
 
 .legion_test_script: &legion_test_script
   script:
-    - PYTHONPATH="$PYTHONPATH:$EXTERNAL_WORKDIR:$PWD/mpi4py_poison_wrapper" $SPINIFEL_TEST_LAUNCHER legion_python -ll:py 1 -ll:csize 8192 legion_main.py --default-settings=test_mpi.toml --mode=legion psana.enable=false
+    - PYTHONPATH="$PYTHONPATH:$EXTERNAL_WORKDIR:$PWD/mpi4py_poison_wrapper" $SPINIFEL_TEST_LAUNCHER legion_python -ll:py 1 -ll:csize 8192 legion_main.py --default-settings=test_mpi.toml --mode=legion
 
 .sequential_test_script: &sequential_test_script
   script:
@@ -97,11 +97,11 @@ variables:
 
 .finufft_test_script: &finufft_test_script
   script:
-    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi runtime.use_cufinufft=false psana.enable=false
+    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi runtime.use_cufinufft=false
 
 .nocuda_test_script: &nocuda_test_script
   script:
-    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi runtime.use_cufinufft=false runtime.use_cuda=false runtime.use_cupy=false psana.enable=false
+    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi runtime.use_cufinufft=false runtime.use_cuda=false runtime.use_cupy=false
 
 .cleanup_script: &cleanup_script
   script:

@@ -16,7 +16,7 @@ name = "3iyf_sim_10k.h5"
 shape = [1, 128, 128]
 
 [psana]
-enable = true 
+enable = false
 ps_smd_n_events = 10000
 ps_eb_nodes = 1
 ps_srv_nodes = 0
@@ -46,7 +46,7 @@ N_clipping = 0
 N_binning = 0
 N_orientations = 10000  # model_slices
 N_batch_size = 1000
-N_images_max = 2000
+N_images_max = 6000
 
 [fsc]
 pdb_path="setup/skopi/examples/input/pdb/3iyf.pdb"
