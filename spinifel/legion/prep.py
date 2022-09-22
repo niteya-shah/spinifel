@@ -20,7 +20,7 @@ all_objs  = {}
 psana = None
 if settings.use_psana:
     import psana
-    from psana.psexp.legion_node import smd_chunks, smd_batches, batch_events
+    from psana.psexp.legion_node import batch_events
     from psana.psexp.legion_node import smd_batches_without_transitions, smd_chunks_steps
 
 @task(leaf=True, privileges=[WD])
