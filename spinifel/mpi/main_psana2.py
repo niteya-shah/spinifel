@@ -41,27 +41,26 @@ def log_cuda_mem_info(logger):
 
 @nvtx.annotate("mpi/main.py", is_prefix=True)
 def main():
+    assert settings.use_psana
+    
     comm = contexts.comm
 
     timer = utils.Timer()
 
-    # Reading input images from hdf5
     N_images_per_rank = settings.N_images_per_rank
     N_images_max = settings.N_images_max
-    # batch_size = min(N_images_per_rank, 100)
-    N_big_data_nodes = comm.size
-    # max_events = min(settings.N_images_max, N_big_data_nodes*N_images_per_rank)
-    writer_rank = 0  # pick writer rank as core 0
-    N_generations = settings.N_generations
+    assert N_images_max % N_images_per_rank == 0, "N_images_max must be divisible by N_images_per_rank" 
 
-    assert settings.use_psana
+    N_generations = settings.N_generations
+    
+    # BigData cores are those excluding Smd0, EventBuilder, & Server cores.
+    N_big_data_nodes = comm.size - (1 + settings.ps_eb_nodes + settings.ps_srv_nodes)
+    # Writer rank is the first bigdata core 
+    writer_rank = 1 + settings.ps_eb_nodes  
 
     # Reading input images using psana2
     from psana import DataSource
 
-    # BigData cores are those excluding Smd0, EventBuilder, & Server cores.
-    N_big_data_nodes = comm.size - (1 + settings.ps_eb_nodes + settings.ps_srv_nodes)
-    writer_rank = 1 + settings.ps_eb_nodes  # pick writer rank as the first BigData core
     ds = DataSource(exp=settings.ps_exp, run=settings.ps_runnum, dir=settings.ps_dir)
 
     # Setup logger after knowing the writer rank
@@ -504,7 +503,7 @@ def main():
 
     # end for i_evt, evt in ...
 
-    if settings.chk_convergence:
+    if settings.chk_convergence and comm.rank==writer_rank:
         msg = f"chk_convergence flag was set and the algorithm did no converge ({settings.fsc_min_cc=}, {settings.fsc_min_change_cc=})."
         assert flag_converged, msg
     logger.log(f"Results saved in {settings.out_dir}")
