@@ -271,10 +271,10 @@ fi
 # as an immediate hack, we'll just put this as late in the build as
 # possible so that we hope we don't mess with anything important.
 
-#if [[ ${target} = *"summit"* || ${target} = *"ascent"* ]]
-#then
-#    ${root_dir}/../scripts/fix_lib_olcf.sh
-#fi
+if [[ ${target} = *"summit"* ]]
+then
+    ${root_dir}/../scripts/fix_lib_olcf.sh
+fi
 
 #-------------------------------------------------------------------------------
 
