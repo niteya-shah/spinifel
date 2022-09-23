@@ -4,6 +4,7 @@ import pygion
 import math
 from pygion import task, RO
 from spinifel import settings
+from spinifel import utils
 from . import utils as lgutils
 from eval.fsc import compute_fsc, compute_reference
 from eval.align import align_volumes
@@ -38,6 +39,8 @@ def init_fsc_task(pixel_distance):
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/fsc.py", is_prefix=True)
 def compute_fsc_task(phased, fsc):
+    if settings.verbose:
+        timer = utils.Timer()
     fsc_dict = fsc.get()
     prev_cc = fsc_dict['final']
     rho = np.fft.ifftshift(phased.rho_)
@@ -49,9 +52,12 @@ def compute_fsc_task(phased, fsc):
                                                         n_search=settings.fsc_nsearch)
     resolution, rshell, fsc_val = compute_fsc(ali_reference, ali_volume, fsc_dict['dist_recip_max'])
     # uses a lot of memory - release it asap
-    if settings.use_cupy:
+    if settings.use_cupy and settings.cupy_mempool_clear:
         mempool = cupy.get_default_memory_pool()
         mempool.free_all_blocks()
+
+    if settings.verbose:
+        print(f'FSC clear_cupy_mempool:{settings.cupy_mempool_clear} completed in: {timer.lap():.2f}s.', flush=True)
 
     min_cc = fsc_dict['min_cc']
     delta_cc = final_cc - prev_cc

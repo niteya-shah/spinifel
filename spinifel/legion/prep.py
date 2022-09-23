@@ -511,7 +511,7 @@ def setup_objects_task(pixel_position, pixel_distance, slices):
     global all_objs
     N_images_per_rank = slices.ispace.domain.extent[0]
     # release all memory used by cupy aggressively
-    if settings.use_cupy:
+    if settings.use_cupy and settings.cupy_mempool_clear:
         mempool = cupy.get_default_memory_pool()
         mempool.free_all_blocks()
 

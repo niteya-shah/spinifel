@@ -430,6 +430,11 @@ class SpinifelSettings(metaclass=Singleton):
                 parse_bool, False,
                 "Algorithm is expected to converge"
             ),
+            "_cupy_mempool_clear": (
+                "runtime", "cupy_mempool_clear",
+                parse_bool, True,
+                "Aggresively clear CuPy mempool"
+            ),
             "_pdb_path": (
                 "fsc", "pdb_path",
                 Path, Path(""),

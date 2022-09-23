@@ -11,5 +11,21 @@ export PYTHONPATH="$PYTHONPATH:$root_dir"
 
 set -x
 
-pytest -s tests/test_FSC.py
-# pytest tests
+# Pickup all tests spinifel modules (anything that don't import mpi)
+#pytest -s tests
+#pytest -s spinifel/tests
+
+# Running pytest on scripts that potentially use mpi fails (originally
+# seen in psana2 branch - see issue#56) The solution right now is to wrap
+# it under jsrun/srun.
+target=${SPINIFEL_TARGET:-${NERSC_HOST:-$(hostname --fqdn)}}
+echo "[tests] target: $target"
+
+if [[ ${target} = "cgpu"* ]]; then
+    SPINIFEL_TEST_LAUNCHER="srun -n1 -G1"
+elif [[ ${target} = *"summit"* || ${target} = *"ascent"* ]]; then
+    SPINIFEL_TEST_LAUNCHER="jsrun -n1 -g1"
+fi
+
+$SPINIFEL_TEST_LAUNCHER pytest -s tests/test_FSC.py
+
