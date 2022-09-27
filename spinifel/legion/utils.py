@@ -69,13 +69,17 @@ def create_partition_with_offset(region, secShape, nImagesPerRank, maxImagesPerR
         region_p = Partition(region, pending_p)
     return region_p
 
+@nvtx.annotate("legion/utils.py", is_prefix=True)
+def dump_single_partition(p):
+    for j, p2 in enumerate(p):
+        print(f' init_parts p2[{j}] = {p2.ispace.bounds}', flush=True)
 
 @nvtx.annotate("legion/utils.py", is_prefix=True)
 def dump_partitions(p):
     for i,p1 in enumerate(p):
         p1 = p[i]
-        for j, p2 in enumerate(p1):
-            print(f' init_parts i={i},  p2[{j}] = {p2.ispace.bounds}', flush=True)
+        print(f'--------partition {i}-------', flush=True)
+        dump_single_partition(p1)
 
 # create a set of partitions to be used for filling in subregions
 @nvtx.annotate("legion/utils.py", is_prefix=True)

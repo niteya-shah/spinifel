@@ -9,13 +9,13 @@ from spinifel import settings, utils, contexts, checkpoint
 from spinifel.prep import save_mrc
 
 from .prep import get_data, init_partitions_regions_psana2, load_image_batch, load_pixel_data, process_data, prep_objects
-from .utils import union_partitions_with_stride, fill_region
+from .utils import union_partitions_with_stride, fill_region, dump_single_partition
 from .autocorrelation import solve_ac
 from .phasing import phased_output, new_phase, fill_phase_regions
 from .orientation_matching import match, create_orientations_rp
 from . import mapper
 from . import checkpoint
-from .fsc import init_fsc_task, compute_fsc_task
+from .fsc import init_fsc_task, compute_fsc_task, check_convergence_task
 
 @nvtx.annotate("legion/main.py", is_prefix=True)
 def load_psana():
@@ -70,13 +70,13 @@ def load_psana_subset(gen_run, gen_smd, batch_size, cur_batch_size, slices, all_
     assert cur_batch_size%batch_size == 0
     slices_p = all_partitions[cur_batch_size//batch_size]
     slices_images_p = slices_images_all_p[idx]
+
     gen_run, gen_smd, run = load_image_batch(run, gen_run, gen_smd, slices_images_p)
 
     # bin data
     pixel_position, pixel_distance, pixel_index = process_data(slices_images, slices_images_p, slices, slices_p, pixel_distance, pixel_index, pixel_position,idx)
 
     return slices_p, gen_run, gen_smd, run, pixel_distance, pixel_index, pixel_position
-
 
 def main_spinifel(pixel_position, pixel_distance, pixel_index, slices_p, n_images_per_rank, solve_dict=None):
     logger = utils.Logger(True)
@@ -111,7 +111,7 @@ def main_spinifel(pixel_position, pixel_distance, pixel_index, slices_p, n_image
         logger.log(f"#"*27)
 
         # Orientation matching
-        match(phased, orientations_p, n_images_per_rank)
+        match(phased, orientations_p, slices_p, n_images_per_rank)
         # Solve autocorrelation
         solved, solve_ac_dict = solve_ac(solve_ac_dict,
                                          generation, pixel_position,
@@ -124,16 +124,12 @@ def main_spinifel(pixel_position, pixel_distance, pixel_index, slices_p, n_image
         if settings.pdb_path.is_file() and settings.chk_convergence:
             print(f"checking convergence: FSC calculation", flush=True)
             fsc = compute_fsc_task(phased, fsc)
-            fsc_dict = fsc.get()
-            if fsc_dict['converge'] == True:
-                res = fsc_dict['res']
-                final_cc = fsc_dict['final']
-                logger.log(f"Stopping criteria met! Algorithm converged at resolution: {res:.2f} with cc: {final_cc:.3f}.")
-                break;
-
+            converge = check_convergence_task(fsc)
+            converge = converge.get()
+            if converge:
+                break
     #fill regions so they get garbage collected
     fill_region(orientations, 0)
-    fill_region(phased, 0)
     fill_phase_regions(phased_regions_dict)
     return solve_ac_dict
 
@@ -145,7 +141,6 @@ def main():
     logger.log("In Legion Psana2 with Streaming")
     ds = None
     timer = utils.Timer()
-
     # Reading input images using psana2
     assert(settings.use_psana)
     # compute pixel_position, pixel_distance, pixel_index, partitions,
@@ -170,7 +165,6 @@ def main():
                                                     n_points)
         execution_fence(block=True)
         solve_ac_dict = main_spinifel(pixel_position, pixel_distance, pixel_index, slices_p, cur_batch_size,solve_ac_dict)
-
         if cur_batch_size == max_batch_size:
             done = True
         if not done:

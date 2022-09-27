@@ -71,4 +71,15 @@ def compute_fsc_task(phased, fsc):
     else:
         if final_cc > min_cc and delta_cc < min_change_cc:
             fsc_dict['converge'] = True
+            print(f"Stopping criteria met! Algorithm converged at resolution: {resolution:.2f} with cc: {final_cc:.3f}.", flush=True)
     return fsc_dict
+
+@task
+@lgutils.gpu_task_wrapper
+@nvtx.annotate("legion/fsc.py", is_prefix=True)
+def check_convergence_task(fsc):
+    converge = False
+    fsc_dict = fsc.get()
+    if fsc_dict['converge'] == True:
+        converge = True
+    return converge

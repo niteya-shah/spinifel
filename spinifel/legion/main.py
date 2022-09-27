@@ -15,7 +15,7 @@ from .orientation_matching import match, create_orientations_rp
 from . import mapper
 from . import checkpoint
 from . import utils as lgutils
-from .fsc import init_fsc_task, compute_fsc_task
+from .fsc import init_fsc_task, compute_fsc_task, check_convergence_task
 
 @nvtx.annotate("legion/main.py", is_prefix=True)
 def load_psana():
@@ -28,16 +28,17 @@ def load_psana():
     from psana import DataSource
     total_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
     batch_size = min(settings.N_images_per_rank, 100)
-    max_events = min(settings.N_images_max, total_procs*settings.N_images_per_rank)
+    max_events = total_procs*settings.N_images_per_rank
     logger.log(f'Using psana: exp={settings.ps_exp}, run={settings.ps_runnum}, dir={settings.ps_dir}, batch_size={batch_size}, max_events={max_events}, mode={mode}')
     assert mode == 'legion'
     ds = DataSource(exp=settings.ps_exp, run=settings.ps_runnum,
-                    dir=settings.ps_dir, batch_size=batch_size,
+                    dir=settings.ps_dir,
                     max_events=max_events)
+
     # Load unique set of intensity slices for python process
     (pixel_position,
      pixel_distance,
-    pixel_index,
+     pixel_index,
      slices, slices_p) = get_data(ds)
     return pixel_position, pixel_distance, pixel_index, slices, slices_p
 
@@ -80,7 +81,7 @@ def main_task(pixel_position, pixel_distance, pixel_index, slices, slices_p):
         logger.log(f"#"*27)
 
         # Orientation matching
-        match(phased,orientations_p, settings.N_images_per_rank)
+        match(phased,orientations_p, slices_p, settings.N_images_per_rank)
 
         # Solve autocorrelation
         solved,solve_ac_dict = solve_ac(solve_ac_dict,
@@ -103,19 +104,15 @@ def main_task(pixel_position, pixel_distance, pixel_index, slices, slices_p):
         if settings.pdb_path.is_file() and settings.chk_convergence:
             print(f"checking convergence: FSC calculation", flush=True)
             fsc = compute_fsc_task(phased, fsc)
-            fsc_dict = fsc.get()
-            if fsc_dict['converge'] == True:
-                res = fsc_dict['res']
-                final_cc = fsc_dict['final']
-                logger.log(f"Stopping criteria met! Algorithm converged at resolution: {res:.2f} with cc: {final_cc:.3f}.")
-                break;
+            converge = check_convergence_task(fsc)
+            converge = converge.get()
+            if converge:
+                break
     execution_fence(block=True)
 
     if settings.must_converge:
         assert settings.pdb_path.is_file() and settings.chk_convergence
-        assert fsc_dict is not None
-        fsc_dict = fsc.get()
-        assert fsc_dict['converge'] == True
+        assert converge == True
 
     logger.log(f"Results saved in {settings.out_dir}")
     logger.log(f"Successfully completed in {timer.total():.2f}s.")

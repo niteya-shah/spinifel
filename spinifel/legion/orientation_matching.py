@@ -18,7 +18,7 @@ def create_orientations_rp(n_images_per_rank):
     return orientations, orientations_p
 
 @nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
-def match(phased, orientations_p, n_images_per_rank):
+def match(phased, orientations_p, slices_p, n_images_per_rank):
     # The reference orientations don't have to match exactly between ranks.
     # Each rank aligns its own slices.
     # We can call the sequential function on each rank, provided that the
@@ -29,12 +29,12 @@ def match(phased, orientations_p, n_images_per_rank):
         # location of the slices.
         i=N_procs-idx-1
         match_task(
-            phased, orientations_p[i], point=i)
+            phased, orientations_p[i], slices_p[i], point=i)
 
-@task(leaf=True, privileges=[RO("ac"), WD("quaternions")])
+@task(leaf=True, privileges=[RO("ac"), WD("quaternions"), RO("data")])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
-def match_task(phased, orientations):
+def match_task(phased, orientations, slices):
     if settings.verbosity > 0:
         print(f"{socket.gethostname()} starts Orientation Matching.", flush=True)
     snm = gprep.all_objs['snm']
