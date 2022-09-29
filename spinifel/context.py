@@ -103,7 +103,7 @@ class SpinifelContexts(metaclass=Singleton):
         dev = drv.Device(self.dev_id)
         self.ctx = dev.retain_primary_context()
 
-        if settings.mode != "legion":
+        if settings.mode != "legion" and settings.mode !="legion_psana2":
             self.ctx.push()
             register(self.ctx.pop)
 
