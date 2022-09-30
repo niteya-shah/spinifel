@@ -344,7 +344,7 @@ def main():
             
             # In test mode, we supply some correct orientations to guarantee convergence
             if int(os.environ.get("SPINIFEL_TEST_FLAG", "0")) and generation==0:
-                logger.log(f"****WARNING**** In Test Mode - supplying some correct orientations")
+                logger.log(f"****WARNING**** In Test Mode - supplying {settings.fsc_fraction_known_orientations*100:.1f}% correct orientations")
                 N_supply = int(settings.fsc_fraction_known_orientations * orientations.shape[0])
                 orientations[:N_supply] = get_known_orientations()[:N_supply]
 
