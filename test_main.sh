@@ -62,7 +62,7 @@ $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mo
 
 
 # test_legion
-PYTHONPATH="$PYTHONPATH:$EXTERNAL_WORKDIR:$PWD/mpi4py_poison_wrapper" $SPINIFEL_TEST_LAUNCHER legion_python -ll:py 1 -ll:csize 8192 legion_main.py --default-settings=test_mpi.toml --mode=legion
+PYTHONPATH="$PYTHONPATH:$EXTERNAL_WORKDIR:$PWD/mpi4py_poison_wrapper" $SPINIFEL_TEST_LAUNCHER legion_python -ll:py 1 -ll:csize 8192 legion_main.py --default-settings=summit_ci.toml --mode=legion
 
 
 # test_nocuda
@@ -71,7 +71,7 @@ $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mo
 
 # test_psana2/ test_psana2_stream
 $SPINIFEL_PSANA2_LAUNCHER python -u -m spinifel --settings=./settings/test_mpi.toml --mode=mpi psana.enable=true
-$SPINIFEL_PSANA2_LAUNCHER python -u -m spinifel --settings=./settings/test_mpi.toml --mode=psana2 psana.enable=true runtime.N_images_per_rank=3000 fsc.fsc_fraction_known_orientations=0.0 algorithm.N_generations=10 runtime.chk_convergence=false
+$SPINIFEL_PSANA2_LAUNCHER python -u -m spinifel --settings=./settings/test_mpi.toml --mode=psana2 psana.enable=true
 
 
 # debug test - keeping it for now
