@@ -160,19 +160,6 @@ conda install --freeze-installed -y scikit-learn=1.0.2
 
 
 #_______________________________________________________________________________
-# Install UCX
-
-if [[ $GASNET_CONDUIT = "ucx" ]]
-then
-    ./rebuild_ucx.sh
-    export GASNET_EXTRA_CONFIGURE_ARGS="--with-ucx-home=$LEGION_INSTALL_DIR --with-mpi-cc=$CC"
-    export CROSS_CONFIGURE=
-fi
-
-#-------------------------------------------------------------------------------
-
-
-#_______________________________________________________________________________
 # Install GASNET
 
 if [[ $LEGION_USE_GASNET -eq 1 && $GASNET_ROOT == ${root_dir}/gasnet/release ]]
@@ -270,11 +257,13 @@ fi
 # not others). What we've got right now is far too indiscriminant. But
 # as an immediate hack, we'll just put this as late in the build as
 # possible so that we hope we don't mess with anything important.
+#
+# *Only required for Summit and not Ascent.
 
-#if [[ ${target} = *"summit"* || ${target} = *"ascent"* ]]
-#then
-#    ${root_dir}/../scripts/fix_lib_olcf.sh
-#fi
+if [[ ${target} = *"summit"* ]]
+then
+    ${root_dir}/../scripts/fix_lib_olcf.sh
+fi
 
 #-------------------------------------------------------------------------------
 

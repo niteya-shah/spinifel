@@ -45,8 +45,7 @@ class SNM:
             slices_,
             pixel_position_reciprocal,
             pixel_distance_reciprocal,
-            nufft,
-            ref_orientations=None):
+            nufft):
         """
         Initialise our Slicing and matching class, storing reused data in memory so that we
         we dont have to continously recalculate them.
@@ -68,13 +67,6 @@ class SNM:
 
         self.reciprocal_extent = pixel_distance_reciprocal.max()
         self.pixel_position_reciprocal = pixel_position_reciprocal
-        
-        # For test, ref_orientations (known answer) is used
-        if ref_orientations is None:
-            self.ref_orientations = skp.get_uniform_quat(self.N_orientations, True)
-        else:
-            print(f'[Warning] Test Mode: ref_orientations is given')
-            self.ref_orientations = ref_orientations
 
         self.slices_ = xp.array(
             slices_.reshape(
@@ -189,7 +181,7 @@ class SNM:
         match_time += en_match - match_start
 
         print(f"Match tot:{en_match-st_init:.2f}s. slice={slices_time:.2f}s. match={match_time:.2f}s. slice_oh={slice_init-st_init:.2f}s. match_oh={match_oth_time:.2f}s.")
-        return self.ref_orientations[index]
+        return self.nufft.ref_orientations[index]
 
 @nvtx.annotate("sequential/orientation_matching.py", is_prefix=True)
 def slicing_and_match(ac, slices_, pixel_position_reciprocal, pixel_distance_reciprocal, ref_orientations=None):

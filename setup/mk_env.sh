@@ -107,6 +107,7 @@ module load PrgEnv-gnu
 module load cudatoolkit
 module load cpe-cuda
 module load cray-fftw
+module load cray-pmi # for GASNet
 
 export CC=cc
 export CXX=CC
@@ -120,7 +121,8 @@ export MPI4PY_MPICC="\$(which cc) --shared"
 export LD_PRELOAD="\${FFTW_DIR}/libfftw3.so"
 
 export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
-export GASNET_CONDUIT=ucx
+export GASNET_CONDUIT=${GASNET_CONDUIT:-ofi-slingshot11}
+export LEGION_GASNET_CONDUIT=${LEGION_GASNET_CONDUIT:-ofi}
 EOF
 elif [[ ${target} = *"summit"* || ${target} = *"ascent"* ]]; then
     cat >> env.sh <<EOF
@@ -231,7 +233,8 @@ export MPI4PY_MPICC="\$(which cc) --shared"
 export LD_PRELOAD="\${FFTW_DIR}/libfftw3.so"
 
 export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
-export GASNET_CONDUIT=${GASNET_CONDUIT:-ucx}
+export GASNET_CONDUIT=${GASNET_CONDUIT:-ofi-slingshot10}
+export LEGION_GASNET_CONDUIT=${LEGION_GASNET_CONDUIT:-ofi}
 EOF
 elif [[ $(hostname --fqdn) = *"darwin"* ]]; then
     cat >> env.sh <<EOF
