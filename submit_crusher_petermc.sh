@@ -7,16 +7,22 @@
 #SBATCH -o RunSpinifel.%J
 #SBATCH -e RunSpinifel.%J
 
+set +x
+
 t_start=`date +%s`
 
 # spinifel
 source setup/env.sh
 
-printenv PYTHONPATH
-
 export PYTHONPATH=$PYTHONPATH:/ccs/home/petermc/spiral-python-mine
-
+echo "PYTHONPATH"
 printenv PYTHONPATH
+
+export SPIRAL_HOME=/ccs/home/petermc/spiral-software
+
+export PATH=$PATH:$SPIRAL_HOME/bin
+echo "PATH"
+printenv PATH
 
 #export SLURM_CPU_BIND="cores"
 srun --nodes=1 --ntasks=1 --cpus-per-task=1 --gpus=1  python -m spinifel --default-settings=crusher_quickstart_petermc.toml --mode=mpi
