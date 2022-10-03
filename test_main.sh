@@ -58,7 +58,7 @@ $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mo
 
 
 # test_finufft
-$SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi runtime.use_cufinufft=false
+$SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi runtime.use_cufinufft=false fsc.fsc_min_cc=0.6 fsc.fsc_min_change_cc=0.1
 
 
 # test_legion
@@ -66,7 +66,7 @@ PYTHONPATH="$PYTHONPATH:$EXTERNAL_WORKDIR:$PWD/mpi4py_poison_wrapper" $SPINIFEL_
 
 
 # test_nocuda
-$SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi runtime.use_cufinufft=false runtime.use_cuda=false runtime.use_cupy=false
+$SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi runtime.use_cufinufft=false runtime.use_cuda=false runtime.use_cupy=false fsc.fsc_min_cc=0.6 fsc.fsc_min_change_cc=0.1
 
 
 # test_psana2/ test_psana2_stream
