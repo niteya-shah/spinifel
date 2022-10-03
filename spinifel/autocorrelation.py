@@ -253,7 +253,7 @@ def core_problem_convolution_spinifel(uvect, M, F_ugrid_conv_, M_ups, ac_support
     xp_time = end_time - start_time
     if settings.use_fftx:
         start_time = time.time()
-        ugrid_conv_out_fftx = fftxp.kernels.core_problem_convolution_kernel(xp, ugrid, M,  F_ugrid_conv_, M_ups) / M**3 * (M_ups/M)**3
+        ugrid_conv_out_fftx = fftxp.convo.mdrconv(ugrid, F_ugrid_conv_) / M**3 * (M_ups/M)**3
         end_time = time.time()
         fftxp_time = end_time - start_time
         fftxp.utils.print_diff(xp, ugrid_conv_out, ugrid_conv_out_fftx,
