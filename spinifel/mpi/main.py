@@ -227,8 +227,10 @@ def main():
             save_mrc(settings.out_dir / f"intensity-{curr_gen}.mrc", intensity)
             save_mrc(settings.out_dir / f"rho-{curr_gen}.mrc", rho)
 
-    # Use improvement of cc(prev_rho, cur_rho) to dertemine if we should
-    # terminate the loop
+    # Convergence check uses reference model (known answer) and compare with
+    # phased model at the end of the generation. The algorithm is decided 'converged'
+    # when the correlation between the known and the calculated models are above
+    # min_cc and that the change from previous generation is less than min_change_cc.
     min_cc, min_change_cc = settings.fsc_min_cc, settings.fsc_min_change_cc
     final_cc, delta_cc = 0.0, 1.0
     resolution = 0.0
@@ -293,10 +295,6 @@ def main():
                 myRes, settings.out_dir, generation, tag="solve_ac", protocol=4
             )
 
-            # Save rho and support for comparisons in the next generation
-            prev_rho_ = rho_[:]
-            prev_support_ = support_[:]
-
         ac_phased, support_, rho_ = phase(generation, ac, support_, rho_)
 
         logger.log(f"Problem phased in {timer.lap():.2f}s.")
@@ -305,8 +303,6 @@ def main():
                 **myRes,
                 **{
                     "ac": ac,
-                    "prev_support_": prev_support_,
-                    "prev_rho_": prev_rho_,
                     "ac_phased": ac_phased,
                     "support_": support_,
                     "rho_": rho_,
