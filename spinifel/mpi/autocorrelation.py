@@ -54,7 +54,7 @@ class MergeMPI(Merge):
             nufft)
         # more variables are added and changes are made to some existing ones
         # required to work with MPI
-        self.comm = MPI.COMM_WORLD
+        self.comm = contexts.comm_compute             # safe for psana2
         self.use_psana = settings.use_psana
         self.out_dir = settings.out_dir
 
@@ -214,3 +214,4 @@ class MergeMPI(Merge):
         self.comm.Bcast(ac, root=self.ref_rank)
 
         return ac
+

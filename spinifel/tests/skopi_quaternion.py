@@ -4,6 +4,9 @@ import skopi as skp
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 
+from psana import DataSource
+from psana.psexp.tools import get_excl_ranks
+
 
 def test_quat():
     # https://www.andre-gaschler.com/rotationconverter/

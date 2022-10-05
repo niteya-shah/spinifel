@@ -11,5 +11,3 @@ class Test:
     def test_skopi(self, ):
         args = self.launch_args + ['python', os.path.join(self.test_dir,'skopi_quaternion.py')]
         subprocess.check_call(args)
-
-

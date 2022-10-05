@@ -5,30 +5,37 @@
 """Manages Global Contexts, eg MPI and CUDA"""
 
 
-
-from atexit         import register
+from atexit import register
 from importlib.util import find_spec
-from functools      import wraps
-from callmonitor    import intercept as cm_intercept
+from functools import wraps
+from callmonitor import intercept as cm_intercept
 
 from .settings import SpinifelSettings
-from .utils    import Singleton
+from .utils import Singleton
 
 MPI4PY_AVAILABLE = False
 if find_spec("mpi4py") is not None:
     import mpi4py
+
     mpi4py.rc(initialize=False, finalize=False)
     from mpi4py import MPI
+
     MPI4PY_AVAILABLE = True
 
 PYCUDA_AVAILABLE = False
 if find_spec("pycuda") is not None:
     # import pycuda
     import pycuda.driver as drv
+
     PYCUDA_AVAILABLE = True
 
 
-
+def goodbye():
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    print(f"MPI will be finalized on rank {rank}")
+    comm.Barrier()
+    # MPI.Finalize()
 
 
 class SpinifelContexts(metaclass=Singleton):
@@ -69,17 +76,32 @@ class SpinifelContexts(metaclass=Singleton):
         if not MPI.Is_initialized():
             MPI.Init()
 
-        self._comm = MPI.COMM_WORLD
-        self._rank = self.comm.Get_rank()
-
-        register(MPI.Finalize)
-
         settings = SpinifelSettings()
+
+        self._psana_excl_ranks = []
+        if settings.use_psana:
+            # A _comm_compute is created here to include only the worker ranks.
+            from psana.psexp.tools import (
+                get_excl_ranks,
+            )  # FIXME: only available on latest psana2
+
+            self._comm = MPI.COMM_WORLD
+            self._psana_excl_ranks = get_excl_ranks()
+
+            self._grp_compute = self._comm.group.Excl(self._psana_excl_ranks)
+            self._comm_compute = self._comm.Create(self._grp_compute)
+            self._rank = self._comm.Get_rank()
+        else:
+            self._comm = MPI.COMM_WORLD
+            self._rank = self._comm.Get_rank()
+
+        # register(MPI.Finalize)
+        register(goodbye)
+
         if settings.verbose:
             print(f"MPI has been initialized on rank {self.rank}")
 
         self._mpi_initialized = True
-
 
     def init_cuda(self):
         """
@@ -97,7 +119,7 @@ class SpinifelContexts(metaclass=Singleton):
 
         drv.init()
 
-        settings     = SpinifelSettings()
+        settings = SpinifelSettings()
         self._dev_id = self.rank % drv.Device.count()
 
         dev = drv.Device(self.dev_id)
@@ -113,14 +135,12 @@ class SpinifelContexts(metaclass=Singleton):
 
         self._cuda_initialized = True
 
-
     @property
     def rank(self):
         """
         Get MPI Rank
         """
         return self._rank
-
 
     @property
     def comm(self):
@@ -129,6 +149,36 @@ class SpinifelContexts(metaclass=Singleton):
         """
         return self._comm
 
+    @property
+    def comm_compute(self):
+        """
+        Get MPI Compute Only Communicator.
+
+        We use `_psana_excl_ranks` to check if psana2 is used
+        to avoid intializing SpinfielSettings again.
+
+        For MPI-hdf5, this is world communication.
+        For MPI-psana2, this comm exludes all exclusive
+        ranks (smd0, eb and srv) from the communication group.
+        """
+        if self._psana_excl_ranks:
+            return self._comm_compute
+        else:
+            return self._comm
+
+    @property
+    def is_worker(self):
+        """
+        Determines if this MPI rank is a worker rank.
+
+        For MPI-hdf5, all ranks are worker ranks.
+        For MPI-psana2, all ranks except the exclusive ranks are
+        worker rank.
+        """
+        if self._rank in self._psana_excl_ranks:
+            return False
+        else:
+            return True
 
     @property
     def dev_id(self):
@@ -136,7 +186,6 @@ class SpinifelContexts(metaclass=Singleton):
         Get CUDA device ID
         """
         return self._dev_id
-
 
     def cuda_mem_info(self):
         """
@@ -147,7 +196,6 @@ class SpinifelContexts(metaclass=Singleton):
             return drv.mem_get_info()
         return -1, -1
 
-
     @property
     def cufinufft_available(self):
         """
@@ -156,7 +204,6 @@ class SpinifelContexts(metaclass=Singleton):
         loader = find_spec("cufinufft")
         return loader is not None
 
-
     @property
     def finufftpy_available(self):
         """
@@ -164,7 +211,6 @@ class SpinifelContexts(metaclass=Singleton):
         """
         loader = find_spec("finufftpy")
         return loader is not None
-
 
 
 class Profiler(metaclass=Singleton):
@@ -180,7 +226,6 @@ class Profiler(metaclass=Singleton):
     def __init__(self):
         self._callmonitor_enabled = False
 
-
     @property
     def callmonitor_enabled(self):
         """
@@ -188,11 +233,9 @@ class Profiler(metaclass=Singleton):
         """
         return self._callmonitor_enabled
 
-
     @callmonitor_enabled.setter
     def callmonitor_enabled(self, val):
         self._callmonitor_enabled = val
-
 
     @property
     def intercept(self):
