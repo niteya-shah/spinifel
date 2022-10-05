@@ -54,7 +54,7 @@ fi
 
 
 # test_mpi
-$SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi
+$SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi runtime.N_images_per_rank=2000
 
 
 # test_finufft
@@ -70,7 +70,7 @@ $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mo
 
 
 # test_psana2/ test_psana2_stream
-$SPINIFEL_PSANA2_LAUNCHER python -u -m spinifel --settings=./settings/test_mpi.toml --mode=mpi psana.enable=true
+$SPINIFEL_PSANA2_LAUNCHER python -u -m spinifel --settings=./settings/test_mpi.toml --mode=mpi psana.enable=true runtime.N_images_per_rank=2000
 $SPINIFEL_PSANA2_LAUNCHER python -u -m spinifel --settings=./settings/test_mpi.toml --mode=psana2 psana.enable=true
 
 
