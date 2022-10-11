@@ -64,3 +64,4 @@ class Singleton(type):
                 Singleton, cls).__call__(
                 *args, **kwargs)
         return cls._instances[cls]
+

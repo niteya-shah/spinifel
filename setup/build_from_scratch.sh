@@ -86,7 +86,7 @@ PACKAGE_LIST=(
     tqdm  # convenience
 
     # lcls2
-    setuptools=46.4.0  # temp need specific version
+    setuptools=46.4.0
     cmake
     cython
     mongodb
@@ -155,19 +155,6 @@ pip install --no-cache-dir PyNVTX
 # Pin sckit-learn to 1.0.2 w/o breaking psana (see issue #51)
 conda remove --force -y scikit-learn
 conda install --freeze-installed -y scikit-learn=1.0.2
-
-#-------------------------------------------------------------------------------
-
-
-#_______________________________________________________________________________
-# Install UCX
-
-if [[ $GASNET_CONDUIT = "ucx" ]]
-then
-    ./rebuild_ucx.sh
-    export GASNET_EXTRA_CONFIGURE_ARGS="--with-ucx-home=$LEGION_INSTALL_DIR --with-mpi-cc=$CC"
-    export CROSS_CONFIGURE=
-fi
 
 #-------------------------------------------------------------------------------
 
@@ -270,6 +257,8 @@ fi
 # not others). What we've got right now is far too indiscriminant. But
 # as an immediate hack, we'll just put this as late in the build as
 # possible so that we hope we don't mess with anything important.
+#
+# *Only required for Summit and not Ascent.
 
 if [[ ${target} = *"summit"* ]]
 then
@@ -288,4 +277,6 @@ echo "Done. Please run 'source setup/env.sh' to use this build."
 
 # Restore the LD_PRELOAD variable
 export LD_PRELOAD=$__LD_PRELOAD
+
+
 export popd

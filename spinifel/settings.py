@@ -280,6 +280,16 @@ class SpinifelSettings(metaclass=Singleton):
                 int, 1,
                 "PSANA experiment number"
             ),
+            "_ps_batch_size": (
+                "psana", "ps_batch_size",
+                int, 100,
+                "PSANA batch size"
+            ),
+            "_ps_dir": (
+                "psana", "ps_dir",
+                str, "",
+                "PSANA xtc2 directory"
+            ),
             "_use_callmonitor": (
                 "debug", "use_callmonitor",
                 parse_bool, False,
@@ -459,6 +469,21 @@ class SpinifelSettings(metaclass=Singleton):
                 "fsc", "fsc_nsearch",
                 int, 360,
                 "Number of quaternions to score per iteration"
+            ),
+            "_fsc_min_cc": (
+                "fsc", "fsc_min_cc",
+                float, 0.8,
+                "Minimum correlation used in convergence test"
+            ),
+            "_fsc_min_change_cc": (
+                "fsc", "fsc_min_change_cc",
+                float, 0.001,
+                "Minimum change in correlation used in convergence test"
+            ),
+            "_fsc_fraction_known_orientations": (
+                "fsc", "fsc_fraction_known_orientations",
+                float, 0.75,
+                "Amount of correct orientations in main and unit tests"
             ),
         }
 

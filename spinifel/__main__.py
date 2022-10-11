@@ -4,8 +4,6 @@
 
 from . import settings
 
-
-
 if __name__ == "__main__":
 
     if settings.verbose:
@@ -22,6 +20,9 @@ if __name__ == "__main__":
     elif settings.mode == "mpi":
         from .mpi import main
         main()
+    elif settings.mode == "psana2":
+        from .mpi import main_psana2
+        main_psana2()
     elif settings.mode == "legion":
         from .legion import main
         main()

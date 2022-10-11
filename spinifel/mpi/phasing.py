@@ -11,7 +11,7 @@ from spinifel.sequential.phasing import phase as sequential_phase
 def phase(generation, ac, support_=None, rho_=None):
     """Phase retrieval by Rank0 and broadcast to all ranks."""
 
-    comm = MPI.COMM_WORLD
+    comm = contexts.comm_compute
 
     weight = 0.5 + comm.rank/comm.size # shrinkwrap weight range: 0.5 to 1.5
     method = 'std'

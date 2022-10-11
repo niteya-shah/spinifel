@@ -9,10 +9,17 @@ variables:
 
   # launcher for tests
   SPINIFEL_TEST_LAUNCHER: "jsrun -n1 -a1 -g1"
+  SPINIFEL_PSANA2_LAUNCHER: "jsrun -n4 -g1"
+
+  # for psana2 tests
+  SPINIFEL_TEST_FLAG: 1
+  all_proxy: "socks://proxy.ccs.ornl.gov:3128/"
+  ftp_proxy: "ftp://proxy.ccs.ornl.gov:3128/"
+  http_proxy: "http://proxy.ccs.ornl.gov:3128/"
+  https_proxy: "http://proxy.ccs.ornl.gov:3128/"
+  no_proxy: "localhost,127.0.0.0/8,*.ccs.ornl.gov"
 
   # for script test
-  DATA_DIR: /gpfs/wolf/chm137/proj-shared/spinifel_data
-  DATA_FILENAME: 2CEX-10k-2.h5
   OUT_DIR: /gpfs/wolf/chm137/proj-shared/ci/${CI_PIPELINE_ID}/spinifel_output
   CUPY_CACHE_DIR: /gpfs/wolf/chm137/proj-shared/ci/${CI_PIPELINE_ID}/cupy_cache
   PYCUDA_CACHE_DIR: /gpfs/wolf/chm137/proj-shared/ci/${CI_PIPELINE_ID}
@@ -66,7 +73,15 @@ variables:
 
 .mpi_test_script: &mpi_test_script
   script:
-    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=summit_ci.toml --mode=mpi
+    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi runtime.N_images_per_rank=2000
+
+.psana2_test_script: &psana2_test_script
+  script:
+    - $SPINIFEL_PSANA2_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi psana.enable=true runtime.N_images_per_rank=2000
+
+.psana2_stream_test_script: &psana2_stream_test_script
+  script:
+    - $SPINIFEL_PSANA2_LAUNCHER python -u -m spinifel --default-settings=test_mpi.toml --mode=psana2 psana.enable=true
 
 .legion_test_script: &legion_test_script
   script:
@@ -74,19 +89,19 @@ variables:
 
 .sequential_test_script: &sequential_test_script
   script:
-    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=summit_ci.toml --mode=sequential
+    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=sequential
 
 .large_test_script: &large_test_script
   script:
-    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=summit_ci.toml --mode=mpi runtime.small_problem=false
+    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi runtime.small_problem=false
 
 .finufft_test_script: &finufft_test_script
   script:
-    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=summit_ci.toml --mode=mpi runtime.use_cufinufft=false
+    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi runtime.use_cufinufft=false fsc.fsc_min_cc=0.6 fsc.fsc_min_change_cc=0.1
 
 .nocuda_test_script: &nocuda_test_script
   script:
-    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=summit_ci.toml --mode=mpi runtime.use_cufinufft=false runtime.use_cuda=false runtime.use_cupy=false
+    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi runtime.use_cufinufft=false runtime.use_cuda=false runtime.use_cupy=false fsc.fsc_min_cc=0.6 fsc.fsc_min_change_cc=0.1
 
 .cleanup_script: &cleanup_script
   script:
@@ -134,6 +149,22 @@ unit_test_ascent:
 
 test_mpi_ascent:
   <<: [*test_rules, *test_before_script, *mpi_test_script]
+  stage: test
+  tags:
+    - batch
+  variables:
+    <<: [*ascent_variables]
+
+test_psana2_ascent:
+  <<: [*test_rules, *test_before_script, *psana2_test_script]
+  stage: test
+  tags:
+    - batch
+  variables:
+    <<: [*ascent_variables]
+
+test_psana2_stream_ascent:
+  <<: [*test_rules, *test_before_script, *psana2_stream_test_script]
   stage: test
   tags:
     - batch
