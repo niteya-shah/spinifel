@@ -26,8 +26,8 @@ def init_fsc_task(pixel_distance):
     fsc['final'] = 0.0
     fsc['delta'] = 1.0
     fsc['res'] = 0.0
-    fsc['min_cc'] = 0.80
-    fsc['min_change_cc'] = 0.001
+    fsc['min_cc'] = settings.fsc_min_cc
+    fsc['min_change_cc'] = settings.fsc_min_change_cc
     fsc['dist_recip_max'] = dist_recip_max
     fsc['converge'] = False
 
