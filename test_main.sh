@@ -27,19 +27,19 @@ fi
 # Set input and output folders
 if [[ ${target} = *"ascent"* ]]; then
     export test_data_dir="/gpfs/wolf/chm137/proj-shared/spinifel_data/testdata"
-    export OUT_DIR="/gpfs/wolf/chm137/proj-shared/ci/${CI_PIPELINE_ID}/spinifel_output"
+    export out_dir="/gpfs/wolf/chm137/proj-shared/ci/${CI_PIPELINE_ID}/spinifel_output"
 elif [[ ${target} = *"summit"* ]]; then
     export test_data_dir="/gpfs/alpine/proj-shared/chm137/data/testdata"
-    export OUT_DIR="/gpfs/alpine/proj-shared/chm137/test_main/${CI_PIPELINE_ID}/spinifel_output"
+    export out_dir="/gpfs/alpine/proj-shared/chm137/test_main/${CI_PIPELINE_ID}/spinifel_output"
 elif [[ ${target} = *"cgpu"* ]]; then
     export test_data_dir="${CFS}/m2859/data/testdata"
-    export OUT_DIR="${SCRATCH}/spinifel_output"
+    export out_dir="${SCRATCH}/spinifel_output"
 fi
 
 
 # Set job submisson command
 if [[ ${target} = *"summit"* || ${target} = *"ascent"* ]]; then
-    export SPINIFEL_TEST_LAUNCHER="jsrun -n1 -a1 -g1"
+    export SPINIFEL_TEST_LAUNCHER="jsrun -n2 -a1 -g1"
     export SPINIFEL_PSANA2_LAUNCHER="jsrun -n3 -g1"
 elif [[ ${target} = *"cgpu"* ]]; then
     export SPINIFEL_TEST_LAUNCHER="srun -n1 -G1"
@@ -48,8 +48,8 @@ fi
 
 
 # Creates the output folder if not already exist.
-if [ ! -d "${OUT_DIR}" ]; then
-    mkdir -p ${OUT_DIR}
+if [ ! -d "${out_dir}" ]; then
+    mkdir -p ${out_dir}
 fi
 
 

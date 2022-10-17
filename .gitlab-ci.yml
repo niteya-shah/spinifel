@@ -20,7 +20,7 @@ variables:
   no_proxy: "localhost,127.0.0.0/8,*.ccs.ornl.gov"
 
   # for script test
-  OUT_DIR: /gpfs/wolf/chm137/proj-shared/ci/${CI_PIPELINE_ID}/spinifel_output
+  out_dir: /gpfs/wolf/chm137/proj-shared/ci/${CI_PIPELINE_ID}/spinifel_output
   CUPY_CACHE_DIR: /gpfs/wolf/chm137/proj-shared/ci/${CI_PIPELINE_ID}/cupy_cache
   PYCUDA_CACHE_DIR: /gpfs/wolf/chm137/proj-shared/ci/${CI_PIPELINE_ID}
 
@@ -40,7 +40,7 @@ variables:
   # for script test
   DATA_DIR: /gpfs/alpine/chm137/proj-shared/spinifel_data
   DATA_FILENAME: 2CEX-10k-2.h5
-  OUT_DIR: /gpfs/alpine/chm137/proj-shared/ci/${CI_PIPELINE_ID}/spinifel_output
+  out_dir: /gpfs/alpine/chm137/proj-shared/ci/${CI_PIPELINE_ID}/spinifel_output
   CUPY_CACHE_DIR: /gpfs/alpine/chm137/proj-shared/ci/${CI_PIPELINE_ID}/cupy_cache
   PYCUDA_CACHE_DIR: /gpfs/wolf/chm137/proj-shared/ci/${CI_PIPELINE_ID}
 
@@ -64,7 +64,7 @@ variables:
 .test_before_script: &test_before_script
   before_script:
     - cd ${EXTERNAL_WORKDIR}
-    - mkdir -p ${OUT_DIR}
+    - mkdir -p ${out_dir}
     - source ./setup/env.sh
 
 .unit_test_script: &unit_test_script
