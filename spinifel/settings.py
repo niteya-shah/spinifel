@@ -320,6 +320,11 @@ class SpinifelSettings(metaclass=Singleton):
                 int, 10,
                 "max generations"
             ),
+            "_N_gens_stream": (
+                "algorithm", "N_gens_stream",
+                int, 5,
+                "Combine streamed batch of images at every N_gens_stream iteration"
+            ),
             "_data_field_name": (
                 "detector", "data_field_name",
                 str, "intensities",

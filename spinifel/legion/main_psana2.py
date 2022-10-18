@@ -10,11 +10,12 @@ from spinifel.prep import save_mrc
 
 from .prep import get_data, init_partitions_regions_psana2, load_image_batch, load_pixel_data, process_data, prep_objects
 from .utils import union_partitions_with_stride, fill_region, dump_single_partition
-from .autocorrelation import solve_ac
+from .autocorrelation import solve_ac, fill_autocorrelation_regions
 from .phasing import phased_output, new_phase, fill_phase_regions
 from .orientation_matching import match, create_orientations_rp
 from . import mapper
 from . import checkpoint
+from . import utils as lgutils
 from .fsc import init_fsc_task, compute_fsc_task, check_convergence_task
 
 @nvtx.annotate("legion/main.py", is_prefix=True)
@@ -78,14 +79,14 @@ def load_psana_subset(gen_run, gen_smd, batch_size, cur_batch_size, slices, all_
 
     return slices_p, gen_run, gen_smd, run, pixel_distance, pixel_index, pixel_position
 
-def main_spinifel(pixel_position, pixel_distance, pixel_index, slices_p, n_images_per_rank, solve_dict=None):
+def main_spinifel(pixel_position, pixel_distance, pixel_index, slices, slices_p, n_images_per_rank, solve_dict, start_gen, end_gen):
     logger = utils.Logger(True)
     timer = utils.Timer()
     curr_gen = 0
     fsc = {}
     total_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
+    ready_objs = []
     ready_objs = prep_objects(pixel_position, pixel_distance, slices_p, total_procs)
-
     if settings.chk_convergence and settings.pdb_path.is_file():
         fsc = init_fsc_task(pixel_distance)
         print(f"initialized FSC", flush=True)
@@ -94,24 +95,29 @@ def main_spinifel(pixel_position, pixel_distance, pixel_index, slices_p, n_image
     assert(settings.load_gen == -1)
 
     orientations, orientations_p = create_orientations_rp(n_images_per_rank)
+    solve_dict = None
     solved, solve_ac_dict = solve_ac(solve_dict, 0, pixel_position, pixel_distance, slices_p, ready_objs)
     #logger.log(f"AC recovered in {timer.lap():.2f}s.")
 
     phased, phased_regions_dict = new_phase(0, solved)
     phased_output(phased, 0)
-
+    #make sure all partitions are valid
+    execution_fence(block=True)
     #not valid since tasks are async
     #logger.log(f"Problem phased in {timer.lap():.2f}s.")
 
-    curr_gen +=1
-    N_generations = settings.N_generations
+    curr_gen = curr_gen + 1 + start_gen
+    N_generations = end_gen
+    N_gens_stream = settings.N_gens_stream
+    assert(N_gens_stream <= N_generations)
+
     for generation in range(curr_gen, N_generations+1):
         logger.log(f"#"*27)
         logger.log(f"##### Generation {generation}/{N_generations} #####")
         logger.log(f"#"*27)
 
         # Orientation matching
-        match(phased, orientations_p, slices_p, n_images_per_rank)
+        match(phased, orientations_p, slices_p, n_images_per_rank, ready_objs)
         # Solve autocorrelation
         solved, solve_ac_dict = solve_ac(solve_ac_dict,
                                          generation, pixel_position,
@@ -125,14 +131,15 @@ def main_spinifel(pixel_position, pixel_distance, pixel_index, slices_p, n_image
             print(f"checking convergence: FSC calculation", flush=True)
             fsc = compute_fsc_task(phased, fsc)
             converge = check_convergence_task(fsc)
+            #execution_fence(block=False)
             converge = converge.get()
             if converge:
                 break
     #fill regions so they get garbage collected
     fill_region(orientations, 0)
     fill_phase_regions(phased_regions_dict)
-    return solve_ac_dict
-
+    fill_autocorrelation_regions(solve_ac_dict)
+#    execution_fence(block=True)
 
 # read the data and run the main algorithm. This can be repeated
 @nvtx.annotate("legion/main.py", is_prefix=True)
@@ -153,6 +160,12 @@ def main():
     max_batch_size = settings.N_images_max
     n_points = Tunable.select(Tunable.GLOBAL_PYS).get()
     solve_ac_dict = None
+
+    N_generations = settings.N_generations
+    N_gens_stream = settings.N_gens_stream
+    assert(N_gens_stream <= N_generations)
+    start_gen=0
+    end_gen=N_gens_stream
     while not done:
         # slices_p reflects union of new images that have been loaded
         # and earlier images in the previous partition
@@ -163,16 +176,22 @@ def main():
                                                     max_batch_size,
                                                     max_batch_size,
                                                     n_points)
+        if cur_batch_size == max_batch_size:
+            end_gen=N_generations
+        if settings.verbose:
+            print(f'cur_batch_size = {cur_batch_size}, batch_size = {batch_size}, N_image_batches_max={settings.N_image_batches_max}, max_batch_size={max_batch_size}, start_gen={start_gen}, end_gen={end_gen}', flush=True)
         execution_fence(block=True)
-        solve_ac_dict = main_spinifel(pixel_position, pixel_distance, pixel_index, slices_p, cur_batch_size,solve_ac_dict)
+        main_spinifel(pixel_position, pixel_distance, pixel_index, slices, slices_p, cur_batch_size,solve_ac_dict, start_gen, end_gen)
+        start_gen=end_gen
+        end_gen=min(N_generations, end_gen+N_gens_stream)
+        if end_gen > N_generations:
+            end_gen = N_generations
         if cur_batch_size == max_batch_size:
             done = True
         if not done:
             for i in range(settings.N_image_batches_max):
                 slices_p, gen_run, gen_smd, run, pixel_distance, pixel_index, pixel_position = load_psana_subset(gen_run, gen_smd, batch_size, cur_batch_size, slices, all_partitions, run, slices_images, slices_images_p, i, pixel_position, pixel_distance, pixel_index)
                 cur_batch_size = cur_batch_size + batch_size
-                if settings.verbose:
-                    print(f'cur_batch_size = {cur_batch_size}, batch_size = {batch_size}, N_image_batches_max={settings.N_image_batches_max}, max_batch_size={max_batch_size}')
                 if cur_batch_size==max_batch_size:
                     break
 
