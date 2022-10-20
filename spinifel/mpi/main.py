@@ -188,9 +188,9 @@ def main():
             dist_recip_max = None
             if settings.ref_path.is_file():
                 dist_recip_max = np.max(pixel_distance_reciprocal)
-                if str(settings.ref_path[-3:]) == 'mrc':
+                if str(settings.ref_path)[-3:] == 'mrc':
                     reference = mrcfile.open(settings.ref_path).data
-                elif str(settings.ref_path[-3:]) == 'pdb':
+                elif str(settings.ref_path)[-3:] == 'pdb':
                     reference = compute_reference(
                         settings.ref_path, settings.M, dist_recip_max
                     )
