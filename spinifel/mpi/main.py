@@ -4,6 +4,7 @@ from spinifel.prep import save_mrc, compute_pixel_distance, binning_mean, binnin
 import numpy as np
 import PyNVTX as nvtx
 import os
+import mrcfile
 
 from .prep import get_data, compute_mean_image, show_image, bin_data
 from .phasing import phase
