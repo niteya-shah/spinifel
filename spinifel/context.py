@@ -131,7 +131,7 @@ class SpinifelContexts(metaclass=Singleton):
 
         settings = SpinifelSettings()
         if settings.verbose:
-            print(f"Rank {self.rank} assigned to device {self.dev_id}")
+            print(f"Rank {self.rank} assigned to device {self.dev_id} (total devices: {drv.Device.count()})")
 
         self._cuda_initialized = True
 
