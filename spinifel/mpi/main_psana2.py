@@ -1,5 +1,5 @@
 from spinifel import settings, utils, contexts, checkpoint, image
-from spinifel.prep import save_mrc, compute_pixel_distance, binning_mean, binning_index
+from spinifel.prep import save_mrc, compute_pixel_distance, binning_mean, binning_index, load_pixel_position_reciprocal_psana
 
 import numpy as np
 import PyNVTX as nvtx
@@ -107,12 +107,9 @@ def main():
     pixel_index_map = np.moveaxis(_pixel_index_map[:], -1, 0)
     raw_pixel_index_map = pixel_index_map
 
-    pixel_position_reciprocal = None
+    pixel_position_reciprocal = np.zeros((3,) + settings.reduced_det_shape)
     if hasattr(run.beginruns[0].scan[0].raw, "pixel_position_reciprocal"):
-        _pixel_position_reciprocal = (
-            run.beginruns[0].scan[0].raw.pixel_position_reciprocal
-        )
-        pixel_position_reciprocal = np.moveaxis(_pixel_position_reciprocal[:], -1, 0)
+        load_pixel_position_reciprocal_psana(run, pixel_position_reciprocal)
         raw_pixel_position_reciprocal = pixel_position_reciprocal
 
     pixel_position = None
@@ -259,7 +256,6 @@ def main():
 
             # Intitilize merge and orientation matching 
             if nufft is None:
-                logger.log(f"Initialize nufft")
                 nufft = NUFFT(
                     settings, pixel_position_reciprocal, pixel_distance_reciprocal, cn_processed_events
                 )
@@ -279,6 +275,7 @@ def main():
                     nufft,
                 )
                 log_cuda_mem_info(logger)
+            logger.log(f"Initialized NUFFT in {timer.lap():.2f}s.")
 
             # Solve autocorrelation first for generation 0
             if generation == 0:
