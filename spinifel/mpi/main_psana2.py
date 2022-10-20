@@ -288,13 +288,17 @@ def main():
                 if settings.checkpoint and comm.rank == writer_rank:
                     reference = None
                     dist_recip_max = None
-                    if settings.pdb_path.is_file():
+                    if settings.ref_path.is_file():
                         dist_recip_max = np.max(pixel_distance_reciprocal)
-                        reference = compute_reference(
-                            settings.pdb_path, settings.M, dist_recip_max
-                        )
-                        logger.log(f"Reference created in {timer.lap():.2f}s.")
-
+                        if settings.ref_path[-3:] == 'mrc':
+                            reference = mrcfile.open(settings.ref_path).data
+                        elif settings.ref_path[-3:] == 'pdb':
+                            reference = compute_reference(
+                                settings.ref_path, settings.M, dist_recip_max
+                            )
+                            logger.log(f"Reference created in {timer.lap():.2f}s.")
+                        else:
+                            logger.log(f"PDB or MRC format required for reference. Convergence check will not be performed.")
                     myRes = {
                         "pixel_position_reciprocal": pixel_position_reciprocal,
                         "pixel_distance_reciprocal": pixel_distance_reciprocal,

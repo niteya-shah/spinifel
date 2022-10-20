@@ -445,10 +445,10 @@ class SpinifelSettings(metaclass=Singleton):
                 parse_bool, True,
                 "Aggresively clear CuPy mempool"
             ),
-            "_pdb_path": (
-                "fsc", "pdb_path",
+            "_ref_path": (
+                "fsc", "ref_path",
                 Path, Path(""),
-                "Path for the PDB File"
+                "Path for the reference PDB or MRC File"
             ),
             "_fsc_zoom": (
                 "fsc", "fsc_zoom",
@@ -493,7 +493,7 @@ class SpinifelSettings(metaclass=Singleton):
             "TEST": ("_test", get_str),
             "VERBOSE": ("_verbose", get_bool),
             "DATA_DIR": ("_data_dir", get_path),
-            "PDB_PATH": ("_pdb_path", get_path),
+            "REF_PATH": ("_ref_path", get_path),
             "DATA_FILENAME": ("_data_filename", get_str),
             "USE_PSANA": ("_use_psana", get_bool),
             "OUT_DIR": ("_out_dir", get_path),
