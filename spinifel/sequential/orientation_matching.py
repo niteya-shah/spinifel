@@ -180,7 +180,7 @@ class SNM:
         en_match = time.monotonic()
         match_time += en_match - match_start
 
-        print(f"Match tot:{en_match-st_init:.2f}s. slice={slices_time:.2f}s. match={match_time:.2f}s. slice_oh={slice_init-st_init:.2f}s. match_oh={match_oth_time:.2f}s.")
+        print(f"|-->Match tot:{en_match-st_init:.2f}s. slice={slices_time:.2f}s. match={match_time:.2f}s. slice_oh={slice_init-st_init:.2f}s. match_oh={match_oth_time:.2f}s.")
         return self.nufft.ref_orientations[index]
 
 @nvtx.annotate("sequential/orientation_matching.py", is_prefix=True)
