@@ -104,7 +104,7 @@ def nearest_neighbor(model_slices, slices, batch_size):
 
     # detector size (total pixels) should be >= 16 to use CUDA code
     if settings.use_cuda and slices.shape[1] >= 16:
-        deviceId = rank % settings._devices_per_node
+        deviceId = context.dev_id
         if settings.verbose:
             print(
                 f"Using CUDA  to calculate Euclidean distance and heap sort (batch_size={batch_size})")
