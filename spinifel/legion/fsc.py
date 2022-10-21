@@ -2,6 +2,7 @@ import numpy  as np
 import PyNVTX as nvtx
 import pygion
 import math
+import mrcfile
 from pygion import task, RO
 from spinifel import settings
 from spinifel import utils
@@ -20,9 +21,9 @@ def init_fsc_task(pixel_distance):
         print(f"started init_fsc Task", flush=True)
         
     dist_recip_max = np.max(pixel_distance.reciprocal)
-    if settings.ref_path[-3:] == 'mrc':
+    if str(settings.ref_path)[-3:] == 'mrc':
         fsc['reference'] = mrcfile.open(settings.ref_path).data
-    if settings.ref_path[-3:] == 'pdb':
+    if str(settings.ref_path)[-3:] == 'pdb':
         fsc['reference'] = compute_reference(
             settings.ref_path, settings.M,
             dist_recip_max)

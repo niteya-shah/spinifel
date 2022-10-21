@@ -4,6 +4,7 @@ from spinifel.prep import save_mrc, compute_pixel_distance, binning_mean, binnin
 import numpy as np
 import PyNVTX as nvtx
 import os
+import mrcfile
 
 from .prep import compute_mean_image, show_image, bin_data
 from .phasing import phase
@@ -290,9 +291,9 @@ def main():
                     dist_recip_max = None
                     if settings.ref_path.is_file():
                         dist_recip_max = np.max(pixel_distance_reciprocal)
-                        if settings.ref_path[-3:] == 'mrc':
+                        if str(settings.ref_path)[-3:] == 'mrc':
                             reference = mrcfile.open(settings.ref_path).data
-                        elif settings.ref_path[-3:] == 'pdb':
+                        elif str(settings.ref_path)[-3:] == 'pdb':
                             reference = compute_reference(
                                 settings.ref_path, settings.M, dist_recip_max
                             )
