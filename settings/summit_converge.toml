@@ -37,7 +37,7 @@ N_binning = 0
 N_orientations = 10000 # model_slices
 N_batch_size = 1000
 [fsc]
-pdb_path = "setup/skopi/examples/input/pdb/3iyf.pdb"
+ref_path = "setup/skopi/examples/input/pdb/3iyf.pdb"
 fsc_zoom = 0.6
 fsc_nsearch = 420
 

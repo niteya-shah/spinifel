@@ -46,7 +46,7 @@ N_batch_size = 100
 N_images_max = 10000
 
 [fsc]
-pdb_path="setup/skopi/examples/input/pdb/3iyf.pdb"
+ref_path="setup/skopi/examples/input/pdb/3iyf.pdb"
 fsc_zoom=0.6
 fsc_nsearch=420
 
