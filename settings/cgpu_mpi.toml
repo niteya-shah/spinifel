@@ -44,6 +44,6 @@ N_orientations = 10000  # model_slices
 N_batch_size = 100
 
 [fsc]
-ref_path="setup/skopi/examples/input/pdb/3iyf.pdb"
+ref_path="/global/cfs/cdirs/m2859/data/3iyf/clean/3iyf.mrc"
 zoom=0.6
 
