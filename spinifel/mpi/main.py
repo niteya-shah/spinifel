@@ -12,7 +12,7 @@ from spinifel.sequential.orientation_matching import SNM
 from .autocorrelation import MergeMPI
 from spinifel.extern.nufft_ext import NUFFT
 
-from eval.fsc import compute_fsc, compute_reference
+from eval.fsc import compute_fsc
 from eval.align import align_volumes
 
 # Old solve_act and match for debugging in psana2 branch
