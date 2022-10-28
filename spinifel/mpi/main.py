@@ -1,11 +1,11 @@
 from spinifel import settings, utils, contexts, checkpoint, image
-from spinifel.prep import save_mrc, compute_pixel_distance, binning_mean, binning_index
+from spinifel.prep import save_mrc, compute_pixel_distance, binning_mean, binning_index, load_ref
 
 import numpy as np
 import PyNVTX as nvtx
 import os
 
-from .prep import get_data, compute_mean_image, show_image, bin_data, load_ref
+from .prep import get_data, compute_mean_image, show_image, bin_data
 from .phasing import phase
 
 from spinifel.sequential.orientation_matching import SNM
