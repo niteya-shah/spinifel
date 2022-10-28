@@ -2,12 +2,12 @@ import numpy  as np
 import PyNVTX as nvtx
 import pygion
 import math
-import mrcfile
 from pygion import task, RO
 from spinifel import settings
 from spinifel import utils
 from . import utils as lgutils
-from eval.fsc import compute_fsc, compute_reference
+from spinifel.prep import load_ref
+from eval.fsc import compute_fsc
 from eval.align import align_volumes
 if settings.use_cupy:
     import cupy
@@ -21,12 +21,9 @@ def init_fsc_task(pixel_distance):
         print(f"started init_fsc Task", flush=True)
         
     dist_recip_max = np.max(pixel_distance.reciprocal)
-    if str(settings.ref_path)[-3:] == 'mrc':
-        fsc['reference'] = mrcfile.open(settings.ref_path).data
-    if str(settings.ref_path)[-3:] == 'pdb':
-        fsc['reference'] = compute_reference(
-            settings.ref_path, settings.M,
-            dist_recip_max)
+    fsc['reference'], statement = load_ref(str(settings.ref_path),
+                                           settings.M,
+                                           dist_recip_max=dist_recip_max)
     fsc['final'] = 0.0
     fsc['delta'] = 1.0
     fsc['res'] = 0.0
@@ -36,6 +33,7 @@ def init_fsc_task(pixel_distance):
     fsc['converge'] = False
 
     if settings.verbose:
+        print(statement, flush=True)
         print(f"finished init_fsc Task", flush=True)
     return fsc
 
