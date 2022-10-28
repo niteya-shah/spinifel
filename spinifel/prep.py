@@ -6,6 +6,7 @@ import mrcfile
 import PyNVTX            as nvtx
 
 from matplotlib.colors import LogNorm
+import scipy.ndimage
 
 from spinifel import settings
 
@@ -209,3 +210,46 @@ def load_pixel_position_reciprocal_psana(run, pixel_position_reciprocal):
         else:
             pixel_position_reciprocal[:] = np.moveaxis(_pixel_position_reciprocal[:], -1, 0)
 
+
+@nvtx.annotate("prep.py", is_prefix=True)
+def load_ref(ref_path, M, dist_recip_max=None):
+    """
+    Load the reference volume. If a PDB file is provided, compute
+    the density map using skopi. If an MRC file is provided, load
+    and downsample as needed.
+    
+    Parameters
+    ----------
+    ref_path : str
+        path to reference file in MRC or PDB format
+    M : int
+        dimensions of cubic reconstruction volume
+    dist_recip_max : float
+        max resolution in 1/A, required for PDB input
+        
+    Returns
+    -------
+    reference : ndarray, 3d
+        reference volume of shape (M,M,M)
+    log : str 
+        logging statement 
+    """
+    if ref_path[-3:] == 'mrc':
+        reference = mrcfile.open(ref_path).data
+        log = f"Reference loaded from {ref_path}"
+        if reference.shape[0] != M:
+            ratio = M / reference.shape[0]
+            reference = scipy.ndimage.zoom(reference, ratio)
+            assert reference.shape[0] == M
+            if ratio > 1:
+                log += "\nWarning: reference had to be upsampled, so the FSC may be inaccurate."
+            else:
+                log += "\nReference was downsampled to match the reconstruction dimensions."
+    elif ref_path[-3:] == 'pdb':
+        reference = compute_reference(ref_path, M, dist_recip_max)
+        log = f"Reference created in {timer.lap():.2f}s."
+    else:
+        reference = None
+        log = f"PDB or MRC format required for reference. Convergence check will not be performed."
+
+    return reference, log

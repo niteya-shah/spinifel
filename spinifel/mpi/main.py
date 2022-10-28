@@ -4,9 +4,8 @@ from spinifel.prep import save_mrc, compute_pixel_distance, binning_mean, binnin
 import numpy as np
 import PyNVTX as nvtx
 import os
-import mrcfile
 
-from .prep import get_data, compute_mean_image, show_image, bin_data
+from .prep import get_data, compute_mean_image, show_image, bin_data, load_ref
 from .phasing import phase
 
 from spinifel.sequential.orientation_matching import SNM
@@ -185,19 +184,13 @@ def main():
         ac = mg.solve_ac(curr_gen)
         logger.log(f"AC recovered in {timer.lap():.2f}s.")
         if comm.rank == writer_rank and settings.checkpoint:
-            reference = None
             dist_recip_max = None
             if settings.ref_path.is_file():
                 dist_recip_max = np.max(pixel_distance_reciprocal)
-                if str(settings.ref_path)[-3:] == 'mrc':
-                    reference = mrcfile.open(settings.ref_path).data
-                elif str(settings.ref_path)[-3:] == 'pdb':
-                    reference = compute_reference(
-                        settings.ref_path, settings.M, dist_recip_max
-                    )
-                    logger.log(f"Reference created in {timer.lap():.2f}s.")
-                else:
-                    logger.log(f"PDB or MRC format required for reference. Convergence check will not be performed.")
+                reference, statement = load_ref(str(settings.ref_path),
+                                                settings.M,
+                                                dist_recip_max=dist_recip_max)
+                logger.log(statement)
             myRes = {
                 "pixel_position_reciprocal": pixel_position_reciprocal,
                 "pixel_distance_reciprocal": pixel_distance_reciprocal,
