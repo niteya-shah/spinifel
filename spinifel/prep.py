@@ -237,7 +237,7 @@ def load_ref(ref_path, M, dist_recip_max=None):
     """
     if ref_path[-3:] == 'mrc':
         reference = mrcfile.open(ref_path).data
-        log = f"Reference loaded from {ref_path}"
+        log = f"Reference loaded from {ref_path}."
         if reference.shape[0] != M:
             ratio = M / reference.shape[0]
             reference = scipy.ndimage.zoom(reference, ratio)
@@ -248,7 +248,7 @@ def load_ref(ref_path, M, dist_recip_max=None):
                 log += "\nReference was downsampled to match the reconstruction dimensions."
     elif ref_path[-3:] == 'pdb':
         reference = compute_reference(ref_path, M, dist_recip_max)
-        log = f"Reference created in {timer.lap():.2f}s."
+        log = f"Reference computed from {ref_path}."
     else:
         reference = None
         log = f"PDB or MRC format required for reference. Convergence check will not be performed."
