@@ -9,6 +9,7 @@ from matplotlib.colors import LogNorm
 import scipy.ndimage
 
 from spinifel import settings
+from eval.fsc import compute_reference
 
 
 @nvtx.annotate("prep.py", is_prefix=True)
