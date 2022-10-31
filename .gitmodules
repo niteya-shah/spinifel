@@ -15,7 +15,12 @@
 	url = https://github.com/chuckie82/pysingfel.git
 [submodule "setup/cufinufft"]
 	path = setup/cufinufft
-	url = https://github.com/flatironinstitute/cufinufft.git
+	url = https://github.com/darrenjhsu/cufinufft.git
+	branch = djh/PyBindGPU
+[submodule "setup/PybindGPU"]
+	path = setup/PybindGPU
+	url = https://github.com/darrenjhsu/PybindGPU.git
+	branch = crusher
 [submodule "setup/skopi"]
 	path = setup/skopi
 	url = https://github.com/chuckie82/skopi.git

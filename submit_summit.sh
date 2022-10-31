@@ -14,8 +14,13 @@ source setup/env.sh
 export CUPY_CACHE_DIR=/tmp # used to be $PWD/setup/cupy
 export MPLCONFIGDIR=/tmp # writable directory for matplotlib
 export PYCUDA_CACHE_DIR=/tmp 
+export test_data_dir=/gpfs/alpine/world-shared/chm137/iris/testdata
+export out_dir=/gpfs/alpine/proj-shared/chm137/${LOGNAME}/spinifel_output
+export https_proxy=http://proxy.ccs.ornl.gov:3128  # access psana2 calibration dbs
 
-jsrun -n 6 -a 1 -c 7 -g 1 -b rs -d packed python -m spinifel --default-settings=summit_quickstart.toml --mode=mpi
+jsrun -n3 -g1 python -m spinifel --default-settings=quickstart.toml --mode=psana2
+
+#jsrun -n 6 -a 1 -c 7 -g 1 -b rs -d packed python -m spinifel --default-settings=summit_quickstart.toml --mode=mpi
 
 t_end=`date +%s`
 echo PSJobCompleted TotalElapsed $((t_end-t_start)) $t_start $t_end
