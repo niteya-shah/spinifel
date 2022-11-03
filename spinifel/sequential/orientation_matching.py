@@ -67,7 +67,6 @@ class SNM:
 
         self.reciprocal_extent = pixel_distance_reciprocal.max()
         self.pixel_position_reciprocal = pixel_position_reciprocal
-
         self.slices_ = xp.array(
             slices_.reshape(
                 (self.N_slices,

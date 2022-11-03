@@ -14,6 +14,7 @@ from spinifel.sequential.orientation_matching import SNM
 from spinifel.sequential.autocorrelation import Merge
 if settings.use_cupy:
     import cupy
+    import pycuda.driver as cuda
 
 all_objs  = {}
 
@@ -503,18 +504,26 @@ def load_image_batch(run, gen_run, gen_smd, slices_p):
                 break
         gen_smd = smd_chunks_steps(run)
     return gen_run, gen_smd, run
-
 @task(leaf=True, privileges=[RO, RO, RO])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def setup_objects_task(pixel_position, pixel_distance, slices):
     global all_objs
     N_images_per_rank = slices.ispace.domain.extent[0]
-    # release all memory used by cupy aggressively
-    if settings.use_cupy and settings.cupy_mempool_clear:
-        mempool = cupy.get_default_memory_pool()
-        mempool.free_all_blocks()
 
+
+    if settings.verbose and settings.use_cupy:
+        mem0 = cuda.mem_get_info()
+        print(f'{socket.gethostname()}: gpu memory: in setup_objects_task = {(mem0[1]-mem0[0])/1e9:.2f}GB ,gpu_total={mem0[1]/1e9:.2f}GB', flush=True)
+
+    # release all memory used by cupy aggressively
+    if settings.use_cupy:
+        if settings.cupy_mempool_clear:
+            mempool = cupy.get_default_memory_pool()
+            mempool.free_all_blocks()
+            if settings.verbose:
+                mem0 = cuda.mem_get_info()
+                print(f'{socket.gethostname()}: gpu memory: after free cupy mempool in setup_objects_task = {(mem0[1]-mem0[0])/1e9:.2f}GB ,gpu_total={mem0[1]/1e9:.2f}GB',flush=True)
     # update nufft
     if 'nufft' in all_objs:
         all_objs['nufft'].update_fields(N_images_per_rank)
@@ -536,6 +545,9 @@ def setup_objects_task(pixel_position, pixel_distance, slices):
         all_objs['nufft'])
     done = True
 
+    if settings.verbose and settings.use_cupy:
+        mem0 = cuda.mem_get_info()
+        print(f'{socket.gethostname()}: gpu memory: after allocation in setup_objects_task = {(mem0[1]-mem0[0])/1e9:.2f}GB ,gpu_total={mem0[1]/1e9:.2f}GB')
     return done
 
 @nvtx.annotate("legion/prep.py", is_prefix=True)
@@ -544,4 +556,6 @@ def prep_objects(pixel_position, pixel_distance, slices, N_procs):
     for i in range(N_procs):
         done = setup_objects_task(pixel_position, pixel_distance, slices[i], point=i)
         done_list.append(done)
+    for i in range(N_procs):
+        assert(done_list[i].get() == True)
     return done_list

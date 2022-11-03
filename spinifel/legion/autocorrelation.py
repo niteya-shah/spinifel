@@ -88,7 +88,8 @@ def get_nonuniform_positions(ac_dict, N_procs, ready_objs):
     nonuniform_p = ac_dict['nonuniform_p']
     for i in range(N_procs):
         gen_nonuniform_positions(
-            orientations_p[i], nonuniform_p[i], ready_objs[i],
+            orientations_p[i], nonuniform_p[i],
+            ready_objs[i],
             point=i)
 
 #equivalent to setup_linops
@@ -189,6 +190,41 @@ def prep_Fantisupport(uregion, M):
     assert np.all(Fantisup[:] == Fantisup[::-1, ::-1, ::-1])
 
 
+# garbage collect all autocorrelation regions
+@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
+def fill_autocorrelation_regions(solve_dict):
+
+    if solve_dict is None:
+        return
+
+    # garbage collect all regions
+    if 'uregion' in solve_dict:
+        pygion.fill(solve_dict['uregion'], "ADb", 0.0)
+        pygion.fill(solve_dict['uregion'], "F_antisupport", True)
+    if 'uregion_ups' in solve_dict:
+        lgutils.fill_region_task(solve_dict['uregion_ups'], complex(0,0))
+
+    if 'nonuniform_v' in solve_dict:
+        lgutils.fill_region_task(solve_dict['nonuniform_v'], 0.0)
+
+    if 'nonuniform' in solve_dict:
+        lgutils.fill_region_task(solve_dict['nonuniform'], 0.0)
+
+    if 'ac' in solve_dict:
+        pygion.fill(solve_dict['ac'], "support", True)
+        pygion.fill(solve_dict['ac'], "estimate", 0.0)
+
+    if 'summary' in solve_dict:
+        pygion.fill(solve_dict['summary'], "rank", 0)
+        pygion.fill(solve_dict['summary'], "rlambda", 0.0)
+        pygion.fill(solve_dict['summary'], "v1", 0.0)
+        pygion.fill(solve_dict['summary'], "v2", 0.0)
+
+    if 'results' in solve_dict:
+        pygion.fill(solve_dict['results'], "ac", 0.0)
+    if 'results_r' in solve_dict:
+        pygion.fill(solve_dict['results_r'], "ac", 0.0)
+
 # create all the region
 # initialize regions
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
@@ -246,8 +282,6 @@ def prepare_solve_all_gens(slices_p, solve_dict):
 
     if 'nonuniform_v' in solve_dict:
         lgutils.fill_region_task(solve_dict['nonuniform_v'], 0.0)
-    else:
-        print(f' nonuniform_v NOT in solve_dict ')
 
     solve_dict['nonuniform_v'] = nonuniform_v
     solve_dict['nonuniform_v_p'] = nonuniform_v_p
@@ -302,8 +336,6 @@ def prepare_solve_all_gens(slices_p, solve_dict):
     solve_dict['results'] = results
     solve_dict['results_p'] = results_p
     solve_dict['results_r'] = results_r
-
-
     # create a dictionary of regions/partitions
     return solve_dict
 

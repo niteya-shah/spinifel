@@ -27,3 +27,4 @@ fi
 pytest -s tests/test_main.py
 pytest -s spinifel/tests/test_main.py
 
+
