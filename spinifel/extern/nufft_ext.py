@@ -45,7 +45,6 @@ class NUFFT:
         self.reduced_det_shape = settings.reduced_det_shape
         self.oversampling = settings.oversampling
         self.N_pixels = np.prod(self.reduced_det_shape)
-
         # For psana2 streaming, no. of images can grow over no. of generations
         if images_per_rank is None:
             self.N_images = settings.N_images_per_rank
