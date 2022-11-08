@@ -29,7 +29,7 @@ N_images_per_rank = 1000
 use_cuda = true 
 use_cufinufft = true
 use_cupy = true
-use_single_prec = false 
+use_single_prec = true 
 chk_convergence = true
 
 [gpu]
