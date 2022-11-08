@@ -142,6 +142,9 @@ class SNM:
         match_time = 0
         match_oth_time = 0
         slice_init = time.monotonic()
+
+        # Note: [Niteya] Each rank calculates 10k orientation independently
+        # and applies that to its own set of images.
         for i in range(self.N_orientations // self.N_batch_size):
             slice_start = time.monotonic()
             st = i * self.N_batch_size

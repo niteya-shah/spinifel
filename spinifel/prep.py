@@ -129,8 +129,11 @@ def binning_index(arr): return bin2nx2n_index(
 @nvtx.annotate("prep.py", is_prefix=True)
 def load_pixel_position_reciprocal(pixel_position_reciprocal):
     with h5py.File(settings.data_path, 'r') as h5f:
-        pixel_position_reciprocal[:] = np.moveaxis(
-            h5f['pixel_position_reciprocal'][:], -1, 0)
+        _pixel_position_reciprocal = h5f['pixel_position_reciprocal'][:]
+        if _pixel_position_reciprocal.shape[0] == 3:
+            pixel_position_reciprocal[:] = _pixel_position_reciprocal
+        else:
+            pixel_position_reciprocal[:] = np.moveaxis(_pixel_position_reciprocal[:], -1, 0)
 
 
 

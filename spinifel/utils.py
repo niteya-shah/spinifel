@@ -46,12 +46,16 @@ class Timer():
 
 
 class Logger():
-    def __init__(self, active):
+    def __init__(self, active, myrank=None):
         self.active = active
+        self.myrank = myrank
 
     def log(self, msg):
         if self.active:
-            print(msg, flush=True)
+            if self.myrank is None:
+                print(msg, flush=True)
+            else:
+                print(f'rank:{self.myrank} {msg}', flush=True)
 
 
 

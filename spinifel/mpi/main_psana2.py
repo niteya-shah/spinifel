@@ -60,11 +60,11 @@ def main():
 
     # Reading input images using psana2
     from psana import DataSource
+    
+    ds = DataSource(exp=settings.ps_exp, run=settings.ps_runnum, dir=settings.ps_dir, batch_size=settings.ps_batch_size)
 
-    ds = DataSource(exp=settings.ps_exp, run=settings.ps_runnum, dir=settings.ps_dir)
-
-    # Setup logger after knowing the writer rank
-    logger = utils.Logger(comm.rank == writer_rank)
+    # Setup logger for all worker ranks
+    logger = utils.Logger(contexts.is_worker, myrank=comm.rank)
     logger.log("In MPI main")
     if settings.use_psana:
         logger.log("Using psana")
@@ -72,9 +72,12 @@ def main():
     logger.log(f"#workers  : {N_big_data_nodes:d}")
     logger.log(f"writerrank: {writer_rank}")
     logger.log(f"#img/rank : {N_images_per_rank}")
+    logger.log(f"PS_SMD_N_EVENTS: {os.environ.get('PS_SMD_N_EVENTS','10000')}")
+    logger.log(f"ps batch_size: {settings.ps_batch_size}")
 
     # Skip this data saving and ac calculation in test mode
     generation = 0
+    reference_dict = {"reference": None, "dist_recip_max": None}
     if settings.load_gen > 0:  # Load input from previous generation
         generation = settings.load_gen
         print(
@@ -110,7 +113,10 @@ def main():
     pixel_position_reciprocal = np.zeros((3,) + settings.reduced_det_shape)
     if hasattr(run.beginruns[0].scan[0].raw, "pixel_position_reciprocal"):
         load_pixel_position_reciprocal_psana(run, pixel_position_reciprocal)
+        if settings.use_single_prec:
+            pixel_position_reciprocal = pixel_position_reciprocal.astype(np.float32)
         raw_pixel_position_reciprocal = pixel_position_reciprocal
+
 
     pixel_position = None
     if hasattr(run.beginruns[0].scan[0].raw, "pixel_position"):
@@ -142,8 +148,12 @@ def main():
 
     flag_converged = False
 
+    logger.log(f"Initialized in {timer.lap():.2f}s.")
     # Looping over events and run spinifel when receive enough events
     for i_evt, evt in enumerate(run.events()):
+        # Quit reading when max generations reached
+        if generation == N_generations: ds.terminate()
+
         # Only need to do once for data that needs to convert pixel_position
         if pixel_position_reciprocal is None:
             photon_energy = det.raw.photon_energy(evt)
@@ -184,12 +194,21 @@ def main():
             and cn_processed_events % N_images_per_rank == 0
             and generation < N_generations
         ):
+            logger.log(f"#" * 42)
+            logger.log(
+                f"##### Generation {generation}/{N_generations} Slices:{cn_processed_events}/{N_images_max}#####"
+            )
+            logger.log(f"#" * 42)
+            logger.log(f"Loaded in {timer.lap():.2f}s.")
+            
             # Computes reciprocal distance and mean of new images then save to .png
             # prior to binning.
             raw_pixel_distance_reciprocal = compute_pixel_distance(
                 raw_pixel_position_reciprocal
             )
+            
             mean_image = compute_mean_image(raw_slices_)
+            
             # This is only done on first worker rank - other ranks will see None for mean_image
             if mean_image is not None:
                 show_image(
@@ -247,12 +266,7 @@ def main():
             # Create an operating window into all the slices
             slices_ = all_slices_[:cn_processed_events, :]
 
-            logger.log(f"Loaded in {timer.lap():.2f}s.")
-            logger.log(f"#" * 42)
-            logger.log(
-                f"##### Generation {generation}/{N_generations} Slices:{cn_processed_events}/{N_images_max}#####"
-            )
-            logger.log(f"#" * 42)
+            logger.log(f"Images prepared in {timer.lap():.2f}s.")
 
             # Intitilize merge and orientation matching 
             if nufft is None:
@@ -284,24 +298,23 @@ def main():
                 ac = mg.solve_ac(generation)
                 logger.log(f"AC recovered in {timer.lap():.2f}s.")
 
-                # If the pdb file is given and checkpoint is set, the writer rank will calculate this
-                if settings.checkpoint and comm.rank == writer_rank:
-                    reference = None
-                    dist_recip_max = None
-                    if settings.pdb_path.is_file():
-                        dist_recip_max = np.max(pixel_distance_reciprocal)
-                        reference = compute_reference(
-                            settings.pdb_path, settings.M, dist_recip_max
-                        )
-                        logger.log(f"Reference created in {timer.lap():.2f}s.")
+                # If the pdb file is given, the writer rank will calculate this
+                if settings.pdb_path.is_file() and settings.chk_convergence and comm.rank == writer_rank:
+                    dist_recip_max = np.max(pixel_distance_reciprocal)
+                    reference = compute_reference(
+                        settings.pdb_path, settings.M, dist_recip_max
+                    )
+                    logger.log(f"Reference created in {timer.lap():.2f}s.")
+                    reference_dict["reference"] = reference
+                    reference_dict["dist_recip_max"] = dist_recip_max
 
+                # If the checkpoint is set, the writer rank will calculate this
+                if settings.checkpoint and comm.rank == writer_rank:
                     myRes = {
                         "pixel_position_reciprocal": pixel_position_reciprocal,
                         "pixel_distance_reciprocal": pixel_distance_reciprocal,
                         "slices_": slices_,
                         "ac": ac,
-                        "reference": reference,
-                        "dist_recip_max": dist_recip_max,
                     }
                     checkpoint.save_checkpoint(
                         myRes, settings.out_dir, generation, tag="solve_ac", protocol=4
@@ -310,7 +323,7 @@ def main():
                 ac_phased, support_, rho_ = phase(generation, ac)
                 logger.log(f"Problem phased in {timer.lap():.2f}s.")
 
-                if comm.rank == writer_rank:
+                if settings.checkpoint and comm.rank == writer_rank:
                     myRes = {
                         **myRes,
                         **{
@@ -323,7 +336,9 @@ def main():
                     checkpoint.save_checkpoint(
                         myRes, settings.out_dir, generation, tag="phase", protocol=4
                     )
-                    # Save electron density and intensity
+                
+                # Save electron density and intensity
+                if comm.rank == writer_rank:
                     rho = np.fft.ifftshift(rho_)
                     intensity = np.fft.ifftshift(
                         np.abs(np.fft.fftshift(ac_phased) ** 2)
@@ -349,7 +364,7 @@ def main():
 
             logger.log(f"Orientations matched in {timer.lap():.2f}s.")
 
-            if comm.rank == writer_rank:
+            if settings.checkpoint and comm.rank == writer_rank:
                 myRes = {
                     **myRes,
                     **{
@@ -372,7 +387,7 @@ def main():
             ac = mg.solve_ac(generation, orientations, ac_phased)
             logger.log(f"AC recovered in {timer.lap():.2f}s.")
 
-            if comm.rank == writer_rank:
+            if settings.checkpoint and comm.rank == writer_rank:
                 myRes = {
                     **myRes,
                     **{
@@ -392,7 +407,7 @@ def main():
 
             logger.log(f"Problem phased in {timer.lap():.2f}s.")
 
-            if comm.rank == writer_rank:
+            if settings.checkpoint and comm.rank == writer_rank:
                 myRes = {
                     **myRes,
                     **{
@@ -413,34 +428,35 @@ def main():
                 save_mrc(settings.out_dir / f"ac-{generation}.mrc", ac_phased)
                 save_mrc(settings.out_dir / f"intensity-{generation}.mrc", intensity)
                 save_mrc(settings.out_dir / f"rho-{generation}.mrc", rho)
-
-                # Save output
-                myRes = {
-                    **myRes,
-                    **{
-                        "ac_phased": ac_phased,
-                        "support_": support_,
-                        "rho_": rho_,
-                        "orientations": orientations,
-                    },
-                }
-                checkpoint.save_checkpoint(
-                    myRes, settings.out_dir, generation, tag="", protocol=4
-                )
+                
+                if settings.checkpoint:
+                    # Save output
+                    myRes = {
+                        **myRes,
+                        **{
+                            "ac_phased": ac_phased,
+                            "support_": support_,
+                            "rho_": rho_,
+                            "orientations": orientations,
+                        },
+                    }
+                    checkpoint.save_checkpoint(
+                        myRes, settings.out_dir, generation, tag="", protocol=4
+                    )
 
                 # Check convergence w.r.t reference electron density
-                if myRes["reference"] is not None:
+                if reference_dict["reference"] is not None:
                     prev_cc = final_cc
                     ali_volume, ali_reference, final_cc = align_volumes(
                         rho,
-                        myRes["reference"],
+                        reference_dict["reference"],
                         zoom=settings.fsc_zoom,
                         sigma=settings.fsc_sigma,
                         n_iterations=settings.fsc_niter,
                         n_search=settings.fsc_nsearch,
                     )
                     resolution, rshell, fsc_val = compute_fsc(
-                        ali_reference, ali_volume, myRes["dist_recip_max"]
+                        ali_reference, ali_volume, reference_dict["dist_recip_max"]
                     )
                     delta_cc = final_cc - prev_cc
                     logger.log("Align volumes")
@@ -462,6 +478,7 @@ def main():
                     flag_converged = True
                     ds.terminate()
 
+            logger.log(f"Check convergence done in {timer.lap():.2f}s.")
             # Keeps record of last seen slice and reset processed event counter
             # (will be updated when N_images_per_rank is met)
             last_seen_slice = cn_processed_events - 1
@@ -489,6 +506,7 @@ def main():
                     nufft = None
 
 
+            logger.log(f"Free memory done in {timer.lap():.2f}s.")
             # Update generation
             generation += 1
 

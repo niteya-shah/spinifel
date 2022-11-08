@@ -31,7 +31,7 @@ if [[ ${target} = *"ascent"* ]]; then
 elif [[ ${target} = *"summit"* ]]; then
     export test_data_dir="/gpfs/alpine/proj-shared/chm137/data/testdata"
     export out_dir="/gpfs/alpine/proj-shared/chm137/test_main/${CI_PIPELINE_ID}/spinifel_output"
-elif [[ ${target} = *"cgpu"* ]]; then
+elif [[ ${target} = *"cgpu"* || ${target} = *"perlmutter"* ]]; then
     export test_data_dir="${CFS}/m2859/data/testdata"
     export out_dir="${SCRATCH}/spinifel_output"
 fi
@@ -41,9 +41,9 @@ fi
 if [[ ${target} = *"summit"* || ${target} = *"ascent"* ]]; then
     export SPINIFEL_TEST_LAUNCHER="jsrun -n2 -a1 -g1"
     export SPINIFEL_PSANA2_LAUNCHER="jsrun -n3 -g1"
-elif [[ ${target} = *"cgpu"* ]]; then
+elif [[ ${target} = *"cgpu"* || ${target} = *"perlmutter"* ]]; then
     export SPINIFEL_TEST_LAUNCHER="srun -n1 -G1"
-    export SPINIFEL_PSANA2_LAUNCHER="srun -n3 -G1"
+    export SPINIFEL_PSANA2_LAUNCHER="srun -n3 -G3"
 fi
 
 
@@ -58,7 +58,7 @@ $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mo
 
 
 # test_finufft
-$SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi runtime.use_cufinufft=false fsc.fsc_min_cc=0.6 fsc.fsc_min_change_cc=0.1
+$SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi runtime.use_cufinufft=false fsc.fsc_min_cc=0.6 fsc.fsc_min_change_cc=0.1 runtime.use_single_prec=false
 
 
 # test_legion
@@ -66,7 +66,7 @@ PYTHONPATH="$PYTHONPATH:$EXTERNAL_WORKDIR:$PWD/mpi4py_poison_wrapper" $SPINIFEL_
 
 
 # test_nocuda
-$SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi runtime.use_cufinufft=false runtime.use_cuda=false runtime.use_cupy=false fsc.fsc_min_cc=0.6 fsc.fsc_min_change_cc=0.1
+$SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi runtime.use_cufinufft=false runtime.use_cuda=false runtime.use_cupy=false fsc.fsc_min_cc=0.6 fsc.fsc_min_change_cc=0.1 runtime.use_single_prec=false
 
 
 # test_psana2/ test_psana2_stream
@@ -74,7 +74,3 @@ $SPINIFEL_PSANA2_LAUNCHER python -u -m spinifel --settings=./settings/test_mpi.t
 $SPINIFEL_PSANA2_LAUNCHER python -u -m spinifel --settings=./settings/test_mpi.toml --mode=psana2 psana.enable=true
 
 
-# debug test - keeping it for now
-if [[ ${target} = *"cgpu"* ]]; then
-    srun -n3 -G1 python -u -m spinifel --settings=./settings/cgpu_mpi_gpu.toml --mode=psana2
-fi

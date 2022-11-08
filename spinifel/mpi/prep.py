@@ -6,6 +6,7 @@ from matplotlib.colors import LogNorm
 from mpi4py import MPI
 
 from spinifel import settings, prep, image, contexts
+from spinifel.prep import load_pixel_position_reciprocal_psana
 
 
 @nvtx.annotate("mpi/prep.py", is_prefix=True)
@@ -65,9 +66,6 @@ def get_slices_and_pixel_info(N_images_per_rank, ds):
     pixel_index_map = None
     N_images_loaded = 0
 
-    # TODO: Legion - we can make callback works for spinifel
-    # ds.analyze(callback, N_images_per_rank)
-
     for run in ds.runs():
         # TODO: We will need all detnames below to be part of toml file.
         det = run.Detector("amopnccd")
@@ -82,14 +80,9 @@ def get_slices_and_pixel_info(N_images_per_rank, ds):
         _pixel_index_map = run.beginruns[0].scan[0].raw.pixel_index_map
         pixel_index_map = np.moveaxis(_pixel_index_map[:], -1, 0)
 
-        pixel_position_reciprocal = None
+        pixel_position_reciprocal = np.zeros((3,) + settings.reduced_det_shape)
         if hasattr(run.beginruns[0].scan[0].raw, "pixel_position_reciprocal"):
-            _pixel_position_reciprocal = (
-                run.beginruns[0].scan[0].raw.pixel_position_reciprocal
-            )
-            pixel_position_reciprocal = np.moveaxis(
-                _pixel_position_reciprocal[:], -1, 0
-            )
+            load_pixel_position_reciprocal_psana(run, pixel_position_reciprocal)
 
         pixel_position = None
         if hasattr(run.beginruns[0].scan[0].raw, "pixel_position"):
@@ -165,18 +158,19 @@ def show_image(
     image_sax_name,
 ):
     """Asks a unique worker rank to write sample images to disk."""
-    show = False
-    if ds is None:
-        if rank == 0:
-            show = True
-    else:
-        if ds.unique_user_rank():
-            show = True
+    if settings.show_image:
+        show = False
+        if ds is None:
+            if rank == 0:
+                show = True
+        else:
+            if ds.unique_user_rank():
+                show = True
 
-    if show:
-        image.show_image(pixel_index_map, slices_[0], image_0_name)
-        image.show_image(pixel_index_map, mean_image, image_mean_name)
-        prep.export_saxs(pixel_distance_reciprocal, mean_image, image_sax_name)
+        if show:
+            image.show_image(pixel_index_map, slices_[0], image_0_name)
+            image.show_image(pixel_index_map, mean_image, image_mean_name)
+            prep.export_saxs(pixel_distance_reciprocal, mean_image, image_sax_name)
 
 
 @nvtx.annotate("mpi/prep.py", is_prefix=True)
@@ -184,6 +178,9 @@ def get_data(N_images_per_rank, ds):
     """
     Load intensity slices, reciprocal pixel position, index map
     Perform binning
+
+    Note that pixel_position_reciprocal is converted to the expected shape
+    in get_pixel_position_reciprocal and get_slices_and_pixel_info.
     """
     comm = contexts.comm
     rank = comm.rank
@@ -199,6 +196,9 @@ def get_data(N_images_per_rank, ds):
         pixel_position_reciprocal = pixel_info["pixel_position_reciprocal"]
         pixel_index_map = pixel_info["pixel_index_map"]
     N_images_local = slices_.shape[0]
+    
+    if settings.use_single_prec:
+        pixel_position_reciprocal = pixel_position_reciprocal.astype(np.float32)
 
     return (pixel_position_reciprocal, pixel_index_map, slices_)
 

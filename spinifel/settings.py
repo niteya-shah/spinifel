@@ -195,6 +195,11 @@ class SpinifelSettings(metaclass=Singleton):
                 parse_bool, True,
                 "save intermediate checkpoint"
             ),
+            "_show_image": (
+                "debug", "show_image",
+                parse_bool, True,
+                "save png files"
+            ),
             "_data_dir": (
                 "data", "in_dir",
                 Path, Path(""),
@@ -704,7 +709,13 @@ class SpinifelSettings(metaclass=Singleton):
                 return 1
             return 0
         return self._verbosity # noqa: E1101 pylint: disable=no-member
-
+    
+    @property
+    def show_image(self):
+        """
+        save png files
+        """
+        return self._show_image 
 
     @property
     def data_path(self):
