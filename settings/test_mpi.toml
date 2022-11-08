@@ -1,0 +1,57 @@
+# This toml file contains settings for testing orientation matching 
+# and mpi/main with xtc2 data (no streaming).
+
+[debug]
+test = "CI settings"
+verbose = true
+verbosity = 0
+use_callmonitor = false
+
+[data]
+in_dir = "${test_data_dir}/3IYF"
+out_dir = "${out_dir}"
+name = "3iyf_sim_10k.h5"
+
+[detector]
+shape = [1, 128, 128]
+
+[psana]
+enable = false
+ps_smd_n_events = 10000
+ps_eb_nodes = 1
+ps_srv_nodes = 0
+ps_dir = "${test_data_dir}/3IYF/xtc2"       # This tests mpi/main using xtc2 w/o streaming
+exp = "xpptut15"
+runnum = 1
+
+[runtime]
+N_images_per_rank = 1000
+use_cuda = true 
+use_cufinufft = true
+use_cupy = true
+use_single_prec = true 
+chk_convergence = true
+
+[gpu]
+devices_per_node = 1
+
+[algorithm]
+N_generations = 20
+nER = 50
+nHIO = 25
+beta = 0.3
+cutoff = 0.05
+N_phase_loops = 10
+N_clipping = 0
+N_binning = 0
+N_orientations = 10000  # model_slices
+N_batch_size = 1000
+N_images_max = 6000
+
+[fsc]
+pdb_path="setup/skopi/examples/input/pdb/3iyf.pdb"
+fsc_zoom=0.6
+fsc_nsearch=420
+fsc_min_cc=0.8         # see https://gitlab.osti.gov/mtip/spinifel/-/wikis/Perlmutter-Baseline-Convergence
+fsc_min_change_cc=0.05
+fsc_fraction_known_orientations=0.75

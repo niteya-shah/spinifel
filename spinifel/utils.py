@@ -23,9 +23,9 @@ def getMyUnfairShare(numJobs, numWorkers, rank):
         allJobs = np.arange(numJobs)
         jobChunks = np.array_split(allJobs, numWorkers)
         myChunk = jobChunks[rank]
-        myJobs = allJobs[myChunk[0]:myChunk[-1]+1]
+        myJobs = allJobs[myChunk[0]:myChunk[-1] + 1]
         return myJobs
-    except:
+    except BaseException:
         return None
 
 
@@ -46,18 +46,26 @@ class Timer():
 
 
 class Logger():
-    def __init__(self, active):
+    def __init__(self, active, myrank=None):
         self.active = active
+        self.myrank = myrank
 
     def log(self, msg):
         if self.active:
-            print(msg, flush=True)
+            if self.myrank is None:
+                print(msg, flush=True)
+            else:
+                print(f'rank:{self.myrank} {msg}', flush=True)
 
 
 
 class Singleton(type):
     _instances = {}
+
     def __call__(cls, *args, **kwargs):
         if cls not in cls._instances:
-            cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
+            cls._instances[cls] = super(
+                Singleton, cls).__call__(
+                *args, **kwargs)
         return cls._instances[cls]
+

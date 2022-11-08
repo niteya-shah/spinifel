@@ -1,0 +1,40 @@
+# This toml file contains settings for the Cori quicktart
+
+[debug]
+test = "Quickstart settings for Cori"
+verbose = true
+verbosity = 0
+use_callmonitor = false
+
+[data]
+in_dir = "${CFS}/m2859/data/3iyf/clean"
+out_dir = "${SCRATCH}/spinifel_output"
+name = "3iyf_128x128pixels_500k.h5"
+
+[detector]
+shape = [1, 128, 128]
+
+[psana]
+enable = false
+ps_smd_n_events = 0
+
+[runtime]
+N_images_per_rank = 1000
+use_cuda = true
+use_cufinufft = true
+use_cupy = true
+use_single_prec = false
+
+[gpu]
+devices_per_node = 1
+
+[algorithm]
+nER = 10
+nHIO = 5
+beta = 0.9
+cutoff = 5e-2
+N_phase_loops = 5
+N_clipping = 1
+N_binning = 4
+N_orientations = 1000
+N_batch_size = 1000

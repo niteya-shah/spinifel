@@ -6,7 +6,7 @@ fix_lib () {
 
     __fix_lib_link () {
 
-        blacklist=(ssl crypto krb5 stdc++)
+        blacklist=(openjp2) # ssl crypto krb5 stdc++
         fn=$(basename -- $1)
 
         safe=true
@@ -23,11 +23,10 @@ fix_lib () {
         then
             echo "Overwriting: $fn with $1" >> fix_lib.log
             mv $fn fix_lib_moveasie/
+            ln -sf $1
         else
             echo "Skipping: $fn due to blacklist" >> fix_lib.log
         fi
-
-        ln -sf $1
     }
 
     mkdir -p fix_lib_moveasie
