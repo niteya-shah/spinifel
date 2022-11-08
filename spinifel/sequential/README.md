@@ -47,8 +47,6 @@ and `Wi` is the `i`th dimension of `W`.
 Heap sort is used to sort the distances computed earlier. The base algorithm is
 adopted from GeeksforGeeks website https://www.geeksforgeeks.org/heap-sort/.
 
-
-
 ## Code Implementation in CUDA
 
 ### Euclidean Distance
@@ -82,7 +80,15 @@ In the current implementations, each thread computes Euclidean distance between
 multiple data and reference images result in better utilization of GPU
 resources, and improves performance.
 
+### Optimized Euclidean Distance
+
+The optimized euclidean distance uses the expansion of (x - y)^2 and re-formats
+it into matrix operations to take advantage of Tensor Cores. 
 
 ### Sorting
 
 The algorithm adopted from GeeksforGeeks is ported onto GPU using CUDA.
+
+### Optimized Argmin
+
+Optimized takes advantage of CUB Device Segmented Argmin to use tree based reductions for the GPUs.

@@ -4,12 +4,11 @@
 #include <iostream>
 #include <sstream>
 #include <chrono>
-#include <cuda.h>
-#include <cuda_runtime.h>
-#include <cuda_runtime_api.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
 #include <pybind11/stl.h>
+
+#include "cuda_hip_wrapper.h"
 
 using namespace std;
 using namespace std::chrono;
@@ -20,7 +19,7 @@ const int TILE = 16;
 const int imgPerThread = 6;
 
 //CUDA kernel used to computed Euclidean distance across data images and reference images.
-__global__ void computeEuDistSharReg(float *dataImgs, float *refImgs, float *euDist, int numDataImgs, int numRefImgs, long int totalPixels)
+__global__ void computeEuDistSharReg(float *refImgs, float *dataImgs, float *euDist, int numRefImgs, int numDataImgs, long int totalPixels)
 {
         int txId = threadIdx.x;
         int tyId = threadIdx.y;
@@ -610,16 +609,16 @@ __global__ void computeKSort(float *dKDist, int *dKIndex, int numDataImgs, int t
 }
 
 //Function used to invoke CUDA kernels.
-py::array_t<dtype> cudaComputeEuclideanDistance(py::array_t<dtype> dataImgs, py::array_t<dtype> refImgs, int numDataImgs, int numRefImgs, int totalPixels, int deviceId)
+py::array_t<dtype> cudaComputeEuclideanDistance(py::array_t<dtype> refImgs, py::array_t<dtype> dataImgs, int numRefImgs, int numDataImgs, int totalPixels, int deviceId)
 {
-	cout<<"[CUDA] In CUDA Euclidean distance function."<<endl;
-	cout<<"[CUDA] Using deviceId: " << deviceId <<endl;
+	//cout<<"[CUDA] In CUDA Euclidean distance function."<<endl;
+	//cout<<"[CUDA] Using deviceId: " << deviceId <<endl;
 	py:: buffer_info dataBuf = dataImgs.request();
 	py:: buffer_info refBuf = refImgs.request();
-	cout<<"[CUDA] Dimension of dataImgs: "<<dataBuf.ndim<<" and refImgs: "<<refBuf.ndim<<endl;
-	cout<<"[CUDA] Size of dataImgs: "<<dataBuf.size<<" and refImgs: "<<refBuf.size<<endl;
+	//cout<<"[CUDA] Dimension of dataImgs: "<<dataBuf.ndim<<" and refImgs: "<<refBuf.ndim<<endl;
+	//cout<<"[CUDA] Size of dataImgs: "<<dataBuf.size<<" and refImgs: "<<refBuf.size<<endl;
 
-    cudaSetDevice(deviceId);
+    	cudaSetDevice(deviceId);
 
 	//Declare and allocate device variables
 	dtype *dDataImgs, *dRefImgs, *dEuDist;
@@ -646,7 +645,7 @@ py::array_t<dtype> cudaComputeEuclideanDistance(py::array_t<dtype> dataImgs, py:
 
 	auto start = high_resolution_clock::now();
 	//Copy host to device
-	cout<<"[CUDA] Copy data from host to device."<<endl;
+	//cout<<"[CUDA] Copy data from host to device."<<endl;
 	cudaMemcpy(dDataImgs, dataPtr, numDataImgs*totalPixels*sizeof(dtype), cudaMemcpyHostToDevice);
 	cudaMemcpy(dRefImgs, refPtr, numRefImgs*totalPixels*sizeof(dtype), cudaMemcpyHostToDevice);
 	//cudaMemcpy(dEuDist, euDistPtr, numDataImgs*numRefImgs*sizeof(dtype), cudaMemcpyHostToDevice);
@@ -659,11 +658,11 @@ py::array_t<dtype> cudaComputeEuclideanDistance(py::array_t<dtype> dataImgs, py:
         dim3 grid((numRefImgs + xImgPerBlock - 1) / xImgPerBlock, (numDataImgs + yImgPerBlock - 1) / yImgPerBlock);
 
 	//Kernel Call
-        computeEuDistSharReg<<<grid, block>>>(dDataImgs,dRefImgs,dEuDist,numDataImgs,numRefImgs,totalPixels);
+        computeEuDistSharReg<<<grid, block>>>(dRefImgs,dDataImgs,dEuDist,numRefImgs,numDataImgs,totalPixels);
         cudaDeviceSynchronize();
 
 	//Copy device to host
-	cout<<"[CUDA] Copy data from device to host."<<endl;
+	//cout<<"[CUDA] Copy data from device to host."<<endl;
 	cudaMemcpy(euDistPtr,dEuDist,numDataImgs*numRefImgs*sizeof(float),cudaMemcpyDeviceToHost);
 
 	//cout<<"[CUDA] euDistPtr values from kernel:"<<endl;
@@ -682,11 +681,11 @@ py::array_t<dtype> cudaComputeEuclideanDistance(py::array_t<dtype> dataImgs, py:
 
 py::array_t<int> cudaComputeHeapSort(py::array_t<dtype> euDist, int numDataImgs, int numRefImgs, long int totalPixels, int totalNN, int deviceId)
 {
-	    cout<<"[CUDA] In CUDA Heap sort function."<<endl;
-	    cout<<"[CUDA] Using deviceId: " << deviceId <<endl;
+	    //cout<<"[CUDA] In CUDA Heap sort function."<<endl;
+	    //cout<<"[CUDA] Using deviceId: " << deviceId <<endl;
         py:: buffer_info euDistBuf = euDist.request();
-        cout<<"[CUDA] Dimension of euDist: "<<euDistBuf.ndim<<endl;
-        cout<<"[CUDA] Size of euDist: "<<euDistBuf.size<<endl;
+        //cout<<"[CUDA] Dimension of euDist: "<<euDistBuf.ndim<<endl;
+        //cout<<"[CUDA] Size of euDist: "<<euDistBuf.size<<endl;
 
         cudaSetDevice(deviceId);
 
@@ -699,8 +698,8 @@ py::array_t<int> cudaComputeHeapSort(py::array_t<dtype> euDist, int numDataImgs,
         //Allocate euDist
         py::array_t<int> kIndex = py::array_t<int>(numDataImgs*totalNN);
         py::buffer_info kIndexBuf = kIndex.request();
-	cout<<"[CUDA] Dimension of kIndex: "<<kIndexBuf.ndim<<endl;
-        cout<<"[CUDA] Size of kIndex: "<<kIndexBuf.size<<endl;
+	//cout<<"[CUDA] Dimension of kIndex: "<<kIndexBuf.ndim<<endl;
+        //cout<<"[CUDA] Size of kIndex: "<<kIndexBuf.size<<endl;
 
         //Obtain numpy data pointer
         dtype* euDistPtr = reinterpret_cast<dtype*>(euDistBuf.ptr);

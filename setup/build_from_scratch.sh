@@ -8,7 +8,7 @@ root_dir=$(readlink -f $(dirname "${BASH_SOURCE[0]}"))
 pushd $root_dir
 
 # Enable host overwrite
-target=${SPINIFEL_TARGET:-$(hostname --fqdn)}
+target=${SPINIFEL_TARGET:-${NERSC_HOST:-$(hostname --fqdn)}}
 
 # Enable CUDA build
 cuda_build=${SPINIFEL_BUILD_CUDA:-true}
@@ -28,6 +28,9 @@ mkdir -p install/bin
 mkdir -p install/include
 mkdir -p install/lib
 mkdir -p install/share
+
+# clear pip cache
+rm -rf ~/.cache/pip
 
 #-------------------------------------------------------------------------------
 
@@ -60,11 +63,19 @@ rm conda-installer.sh
 
 source $CONDA_ROOT/etc/profile.d/conda.sh
 
+# Unfortunately, some packages need to be pinned to specific hashes
+# (not merely versions) because these break on Summit/Ascent. This is
+# inherently unportable (the hash relies on the architecture), so we
+# have to make sure we specify this only for the affected architectures.
+if [[ $(uname -p) = "ppc64le" ]]; then
+    ppc64le_target=1
+fi
+
 PACKAGE_LIST=(
     python=$PYVER
-    matplotlib
+    matplotlib=3.5.1 # https://gitlab.osti.gov/mtip/spinifel/-/issues/54
     numpy
-    scipy
+    scipy=1.7.3${ppc64le_target+=py38he743248_0} # https://gitlab.osti.gov/mtip/spinifel/-/issues/54
     pytest
     h5py
 
@@ -75,7 +86,7 @@ PACKAGE_LIST=(
     tqdm  # convenience
 
     # lcls2
-    setuptools=46.4.0  # temp need specific version
+    setuptools=46.4.0
     cmake
     cython
     mongodb
@@ -88,7 +99,12 @@ PACKAGE_LIST=(
     prometheus_client
 )
 
-conda create -y -p "$CONDA_ENV_DIR" "${PACKAGE_LIST[@]}" -c defaults -c anaconda
+
+if [[ ${target} = "psbuild"* ]]; then
+    conda create -y -p "$CONDA_ENV_DIR" "${PACKAGE_LIST[@]}" -c conda-forge
+else
+   conda create -y -p "$CONDA_ENV_DIR" "${PACKAGE_LIST[@]}" -c defaults -c anaconda
+fi
 
 conda activate "$CONDA_ENV_DIR"
 
@@ -96,35 +112,55 @@ conda activate "$CONDA_ENV_DIR"
 conda install -y amityping -c lcls-ii
 conda install -y bitstruct krtc -c conda-forge
 
-# Extra deps required for psana machines, since there is no module system
-if [[ ${target} = "psbuild"* ]]; then
-    conda install -y compilers openmpi cudatoolkit-dev -c conda-forge
+# Important: install CuPy first, it is now a dependency for mpi4py (at least in some cases)
+(
+    if [[ $(hostname --fqdn) = *".crusher."* ]]; then
+        export CUPY_INSTALL_USE_HIP=1
+        export ROCM_HOME=$ROCM_PATH
+        export HCC_AMDGPU_TARGET=gfx90a
+        pip install --no-cache-dir cupy
+    elif [[ $(hostname --fqdn) = *".spock."* ]]; then
+        export CUPY_INSTALL_USE_HIP=1
+        export ROCM_HOME=$ROCM_PATH
+        export HCC_AMDGPU_TARGET=gfx908
+        pip install --no-cache-dir cupy
+    else
+        pip install --no-cache-dir cupy
+    fi
+)
+
+# Extra deps required for psana machines
+if [[ ${target} = "psbuild"* ]]
+then
+    conda install -y -c conda-forge \
+        compilers                   \
+        openmpi                     \
+        cudatoolkit=11.4            \
+        cudatoolkit-dev=11.4        \
+        cmake                       \
+        make                        \
+        cupy                        \
+        mpi4py                      \
+        mrcfile
+else
+    CC=$MPI4PY_CC MPICC=$MPI4PY_MPICC pip install -v --no-binary mpi4py mpi4py
+    pip install --no-cache-dir mrcfile
+    LDFLAGS=$CUPY_LDFLAGS pip install --no-cache-dir cupy
 fi
 
 # Install pip packages
-CC=$MPI4PY_CC MPICC=$MPI4PY_MPICC pip install -v --no-binary mpi4py mpi4py
 pip install --no-cache-dir callmonitor
 pip install --no-cache-dir PyNVTX
-pip install --no-cache-dir mrcfile
-pip install --no-cache-dir cupy
+
+# Pin sckit-learn to 1.0.2 w/o breaking psana (see issue #51)
+conda remove --force -y scikit-learn
+conda install --freeze-installed -y scikit-learn=1.0.2
 
 #-------------------------------------------------------------------------------
 
 
 #_______________________________________________________________________________
-# Overwrite the conda libraries with system libraries => don't let anaconda
-# provide libraries (like openmp) that are already provided by the system
-
-if [[ ${target} = *"summit"* || ${target} = *"ascent"* ]]
-then
-    ${root_dir}/../scripts/fix_lib_olcf.sh
-fi
-
-#-------------------------------------------------------------------------------
-
-
-#_______________________________________________________________________________
-# Insall GASNET
+# Install GASNET
 
 if [[ $LEGION_USE_GASNET -eq 1 && $GASNET_ROOT == ${root_dir}/gasnet/release ]]
 then
@@ -205,6 +241,31 @@ fi
 #-------------------------------------------------------------------------------
 
 
+#_______________________________________________________________________________
+# Overwrite the conda libraries with system libraries => don't let anaconda
+# provide libraries (like openmp) that are already provided by the system
+
+# FIXME (Elliott): After this point, CMake will be BROKEN. If you try
+# to do any further builds, they will NOT work. The error looks like:
+#
+# cmake: symbol lookup error: cmake: undefined symbol: uv_fs_get_system_error
+#
+# This is probably happening because we're overwriting important
+# libraries from Conda with system ones. Unfortunately, this does not
+# work. I think the long term solution needs to be more precise about
+# exactly what system libraries we're going to get (e.g., OpenMP, but
+# not others). What we've got right now is far too indiscriminant. But
+# as an immediate hack, we'll just put this as late in the build as
+# possible so that we hope we don't mess with anything important.
+#
+# *Only required for Summit and not Ascent.
+
+if [[ ${target} = *"summit"* ]]
+then
+    ${root_dir}/../scripts/fix_lib_olcf.sh
+fi
+
+#-------------------------------------------------------------------------------
 
 
 
@@ -216,4 +277,6 @@ echo "Done. Please run 'source setup/env.sh' to use this build."
 
 # Restore the LD_PRELOAD variable
 export LD_PRELOAD=$__LD_PRELOAD
+
+
 export popd
