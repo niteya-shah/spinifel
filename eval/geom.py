@@ -6,6 +6,7 @@ from .config import xp, ndimage
 Batched versions of skopi geometry functions for handling rotations.
 """
 
+
 def quaternion2rot3d(quat):
     """
     Convert a set of quaternions to rotation matrices.
@@ -35,17 +36,18 @@ def quaternion2rot3d(quat):
 
     # Obtain the rotation matrix
     rotation = xp.zeros((quat.shape[0], 3, 3))
-    rotation[:, 0, 0] = (1. - 2. * (q22 + q33))
-    rotation[:, 0, 1] = 2. * (q12 - q03)
-    rotation[:, 0, 2] = 2. * (q13 + q02)
-    rotation[:, 1, 0] = 2. * (q12 + q03)
-    rotation[:, 1, 1] = (1. - 2. * (q11 + q33))
-    rotation[:, 1, 2] = 2. * (q23 - q01)
-    rotation[:, 2, 0] = 2. * (q13 - q02)
-    rotation[:, 2, 1] = 2. * (q23 + q01)
-    rotation[:, 2, 2] = (1. - 2. * (q11 + q22))
+    rotation[:, 0, 0] = 1.0 - 2.0 * (q22 + q33)
+    rotation[:, 0, 1] = 2.0 * (q12 - q03)
+    rotation[:, 0, 2] = 2.0 * (q13 + q02)
+    rotation[:, 1, 0] = 2.0 * (q12 + q03)
+    rotation[:, 1, 1] = 1.0 - 2.0 * (q11 + q33)
+    rotation[:, 1, 2] = 2.0 * (q23 - q01)
+    rotation[:, 2, 0] = 2.0 * (q13 - q02)
+    rotation[:, 2, 1] = 2.0 * (q23 + q01)
+    rotation[:, 2, 2] = 1.0 - 2.0 * (q11 + q22)
 
     return rotation
+
 
 def axis_angle_to_quaternion(axis, theta):
     """
@@ -72,6 +74,7 @@ def axis_angle_to_quaternion(axis, theta):
 
     return quat
 
+
 def quaternion_product(q1, q0):
     """
     Compute quaternion product, q1 x q0, according to:
@@ -93,12 +96,17 @@ def quaternion_product(q1, q0):
     """
     p0, p1, p2, p3 = q1[:, 0], q1[:, 1], q1[:, 2], q1[:, 3]
     r0, r1, r2, r3 = q0[:, 0], q0[:, 1], q0[:, 2], q0[:, 3]
-    q_prod = xp.array([r0 * p0 - r1 * p1 - r2 * p2 - r3 * p3,
-                       r0 * p1 + r1 * p0 - r2 * p3 + r3 * p2,
-                       r0 * p2 + r1 * p3 + r2 * p0 - r3 * p1,
-                       r0 * p3 - r1 * p2 + r2 * p1 + r3 * p0]).T
+    q_prod = xp.array(
+        [
+            r0 * p0 - r1 * p1 - r2 * p2 - r3 * p3,
+            r0 * p1 + r1 * p0 - r2 * p3 + r3 * p2,
+            r0 * p2 + r1 * p3 + r2 * p0 - r3 * p1,
+            r0 * p3 - r1 * p2 + r2 * p1 + r3 * p0,
+        ]
+    ).T
 
     return q_prod
+
 
 def get_preferred_orientation_quat(num_pts, sigma, base_quat=None):
     """

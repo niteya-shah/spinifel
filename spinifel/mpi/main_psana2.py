@@ -1,5 +1,11 @@
 from spinifel import settings, utils, contexts, checkpoint, image
-from spinifel.prep import save_mrc, compute_pixel_distance, binning_mean, binning_index, load_pixel_position_reciprocal_psana
+from spinifel.prep import (
+    save_mrc,
+    compute_pixel_distance,
+    binning_mean,
+    binning_index,
+    load_pixel_position_reciprocal_psana,
+)
 
 import numpy as np
 import PyNVTX as nvtx
@@ -28,40 +34,54 @@ import gc
 if settings.use_cuda:
     import pycuda.driver as cuda
     import cupy
+
     mempool = cupy.get_default_memory_pool()
     pinned_mempool = cupy.get_default_pinned_memory_pool()
 
+
 def log_cuda_mem_info(logger):
     if settings.use_cuda:
-        (free,total)=cuda.mem_get_info()
-        logger.log(f"Global memory occupancy: {free*100/total:.2f}% free ({free/1e9:.2f}/{total/1e9:.2f} GB)")
-        mempool_used = mempool.used_bytes()*1e-9
-        mempool_total= mempool.total_bytes()*1e-9
-        logger.log(f"|-->Cupy: {mempool_used=:.2f}GB {mempool_total=:.2f}GB {pinned_mempool.n_free_blocks()=:d}")
+        (free, total) = cuda.mem_get_info()
+        logger.log(
+            f"Global memory occupancy: {free*100/total:.2f}% free ({free/1e9:.2f}/{total/1e9:.2f} GB)"
+        )
+        mempool_used = mempool.used_bytes() * 1e-9
+        mempool_total = mempool.total_bytes() * 1e-9
+        logger.log(
+            f"|-->Cupy: {mempool_used=:.2f}GB {mempool_total=:.2f}GB {pinned_mempool.n_free_blocks()=:d}"
+        )
+
 
 @nvtx.annotate("mpi/main.py", is_prefix=True)
 def main():
     assert settings.use_psana
-    
+
     comm = contexts.comm
 
     timer = utils.Timer()
 
     N_images_per_rank = settings.N_images_per_rank
     N_images_max = settings.N_images_max
-    assert N_images_max % N_images_per_rank == 0, "N_images_max must be divisible by N_images_per_rank" 
+    assert (
+        N_images_max % N_images_per_rank == 0
+    ), "N_images_max must be divisible by N_images_per_rank"
 
     N_generations = settings.N_generations
-    
+
     # BigData cores are those excluding Smd0, EventBuilder, & Server cores.
     N_big_data_nodes = comm.size - (1 + settings.ps_eb_nodes + settings.ps_srv_nodes)
-    # Writer rank is the first bigdata core 
-    writer_rank = 1 + settings.ps_eb_nodes  
+    # Writer rank is the first bigdata core
+    writer_rank = 1 + settings.ps_eb_nodes
 
     # Reading input images using psana2
     from psana import DataSource
-    
-    ds = DataSource(exp=settings.ps_exp, run=settings.ps_runnum, dir=settings.ps_dir, batch_size=settings.ps_batch_size)
+
+    ds = DataSource(
+        exp=settings.ps_exp,
+        run=settings.ps_runnum,
+        dir=settings.ps_dir,
+        batch_size=settings.ps_batch_size,
+    )
 
     # Setup logger for all worker ranks
     logger = utils.Logger(contexts.is_worker, myrank=comm.rank)
@@ -117,7 +137,6 @@ def main():
             pixel_position_reciprocal = pixel_position_reciprocal.astype(np.float32)
         raw_pixel_position_reciprocal = pixel_position_reciprocal
 
-
     pixel_position = None
     if hasattr(run.beginruns[0].scan[0].raw, "pixel_position"):
         pixel_position = run.beginruns[0].scan[0].raw.pixel_position
@@ -141,7 +160,7 @@ def main():
     # We also count no. of processed and new images separately from i_evt
     cn_processed_events = 0
     cn_new_events = 0
-    
+
     # For checking if we need to reinitialize nuftt et al.
     nufft = None
     log_cuda_mem_info(logger)
@@ -152,7 +171,8 @@ def main():
     # Looping over events and run spinifel when receive enough events
     for i_evt, evt in enumerate(run.events()):
         # Quit reading when max generations reached
-        if generation == N_generations: ds.terminate()
+        if generation == N_generations:
+            ds.terminate()
 
         # Only need to do once for data that needs to convert pixel_position
         if pixel_position_reciprocal is None:
@@ -200,15 +220,15 @@ def main():
             )
             logger.log(f"#" * 42)
             logger.log(f"Loaded in {timer.lap():.2f}s.")
-            
+
             # Computes reciprocal distance and mean of new images then save to .png
             # prior to binning.
             raw_pixel_distance_reciprocal = compute_pixel_distance(
                 raw_pixel_position_reciprocal
             )
-            
+
             mean_image = compute_mean_image(raw_slices_)
-            
+
             # This is only done on first worker rank - other ranks will see None for mean_image
             if mean_image is not None:
                 show_image(
@@ -268,10 +288,13 @@ def main():
 
             logger.log(f"Images prepared in {timer.lap():.2f}s.")
 
-            # Intitilize merge and orientation matching 
+            # Intitilize merge and orientation matching
             if nufft is None:
                 nufft = NUFFT(
-                    settings, pixel_position_reciprocal, pixel_distance_reciprocal, cn_processed_events
+                    settings,
+                    pixel_position_reciprocal,
+                    pixel_distance_reciprocal,
+                    cn_processed_events,
                 )
                 mg = MergeMPI(
                     settings,
@@ -299,7 +322,11 @@ def main():
                 logger.log(f"AC recovered in {timer.lap():.2f}s.")
 
                 # If the pdb file is given, the writer rank will calculate this
-                if settings.pdb_path.is_file() and settings.chk_convergence and comm.rank == writer_rank:
+                if (
+                    settings.pdb_path.is_file()
+                    and settings.chk_convergence
+                    and comm.rank == writer_rank
+                ):
                     dist_recip_max = np.max(pixel_distance_reciprocal)
                     reference = compute_reference(
                         settings.pdb_path, settings.M, dist_recip_max
@@ -336,7 +363,7 @@ def main():
                     checkpoint.save_checkpoint(
                         myRes, settings.out_dir, generation, tag="phase", protocol=4
                     )
-                
+
                 # Save electron density and intensity
                 if comm.rank == writer_rank:
                     rho = np.fft.ifftshift(rho_)
@@ -355,11 +382,15 @@ def main():
             #    ac_phased, slices_,
             #    pixel_position_reciprocal,
             #    pixel_distance_reciprocal)
-            
+
             # In test mode, we supply some correct orientations to guarantee convergence
-            if int(os.environ.get("SPINIFEL_TEST_FLAG", "0")) and generation==0:
-                logger.log(f"****WARNING**** In Test Mode - supplying {settings.fsc_fraction_known_orientations*100:.1f}% correct orientations")
-                N_supply = int(settings.fsc_fraction_known_orientations * orientations.shape[0])
+            if int(os.environ.get("SPINIFEL_TEST_FLAG", "0")) and generation == 0:
+                logger.log(
+                    f"****WARNING**** In Test Mode - supplying {settings.fsc_fraction_known_orientations*100:.1f}% correct orientations"
+                )
+                N_supply = int(
+                    settings.fsc_fraction_known_orientations * orientations.shape[0]
+                )
                 orientations[:N_supply] = get_known_orientations()[:N_supply]
 
             logger.log(f"Orientations matched in {timer.lap():.2f}s.")
@@ -428,7 +459,7 @@ def main():
                 save_mrc(settings.out_dir / f"ac-{generation}.mrc", ac_phased)
                 save_mrc(settings.out_dir / f"intensity-{generation}.mrc", intensity)
                 save_mrc(settings.out_dir / f"rho-{generation}.mrc", rho)
-                
+
                 if settings.checkpoint:
                     # Save output
                     myRes = {
@@ -469,7 +500,7 @@ def main():
                 final_cc = comm_compute.bcast(final_cc, root=0)
                 delta_cc = comm_compute.bcast(delta_cc, root=0)
                 logger.log(
-                        f"Check convergence resolution: {resolution:.2f} with cc: {final_cc:.3f} delta_cc:{delta_cc:.5f}."
+                    f"Check convergence resolution: {resolution:.2f} with cc: {final_cc:.3f} delta_cc:{delta_cc:.5f}."
                 )
                 if final_cc > min_cc and delta_cc < min_change_cc:
                     logger.log(
@@ -483,7 +514,7 @@ def main():
             # (will be updated when N_images_per_rank is met)
             last_seen_slice = cn_processed_events - 1
             cn_processed_events = 0
-            
+
             # A hack to free gpu memory at the end of a generation. Note that we only
             # need to recreate all these objects when no. of max images hasn't been reached.
             logger.log("Done")
@@ -493,7 +524,7 @@ def main():
                     logger.log("Free GPUArrays and cufinufft plans")
                     nufft.free_gpuarrays_and_cufinufft_plans()
                     log_cuda_mem_info(logger)
-                    logger.log("Free cupy memory pools") 
+                    logger.log("Free cupy memory pools")
                     del nufft
                     del mg
                     del snm
@@ -505,7 +536,6 @@ def main():
                     # new nufft, etc. can be reallocated in the next generation.
                     nufft = None
 
-
             logger.log(f"Free memory done in {timer.lap():.2f}s.")
             # Update generation
             generation += 1
@@ -514,7 +544,7 @@ def main():
 
     # end for i_evt, evt in ...
 
-    if settings.chk_convergence and comm.rank==writer_rank:
+    if settings.chk_convergence and comm.rank == writer_rank:
         msg = f"chk_convergence flag was set and the algorithm did no converge ({settings.fsc_min_cc=}, {settings.fsc_min_change_cc=})."
         assert flag_converged, msg
     logger.log(f"Results saved in {settings.out_dir}")

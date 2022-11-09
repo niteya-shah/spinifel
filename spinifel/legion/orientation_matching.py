@@ -7,15 +7,19 @@ from spinifel import settings
 from . import utils as lgutils
 from . import prep as gprep
 
+
 @nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
 def create_orientations_rp(n_images_per_rank):
     if settings.use_single_prec:
         orientations, orientations_p = lgutils.create_distributed_region(
-            n_images_per_rank, {"quaternions": pygion.float32}, (4,))
+            n_images_per_rank, {"quaternions": pygion.float32}, (4,)
+        )
     else:
         orientations, orientations_p = lgutils.create_distributed_region(
-            n_images_per_rank, {"quaternions": pygion.float64}, (4,))
+            n_images_per_rank, {"quaternions": pygion.float64}, (4,)
+        )
     return orientations, orientations_p
+
 
 @nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
 def match(phased, orientations_p, slices_p, n_images_per_rank, ready_objs=None):
@@ -28,13 +32,12 @@ def match(phased, orientations_p, slices_p, n_images_per_rank, ready_objs=None):
     for idx in range(N_procs):
         # Ideally, the location (point) should be deduced from the
         # location of the slices.
-        i=N_procs-idx-1
+        i = N_procs - idx - 1
         if ready_objs is not None:
-            match_task(
-                phased, orientations_p[i], slices_p[i], ready_objs[i], point=i)
+            match_task(phased, orientations_p[i], slices_p[i], ready_objs[i], point=i)
         else:
-            match_task(
-                phased, orientations_p[i], slices_p[i], None, point=i)
+            match_task(phased, orientations_p[i], slices_p[i], None, point=i)
+
 
 @task(leaf=True, privileges=[RO("ac"), WD("quaternions"), RO("data")])
 @lgutils.gpu_task_wrapper
@@ -45,7 +48,7 @@ def match_task(phased, orientations, slices, ready_obj):
     if ready_obj is not None:
         ready_obj = ready_obj.get()
 
-    snm = gprep.all_objs['snm']
+    snm = gprep.all_objs["snm"]
     orientations.quaternions[:] = snm.slicing_and_match(phased.ac)
 
     if settings.verbosity > 0:

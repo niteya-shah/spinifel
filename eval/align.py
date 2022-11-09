@@ -4,6 +4,7 @@ from .geom import *
 import skopi as sk
 from .config import xp, ndimage
 
+
 def save_mrc(output, data, voxel_size=None, header_origin=None):
     """
     Save numpy array as an MRC file.
@@ -25,13 +26,14 @@ def save_mrc(output, data, voxel_size=None, header_origin=None):
     if voxel_size is not None:
         mrc.voxel_size = voxel_size
     if header_origin is not None:
-        mrc.header['origin']['x'] = float(header_origin['origin']['x'])
-        mrc.header['origin']['y'] = float(header_origin['origin']['y'])
-        mrc.header['origin']['z'] = float(header_origin['origin']['z'])
+        mrc.header["origin"]["x"] = float(header_origin["origin"]["x"])
+        mrc.header["origin"]["y"] = float(header_origin["origin"]["y"])
+        mrc.header["origin"]["z"] = float(header_origin["origin"]["z"])
         mrc.update_header_from_data()
         mrc.update_header_stats()
     mrc.close()
     return
+
 
 def rotate_volume(vol, quat):
     """
@@ -53,19 +55,28 @@ def rotate_volume(vol, quat):
     lincoords = xp.arange(M)
     coords = xp.meshgrid(lincoords, lincoords, lincoords)
 
-    xyz = xp.vstack([coords[0].reshape(-1) - int(M / 2),
-                     coords[1].reshape(-1) - int(M / 2),
-                     coords[2].reshape(-1) - int(M / 2)])
+    xyz = xp.vstack(
+        [
+            coords[0].reshape(-1) - int(M / 2),
+            coords[1].reshape(-1) - int(M / 2),
+            coords[2].reshape(-1) - int(M / 2),
+        ]
+    )
 
     R = quaternion2rot3d(quat)
     transformed_xyz = xp.dot(R, xyz) + int(M / 2)
 
-    new_xyz = xp.array([transformed_xyz[:, 1, :].flatten(),
-                        transformed_xyz[:, 0, :].flatten(),
-                        transformed_xyz[:, 2, :].flatten()])
+    new_xyz = xp.array(
+        [
+            transformed_xyz[:, 1, :].flatten(),
+            transformed_xyz[:, 0, :].flatten(),
+            transformed_xyz[:, 2, :].flatten(),
+        ]
+    )
     rot_vol = ndimage.map_coordinates(vol, new_xyz, order=1)
     rot_vol = rot_vol.reshape((quat.shape[0], M, M, M))
     return rot_vol
+
 
 def center_volume(vol):
     """
@@ -85,6 +96,7 @@ def center_volume(vol):
     new_center = xp.array(xp.array(vol.shape) / 2).astype(int)
     cen_vol = ndimage.shift(vol, -1 * (old_center - new_center))
     return cen_vol
+
 
 def pearson_cc(arr1, arr2):
     """
@@ -109,6 +121,7 @@ def pearson_cc(arr1, arr2):
     # Merge Square root because we have squares
     denom = xp.sqrt(xp.sum(vx**2, axis=1)) * xp.sqrt(xp.sum(vy**2, axis=1))
     return numerator / denom
+
 
 def score_deformations(mrc1, mrc2, warp):
     """
@@ -146,13 +159,10 @@ def score_deformations(mrc1, mrc2, warp):
     ccs = pearson_cc(wmrc1_flat, mrc2_flat)
     return ccs
 
+
 def scan_orientations_fine(
-        mrc1,
-        mrc2,
-        opt_q,
-        prev_score,
-        n_iterations=10,
-        n_search=420):
+    mrc1, mrc2, opt_q, prev_score, n_iterations=10, n_search=420
+):
     """
     Perform a fine alignment search in the vicinity of the input quaternion
     to align mrc1 to mrc2.
@@ -183,24 +193,21 @@ def scan_orientations_fine(
     sigmas = 2 - 0.2 * xp.arange(1, 10)
     for n in range(1, n_iterations):
         quat = get_preferred_orientation_quat(
-            n_search - 1, float(sigmas[n - 1]), base_quat=opt_q)
+            n_search - 1, float(sigmas[n - 1]), base_quat=opt_q
+        )
         quat = xp.vstack((opt_q, quat))
         ccs = score_deformations(mrc1, mrc2, quat)
         if xp.max(ccs) < prev_score:
             break
         else:
             opt_q = quat[xp.argmax(ccs)]
-        #print(torch.max(ccs), opt_q) # useful for debugging
+        # print(torch.max(ccs), opt_q) # useful for debugging
         prev_score = xp.max(ccs)
 
     return opt_q, prev_score
 
-def scan_orientations(
-        mrc1,
-        mrc2,
-        n_iterations=10,
-        n_search=420,
-        nscs=1):
+
+def scan_orientations(mrc1, mrc2, n_iterations=10, n_search=420, nscs=1):
     """
     Find the quaternion and its associated score that best aligns volume mrc1 to mrc2.
     Candidate orientations are scored based on the Pearson correlation coefficient.
@@ -229,7 +236,7 @@ def scan_orientations(
         cross-correlation between aligned mrc1 and mrc2
     """
     # perform a coarse alignment to start
-    quat = xp.array(sk.get_uniform_quat(n_search)) # update for skopi
+    quat = xp.array(sk.get_uniform_quat(n_search))  # update for skopi
     ccs = score_deformations(mrc1, mrc2, quat)
     ccs_order = xp.argsort(ccs)[::-1]
 
@@ -238,21 +245,29 @@ def scan_orientations(
     for n in range(nscs):
         start_q, start_score = quat[ccs_order[n]], ccs[ccs_order[n]]
         opt_q_list[n], ccs_list[n] = scan_orientations_fine(
-            mrc1, mrc2, start_q, start_score, n_iterations=n_iterations, n_search=n_search)
+            mrc1,
+            mrc2,
+            start_q,
+            start_score,
+            n_iterations=n_iterations,
+            n_search=n_search,
+        )
 
     opt_q, score = opt_q_list[xp.argmax(ccs_list)], xp.max(ccs_list)
     return opt_q, score
 
+
 def align_volumes(
-        mrc1,
-        mrc2,
-        zoom=1,
-        sigma=0,
-        n_iterations=10,
-        n_search=420,
-        nscs=1,
-        output=None,
-        voxel_size=None):
+    mrc1,
+    mrc2,
+    zoom=1,
+    sigma=0,
+    n_iterations=10,
+    n_search=420,
+    nscs=1,
+    output=None,
+    voxel_size=None,
+):
     """
     Find the quaternion that best aligns volume mrc1 to mrc2. Volumes are
     optionally preprocessed by up / downsampling and applying a Gaussian
@@ -303,10 +318,10 @@ def align_volumes(
         mrc2 = ndimage.gaussian_filter(mrc2, sigma=sigma)
 
     # evaluate both hands
-    opt_q1, cc1 = scan_orientations(
-        mrc1, mrc2, n_iterations, n_search, nscs=nscs)
+    opt_q1, cc1 = scan_orientations(mrc1, mrc2, n_iterations, n_search, nscs=nscs)
     opt_q2, cc2 = scan_orientations(
-        flip(mrc1, [0, 1, 2]), mrc2, n_iterations, n_search, nscs=nscs)
+        flip(mrc1, [0, 1, 2]), mrc2, n_iterations, n_search, nscs=nscs
+    )
     if cc1 > cc2:
         opt_q, cc_r, invert = opt_q1, cc1, False
     else:
@@ -317,14 +332,12 @@ def align_volumes(
     if invert:
         print("Map had to be inverted")
         mrc1_original = flip(mrc1_original, [0, 1, 2])
-    r_vol = rotate_volume(mrc1_original, xp.expand_dims(
-        opt_q, axis=0))[0]
+    r_vol = rotate_volume(mrc1_original, xp.expand_dims(opt_q, axis=0))[0]
     final_cc = pearson_cc(
-        xp.expand_dims(
-            r_vol.flatten(), axis=0), xp.expand_dims(
-             mrc2_original.flatten(), axis=0))[0]
-    print(
-        f"Final CC between unzoomed / unfiltered volumes is: {final_cc:.3f}")
+        xp.expand_dims(r_vol.flatten(), axis=0),
+        xp.expand_dims(mrc2_original.flatten(), axis=0),
+    )[0]
+    print(f"Final CC between unzoomed / unfiltered volumes is: {final_cc:.3f}")
 
     # Convert CuPy array to NumPy
     if not isinstance(r_vol, np.ndarray):
@@ -334,6 +347,7 @@ def align_volumes(
         save_mrc(output, np.array(r_vol), voxel_size=voxel_size)
 
     return r_vol, mrc2_original, final_cc
+
 
 # Work around for bug in cupy flip and its normalize axis indicies
 def flip(arr, orien):

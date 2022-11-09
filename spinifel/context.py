@@ -125,13 +125,15 @@ class SpinifelContexts(metaclass=Singleton):
         dev = drv.Device(self.dev_id)
         self.ctx = dev.retain_primary_context()
 
-        if settings.mode != "legion" and settings.mode !="legion_psana2":
+        if settings.mode != "legion" and settings.mode != "legion_psana2":
             self.ctx.push()
             register(self.ctx.pop)
 
         settings = SpinifelSettings()
         if settings.verbose:
-            print(f"Rank {self.rank} assigned to device {self.dev_id} (total devices: {drv.Device.count()})")
+            print(
+                f"Rank {self.rank} assigned to device {self.dev_id} (total devices: {drv.Device.count()})"
+            )
 
         self._cuda_initialized = True
 

@@ -196,7 +196,7 @@ def get_data(N_images_per_rank, ds):
         pixel_position_reciprocal = pixel_info["pixel_position_reciprocal"]
         pixel_index_map = pixel_info["pixel_index_map"]
     N_images_local = slices_.shape[0]
-    
+
     if settings.use_single_prec:
         pixel_position_reciprocal = pixel_position_reciprocal.astype(np.float32)
 

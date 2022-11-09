@@ -5,7 +5,9 @@ import numpy as np
 import scipy.interpolate
 import os
 import matplotlib
-matplotlib.use('Agg')
+
+matplotlib.use("Agg")
+
 
 def get_reciprocal_mesh(voxel_number_1d, distance_reciprocal_max, xp):
     """
@@ -28,10 +30,12 @@ def get_reciprocal_mesh(voxel_number_1d, distance_reciprocal_max, xp):
     max_value = distance_reciprocal_max
     linspace = xp.linspace(-max_value, max_value, voxel_number_1d)
     reciprocal_mesh_stack = xp.asarray(
-        xp.meshgrid(linspace, linspace, linspace, indexing='ij'))
+        xp.meshgrid(linspace, linspace, linspace, indexing="ij")
+    )
     reciprocal_mesh = xp.moveaxis(reciprocal_mesh_stack, 0, -1)
 
     return reciprocal_mesh
+
 
 def compute_reference(pdb_file, M, distance_reciprocal_max):
     """
@@ -56,19 +60,17 @@ def compute_reference(pdb_file, M, distance_reciprocal_max):
 
     # set up Particle object
     particle = sk.Particle()
-    particle.read_pdb(pdb_file, ff='WK')
+    particle.read_pdb(pdb_file, ff="WK")
     # compute ideal diffraction volume and take FT for density map
     mesh = get_reciprocal_mesh(M, distance_reciprocal_max, np)
     cfield = pg.calculate_diffraction_pattern_gpu(
-        mesh, particle, return_type='complex_field')
+        mesh, particle, return_type="complex_field"
+    )
     density = np.fft.fftshift(np.fft.ifftn(np.fft.ifftshift(cfield))).real
     return density
 
-def compute_fsc(
-        volume1,
-        volume2,
-        distance_reciprocal_max,
-        spacing=0.01):
+
+def compute_fsc(volume1, volume2, distance_reciprocal_max, spacing=0.01):
     """
     Compute the Fourier shell correlation (FSC) curve, with the
     estimated resolution based on a threshold of 0.5.
@@ -103,14 +105,9 @@ def compute_fsc(
         indices = xp.where((smags > r) & (smags < r + spacing))[0]
         numerator = xp.sum(ft1[indices] * ft2[indices])
         denominator = xp.sqrt(
-            xp.sum(
-                xp.square(
-                    xp.abs(
-                        ft1[indices]))) *
-            xp.sum(
-                    xp.square(
-                        xp.abs(
-                            ft2[indices]))))
+            xp.sum(xp.square(xp.abs(ft1[indices])))
+            * xp.sum(xp.square(xp.abs(ft2[indices])))
+        )
         rshell[i] = r + 0.5 * spacing
         fsc[i] = numerator.real / denominator
 
@@ -128,6 +125,7 @@ def compute_fsc(
 
     return resolution, rshell, fsc
 
+
 def plot(rshell, fsc, output):
     """
     Plot the results of FSC
@@ -136,16 +134,15 @@ def plot(rshell, fsc, output):
     rshell : ndarray
 
     fsc : ndarray
-        
+
     output : string
         directory to which to save png of FSC curve
     """
     f, ax1 = plt.subplots(figsize=(5, 3))
-    ax1.plot(rshell, fsc, c='black')
-    ax1.scatter(rshell, fsc, c='black')
-    ax1.plot([rshell.min(), rshell.max()], [
-             0.5, 0.5], c='grey', linestyle='dashed')
+    ax1.plot(rshell, fsc, c="black")
+    ax1.scatter(rshell, fsc, c="black")
+    ax1.plot([rshell.min(), rshell.max()], [0.5, 0.5], c="grey", linestyle="dashed")
     ax1.set_xlim(rshell.min(), rshell.max())
     ax1.set_xlabel("Resolution (1/${\\mathrm{\\AA}}$)")
     ax1.set_ylabel("FSC", fontsize=12)
-    f.savefig(os.path.join(output, "fsc.png"), dpi=300, bbox_inches='tight')
+    f.savefig(os.path.join(output, "fsc.png"), dpi=300, bbox_inches="tight")

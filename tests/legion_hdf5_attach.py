@@ -15,18 +15,19 @@ def print_region(R):
 def main():
     print("In main", flush=True)
 
-    R = Region([4, 4],
-               {'x': pygion.int32, 'y': pygion.int32,
-                'z': pygion.int32, 'w': pygion.int32})
+    R = Region(
+        [4, 4],
+        {"x": pygion.int32, "y": pygion.int32, "z": pygion.int32, "w": pygion.int32},
+    )
 
     filename = str(Path(os.environ.get("DATA_DIR", "")) / "test.h5")
 
-    with attach_hdf5(R, filename,
-                     {'x': 'x', 'y': 'y', 'z': 'z', 'w': 'w'},
-                     pygion.file_read_only):
-        with acquire(R, ['x', 'y']):
+    with attach_hdf5(
+        R, filename, {"x": "x", "y": "y", "z": "z", "w": "w"}, pygion.file_read_only
+    ):
+        with acquire(R, ["x", "y"]):
             print_region(R)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

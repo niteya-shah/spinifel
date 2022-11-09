@@ -7,7 +7,7 @@ import numpy as np
 
 def get_known_orientations():
     """Returns known orientations for 3iyf
-    
+
     Motivation: our main tests rely on convergence check of the cc between known
     electron density and the calculated one from spinifel. I observed that this
     can fail or pass depending on the starting point. By giving the module a better

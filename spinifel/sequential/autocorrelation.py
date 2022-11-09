@@ -2,18 +2,20 @@ import skopi as skp
 import PyNVTX as nvtx
 
 import matplotlib.pyplot as plt
-from matplotlib          import cm
-from matplotlib.colors   import LogNorm, SymLogNorm
+from matplotlib import cm
+from matplotlib.colors import LogNorm, SymLogNorm
 
 import numpy as np
 from scipy.ndimage import gaussian_filter
 from spinifel import settings, utils, image, autocorrelation
 
 from spinifel import SpinifelSettings
+
 settings = SpinifelSettings()
 if settings.use_cupy:
     import os
-    os.environ['CUPY_ACCELERATORS'] = "cub"
+
+    os.environ["CUPY_ACCELERATORS"] = "cub"
 
     from pycuda import gpuarray
 
@@ -21,8 +23,9 @@ if settings.use_cupy:
     from cupy.linalg import norm
     import cupy as xp
 else:
-    from scipy.linalg        import norm
+    from scipy.linalg import norm
     from scipy.sparse.linalg import LinearOperator, cg
+
     xp = np
 
 if settings.use_single_prec:
@@ -32,14 +35,16 @@ else:
     f_type = xp.float64
     c_type = xp.complex128
 
+
 class Merge:
     def __init__(
-            self,
-            settings,
-            slices_,
-            pixel_position_reciprocal,
-            pixel_distance_reciprocal,
-            nufft):
+        self,
+        settings,
+        slices_,
+        pixel_position_reciprocal,
+        pixel_distance_reciprocal,
+        nufft,
+    ):
         # We store variables in memory so that we don't end up recreating them
         # every time
         self.M = settings.M
@@ -76,7 +81,7 @@ class Merge:
         self.N_pixels = np.prod(reduced_det_shape)
 
         lu = np.linspace(-np.pi, np.pi, self.M)
-        Hu_, Ku_, Lu_ = np.meshgrid(lu, lu, lu, indexing='ij')
+        Hu_, Ku_, Lu_ = np.meshgrid(lu, lu, lu, indexing="ij")
         Qu_ = np.sqrt(Hu_**2 + Ku_**2 + Lu_**2)
         F_antisupport = Qu_ > np.pi / settings.oversampling
         assert np.all(F_antisupport == F_antisupport[::-1, :, :])
@@ -90,15 +95,17 @@ class Merge:
     @nvtx.annotate("sequential/autocorrelation.py::modified", is_prefix=True)
     def get_non_uniform_positions(self, orientations):
         if orientations.shape[0] > 0:
-            rotmat = np.array([np.linalg.inv(skp.quaternion2rot3d(quat))
-                              for quat in orientations])
+            rotmat = np.array(
+                [np.linalg.inv(skp.quaternion2rot3d(quat)) for quat in orientations]
+            )
         else:
             rotmat = np.zeros((0, 3, 3))
             print(
-                "WARNING: gen_nonuniform_positions got empty orientation - returning h,k,l for Null rotation")
+                "WARNING: gen_nonuniform_positions got empty orientation - returning h,k,l for Null rotation"
+            )
 
-# TODO : How to ensure we support all formats of pixel_position reciprocal
-# Current support shape is(3, N_panels, Dim_x, Dim_y)
+        # TODO : How to ensure we support all formats of pixel_position reciprocal
+        # Current support shape is(3, N_panels, Dim_x, Dim_y)
         # We save the optimal path of einsum so that we are faster after the
         # first run.
         if not hasattr(self, "einsum_path"):
@@ -106,10 +113,15 @@ class Merge:
                 "ijk,klmn->jilmn",
                 rotmat,
                 self.pixel_position_reciprocal,
-                optimize="optimal")[0]
-        H, K, L = np.einsum("ijk,klmn->jilmn", rotmat,
-                            self.pixel_position_reciprocal, optimize=self.einsum_path)
-# shape->[N_images] x det_shape
+                optimize="optimal",
+            )[0]
+        H, K, L = np.einsum(
+            "ijk,klmn->jilmn",
+            rotmat,
+            self.pixel_position_reciprocal,
+            optimize=self.einsum_path,
+        )
+        # shape->[N_images] x det_shape
         return H, K, L
 
     @nvtx.annotate("sequential/autocorrelation.py::modified", is_prefix=True)
@@ -132,14 +144,13 @@ class Merge:
             assert xp.all(xp.isreal(uvect))
         ugrid = uvect.reshape((self.M,) * 3) * ac_support
         ugrid_ups = xp.zeros((self.M_ups,) * 3, dtype=uvect.dtype)
-        ugrid_ups[:self.M, :self.M, :self.M] = ugrid
+        ugrid_ups[: self.M, : self.M, : self.M] = ugrid
         # Convolution = Fourier multiplication
         F_ugrid_ups = xp.fft.fftn(xp.fft.ifftshift(ugrid_ups))
         F_ugrid_conv_out_ups = F_ugrid_ups * F_ugrid_conv_
-        ugrid_conv_out_ups = xp.fft.fftshift(
-            xp.fft.ifftn(F_ugrid_conv_out_ups))
+        ugrid_conv_out_ups = xp.fft.fftshift(xp.fft.ifftn(F_ugrid_conv_out_ups))
         # Downsample
-        ugrid_conv_out = ugrid_conv_out_ups[:self.M, :self.M, :self.M]
+        ugrid_conv_out = ugrid_conv_out_ups[: self.M, : self.M, : self.M]
         ugrid_conv_out *= ac_support
         if self.use_reciprocal_symmetry:
             # Both ugrid_conv and ugrid are real, so their convolution
@@ -157,29 +168,22 @@ class Merge:
 
         ugrid_conv = xp.array(
             self.nufft.adjoint(
-                self.nuvect,
-                H_,
-                K_,
-                L_,
-                1,
-                self.use_reciprocal_symmetry,
-                self.M_ups))
+                self.nuvect, H_, K_, L_, 1, self.use_reciprocal_symmetry, self.M_ups
+            )
+        )
 
-        F_ugrid_conv_ = xp.fft.fftn(
-            xp.fft.ifftshift(ugrid_conv)) / self.M**3
+        F_ugrid_conv_ = xp.fft.fftn(xp.fft.ifftshift(ugrid_conv)) / self.M**3
 
         def W_matvec(uvect):
             """Define W part of the W @ x = d problem."""
-            uvect_ADA = self.core_problem_convolution(
-                uvect, F_ugrid_conv_, ac_support)
+            uvect_ADA = self.core_problem_convolution(uvect, F_ugrid_conv_, ac_support)
             uvect_FDF = self.fourier_reg(uvect, ac_support)
             uvect = uvect_ADA + self.rlambda * uvect + self.flambda * uvect_FDF
             return uvect
 
         W = LinearOperator(
-            dtype=c_type,
-            shape=(self.M**3, self.M**3),
-            matvec=W_matvec)
+            dtype=c_type, shape=(self.M**3, self.M**3), matvec=W_matvec
+        )
 
         uvect_ADb = xp.array(
             self.nufft.adjoint(
@@ -189,7 +193,9 @@ class Merge:
                 L_,
                 ac_support,
                 self.use_reciprocal_symmetry,
-                self.M).flatten())
+                self.M,
+            ).flatten()
+        )
         d = uvect_ADb + self.rlambda * x0
 
         return W, d
@@ -214,8 +220,7 @@ class Merge:
         x0 = ac_estimate.reshape(-1)
 
         W, d = self.setup_linops(H, K, L, ac_support, x0)
-        ret, info = cg(W, d, x0=x0, maxiter=self.maxiter,
-                       callback=self.callback)
+        ret, info = cg(W, d, x0=x0, maxiter=self.maxiter, callback=self.callback)
         ac = ret.reshape((self.M,) * 3).get()
         if self.use_reciprocal_symmetry:
             assert np.all(np.isreal(ac))

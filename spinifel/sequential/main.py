@@ -22,33 +22,31 @@ def main():
     ds = None
     if settings.use_psana:
         from psana import DataSource
+
         logger.log("Using psana")
-        ds = DataSource(exp=settings.exp, run=settings.runnum,
-                        dir=settings.data_dir, batch_size=50,
-                        max_events=settings.N_images_max)
-    (pixel_position_reciprocal,
-     pixel_distance_reciprocal,
-     pixel_index_map,
-     slices_) = get_data(N_images, ds)
+        ds = DataSource(
+            exp=settings.exp,
+            run=settings.runnum,
+            dir=settings.data_dir,
+            batch_size=50,
+            max_events=settings.N_images_max,
+        )
+    (
+        pixel_position_reciprocal,
+        pixel_distance_reciprocal,
+        pixel_index_map,
+        slices_,
+    ) = get_data(N_images, ds)
 
     logger.log(f"Loaded in {timer.lap():.2f}s.")
 
-    nufft = NUFFT(
-        settings,
-        pixel_position_reciprocal,
-        pixel_distance_reciprocal)
+    nufft = NUFFT(settings, pixel_position_reciprocal, pixel_distance_reciprocal)
     mg = Merge(
-        settings,
-        slices_,
-        pixel_position_reciprocal,
-        pixel_distance_reciprocal,
-        nufft)
+        settings, slices_, pixel_position_reciprocal, pixel_distance_reciprocal, nufft
+    )
     snm = SNM(
-        settings,
-        slices_,
-        pixel_position_reciprocal,
-        pixel_distance_reciprocal,
-        nufft)
+        settings, slices_, pixel_position_reciprocal, pixel_distance_reciprocal, nufft
+    )
 
     ac = mg.solve_ac(0)
     logger.log(f"AC recovered in {timer.lap():.2f}s.")

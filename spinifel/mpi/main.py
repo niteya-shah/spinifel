@@ -22,6 +22,7 @@ from .work_orientation_matching import match as work_match
 # For main and unit tests
 from .test_util import get_known_orientations
 
+
 @nvtx.annotate("mpi/main.py", is_prefix=True)
 def main():
     comm = contexts.comm
@@ -147,7 +148,7 @@ def main():
     # Generation 0: solve_ac and phase
     N_generations = settings.N_generations
 
-    # Intitilize merge and orientation matching 
+    # Intitilize merge and orientation matching
     nufft = NUFFT(settings, pixel_position_reciprocal, pixel_distance_reciprocal)
     mg = MergeMPI(
         settings, slices_, pixel_position_reciprocal, pixel_distance_reciprocal, nufft
@@ -248,11 +249,15 @@ def main():
         #    pixel_distance_reciprocal,)
 
         orientations = snm.slicing_and_match(ac_phased)
-        
+
         # In test mode, we supply some correct orientations to guarantee convergence
-        if int(os.environ.get("SPINIFEL_TEST_FLAG", "0")) and generation==1:
-            logger.log(f"****WARNING**** In Test Mode - supplying {settings.fsc_fraction_known_orientations*100:.1f}% correct orientations")
-            N_supply = int(settings.fsc_fraction_known_orientations * orientations.shape[0])
+        if int(os.environ.get("SPINIFEL_TEST_FLAG", "0")) and generation == 1:
+            logger.log(
+                f"****WARNING**** In Test Mode - supplying {settings.fsc_fraction_known_orientations*100:.1f}% correct orientations"
+            )
+            N_supply = int(
+                settings.fsc_fraction_known_orientations * orientations.shape[0]
+            )
             orientations[:N_supply] = get_known_orientations()[:N_supply]
 
         logger.log(f"Orientations matched in {timer.lap():.2f}s.")
@@ -356,7 +361,7 @@ def main():
             final_cc = comm_compute.bcast(final_cc, root=0)
             delta_cc = comm_compute.bcast(delta_cc, root=0)
             logger.log(
-                    f"Check convergence resolution: {resolution:.2f} with cc: {final_cc:.3f} delta_cc:{delta_cc:.5f}."
+                f"Check convergence resolution: {resolution:.2f} with cc: {final_cc:.3f} delta_cc:{delta_cc:.5f}."
             )
             if final_cc > min_cc and delta_cc < min_change_cc:
                 logger.log(

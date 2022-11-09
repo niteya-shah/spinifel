@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
-from mpi4py              import MPI
-from matplotlib          import cm
-from matplotlib.colors   import LogNorm, SymLogNorm
+from mpi4py import MPI
+from matplotlib import cm
+from matplotlib.colors import LogNorm, SymLogNorm
 
 from scipy.ndimage import gaussian_filter
 
@@ -15,10 +15,12 @@ from spinifel.sequential.autocorrelation import Merge
 
 
 from spinifel import SpinifelSettings
+
 settings = SpinifelSettings()
 if settings.use_cupy:
     import os
-    os.environ['CUPY_ACCELERATORS'] = "cub"
+
+    os.environ["CUPY_ACCELERATORS"] = "cub"
 
     from pycuda import gpuarray
 
@@ -26,8 +28,9 @@ if settings.use_cupy:
     from cupy.linalg import norm
     import cupy as xp
 else:
-    from scipy.linalg        import norm
+    from scipy.linalg import norm
     from scipy.sparse.linalg import LinearOperator, cg
+
     xp = np
 
 if settings.use_single_prec:
@@ -37,24 +40,26 @@ else:
     f_type = xp.float64
     c_type = xp.complex128
 
-class MergeMPI(Merge):
 
+class MergeMPI(Merge):
     def __init__(
-            self,
-            settings,
-            slices_,
-            pixel_position_reciprocal,
-            pixel_distance_reciprocal,
-            nufft):
+        self,
+        settings,
+        slices_,
+        pixel_position_reciprocal,
+        pixel_distance_reciprocal,
+        nufft,
+    ):
         super().__init__(
             settings,
             slices_,
             pixel_position_reciprocal,
             pixel_distance_reciprocal,
-            nufft)
+            nufft,
+        )
         # more variables are added and changes are made to some existing ones
         # required to work with MPI
-        self.comm = contexts.comm_compute             # safe for psana2
+        self.comm = contexts.comm_compute  # safe for psana2
         self.use_psana = settings.use_psana
         self.out_dir = settings.out_dir
 
@@ -62,15 +67,14 @@ class MergeMPI(Merge):
         self.Mquat = settings.Mquat
         self.M_ups = self.M * 2
         self.alambda = 1
-        self.Mtot = self.M ** 3
-        self.rlambda = self.Mtot / self.N * \
-            2 ** (self.comm.rank - self.comm.size / 2)
+        self.Mtot = self.M**3
+        self.rlambda = self.Mtot / self.N * 2 ** (self.comm.rank - self.comm.size / 2)
         self.flambda = 1e5 * pow(10, self.comm.rank - self.comm.size // 2)
         self.ref_rank = -1
         self.mult = np.pi / (self.reciprocal_extent)
 
         lu = np.linspace(-np.pi, np.pi, self.M)
-        Hu_, Ku_, Lu_ = np.meshgrid(lu, lu, lu, indexing='ij')
+        Hu_, Ku_, Lu_ = np.meshgrid(lu, lu, lu, indexing="ij")
 
         Qu_ = np.around(np.sqrt(Hu_**2 + Ku_**2 + Lu_**2), 4)
         F_antisupport = Qu_ > np.pi
@@ -91,43 +95,34 @@ class MergeMPI(Merge):
         L_ = L.reshape(-1) * self.mult
 
         ugrid_conv = self.nufft.adjoint(
-            self.nuvect,
-            H_,
-            K_,
-            L_,
-            1,
-            self.use_reciprocal_symmetry,
-            self.M_ups)
+            self.nuvect, H_, K_, L_, 1, self.use_reciprocal_symmetry, self.M_ups
+        )
 
-        F_ugrid_conv_ = xp.fft.fftn(
-            xp.fft.ifftshift(ugrid_conv))
+        F_ugrid_conv_ = xp.fft.fftn(xp.fft.ifftshift(ugrid_conv))
 
         def W_matvec(uvect):
             """Define W part of the W @ x = d problem."""
-            uvect_ADA = self.core_problem_convolution(
-                uvect, F_ugrid_conv_, ac_support)
+            uvect_ADA = self.core_problem_convolution(uvect, F_ugrid_conv_, ac_support)
             uvect_FDF = self.fourier_reg(uvect, ac_support)
-            uvect = self.alambda * uvect_ADA + self.rlambda * uvect + self.flambda * uvect_FDF
+            uvect = (
+                self.alambda * uvect_ADA
+                + self.rlambda * uvect
+                + self.flambda * uvect_FDF
+            )
 
             return uvect
 
         # double precision is used for convergence with Conjugated Gradient
-        W = LinearOperator(
-            dtype=c_type,
-            shape=(self.Mtot, self.Mtot),
-            matvec=W_matvec)
+        W = LinearOperator(dtype=c_type, shape=(self.Mtot, self.Mtot), matvec=W_matvec)
 
-        uvect_ADb = self.nufft.adjoint(self.nuvect_Db,
-                                        H_,
-                                        K_,
-                                        L_,
-                                        ac_support,
-                                        self.use_reciprocal_symmetry,
-                                        self.M).reshape(-1)
+        uvect_ADb = self.nufft.adjoint(
+            self.nuvect_Db, H_, K_, L_, ac_support, self.use_reciprocal_symmetry, self.M
+        ).reshape(-1)
         if xp.sum(xp.isnan(uvect_ADb)) > 0:
             print(
                 "Warning: nans in the adjoint calculation; intensities may be too large",
-                flush=True)
+                flush=True,
+            )
         d = self.alambda * uvect_ADb + self.rlambda * x0
 
         return W, d
@@ -145,7 +140,7 @@ class MergeMPI(Merge):
             ac_estimate = np.zeros((self.M,) * 3)
         else:
             ac_smoothed = gaussian_filter(ac_estimate, 0.5)
-            ac_support = (ac_smoothed > 1e-12)
+            ac_support = ac_smoothed > 1e-12
             ac_estimate *= ac_support
 
         # This segment completely stalls the entire code
@@ -158,17 +153,15 @@ class MergeMPI(Merge):
         #     plt.cla()
         #     plt.clf()
 
-
         ac_estimate = xp.array(ac_estimate)
         ac_support = xp.array(ac_support)
         x0 = ac_estimate.reshape(-1)
 
         W, d = self.setup_linops(H, K, L, ac_support, x0)
-        ret, info = cg(W, d, x0=x0, maxiter=self.maxiter,
-                       callback=self.callback)
+        ret, info = cg(W, d, x0=x0, maxiter=self.maxiter, callback=self.callback)
 
         if info != 0:
-            print(f'WARNING: CG did not converge at rlambda = {self.rlambda}')
+            print(f"WARNING: CG did not converge at rlambda = {self.rlambda}")
 
         v1 = norm(ret)
         v2 = norm(W * ret - d)
@@ -178,9 +171,8 @@ class MergeMPI(Merge):
             v2 = v2.get()
 
         # Rank0 gathers rlambda, solution norm, residual norm from all ranks
-        summary = self.comm.gather(
-            (self.comm.rank, self.rlambda, v1, v2), root=0)
-        print('summary =', summary)
+        summary = self.comm.gather((self.comm.rank, self.rlambda, v1, v2), root=0)
+        print("summary =", summary)
         if self.comm.rank == 0:
             ranks, lambdas, v1s, v2s = [np.array(el) for el in zip(*summary)]
 
@@ -193,7 +185,8 @@ class MergeMPI(Merge):
             self.ref_rank = ranks[iref]
             print(
                 f"Keeping result from rank {self.ref_rank}: v1={v1s[iref]} and v2={v2s[iref]}",
-                flush=True)
+                flush=True,
+            )
         else:
             self.ref_rank = -1
         self.ref_rank = self.comm.bcast(self.ref_rank, root=0)
@@ -205,13 +198,12 @@ class MergeMPI(Merge):
             assert np.all(np.isreal(ac))
         ac = np.ascontiguousarray(ac.real)
         image.show_volume(
-            ac,
-            self.Mquat,
-            f"autocorrelation_{generation}_{self.comm.rank}.png")
+            ac, self.Mquat, f"autocorrelation_{generation}_{self.comm.rank}.png"
+        )
         print(
             f"Rank {self.comm.rank} got AC in {self.callback.counter} iterations.",
-            flush=True)
+            flush=True,
+        )
         self.comm.Bcast(ac, root=self.ref_rank)
 
         return ac
-

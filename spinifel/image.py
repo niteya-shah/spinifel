@@ -1,12 +1,11 @@
 import matplotlib.pyplot as plt
-import numpy             as np
-import PyNVTX            as nvtx
+import numpy as np
+import PyNVTX as nvtx
 
-from matplotlib        import cm
+from matplotlib import cm
 from matplotlib.colors import LogNorm, SymLogNorm
 
 from spinifel import settings
-
 
 
 @nvtx.annotate("image.py", is_prefix=True)
@@ -14,9 +13,9 @@ def show_image(pixel_index_map, image, filename):
     if settings.show_image:
         # load image data
         buffer = np.zeros(
-            (pixel_index_map[0].max() + 1,
-             pixel_index_map[1].max() + 1),
-            dtype=image.dtype)
+            (pixel_index_map[0].max() + 1, pixel_index_map[1].max() + 1),
+            dtype=image.dtype,
+        )
         buffer[pixel_index_map[0], pixel_index_map[1]] = image
         # set all values that equal 0 to NaN => will render as white on the log
         # plot
@@ -49,8 +48,12 @@ def show_volume(ac, Mquat, filename):
         axes[1].imshow(ac_midy, norm=norm)
         axes[2].imshow(ac_midz, norm=norm)
 
-        fig.colorbar(cm.ScalarMappable(norm=norm),
-                     ax=axes.ravel().tolist(), fraction=0.04, pad=0.04)
+        fig.colorbar(
+            cm.ScalarMappable(norm=norm),
+            ax=axes.ravel().tolist(),
+            fraction=0.04,
+            pad=0.04,
+        )
 
         plt.savefig(settings.out_dir / filename)
-        plt.close('all')
+        plt.close("all")
