@@ -1,4 +1,4 @@
-# Spinifel
+# Spinifel: M-TIP single particle reconstruction
 
 See the Wiki: https://gitlab.osti.gov/mtip/spinifel/-/wikis/home for more informaion.
 
