@@ -2,11 +2,11 @@
 #SBATCH -A m3890_g
 #SBATCH -C gpu
 #SBATCH -q regular
-#SBATCH -t 01:00:00
-#SBATCH -N 3
+#SBATCH -t 00:20:00
+#SBATCH -N 1
 ##SBATCH --ntasks-per-node=4
 ##SBATCH -c 32
-#SBATCH -J RunSpinifelGS8
+#SBATCH -J RunSpinifel
 #SBATCH -o %x-%j.out
 #SBATCH -e %x-%j.err
 
@@ -31,8 +31,8 @@ set -x
 
 
 # Setup scaling resources
-n_nodes=3
-n_bd_cores=8
+n_nodes=1
+n_bd_cores=1
 n_gpus_per_node=4
 
 
@@ -45,7 +45,7 @@ n_gpus=$(($n_gpus_per_node*$n_nodes))
 
 
 # Check the allocations
-srun -N${n_nodes} -n${n_tasks} -G${n_gpus} ./gpus_for_tasks
+#srun -N${n_nodes} -n${n_tasks} -G${n_gpus} ./gpus_for_tasks
 
 
 # Run spinifel
