@@ -11,7 +11,7 @@ variables:
   SPINIFEL_TEST_LAUNCHER: "jsrun -n1 -a1 -g1"
   SPINIFEL_PSANA2_LAUNCHER: "jsrun -n4 -g1"
 
-  # for psana2 tests
+  # for mpi-xtc2 tests
   SPINIFEL_TEST_FLAG: 1
   all_proxy: "socks://proxy.ccs.ornl.gov:3128/"
   ftp_proxy: "ftp://proxy.ccs.ornl.gov:3128/"
@@ -71,17 +71,13 @@ variables:
   script:
     - ./scripts/test.sh
 
-.mpi_test_script: &mpi_test_script
+.mpi_hdf5_test_script: &mpi_hdf5_test_script
   script:
     - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi runtime.N_images_per_rank=2000
 
-.psana2_test_script: &psana2_test_script
+.mpi_xtc2_test_script: &mpi_xtc2_test_script
   script:
-    - $SPINIFEL_PSANA2_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi psana.enable=true runtime.N_images_per_rank=2000
-
-.psana2_stream_test_script: &psana2_stream_test_script
-  script:
-    - $SPINIFEL_PSANA2_LAUNCHER python -u -m spinifel --default-settings=test_mpi.toml --mode=psana2 psana.enable=true
+    - $SPINIFEL_PSANA2_LAUNCHER python -u -m spinifel --default-settings=test_mpi.toml --mode=mpi psana.enable=true
 
 .legion_test_script: &legion_test_script
   script:
@@ -147,24 +143,16 @@ unit_test_ascent:
   variables:
     <<: [*ascent_variables]
 
-test_mpi_ascent:
-  <<: [*test_rules, *test_before_script, *mpi_test_script]
+test_mpi_hdf5_ascent:
+  <<: [*test_rules, *test_before_script, *mpi_hdf5_test_script]
   stage: test
   tags:
     - batch
   variables:
     <<: [*ascent_variables]
 
-test_psana2_ascent:
-  <<: [*test_rules, *test_before_script, *psana2_test_script]
-  stage: test
-  tags:
-    - batch
-  variables:
-    <<: [*ascent_variables]
-
-test_psana2_stream_ascent:
-  <<: [*test_rules, *test_before_script, *psana2_stream_test_script]
+test_mpi_xtc2_ascent:
+  <<: [*test_rules, *test_before_script, *mpi_xtc2_test_script]
   stage: test
   tags:
     - batch
@@ -245,7 +233,7 @@ unit_test_crusher:
     <<: [*crusher_variables]
 
 test_mpi_crusher:
-  <<: [*test_rules, *test_before_script, *mpi_test_script]
+  <<: [*test_rules, *test_before_script, *mpi_hdf5_test_script]
   stage: test
   tags:
     - slurm

@@ -53,7 +53,7 @@ if [ ! -d "${out_dir}" ]; then
 fi
 
 
-# test_mpi
+# test_mpi_hdf5
 $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi runtime.N_images_per_rank=2000
 
 
@@ -69,8 +69,7 @@ PYTHONPATH="$PYTHONPATH:$EXTERNAL_WORKDIR:$PWD/mpi4py_poison_wrapper" $SPINIFEL_
 $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi runtime.use_cufinufft=false runtime.use_cuda=false runtime.use_cupy=false fsc.fsc_min_cc=0.6 fsc.fsc_min_change_cc=0.1 runtime.use_single_prec=false
 
 
-# test_psana2/ test_psana2_stream
-$SPINIFEL_PSANA2_LAUNCHER python -u -m spinifel --settings=./settings/test_mpi.toml --mode=mpi psana.enable=true runtime.N_images_per_rank=2000
-$SPINIFEL_PSANA2_LAUNCHER python -u -m spinifel --settings=./settings/test_mpi.toml --mode=psana2 psana.enable=true
+# test_mpi_xtc2
+$SPINIFEL_PSANA2_LAUNCHER python -u -m spinifel --settings=./settings/test_mpi.toml --mode=mpi psana.enable=true
 
 
