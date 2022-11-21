@@ -49,13 +49,13 @@ n_gpus=$(($n_gpus_per_node*$n_nodes))
 
 
 # Run spinifel
-#srun -N${n_nodes} -n${n_tasks} -G${n_gpus} python -m spinifel --default-settings=perlmutter_converge.toml --mode=psana2 data.out_dir=$out_dir algorithm.N_images_max=10000 psana.enable=true psana.ps_dir="/global/cfs/cdirs/m2859/data/3iyf/xtc2" algorithm.N_generations=20 runtime.chk_convergence=false algorithm.N_batch_size=1000 psana.ps_parallel=mpi
+#srun -N${n_nodes} -n${n_tasks} -G${n_gpus} python -m spinifel --default-settings=perlmutter_converge.toml --mode=mpi data.out_dir=$out_dir algorithm.N_images_max=10000 psana.enable=true psana.ps_dir="/global/cfs/cdirs/m2859/data/3iyf/xtc2" algorithm.N_generations=20 runtime.chk_convergence=false algorithm.N_batch_size=1000 psana.ps_parallel=mpi
 
 
 # Or Run spinifel w/o checkpoint and output only write out mrc
-#srun -N${n_nodes} -n${n_tasks} -G${n_gpus} python -m spinifel --default-settings=perlmutter_converge.toml --mode=psana2 data.out_dir=$out_dir algorithm.N_images_max=10000 psana.enable=true psana.ps_dir="/global/cfs/cdirs/m2859/data/3iyf/xtc2" algorithm.N_generations=20 runtime.chk_convergence=false algorithm.N_batch_size=1000 psana.ps_parallel=mpi debug.checkpoint=false debug.verbose=true debug.show_image=false
+#srun -N${n_nodes} -n${n_tasks} -G${n_gpus} python -m spinifel --default-settings=perlmutter_converge.toml --mode=mpi data.out_dir=$out_dir algorithm.N_images_max=10000 psana.enable=true psana.ps_dir="/global/cfs/cdirs/m2859/data/3iyf/xtc2" algorithm.N_generations=20 runtime.chk_convergence=false algorithm.N_batch_size=1000 psana.ps_parallel=mpi debug.checkpoint=false debug.verbose=true debug.show_image=false
 
-srun -N${n_nodes} -n${n_tasks} -G${n_gpus} python -m spinifel --default-settings=perlmutter_converge.toml --mode=psana2 data.out_dir=$out_dir algorithm.N_images_max=1000 psana.enable=true psana.ps_dir="/global/cfs/cdirs/m2859/data/3iyf/xtc2" algorithm.N_generations=20 runtime.chk_convergence=false algorithm.N_batch_size=1000 psana.ps_parallel=mpi debug.checkpoint=false debug.verbose=true debug.show_image=false runtime.N_images_per_rank=1000
+srun -N${n_nodes} -n${n_tasks} -G${n_gpus} python -m spinifel --default-settings=perlmutter_converge.toml --mode=mpi data.out_dir=$out_dir algorithm.N_images_max=1000 psana.enable=true psana.ps_dir="/global/cfs/cdirs/m2859/data/3iyf/xtc2" algorithm.N_generations=20 runtime.chk_convergence=false algorithm.N_batch_size=1000 psana.ps_parallel=mpi debug.checkpoint=false debug.verbose=true debug.show_image=false runtime.N_images_per_rank=1000
 
 
 set +x
