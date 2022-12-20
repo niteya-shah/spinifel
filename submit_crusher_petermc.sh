@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -A CSC304
+#SBATCH -A CSC304_crusher
 #SBATCH -t 1:00:00
 #SBATCH -N 1
 #SBATCH -c 64
