@@ -20,7 +20,6 @@
 [submodule "setup/PybindGPU"]
 	path = setup/PybindGPU
 	url = https://github.com/darrenjhsu/PybindGPU.git
-	branch = crusher
 [submodule "setup/skopi"]
 	path = setup/skopi
 	url = https://github.com/chuckie82/skopi.git
