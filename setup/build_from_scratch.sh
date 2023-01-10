@@ -80,7 +80,7 @@ PACKAGE_LIST=(
     h5py
 
     cffi  # Legion
-    pybind11  # FINUFFT
+    pybind11=2.9.2  # FINUFFT
     numba  # skopi 
     scikit-learn  # skopi
     tqdm  # convenience
@@ -95,7 +95,7 @@ PACKAGE_LIST=(
     rapidjson
     ipython
     requests
-    mypy
+    mypy=0.910
     prometheus_client
 )
 

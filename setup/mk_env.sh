@@ -262,6 +262,7 @@ export LG_RT_DIR="${LG_RT_DIR:-${root_dir}/legion/runtime}"
 export LEGION_DEBUG=0
 
 export PYVER=3.8
+export PYVER_FULL=3.8.13
 
 export LEGION_INSTALL_DIR="${root_dir}/install"
 pathappend \${LEGION_INSTALL_DIR}/bin
