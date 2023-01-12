@@ -71,32 +71,37 @@ if [[ $(uname -p) = "ppc64le" ]]; then
     ppc64le_target=1
 fi
 
+# IMPORTANT: We pin ALL of our dependencies, otherwise we see repeated
+# issues like https://gitlab.osti.gov/mtip/spinifel/-/issues/61 .
 PACKAGE_LIST=(
     python=$PYVER
     matplotlib=3.5.1 # https://gitlab.osti.gov/mtip/spinifel/-/issues/54
-    numpy
+    numpy=1.22.3
     scipy=1.7.3${ppc64le_target+=py38he743248_0} # https://gitlab.osti.gov/mtip/spinifel/-/issues/54
-    pytest
-    h5py
+    pytest=7.1.2
+    h5py=3.7.0
 
-    cffi  # Legion
+    cffi=1.15.1  # Legion
     pybind11=2.9.2  # FINUFFT
-    numba  # skopi 
-    scikit-learn  # skopi
-    tqdm  # convenience
+    numba=0.56.3  # skopi
+    scikit-learn=1.1.3  # skopi
+    tqdm=4.64.1  # convenience
 
     # lcls2
     setuptools=46.4.0
-    cmake
-    cython
-    mongodb
-    pymongo
-    curl
-    rapidjson
-    ipython
-    requests
+    cmake=3.22.1
+    cython=0.29.32
+    mongodb=4.0.3
+    pymongo=3.12.0
+    curl=7.85.0
+    rapidjson=1.1.0
+    ipython=8.6.0
+    requests=2.28.1
     mypy=0.910
-    prometheus_client
+    prometheus_client=0.14.1
+
+    # transitive dependencies
+    kiwisolver=1.4.2 # from matplotlib # https://gitlab.osti.gov/mtip/spinifel/-/issues/61
 )
 
 
