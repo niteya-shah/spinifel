@@ -32,10 +32,10 @@ fi
 
 
 if [[ ${target} = "psbuild"* ]]; then
-    conda install -y -c conda-forge pycuda
+    conda install -y -c conda-forge pycuda=2022.1
     LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CUFINUFFT_DIR:/opt/nvidia/usr/lib64 pip install --no-cache-dir .
 else
-    pip install --no-cache-dir pycuda
+    pip install --no-cache-dir pycuda==2022.1
     LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CUFINUFFT_DIR pip install --no-cache-dir .
 fi
 
