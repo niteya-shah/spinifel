@@ -108,6 +108,7 @@ module load cudatoolkit
 module load cpe-cuda
 module load cray-fftw
 module load cray-pmi # for GASNet
+module load evp-patch # workaround for recent Perlmutter issue
 
 export CC=cc
 export CXX=CC
