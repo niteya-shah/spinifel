@@ -4,7 +4,7 @@ from scipy.stats import skew
 import matplotlib.pyplot as plt
 import PyNVTX as nvtx
 import pygion
-from pygion import task, Region, RO, RW, WD, Tunable, Partition, Region
+from pygion import task, Region, RO, RW, WD, Tunable, Partition, Region, execution_fence
 
 from spinifel import settings
 from spinifel.prep import save_mrc
@@ -42,6 +42,8 @@ def create_phased_regions(N_procs, phased=None):
             (settings.M,) * 3,
             {"ac": ftype, "support_": pygion.bool_, "rho_": pygion.float64},
         )
+    # make sure phased regions are valid
+    execution_fence(block=True)
     return {
         "summary": summary_phase,
         "summary_part": summary_phase_p,
@@ -179,11 +181,18 @@ def phase_gen0_task(solved, phased):
 
 
 @nvtx.annotate("legion/phasing.py", is_prefix=True)
+def create_phase_regions():
+    num_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
+    phased_regions_dict = create_phased_regions(num_procs)
+    return phased_regions_dict
+
+
+@nvtx.annotate("legion/phasing.py", is_prefix=True)
 def new_phase(generation, solved, phased_regions_dict=None):
     num_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
     if generation == 0:
-        assert phased_regions_dict is None
-        phased_regions_dict = create_phased_regions(num_procs)
+        if phased_regions_dict is None:
+            phased_regions_dict = create_phased_regions(num_procs)
         multi_phased = phased_regions_dict["multi_phase_part"]
         summary = phased_regions_dict["summary_part"]
         phased_region = phased_regions_dict["phased"]

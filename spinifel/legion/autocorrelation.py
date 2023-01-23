@@ -5,7 +5,18 @@ import PyNVTX as nvtx
 import pygion
 import socket
 
-from pygion import task, IndexLaunch, Partition, Region, RO, WD, RW, Reduce, Tunable
+from pygion import (
+    task,
+    IndexLaunch,
+    Partition,
+    Region,
+    RO,
+    WD,
+    RW,
+    Reduce,
+    Tunable,
+    execution_fence,
+)
 
 
 from spinifel import settings, utils, image
@@ -46,14 +57,13 @@ def gen_random_orientations(orientations, N_images_per_rank):
 
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def get_random_orientations(N_images_per_rank):
-    if settings.use_single_prec:
-        fields_dict = {"quaternions": pygion.float32}
-    else:
-        fields_dict = {"quaternions": pygion.float64}
+    # quaternions are always double precision
+    fields_dict = {"quaternions": pygion.float64}
     sec_shape = (4,)
     orientations, orientations_p = lgutils.create_distributed_region(
         N_images_per_rank, fields_dict, sec_shape
     )
+    execution_fence(block=True)
     N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
     for i in range(N_procs):
         gen_random_orientations(orientations_p[i], N_images_per_rank, point=i)
@@ -246,44 +256,40 @@ def prep_Fantisupport(uregion, M):
 
 # garbage collect all autocorrelation regions
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
-def fill_autocorrelation_regions(solve_dict):
-
+def fill_autocorrelation_regions(solve_dict, persist=False):
     if solve_dict is None:
         return
-
-    # garbage collect all regions
-    if "uregion" in solve_dict:
-        pygion.fill(solve_dict["uregion"], "ADb", 0.0)
-        pygion.fill(solve_dict["uregion"], "F_antisupport", True)
-    if "uregion_ups" in solve_dict:
-        lgutils.fill_region_task(solve_dict["uregion_ups"], complex(0, 0))
+    # garbage collect all regions or non-persistent regions
+    if persist == False:
+        if "uregion" in solve_dict:
+            pygion.fill(solve_dict["uregion"], "ADb", 0.0)
+            pygion.fill(solve_dict["uregion"], "F_antisupport", True)
+        if "uregion_ups" in solve_dict:
+            lgutils.fill_region_task(solve_dict["uregion_ups"], complex(0, 0))
+        if "ac" in solve_dict:
+            pygion.fill(solve_dict["ac"], "support", True)
+            pygion.fill(solve_dict["ac"], "estimate", 0.0)
+        if "summary" in solve_dict:
+            pygion.fill(solve_dict["summary"], "rank", 0)
+            pygion.fill(solve_dict["summary"], "rlambda", 0.0)
+            pygion.fill(solve_dict["summary"], "v1", 0.0)
+            pygion.fill(solve_dict["summary"], "v2", 0.0)
+        if "results" in solve_dict:
+            pygion.fill(solve_dict["results"], "ac", 0.0)
+        if "results_r" in solve_dict:
+            pygion.fill(solve_dict["results_r"], "ac", 0.0)
 
     if "nonuniform_v" in solve_dict:
         lgutils.fill_region_task(solve_dict["nonuniform_v"], 0.0)
-
     if "nonuniform" in solve_dict:
         lgutils.fill_region_task(solve_dict["nonuniform"], 0.0)
-
-    if "ac" in solve_dict:
-        pygion.fill(solve_dict["ac"], "support", True)
-        pygion.fill(solve_dict["ac"], "estimate", 0.0)
-
-    if "summary" in solve_dict:
-        pygion.fill(solve_dict["summary"], "rank", 0)
-        pygion.fill(solve_dict["summary"], "rlambda", 0.0)
-        pygion.fill(solve_dict["summary"], "v1", 0.0)
-        pygion.fill(solve_dict["summary"], "v2", 0.0)
-
-    if "results" in solve_dict:
-        pygion.fill(solve_dict["results"], "ac", 0.0)
-    if "results_r" in solve_dict:
-        pygion.fill(solve_dict["results_r"], "ac", 0.0)
 
 
 # create all the region
 # initialize regions
+# str=True in streaming mode
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
-def prepare_solve_all_gens(slices_p, solve_dict):
+def prepare_solve_all_gens(slices_p, solve_dict, str_mode=False):
 
     if solve_dict is None:
         solve_dict = {}
@@ -303,7 +309,102 @@ def prepare_solve_all_gens(slices_p, solve_dict):
         float_type = pygion.float64
 
     N_vals_per_rank = N_images_per_rank * utils.prod(settings.reduced_det_shape)
+
+    if str_mode == False:
+        fields_dict = {"ADb": float_type, "F_antisupport": pygion.bool_}
+        uregion, uregion_p = lgutils.create_distributed_region(
+            M,
+            fields_dict,
+            (
+                M,
+                M,
+            ),
+        )
+        solve_dict["uregion"] = uregion
+        solve_dict["uregion_p"] = uregion_p
+        # For upsampled convolution technique
+        M_ups = settings.M_ups
+        fields_dict = {"F_conv_": cmpx_type}
+        uregion_ups, uregion_ups_p = lgutils.create_distributed_region(
+            M_ups,
+            fields_dict,
+            (
+                M_ups,
+                M_ups,
+            ),
+        )
+        solve_dict["uregion_ups"] = uregion_ups
+        solve_dict["uregion_ups_p"] = uregion_ups_p
+        # ac
+        ac = Region((M,) * 3, {"support": pygion.bool_, "estimate": pygion.float64})
+        solve_dict["ac"] = ac
+
+        # summary
+        summary = Region(
+            (N_procs,),
+            {
+                "rank": pygion.int32,
+                "rlambda": pygion.float64,
+                "v1": pygion.float64,
+                "v2": pygion.float64,
+            },
+        )
+        summary_p = Partition.equal(summary, (N_procs,))
+        solve_dict["summary"] = summary
+        solve_dict["summary_p"] = summary_p
+
+        results = Region((N_procs * M, M, M), {"ac": pygion.float64})
+        results_p = Partition.restrict(results, (N_procs,), [[M], [0], [0]], [M, M, M])
+        results_r = Region((M, M, M), {"ac": pygion.float64})
+        solve_dict["results"] = results
+        solve_dict["results_p"] = results_p
+        solve_dict["results_r"] = results_r
+
+    # H, K, L
+    fields_dict = {"H": pygion.float64, "K": pygion.float64, "L": pygion.float64}
+    # nonuniform_v
     sec_shape = ()
+    nonuniform_v, nonuniform_v_p = lgutils.create_distributed_region(
+        N_vals_per_rank, fields_dict, sec_shape
+    )
+    if "nonuniform_v" in solve_dict:
+        lgutils.fill_region_task(solve_dict["nonuniform_v"], 0.0)
+    solve_dict["nonuniform_v"] = nonuniform_v
+    solve_dict["nonuniform_v_p"] = nonuniform_v_p
+
+    # nonuniform
+    sec_shape = settings.reduced_det_shape
+    fields_dict = {"H": float_type, "K": float_type, "L": float_type}
+    nonuniform, nonuniform_p = lgutils.create_distributed_region(
+        N_images_per_rank, fields_dict, sec_shape
+    )
+
+    if "nonuniform" in solve_dict:
+        lgutils.fill_region_task(solve_dict["nonuniform"], 0.0)
+    solve_dict["nonuniform"] = nonuniform
+    solve_dict["nonuniform_p"] = nonuniform_p
+
+    # create a dictionary of regions/partitions
+    return solve_dict
+
+
+# create persistent regions across streams
+@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
+def create_solve_regions():
+    solve_dict = {}
+    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
+    M = settings.M
+    cmpx_type = None
+    np_complx_type = None
+    if settings.use_single_prec:
+        cmpx_type = pygion.complex64
+        np_complx_type = (np.complex64,)
+        float_type = pygion.float32
+    else:
+        cmpx_type = pygion.complex128
+        np_complx_type = (np.complex128,)
+        float_type = pygion.float64
+
     fields_dict = {"ADb": float_type, "F_antisupport": pygion.bool_}
     uregion, uregion_p = lgutils.create_distributed_region(
         M,
@@ -313,12 +414,6 @@ def prepare_solve_all_gens(slices_p, solve_dict):
             M,
         ),
     )
-
-    # garbage collect all regions
-    if "uregion" in solve_dict:
-        pygion.fill(solve_dict["uregion"], "ADb", 0.0)
-        pygion.fill(solve_dict["uregion"], "F_antisupport", True)
-
     solve_dict["uregion"] = uregion
     solve_dict["uregion_p"] = uregion_p
 
@@ -339,42 +434,9 @@ def prepare_solve_all_gens(slices_p, solve_dict):
 
     solve_dict["uregion_ups"] = uregion_ups
     solve_dict["uregion_ups_p"] = uregion_ups_p
-
-    # H, K, L
-    fields_dict = {"H": pygion.float64, "K": pygion.float64, "L": pygion.float64}
-    # nonuniform_v
-    nonuniform_v, nonuniform_v_p = lgutils.create_distributed_region(
-        N_vals_per_rank, fields_dict, sec_shape
-    )
-
-    if "nonuniform_v" in solve_dict:
-        lgutils.fill_region_task(solve_dict["nonuniform_v"], 0.0)
-
-    solve_dict["nonuniform_v"] = nonuniform_v
-    solve_dict["nonuniform_v_p"] = nonuniform_v_p
-
-    # nonuniform
-    fields_dict = {"H": float_type, "K": float_type, "L": float_type}
-    sec_shape = settings.reduced_det_shape
-    nonuniform, nonuniform_p = lgutils.create_distributed_region(
-        N_images_per_rank, fields_dict, sec_shape
-    )
-
-    if "nonuniform" in solve_dict:
-        lgutils.fill_region_task(solve_dict["nonuniform"], 0.0)
-
-    solve_dict["nonuniform"] = nonuniform
-    solve_dict["nonuniform_p"] = nonuniform_p
-
     # ac
     ac = Region((M,) * 3, {"support": pygion.bool_, "estimate": pygion.float64})
-
-    if "ac" in solve_dict:
-        pygion.fill(solve_dict["ac"], "support", True)
-        pygion.fill(solve_dict["ac"], "estimate", 0.0)
-
     solve_dict["ac"] = ac
-
     # summary
     summary = Region(
         (N_procs,),
@@ -386,25 +448,12 @@ def prepare_solve_all_gens(slices_p, solve_dict):
         },
     )
     summary_p = Partition.equal(summary, (N_procs,))
-
-    if "summary" in solve_dict:
-        pygion.fill(solve_dict["summary"], "rank", 0)
-        pygion.fill(solve_dict["summary"], "rlambda", 0.0)
-        pygion.fill(solve_dict["summary"], "v1", 0.0)
-        pygion.fill(solve_dict["summary"], "v2", 0.0)
-
     solve_dict["summary"] = summary
     solve_dict["summary_p"] = summary_p
 
     results = Region((N_procs * M, M, M), {"ac": pygion.float64})
     results_p = Partition.restrict(results, (N_procs,), [[M], [0], [0]], [M, M, M])
     results_r = Region((M, M, M), {"ac": pygion.float64})
-
-    if "results" in solve_dict:
-        pygion.fill(solve_dict["results"], "ac", 0.0)
-    if "results_r" in solve_dict:
-        pygion.fill(solve_dict["results_r"], "ac", 0.0)
-
     solve_dict["results"] = results
     solve_dict["results_p"] = results_p
     solve_dict["results_r"] = results_r
@@ -499,7 +548,7 @@ def solve(
     d = alambda * ADb + rlambda * x0
     callback = gprep.all_objs["mg"].callback
     ret, info = cg(W, d, x0=x0, maxiter=maxiter, callback=callback)
-    if info != 0:
+    if info != 0 and settings.verbosity > 0:
         print(f"WARNING: CG did not converge at rlambda = {rlambda}", flush=True)
 
     ac_res = ret.reshape((M,) * 3)
@@ -514,6 +563,7 @@ def solve(
     image.show_volume(
         ac_res.real, settings.Mquat, f"autocorrelation_{generation}_{rank}.png"
     )
+    #    if settings.debug_image:
     v1 = norm(ret)
     v2 = norm(W * ret - d)
     if not isinstance(v1, np.ndarray) and not isinstance(v1, float):
@@ -576,6 +626,7 @@ def solve_ac(
     orientations=None,
     orientations_p=None,
     phased=None,
+    str_mode=False,
 ):
 
     M = settings.M
@@ -588,11 +639,17 @@ def solve_ac(
     maxiter = settings.solve_ac_maxiter
     fill_orientations = False
 
-    if orientations is None:
-        fill_orientations = True
-
+    if str_mode == True:
+        solve_ac_dict = prepare_solve_all_gens(slices_p, solve_ac_dict, str_mode)
+        solve_ac_dict["slices_p"] = slices_p
+        solve_ac_dict["ready_objs"] = ready_objs
+        if orientations is None:
+            orientations, orientations_p = get_random_orientations(N_images_per_rank)
+        solve_ac_dict["orientations"] = orientations
+        solve_ac_dict["orientations_p"] = orientations_p
+    elif orientations is None:
         orientations, orientations_p = get_random_orientations(N_images_per_rank)
-        solve_ac_dict = prepare_solve_all_gens(slices_p, solve_ac_dict)
+        solve_ac_dict = prepare_solve_all_gens(slices_p, solve_ac_dict, str_mode)
         solve_ac_dict["reciprocal_extent"] = pixel_distance_rp_max_task(pixel_distance)
         solve_ac_dict["orientations"] = orientations
         solve_ac_dict["orientations_p"] = orientations_p
@@ -606,9 +663,6 @@ def solve_ac(
 
     get_nonuniform_positions(solve_ac_dict, N_procs, ready_objs)
 
-    # orientations region can be garbage collected
-    if fill_orientations:
-        pygion.fill(orientations, "quaternions", 0.0)
     ac = solve_ac_dict["ac"]
     if phased is None:
         pygion.fill(ac, "support", 1)

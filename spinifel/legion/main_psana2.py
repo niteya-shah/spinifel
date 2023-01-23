@@ -28,8 +28,15 @@ from .prep import (
     prep_objects,
 )
 from .utils import union_partitions_with_stride, fill_region, dump_single_partition
-from .autocorrelation import solve_ac, fill_autocorrelation_regions
-from .phasing import phased_output, new_phase, fill_phase_regions
+from .autocorrelation import (
+    solve_ac,
+    fill_autocorrelation_regions,
+    create_solve_regions,
+    get_random_orientations,
+    pixel_distance_rp_max_task,
+    prepare_solve_all_gens,
+)
+from .phasing import phased_output, new_phase, fill_phase_regions, create_phase_regions
 from .orientation_matching import match, create_orientations_rp
 from . import mapper
 from . import checkpoint
@@ -47,6 +54,7 @@ def load_psana():
     # parameters used
     # settings.ps_batch_size -> minimum batch size
     # settings.
+    # print(f"setting.ps_smd_n_events={settings.ps_smd_n_events} N_images_per_rank={settings.N_images_per_rank}", flush=True)
     assert settings.ps_smd_n_events == settings.N_images_per_rank
     from psana.psexp.tools import mode
     from psana import DataSource
@@ -71,6 +79,7 @@ def load_psana():
     )
     assert mode == "legion"
     max_events = settings.N_images_max * total_procs
+    # todo add run array settings
     ds = DataSource(
         exp=settings.ps_exp,
         run=settings.ps_runnum,
@@ -161,10 +170,12 @@ def main_spinifel(
     slices,
     slices_p,
     n_images_per_rank,
-    solve_dict,
+    solve_ac_dict,
     start_gen,
     end_gen,
+    phased_regions_dict,
 ):
+
     logger = utils.Logger(True)
     timer = utils.Timer()
     curr_gen = 0
@@ -172,32 +183,54 @@ def main_spinifel(
     total_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
     ready_objs = []
     ready_objs = prep_objects(pixel_position, pixel_distance, slices_p, total_procs)
+
     if settings.chk_convergence and settings.pdb_path.is_file():
         fsc = init_fsc_task(pixel_distance)
-        print(f"initialized FSC", flush=True)
+        if settings.verbose:
+            print(f"initialized FSC", flush=True)
 
     # not supported for streaming/psana mode since image data grows
     assert settings.load_gen == -1
 
-    orientations, orientations_p = create_orientations_rp(n_images_per_rank)
-    solve_dict = None
-    solved, solve_ac_dict = solve_ac(
-        solve_dict, 0, pixel_position, pixel_distance, slices_p, ready_objs
-    )
-    # logger.log(f"AC recovered in {timer.lap():.2f}s.")
+    if start_gen == 0:
+        solved, solve_ac_dict = solve_ac(
+            solve_ac_dict,
+            0,
+            pixel_position,
+            pixel_distance,
+            slices_p,
+            ready_objs,
+            None,
+            None,
+            None,
+            True,
+        )
 
-    phased, phased_regions_dict = new_phase(0, solved)
-    phased_output(phased, 0)
-    # make sure all partitions are valid
-    execution_fence(block=True)
-    # not valid since tasks are async
-    # logger.log(f"Problem phased in {timer.lap():.2f}s.")
+        phased, phased_regions_dict = new_phase(start_gen, solved, phased_regions_dict)
+        phased_output(phased, start_gen)
+
+        # make sure all partitions are valid
+        execution_fence(block=True)
+    else:  # streaming
+        phased = phased_regions_dict["phased"]
+
+        # setup new regions based on n_images_per_rank
+        orientations, orientations_p = get_random_orientations(n_images_per_rank)
+        solve_ac_dict = prepare_solve_all_gens(slices_p, solve_ac_dict, True)
+        solve_ac_dict["orientations"] = orientations
+        solve_ac_dict["orientations_p"] = orientations_p
+        solve_ac_dict["slices_p"] = slices_p
+        solve_ac_dict["ready_objs"] = ready_objs
+        # make sure all partitions are valid
+        execution_fence(block=True)
+
+    orientations = solve_ac_dict["orientations"]
+    orientations_p = solve_ac_dict["orientations_p"]
 
     curr_gen = curr_gen + 1 + start_gen
     N_generations = end_gen
     N_gens_stream = settings.N_gens_stream
     assert N_gens_stream <= N_generations
-
     for generation in range(curr_gen, N_generations + 1):
         logger.log(f"#" * 27)
         logger.log(f"##### Generation {generation}/{N_generations} #####")
@@ -221,20 +254,15 @@ def main_spinifel(
         phased_output(phased, generation)
 
         if settings.pdb_path.is_file() and settings.chk_convergence:
-            print(f"checking convergence: FSC calculation", flush=True)
             fsc = compute_fsc_task(phased, fsc)
             converge = check_convergence_task(fsc)
-            # execution_fence(block=False)
             converge = converge.get()
             if converge:
                 break
     # fill regions so they get garbage collected
     fill_region(orientations, 0)
-    fill_phase_regions(phased_regions_dict)
-    fill_autocorrelation_regions(solve_ac_dict)
+    fill_autocorrelation_regions(solve_ac_dict, True)
 
-
-#    execution_fence(block=True)
 
 # read the data and run the main algorithm. This can be repeated
 @nvtx.annotate("legion/main.py", is_prefix=True)
@@ -268,6 +296,14 @@ def main():
     n_points = Tunable.select(Tunable.GLOBAL_PYS).get()
     solve_ac_dict = None
 
+    # reuse across streams
+    phased_regions_dict = create_phase_regions()
+    # reuse regions across streams
+    solve_ac_dict = create_solve_regions()
+    # reuse dictionary items across streams
+    solve_ac_dict["pixel_position"] = pixel_position
+    solve_ac_dict["pixel_distance"] = pixel_distance
+    solve_ac_dict["reciprocal_extent"] = pixel_distance_rp_max_task(pixel_distance)
     N_generations = settings.N_generations
     N_gens_stream = settings.N_gens_stream
     assert N_gens_stream <= N_generations
@@ -303,6 +339,7 @@ def main():
             solve_ac_dict,
             start_gen,
             end_gen,
+            phased_regions_dict,
         )
         start_gen = end_gen
         end_gen = min(N_generations, end_gen + N_gens_stream)
