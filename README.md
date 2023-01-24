@@ -18,6 +18,21 @@ This, however, limits us to ROCm/5.1.0. We will have to contact Balint for futur
 
 For (2) we have worked on `cufinufft` and now have ![a branch that does not depend on PyCUDA](https://github.com/darrenjhsu/cufinufft/tree/djh/PyBindGPU). However, the `spinifel` code itself now uses PyCUDA extensively, and work is being done to replace those calls.
 
+### General strategy to replace PyCUDA calls with PybindGPU and work in progress
+
+Most of these changes are in commit `d744ed0c` of the `djh/crusher_122022`. 
+
+Consulting Johannes's code and examples, I am replacing all pycuda calls like this:
+
+```python
+#from pycuda.gpuarray import GPUArray, to_gpu
+import PybindGPU
+import PybindGPU.gpuarray as gpuarray
+from PybindGPU.gpuarray import GPUArray, to_gpu 
+```
+
+In `spinifel/extern/nufft_ext.py`, there is an unfinished implmentation for the `PagelockedAllocator` at line 154, and the return `GPUArray` of `class NUFFT` (line 250) does not have an allocator associated with it.
+
 
 
 ## CUDA Support
