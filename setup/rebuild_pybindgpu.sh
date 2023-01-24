@@ -3,6 +3,7 @@
 set -e
 
 root_dir="$(dirname "${BASH_SOURCE[0]}")"
+echo $root_dir
 source "$root_dir"/env.sh
 
 # Enable host overwrite

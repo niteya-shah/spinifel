@@ -13,7 +13,8 @@ if settings.use_cupy:
     import os
     os.environ['CUPY_ACCELERATORS'] = "cub"
 
-    from pycuda import gpuarray
+    #from pycuda import gpuarray
+    from PybindGPU import gpuarray
 
     from cupyx.scipy.sparse.linalg import LinearOperator, cg
     from cupy.linalg import norm
@@ -27,7 +28,8 @@ else:
     xp = np
 
 if settings.use_cufinufft:
-    from pycuda import gpuarray
+    #from pycuda import gpuarray
+    from PybindGPU import gpuarray
 
 if settings.use_single_prec:
     f_type = xp.float32

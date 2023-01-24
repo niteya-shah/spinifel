@@ -15,7 +15,7 @@ name = "3iyf_sim_10k.h5"
 shape = [1, 128, 128]
 
 [psana]
-enable = true
+enable = false
 ps_smd_n_events = 10000
 ps_eb_nodes = 1
 ps_srv_nodes = 0

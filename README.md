@@ -2,6 +2,24 @@
 
 See the Wiki: https://gitlab.osti.gov/mtip/spinifel/-/wikis/home for more informaion.
 
+
+## Effort to port to Crusher (Jan 23, 2023) by Darren Hsu
+
+In this branch we are trying to make sure that the spinifel code runs on Crusher and ultimately gives correct results.
+
+The two main tasks are to (1) wrap CUDA code with a HIP wrapper and (2) replace the PyCUDA dependency by using PybindGPU written by Johannes Blaschke.
+
+For (1), while working on `cufinufft`, we have encountered compilation errors. For now, we use the LLVM compiler provided by Balint Joo, which can be found at `/gpfs/alpine/world-shared/stf006/bjoo/llvm-amd-stg-open-f1937ea` and loaded by
+```bash
+module use /gpfs/alpine/world-shared/stf006/bjoo/llvm-amd-stg-open-f1937ea
+module load amd-llvm
+```
+This, however, limits us to ROCm/5.1.0. We will have to contact Balint for future ROCm versions or figure out a way to automate this.
+
+For (2) we have worked on `cufinufft` and now have ![a branch that does not depend on PyCUDA](https://github.com/darrenjhsu/cufinufft/tree/djh/PyBindGPU). However, the `spinifel` code itself now uses PyCUDA extensively, and work is being done to replace those calls.
+
+
+
 ## CUDA Support
 
 Currently the following components enable CUDA support:

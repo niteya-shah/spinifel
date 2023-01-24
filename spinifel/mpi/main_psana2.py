@@ -26,7 +26,9 @@ from .test_util import get_known_orientations
 import gc
 
 if settings.use_cuda:
-    import pycuda.driver as cuda
+    #import pycuda.driver as cuda
+    import PybindGPU as cuda
+
     import cupy
     mempool = cupy.get_default_memory_pool()
     pinned_mempool = cupy.get_default_pinned_memory_pool()
@@ -35,6 +37,7 @@ def log_cuda_mem_info(logger):
     if settings.use_cuda:
         (free,total)=cuda.mem_get_info()
         logger.log(f"Global memory occupancy: {free*100/total:.2f}% free ({free/1e9:.2f}/{total/1e9:.2f} GB)")
+        print(f"Global memory occupancy: {free*100/total:.2f}% free ({free/1e9:.2f}/{total/1e9:.2f} GB)")
         mempool_used = mempool.used_bytes()*1e-9
         mempool_total= mempool.total_bytes()*1e-9
         logger.log(f"|-->Cupy: {mempool_used=:.2f}GB {mempool_total=:.2f}GB {pinned_mempool.n_free_blocks()=:d}")
