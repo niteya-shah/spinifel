@@ -197,14 +197,19 @@ def step_phase(rho_, amplitudes_, amp_mask_, support_):
         start_time = time.time()
         # rho_complex = rho_.astype(dtype=xp.complex128, order='C')
         # rho_mod_fftx = fftxp.kernels.step_phase_kernel(xp, rho_complex, amp_mask_, amplitudes_)
-        rho_mod_fftx = fftxp.convo.stepphase(rho_, amplitudes_)
+        # REUSE phases_ to store rho_mod_fftx.
+        # Need an array of shape=(M, M, M) dtype=float64 C=True CuPy=True.
+        # rho_mod_fftx = fftxp.convo.stepphase(rho_, amplitudes_)
+        phases_ = fftxp.convo.stepphase(rho_, amplitudes_, phases_) # REUSE phases_ for rho_mod_fftx
         end_time = time.time()
         fftxp_time = end_time - start_time
-        fftxp.utils.print_diff(xp, rho_mod_, rho_mod_fftx, "step_phase rho_mod_")
+        # fftxp.utils.print_diff(xp, rho_mod_, rho_mod_fftx, "step_phase rho_mod_")
+        fftxp.utils.print_diff(xp, rho_mod_, phases_, "step_phase rho_mod_") # REUSE phases_ for rho_mod_fftx
         print(f"FULL TIME step_phase: xp {xp_time} fftxp {fftxp_time}")
         fftxp.utils.print_array_info(xp, rho_, "DATA rho_")
         fftxp.utils.print_array_info(xp, rho_mod_, "DATA rho_mod_")
-        fftxp.utils.print_array_info(xp, rho_mod_fftx, "DATA rho_mod_fftx")
+        # fftxp.utils.print_array_info(xp, rho_mod_fftx, "DATA rho_mod_fftx")
+        fftxp.utils.print_array_info(xp, phases_, "DATA rho_mod_fftx") # REUSE phases_ for rho_mod_fftx
 
     support_star_ = xp.logical_and(support_, rho_mod_>0)
     return rho_mod_, support_star_
