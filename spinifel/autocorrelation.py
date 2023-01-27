@@ -253,10 +253,15 @@ def core_problem_convolution_spinifel(uvect, M, F_ugrid_conv_, M_ups, ac_support
     xp_time = end_time - start_time
     if settings.use_fftx:
         start_time = time.time()
-        ugrid_conv_out_fftx = fftxp.convo.mdrconv(ugrid, F_ugrid_conv_) / M**3 * (M_ups/M)**3
+        # ugrid_conv_out_fftx = fftxp.convo.mdrfsconv(ugrid, F_ugrid_conv_) / M**3 * (M_ups/M)**3
+        # REUSE ugrid as ugrid_conv_out_fftx.
+        # Need an array of shape=(M, M, M) dtype=float64 C=True CuPy=True
+        ugrid = fftxp.convo.mdrfsconv(ugrid, F_ugrid_conv_, ugrid) # REUSE ugrid as ugrid_conv_out_fftx
+        ugrid *= (M_ups/M)**3 / M**3 # REUSE ugrid as ugrid_conv_out_fftx
         end_time = time.time()
         fftxp_time = end_time - start_time
-        fftxp.utils.print_diff(xp, ugrid_conv_out, ugrid_conv_out_fftx,
+        # fftxp.utils.print_diff(xp, ugrid_conv_out, ugrid_conv_out_fftx,
+        fftxp.utils.print_diff(xp, ugrid_conv_out, ugrid, # REUSE ugrid as ugrid_conv_out_fftx
                                "core_problem_convolution_spinifel ugrid_conv_out")
         print(f"FULL TIME core_problem_convolution_spinifel: xp {xp_time} fftxp {fftxp_time}")
     
