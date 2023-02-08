@@ -56,7 +56,7 @@ def gen_random_orientations(orientations, N_images_per_rank):
 
 
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
-def get_random_orientations(N_images_per_rank):
+def get_random_orientations(N_images_per_rank, group_idx=0):
     # quaternions are always double precision
     fields_dict = {"quaternions": pygion.float64}
     sec_shape = (4,)
@@ -64,9 +64,9 @@ def get_random_orientations(N_images_per_rank):
         N_images_per_rank, fields_dict, sec_shape
     )
     execution_fence(block=True)
-    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
+    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get() // settings.N_conformations
     for i in range(N_procs):
-        gen_random_orientations(orientations_p[i], N_images_per_rank, point=i)
+        gen_random_orientations(orientations_p[i], N_images_per_rank, point=i+group_idx)
     return orientations, orientations_p
 
 
@@ -83,11 +83,11 @@ def gen_nonuniform_positions_v(nonuniform, nonuniform_v, reciprocal_extent):
 
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def get_nonuniform_positions_v(
-    nonuniform_p, nonuniform_v_p, reciprocal_extent, N_procs
+        nonuniform_p, nonuniform_v_p, reciprocal_extent, N_procs, group_idx,
 ):
     for i in range(N_procs):
         gen_nonuniform_positions_v(
-            nonuniform_p[i], nonuniform_v_p[i], reciprocal_extent, point=i
+            nonuniform_p[i], nonuniform_v_p[i], reciprocal_extent, point=i+group_idx
         )
 
 
@@ -105,12 +105,12 @@ def gen_nonuniform_positions(orientations, nonuniform, ready_obj):
 
 
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
-def get_nonuniform_positions(ac_dict, N_procs, ready_objs):
+def get_nonuniform_positions(ac_dict, N_procs, ready_objs, group_idx):
     orientations_p = ac_dict["orientations_p"]
     nonuniform_p = ac_dict["nonuniform_p"]
     for i in range(N_procs):
         gen_nonuniform_positions(
-            orientations_p[i], nonuniform_p[i], ready_objs[i], point=i
+            orientations_p[i], nonuniform_p[i], ready_objs[i], point=i+group_idx
         )
 
 
@@ -145,9 +145,9 @@ def right_hand_ADb_task(
 
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def right_hand(
-    slices_p, uregion_p, nonuniform_v_p, ac, M, use_reciprocal_symmetry, ready_objs
+        slices_p, uregion_p, nonuniform_v_p, ac, M, use_reciprocal_symmetry, ready_objs, group_idx
 ):
-    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
+    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get() // settings.N_conformations
 
     for i in range(N_procs):
         right_hand_ADb_task(
@@ -158,7 +158,7 @@ def right_hand(
             M,
             use_reciprocal_symmetry,
             ready_objs[i],
-            point=i,
+            point=i+group_idx,
         )
 
 
@@ -209,8 +209,9 @@ def prep_Fconv(
     reciprocal_extent,
     use_reciprocal_symmetry,
     ready_objs,
+    group_idx,
 ):
-    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
+    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get() // settings.N_conformations
     for i in range(N_procs):
         prep_Fconv_task(
             uregion_ups[i],
@@ -222,7 +223,7 @@ def prep_Fconv(
             reciprocal_extent,
             use_reciprocal_symmetry,
             ready_objs[i],
-            point=i,
+            point=i+group_idx,
         )
 
 
@@ -293,7 +294,7 @@ def prepare_solve_all_gens(slices_p, solve_dict, str_mode=False):
 
     if solve_dict is None:
         solve_dict = {}
-    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
+    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get() // settings.N_conformations
     N_images_per_rank = slices_p[0].ispace.domain.extent[0]
     M = settings.M
 
@@ -388,11 +389,20 @@ def prepare_solve_all_gens(slices_p, solve_dict, str_mode=False):
     return solve_dict
 
 
+# create persistent regions across streams for multiple groups
+@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
+def create_solve_regions_multiple():
+    N_groups = settings.N_conformations
+    solve_regions = []
+    for i in range(N_groups):
+        solve_regions.append(create_solve_regions())
+    return solve_regions
+
 # create persistent regions across streams
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def create_solve_regions():
     solve_dict = {}
-    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
+    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get() // settings.N_conformations
     M = settings.M
     cmpx_type = None
     np_complx_type = None
@@ -463,11 +473,11 @@ def create_solve_regions():
 
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def prepare_solve(
-    solve_ac_dict, slices_p, weights, M, Mtot, M_ups, N, use_reciprocal_symmetry
+        solve_ac_dict, slices_p, weights, M, Mtot, M_ups, N, use_reciprocal_symmetry, group_idx
 ):
 
     N_images_per_rank = slices_p[0].ispace.domain.extent[0]
-    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
+    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get() // settings.N_conformations
     ac = solve_ac_dict["ac"]
     nonuniform = solve_ac_dict["nonuniform"]
     nonuniform_p = solve_ac_dict["nonuniform_p"]
@@ -477,7 +487,7 @@ def prepare_solve(
     uregion_ups_p = solve_ac_dict["uregion_ups_p"]
     uregion_p = solve_ac_dict["uregion_p"]
     ready_objs = solve_ac_dict["ready_objs"]
-    get_nonuniform_positions_v(nonuniform_p, nonuniform_v_p, reciprocal_extent, N_procs)
+    get_nonuniform_positions_v(nonuniform_p, nonuniform_v_p, reciprocal_extent, N_procs, group_idx)
 
     prep_Fconv(
         uregion_ups_p,
@@ -490,10 +500,11 @@ def prepare_solve(
         reciprocal_extent,
         use_reciprocal_symmetry,
         ready_objs,
+        group_idx,
     )
 
     right_hand(
-        slices_p, uregion_p, nonuniform_v_p, ac, M, use_reciprocal_symmetry, ready_objs
+        slices_p, uregion_p, nonuniform_v_p, ac, M, use_reciprocal_symmetry, ready_objs, group_idx
     )
 
 
@@ -526,9 +537,10 @@ def solve(
     reciprocal_extent,
     use_reciprocal_symmetry,
     maxiter,
+    group_idx,
 ):
     if settings.verbosity > 0:
-        print(f"Rank {rank} started solve", flush=True)
+        print(f"Rank {rank} Group ID {group_idx} started solve", flush=True)
 
     def W_matvec(uvect):
         """Define W part of the W @ x = d problem."""
@@ -559,7 +571,7 @@ def solve(
     result.ac[:] = np.ascontiguousarray(ac_res.real)
     it_number = callback.counter
     if settings.verbosity > 0:
-        print(f"Rank {rank} recovered AC in {it_number} iterations.", flush=True)
+        print(f"Rank {rank} Group ID {group_idx} recovered AC in {it_number} iterations.", flush=True)
     image.show_volume(
         ac_res.real, settings.Mquat, f"autocorrelation_{generation}_{rank}.png"
     )
@@ -623,6 +635,7 @@ def solve_ac(
     pixel_distance,
     slices_p,
     ready_objs,
+    group_idx=0,
     orientations=None,
     orientations_p=None,
     phased=None,
@@ -634,7 +647,7 @@ def solve_ac(
     Mtot = M**3
     N_images_per_rank = slices_p[0].ispace.domain.extent[0]
     N = N_images_per_rank * utils.prod(settings.reduced_det_shape)
-    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
+    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get() // settings.N_conformations
     use_reciprocal_symmetry = True
     maxiter = settings.solve_ac_maxiter
     fill_orientations = False
@@ -644,11 +657,11 @@ def solve_ac(
         solve_ac_dict["slices_p"] = slices_p
         solve_ac_dict["ready_objs"] = ready_objs
         if orientations is None:
-            orientations, orientations_p = get_random_orientations(N_images_per_rank)
+            orientations, orientations_p = get_random_orientations(N_images_per_rank, group_idx)
         solve_ac_dict["orientations"] = orientations
         solve_ac_dict["orientations_p"] = orientations_p
     elif orientations is None:
-        orientations, orientations_p = get_random_orientations(N_images_per_rank)
+        orientations, orientations_p = get_random_orientations(N_images_per_rank, group_idx)
         solve_ac_dict = prepare_solve_all_gens(slices_p, solve_ac_dict, str_mode)
         solve_ac_dict["reciprocal_extent"] = pixel_distance_rp_max_task(pixel_distance)
         solve_ac_dict["orientations"] = orientations
@@ -661,7 +674,7 @@ def solve_ac(
         solve_ac_dict["orientations"] = orientations
         solve_ac_dict["orientations_p"] = orientations_p
 
-    get_nonuniform_positions(solve_ac_dict, N_procs, ready_objs)
+    get_nonuniform_positions(solve_ac_dict, N_procs, ready_objs, group_idx)
 
     ac = solve_ac_dict["ac"]
     if phased is None:
@@ -672,7 +685,7 @@ def solve_ac(
 
     weights = 1
     prepare_solve(
-        solve_ac_dict, slices_p, weights, M, Mtot, M_ups, N, use_reciprocal_symmetry
+        solve_ac_dict, slices_p, weights, M, Mtot, M_ups, N, use_reciprocal_symmetry, group_idx,
     )
 
     results = solve_ac_dict["results"]
@@ -705,7 +718,8 @@ def solve_ac(
             reciprocal_extent,
             use_reciprocal_symmetry,
             maxiter,
-            point=i,
+            group_idx,
+            point=group_idx+i,
         )
 
     iref = select_ac(generation, summary)
