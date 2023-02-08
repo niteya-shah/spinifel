@@ -209,7 +209,9 @@ def shrink_wrap(sigma, rho_, support_, method=None, weight=1.0, cutoff=0.05):
 
 
 @nvtx.annotate("sequential/phasing.py", is_prefix=True)
-def phase(generation, ac, support_=None, rho_=None, method=None, weight=1.0):
+def phase(
+    generation, ac, support_=None, rho_=None, method=None, weight=1.0, group_idx=0
+):
     """
     Solve phase retrieval from the autocorrelation of the current electron density estimate
     by performing cycles of ER/HIO/shrinkwrap combination.
@@ -275,13 +277,15 @@ def phase(generation, ac, support_=None, rho_=None, method=None, weight=1.0):
 
     recenter(rho_, support_, M)
 
-    image.show_volume(np.fft.fftshift(rho_), Mquat, f"rho_phased_{generation}.png")
+    image.show_volume(
+        np.fft.fftshift(rho_), Mquat, f"rho_phased_{generation}_{group_idx}.png"
+    )
 
     intensities_phased_ = np.abs(np.fft.fftn(rho_)) ** 2
     image.show_volume(
         np.fft.fftshift(intensities_phased_),
         Mquat,
-        f"intensities_phased_{generation}.png",
+        f"intensities_phased_{generation}_{group_idx}.png",
     )
 
     ac_phased_ = np.abs(np.fft.ifftn(intensities_phased_))

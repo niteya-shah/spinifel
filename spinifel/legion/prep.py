@@ -158,7 +158,7 @@ def get_slices(ds):
     pixel_position = None
     pixel_index = None
     if ds is not None:
-        n_nodes = Tunable.select(Tunable.NODE_COUNT).get()
+        n_nodes = Tunable.select(Tunable.NODE_COUNT).get() // settings.N_conformations
         chunk_i = 0
         val = 0
         for run in ds.runs():
@@ -219,7 +219,7 @@ def get_orientations_prior():
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def reduce_mean_image(slices, mean_image, nprocs):
     if settings.verbosity > 0:
-        print(f"{socket.gethostname()} reduce_mean_image", flush=True)
+        print(f"{socket.gethostname()} reduce_mean_image {nprocs}", flush=True)
     mean_image.data[:] += slices.data.mean(axis=0) / nprocs
     if settings.verbosity > 0:
         print(f"{socket.gethostname()} finished reduce_mean_image", flush=True)
@@ -229,9 +229,9 @@ def reduce_mean_image(slices, mean_image, nprocs):
 def compute_mean_image(slices, slices_p):
     mean_image = Region(lgutils.get_region_shape(slices)[1:], {"data": pygion.float32})
     pygion.fill(mean_image, "data", 0.0)
-    nprocs = Tunable.select(Tunable.GLOBAL_PYS).get()
-
+    nprocs = Tunable.select(Tunable.GLOBAL_PYS).get() // settings.N_conformations
     for i, sl in enumerate(slices_p):
+        print(f"{socket.gethostname()} compute_mean_image {i}", flush=True)
         reduce_mean_image(sl, mean_image, nprocs, point=i)
     return mean_image
 
@@ -342,7 +342,7 @@ def export_saxs(pixel_distance, mean_image, name):
 def init_partitions_regions_psana2():
     # minimum batch size = n_images_per_rank
     n_images_per_rank = settings.N_images_per_rank
-    n_points = Tunable.select(Tunable.GLOBAL_PYS).get()
+    n_points = Tunable.select(Tunable.GLOBAL_PYS).get() // settings.N_conformations
 
     # batch size
     batch_size = settings.N_images_per_rank
@@ -452,7 +452,7 @@ def load_pixel_data(ds):
     pixel_position = None
     pixel_index = None
     assert ds is not None
-    n_nodes = Tunable.select(Tunable.NODE_COUNT).get()
+    n_nodes = Tunable.select(Tunable.NODE_COUNT).get() // settings.N_conformations
     gen_run = ds.runs()
     for run in gen_run:
         # load pixel index map and pixel position reciprocal only once
@@ -528,7 +528,7 @@ def process_data(
 def load_image_batch(run, gen_run, gen_smd, slices_p):
     # create a new region of full size and load the images
     assert gen_run is not None
-    n_nodes = Tunable.select(Tunable.NODE_COUNT).get()
+    n_nodes = Tunable.select(Tunable.NODE_COUNT).get() // settings.N_conformations
     chunk_i = 0
     if run is None:
         run = next(gen_run)
@@ -614,10 +614,12 @@ def setup_objects_task(pixel_position, pixel_distance, slices):
 
 
 @nvtx.annotate("legion/prep.py", is_prefix=True)
-def prep_objects(pixel_position, pixel_distance, slices, N_procs):
+def prep_objects(pixel_position, pixel_distance, slices, N_procs, group_idx=0):
     done_list = []
     for i in range(N_procs):
-        done = setup_objects_task(pixel_position, pixel_distance, slices[i], point=i)
+        done = setup_objects_task(
+            pixel_position, pixel_distance, slices[i], point=i + group_idx
+        )
         done_list.append(done)
     for i in range(N_procs):
         assert done_list[i].get() == True

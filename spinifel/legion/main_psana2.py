@@ -200,14 +200,17 @@ def main_spinifel(
             pixel_distance,
             slices_p,
             ready_objs,
+            0,
             None,
             None,
             None,
             True,
         )
 
-        phased, phased_regions_dict = new_phase(start_gen, solved, phased_regions_dict)
-        phased_output(phased, start_gen)
+        phased, phased_regions_dict = new_phase(
+            start_gen, solved, 0, phased_regions_dict
+        )
+        phased_output(phased, start_gen, 0)
 
         # make sure all partitions are valid
         execution_fence(block=True)
@@ -237,7 +240,7 @@ def main_spinifel(
         logger.log(f"#" * 27)
 
         # Orientation matching
-        match(phased, orientations_p, slices_p, n_images_per_rank, ready_objs)
+        match(phased, orientations_p, slices_p, n_images_per_rank,0, ready_objs)
         # Solve autocorrelation
         solved, solve_ac_dict = solve_ac(
             solve_ac_dict,
@@ -246,12 +249,15 @@ def main_spinifel(
             pixel_distance,
             slices_p,
             ready_objs,
+            0,
             orientations,
             orientations_p,
             phased,
         )
-        phased, phased_regions_dict = new_phase(generation, solved, phased_regions_dict)
-        phased_output(phased, generation)
+        phased, phased_regions_dict = new_phase(
+            generation, solved, 0, phased_regions_dict
+        )
+        phased_output(phased, generation, 0)
 
         if settings.pdb_path.is_file() and settings.chk_convergence:
             fsc = compute_fsc_task(phased, fsc)

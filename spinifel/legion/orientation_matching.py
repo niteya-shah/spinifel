@@ -20,22 +20,32 @@ def create_orientations_rp(n_images_per_rank):
 
 
 @nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
-def match(phased, orientations_p, slices_p, n_images_per_rank, ready_objs=None):
+def match(
+    phased, orientations_p, slices_p, n_images_per_rank, group_idx, ready_objs=None
+):
     # The reference orientations don't have to match exactly between ranks.
     # Each rank aligns its own slices.
     # We can call the sequential function on each rank, provided that the
     # cost of generating the model_slices isn't prohibitive.
 
-    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
+    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get() // settings.N_conformations
 
     for idx in range(N_procs):
         # Ideally, the location (point) should be deduced from the
         # location of the slices.
         i = N_procs - idx - 1
         if ready_objs is not None:
-            match_task(phased, orientations_p[i], slices_p[i], ready_objs[i], point=i)
+            match_task(
+                phased,
+                orientations_p[i],
+                slices_p[i],
+                ready_objs[i],
+                point=i + group_idx,
+            )
         else:
-            match_task(phased, orientations_p[i], slices_p[i], None, point=i)
+            match_task(
+                phased, orientations_p[i], slices_p[i], None, point=i + group_idx
+            )
 
 
 @task(leaf=True, privileges=[RO("ac"), WD("quaternions"), RO("data")])

@@ -21,7 +21,7 @@ from spinifel.prep import save_mrc
 
 from .prep import get_data, prep_objects
 from .autocorrelation import solve_ac
-from .phasing import new_phase, create_phased_regions
+from .phasing import new_phase, create_phased_regions, phased_output
 from .orientation_matching import match, create_orientations_rp
 from . import mapper
 from . import checkpoint
@@ -58,19 +58,20 @@ def load_psana():
     return pixel_position, pixel_distance, pixel_index, slices, slices_p
 
 
-@task(privileges=[RO, RO, RO, RO])
+@task(inner=True, privileges=[RO, RO, RO, RO])
 @lgutils.gpu_task_wrapper
-def main_task(pixel_position, pixel_distance, pixel_index, slices, slices_p):
+def main_task(pixel_position, pixel_distance, pixel_index, slices, slices_p, group_idx):
     logger = utils.Logger(True)
     timer = utils.Timer()
     curr_gen = 0
     fsc = {}
-    total_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
-    ready_objs = prep_objects(pixel_position, pixel_distance, slices_p, total_procs)
+    total_procs = Tunable.select(Tunable.GLOBAL_PYS).get() // settings.N_conformations
+    ready_objs = prep_objects(
+        pixel_position, pixel_distance, slices_p, total_procs, group_idx
+    )
 
     if settings.pdb_path.is_file() and settings.chk_convergence:
-        fsc = init_fsc_task(pixel_distance)
-        print(f"initialized FSC", flush=True)
+        fsc = init_fsc_task(pixel_distance, point=group_idx)
     if settings.load_gen > 0:  # Load input from previous generation
         curr_gen = settings.load_gen
         phased, orientations, orientations_p = checkpoint.load_checkpoint(
@@ -82,28 +83,24 @@ def main_task(pixel_position, pixel_distance, pixel_index, slices, slices_p):
             settings.N_images_per_rank
         )
         solved, solve_ac_dict = solve_ac(
-            None, 0, pixel_position, pixel_distance, slices_p, ready_objs
+            None, 0, pixel_position, pixel_distance, slices_p, ready_objs, group_idx
         )
         # async tasks logger.log(f"AC recovered in {timer.lap():.2f}s.")
 
-        phased, phased_regions_dict = new_phase(0, solved)
-        rho = np.fft.ifftshift(phased.rho_)
-        intensity = np.fft.ifftshift(np.abs(np.fft.fftshift(phased.ac) ** 2))
-        logger.log(f"Problem phased and AC recovered in {timer.lap():.2f}s.")
-        save_mrc(settings.out_dir / f"ac-0.mrc", phased.ac)
-        save_mrc(settings.out_dir / f"rho-0.mrc", rho)
-        save_mrc(settings.out_dir / f"intensity-0.mrc", intensity)
-
+        phased, phased_regions_dict = new_phase(0, solved, group_idx)
+        phased_output(phased, 0, group_idx)
     curr_gen += 1
 
     N_generations = settings.N_generations
     for generation in range(curr_gen, N_generations + 1):
-        logger.log(f"#" * 27)
-        logger.log(f"##### Generation {generation}/{N_generations} #####")
-        logger.log(f"#" * 27)
+        logger.log(f"#" * 40)
+        logger.log(
+            f"##### Generation {generation}/{N_generations}: Group {group_idx}  #####"
+        )
+        logger.log(f"#" * 40)
 
         # Orientation matching
-        match(phased, orientations_p, slices_p, settings.N_images_per_rank)
+        match(phased, orientations_p, slices_p, settings.N_images_per_rank, group_idx)
 
         # Solve autocorrelation
         solved, solve_ac_dict = solve_ac(
@@ -113,25 +110,21 @@ def main_task(pixel_position, pixel_distance, pixel_index, slices, slices_p):
             pixel_distance,
             slices_p,
             ready_objs,
+            group_idx,
             orientations,
             orientations_p,
             phased,
         )
 
-        phased, phased_regions_dict = new_phase(generation, solved, phased_regions_dict)
+        phased, phased_regions_dict = new_phase(
+            generation, solved, group_idx, phased_regions_dict
+        )
         # async tasks logger.log(f"Problem phased in {timer.lap():.2f}s.")
-
-        # Check if density converges
-        rho = np.fft.ifftshift(phased.rho_)
-        intensity = np.fft.ifftshift(np.abs(np.fft.fftshift(phased.ac) ** 2))
-        save_mrc(settings.out_dir / f"ac-{generation}.mrc", phased.ac)
-        save_mrc(settings.out_dir / f"rho-{generation}.mrc", rho)
-        save_mrc(settings.out_dir / f"intensity-{generation}.mrc", intensity)
-        logger.log(f"Generation: {generation} completed in {timer.lap():.2f}s.")
+        phased_output(phased, generation, group_idx)
 
         # check for convergence
         if settings.pdb_path.is_file() and settings.chk_convergence:
-            print(f"checking convergence: FSC calculation", flush=True)
+            logger.log(f"checking convergence: FSC calculation", flush=True)
             fsc = compute_fsc_task(phased, fsc)
             converge = check_convergence_task(fsc)
             converge = converge.get()
@@ -139,14 +132,15 @@ def main_task(pixel_position, pixel_distance, pixel_index, slices, slices_p):
                 break
     execution_fence(block=True)
 
-    if settings.must_converge:
-        assert settings.pdb_path.is_file() and settings.chk_convergence
+    if settings.must_converge and settings.chk_convergence:
+        assert settings.pdb_path.is_file()
         assert converge == True
 
     logger.log(f"Results saved in {settings.out_dir}")
     logger.log(f"Successfully completed in {timer.total():.2f}s.")
 
 
+# run this on all subgroups
 # read the data and run the main algorithm. This can be repeated
 @nvtx.annotate("legion/main.py", is_prefix=True)
 def main():
@@ -162,5 +156,18 @@ def main():
         # Load unique set of intensity slices for python process
         (pixel_position, pixel_distance, pixel_index, slices, slices_p) = get_data(ds)
     logger.log(f"Loaded in {timer.lap():.2f}s.")
-
-    main_task(pixel_position, pixel_distance, pixel_index, slices, slices_p)
+    global_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
+    assert global_procs % settings.N_conformations == 0
+    group_size = global_procs // settings.N_conformations
+    for i in range(settings.N_conformations):
+        # group <i> starts on processor group_idx
+        group_idx = i * group_size
+        main_task(
+            pixel_position,
+            pixel_distance,
+            pixel_index,
+            slices,
+            slices_p,
+            group_idx,
+            point=group_idx,
+        )
