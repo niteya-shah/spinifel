@@ -106,9 +106,9 @@ def phased_result_subregion(results_p0, results):
 @task(inner=True, privileges=[WD, RO])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/phasing.py", is_prefix=True)
-def phased_result_task2(results_p0, results, results_p, iref):
+def phased_result_task2(results_p0, results, results_p, iref, group_idx):
     indx = iref.get()
-    phased_result_subregion(results_p0, results_p[indx])
+    phased_result_subregion(results_p0, results_p[indx], point=group_idx)
 
 
 # new phase algorithm
@@ -252,7 +252,7 @@ def new_phase(generation, solved, group_idx=0, phased_regions_dict=None):
     phased_all_region = phased_regions_dict["multi_phase"]
     phased_all_part = phased_regions_dict["multi_phase_part"]
 
-    phased_result_task2(phased_region, phased_all_region, phased_all_part, iref)
+    phased_result_task2(phased_region, phased_all_region, phased_all_part, iref, group_idx, point=group_idx)
     return phased_region, phased_regions_dict
 
 
@@ -277,4 +277,4 @@ def phased_output_task(phased, generation, group_idx):
 # launch the output task
 @nvtx.annotate("legion/phasing.py", is_prefix=True)
 def phased_output(phased, generation, group_idx):
-    phased_output_task(phased, generation, group_idx)
+    phased_output_task(phased, generation, group_idx, point=group_idx)

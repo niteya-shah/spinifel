@@ -615,9 +615,9 @@ def ac_result_subregion(results_p0, results):
 @task(inner=True, privileges=[WD, RO])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
-def ac_result_task(results_p0, results, results_p, iref):
+def ac_result_task(results_p0, results, results_p, iref, group_idx):
     indx = iref.get()
-    ac_result_subregion(results_p0, results_p[indx])
+    ac_result_subregion(results_p0, results_p[indx], point=group_idx)
 
 
 @task(leaf=True, privileges=[RO("reciprocal")])
@@ -725,5 +725,5 @@ def solve_ac(
     iref = select_ac(generation, summary)
     # remove blocking call
     # return results_p[iref.get()], solve_ac_dict
-    ac_result_task(results_r, results, results_p, iref)
+    ac_result_task(results_r, results, results_p, iref, group_idx, point=group_idx)
     return results_r, solve_ac_dict

@@ -1,6 +1,6 @@
-# This toml file contains settings for the converge/Summit
+# This toml file contains settings for the converge/Perlmutter
 [debug]
-test = "Quickstart settings for Converge on Summit"
+test = "Quickstart settings for Converge on Perlmutter"
 verbose = true
 verbosity = 0
 use_callmonitor = false
