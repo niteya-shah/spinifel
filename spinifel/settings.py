@@ -276,6 +276,13 @@ class SpinifelSettings(metaclass=Singleton):
                 5,
                 "Combine streamed batch of images at every N_gens_stream iteration",
             ),
+            "_N_conformations": (
+                "algorithm",
+                "N_conformations",
+                int,
+                1,
+                "Number of conformations",
+            ),
             "_data_field_name": (
                 "detector",
                 "data_field_name",

@@ -38,7 +38,7 @@ def get_region_shape(region):
 
 @nvtx.annotate("legion/utils.py", is_prefix=True)
 def create_distributed_region(N_images_per_rank, fields_dict, sec_shape):
-    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
+    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get() // settings.N_conformations
     N_images = N_procs * N_images_per_rank
     shape_total = (N_images,) + sec_shape
     shape_local = (N_images_per_rank,) + sec_shape
