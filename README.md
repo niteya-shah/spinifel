@@ -5,10 +5,11 @@ See the Wiki: https://gitlab.osti.gov/mtip/spinifel/-/wikis/home for more inform
 ## Trailing Underscore Convention:
 Trailing underscores (e.g. rho vs rho_) are used to refer to numpy arrays that have been ifftshifted.
 
-For unshifted arrays, the FFT/IFFT are defined as:  
+For unshifted arrays (i.e. origin at image center), the FFT/IFFT are defined as:  
   * f -> np.fft.fftshift(np.fft.fftn(np.fft.ifftshift(f)))  
   * f -> np.fft.fftshift(np.fft.ifftn(np.fft.ifftshift(f)))  
-For shifted arrays, the FFT/IFFT are thus as:  
+
+For shifted arrays (i.e. origin at image corner (0,0)), the FFT/IFFT are thus as:  
   * f_ -> np.fft.fftn(f_)  
   * f_ -> np.fft.ifftn(f_)  
 
