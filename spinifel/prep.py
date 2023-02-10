@@ -131,6 +131,10 @@ def binning_index(arr):
 
 @nvtx.annotate("prep.py", is_prefix=True)
 def load_pixel_position_reciprocal(pixel_position_reciprocal):
+    """
+    Load 3D pixel position reciprocal from hdf5 file.
+    Reshapes the ndarray to (3, 1, nRows, nCols)
+    """
     with h5py.File(settings.data_path, "r") as h5f:
         _pixel_position_reciprocal = h5f["pixel_position_reciprocal"][:]
         if _pixel_position_reciprocal.shape[0] == 3:
