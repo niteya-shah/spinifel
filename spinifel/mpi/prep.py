@@ -58,74 +58,6 @@ def get_slices(comm, N_images_per_rank):
 
 
 @nvtx.annotate("mpi/prep.py", is_prefix=True)
-def get_slices_and_pixel_info(N_images_per_rank, ds):
-    """Each rank loads intensity slices and pixel parameters using psana2."""
-    data_type = getattr(np, settings.data_type_str)
-    slices_ = np.zeros((N_images_per_rank,) + settings.det_shape, dtype=data_type)
-    pixel_position_reciprocal = None
-    pixel_index_map = None
-    N_images_loaded = 0
-
-    for run in ds.runs():
-        # TODO: We will need all detnames below to be part of toml file.
-        det = run.Detector("amopnccd")
-
-        # Test data (amo06516 and xpptut15/3iyf) store run's related data in BeginRun.
-        # In the real case, these data will come from calibration constant.
-        # Note:
-        # - For amo06516, pixel position reciprocal will be calculated (see
-        #   below) using the photon energy value per event.
-        # - The move axis is done so that the dimension xy (2d) or xyz (3d)
-        #   becomes the first axis.
-        _pixel_index_map = run.beginruns[0].scan[0].raw.pixel_index_map
-        pixel_index_map = np.moveaxis(_pixel_index_map[:], -1, 0)
-
-        pixel_position_reciprocal = np.zeros((3,) + settings.reduced_det_shape)
-        if hasattr(run.beginruns[0].scan[0].raw, "pixel_position_reciprocal"):
-            load_pixel_position_reciprocal_psana(run, pixel_position_reciprocal)
-
-        pixel_position = None
-        if hasattr(run.beginruns[0].scan[0].raw, "pixel_position"):
-            pixel_position = run.beginruns[0].scan[0].raw.pixel_position
-
-        assert pixel_position_reciprocal is not None or pixel_position is not None
-
-        for i_evt, evt in enumerate(run.events()):
-            # A quick hack to allow psana2 to exit the loop by throwing
-            # all images after N_images_per_rank away.
-            if i_evt >= N_images_per_rank:
-                continue
-
-            raw = det.raw.calib(evt)
-
-            # Only need to do once for per-run variables
-            if pixel_position_reciprocal is None:
-                photon_energy = det.raw.photon_energy(evt)
-
-                # Calculate pixel position in reciprocal space
-                from skopi.beam import convert
-                from skopi.geometry import get_reciprocal_space_pixel_position
-
-                wavelength = convert.photon_energy_to_wavelength(photon_energy)
-                wavevector = np.array([0, 0, 1.0 / wavelength])  # skopi convention
-                _pixel_position_reciprocal = get_reciprocal_space_pixel_position(
-                    pixel_position, wavevector
-                )
-                pixel_position_reciprocal = np.moveaxis(
-                    _pixel_position_reciprocal[:], -1, 0
-                )
-
-            slices_[i_evt] = raw
-            N_images_loaded = i_evt
-
-    pixel_info = {}
-    pixel_info["pixel_position_reciprocal"] = pixel_position_reciprocal
-    pixel_info["pixel_index_map"] = pixel_index_map
-    print(f"N_images_loaded:{N_images_loaded}")
-    return slices_[: N_images_loaded + 1], pixel_info
-
-
-@nvtx.annotate("mpi/prep.py", is_prefix=True)
 def compute_mean_image(slices_):
     if not contexts.is_worker:
         return None
@@ -174,27 +106,22 @@ def show_image(
 
 
 @nvtx.annotate("mpi/prep.py", is_prefix=True)
-def get_data(N_images_per_rank, ds):
+def get_data(N_images_per_rank):
     """
-    Load intensity slices, reciprocal pixel position, index map
+    Load intensity slices, reciprocal pixel position, index map from hdf5
     Perform binning
 
     Note that pixel_position_reciprocal is converted to the expected shape
-    in get_pixel_position_reciprocal and get_slices_and_pixel_info.
+    in get_pixel_position_reciprocal 
     """
     comm = contexts.comm
     rank = comm.rank
     size = comm.size
 
     # Load intensity slices, reciprocal pixel position, index map
-    if ds is None:
-        pixel_position_reciprocal = get_pixel_position_reciprocal(comm)
-        pixel_index_map = get_pixel_index_map(comm)
-        slices_ = get_slices(comm, N_images_per_rank)
-    else:
-        slices_, pixel_info = get_slices_and_pixel_info(N_images_per_rank, ds)
-        pixel_position_reciprocal = pixel_info["pixel_position_reciprocal"]
-        pixel_index_map = pixel_info["pixel_index_map"]
+    pixel_position_reciprocal = get_pixel_position_reciprocal(comm)
+    pixel_index_map = get_pixel_index_map(comm)
+    slices_ = get_slices(comm, N_images_per_rank)
     N_images_local = slices_.shape[0]
 
     if settings.use_single_prec:

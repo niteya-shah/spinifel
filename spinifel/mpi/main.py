@@ -28,76 +28,23 @@ def main():
     # Reading input images from hdf5
     N_images_per_rank = settings.N_images_per_rank
     batch_size = min(N_images_per_rank, 100)
-    N_big_data_nodes = comm.size
-    max_events = min(settings.N_images_max, N_big_data_nodes * N_images_per_rank)
     writer_rank = 0  # pick writer rank as core 0
 
-    # Reading input images using psana2
+    # Set ds to None for show_image, etc.
     ds = None
-    if settings.use_psana:
-        from psana import DataSource
-
-        # BigData cores are those excluding Smd0, EventBuilder, & Server cores.
-        N_big_data_nodes = comm.size - (
-            1 + settings.ps_eb_nodes + settings.ps_srv_nodes
-        )
-        writer_rank = (
-            1 + settings.ps_eb_nodes
-        )  # pick writer rank as the first BigData core
-
-        # Limit batch size to 100
-        batch_size = min(N_images_per_rank, 100)
-
-        # Calculate total no. of images that will be processed (limit by max)
-        # The +2 per rank is to cover special transitions for xtc2
-        max_events = min(
-            (N_big_data_nodes * settings.N_images_max),
-            (N_big_data_nodes * N_images_per_rank) + 2,
-        )
-
-        def destination(timestamp):
-            # Return big data node destination, numbered from 1, round-robin
-            destination.last = destination.last % N_big_data_nodes + 1
-            return destination.last
-
-        destination.last = 0
-
-        # Create a datasource and ask for images. For example,
-        # batch_size = 100, N_images_per_rank = 4000, N_big_data_nodes = 3
-        # -- > max_events = 12000
-        # The destination callback above sends events to BigData cores
-        # in round robin order.
-        ds = DataSource(
-            exp=settings.ps_exp,
-            run=settings.ps_runnum,
-            dir=settings.ps_dir,
-            destination=destination,
-            max_events=max_events,
-        )
 
     # Setup logger after knowing the writer rank
     logger = utils.Logger(comm.rank == writer_rank)
     logger.log("In MPI main")
-    if settings.use_psana:
-        logger.log("Using psana")
     logger.log(f"comm.size : {comm.size:d}")
-    logger.log(f"#workers  : {N_big_data_nodes:d}")
     logger.log(f"writerrank: {writer_rank}")
     logger.log(f"batch_size: {batch_size}")
-    logger.log(f"max_events: {max_events}")
 
     # Load unique set of intensity slices for each rank
-    # In psana2 mode, get_data loops over the event loop
-    # until the data array is filled with N_images_per_rank
-    # events.
     (pixel_position_reciprocal, pixel_index_map, slices_) = get_data(
-        N_images_per_rank, ds
+        N_images_per_rank
     )
     logger.log(f"slices_: {slices_.shape}")
-
-    # Hacky way to allow only worker ranks for computation tasks
-    if not contexts.is_worker:
-        return
 
     # Computes reciprocal distance and mean image then save to .png
     pixel_distance_reciprocal = compute_pixel_distance(pixel_position_reciprocal)
