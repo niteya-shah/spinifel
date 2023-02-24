@@ -15,10 +15,6 @@ from spinifel.extern.nufft_ext import NUFFT
 from eval.fsc import compute_fsc, compute_reference
 from eval.align import align_volumes
 
-# Old solve_act and match for debugging in psana2 branch
-from .work_autocorrelation import solve_ac as work_solve_ac
-from .work_orientation_matching import match as work_match
-
 # For main and unit tests
 from .test_util import get_known_orientations
 
@@ -243,11 +239,6 @@ def main():
         logger.log(f"##### Generation {generation}/{N_generations} #####")
         logger.log(f"#" * 27)
         # Orientation matching
-        # orientations = work_match(
-        #    known_ac_phased, slices_,
-        #    pixel_position_reciprocal,
-        #    pixel_distance_reciprocal,)
-
         orientations = snm.slicing_and_match(ac_phased)
 
         # In test mode, we supply some correct orientations to guarantee convergence
@@ -278,9 +269,6 @@ def main():
             )
 
         # Solve autocorrelation
-        # ac = work_solve_ac(
-        #    generation, pixel_position_reciprocal, pixel_distance_reciprocal,
-        #    slices_, orientations)
         ac = mg.solve_ac(generation, orientations, ac_phased)
 
         logger.log(f"AC recovered in {timer.lap():.2f}s.")
