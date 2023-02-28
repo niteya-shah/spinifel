@@ -10,8 +10,9 @@ from spinifel.prep import load_pixel_position_reciprocal_psana
 
 
 @nvtx.annotate("mpi/prep.py", is_prefix=True)
-def get_pixel_position_reciprocal(comm):
+def get_pixel_position_reciprocal():
     """Rank0 broadcast pixel reciprocal positions from input file."""
+    comm = contexts.comm
     pixel_position_type = getattr(np, settings.pixel_position_type_str)
     pixel_position_reciprocal = np.zeros(
         settings.pixel_position_shape, dtype=pixel_position_type
@@ -23,8 +24,9 @@ def get_pixel_position_reciprocal(comm):
 
 
 @nvtx.annotate("mpi/prep.py", is_prefix=True)
-def get_pixel_index_map(comm):
+def get_pixel_index_map():
     """Rank0 broadcast pixel index map from input file."""
+    comm = contexts.comm
     pixel_index_type = getattr(np, settings.pixel_index_type_str)
     pixel_index_map = np.zeros(settings.pixel_index_shape, dtype=pixel_index_type)
     if comm.rank == 0:
@@ -108,26 +110,44 @@ def show_image(
 @nvtx.annotate("mpi/prep.py", is_prefix=True)
 def get_data(N_images_per_rank):
     """
-    Load intensity slices, reciprocal pixel position, index map from hdf5
-    Perform binning
+    Load intensity slices
+    """
+    slices_ = get_slices(contexts.comm, N_images_per_rank)
+    return slices_
+
+
+def get_pixel_info(run=None):
+    """
+    Load reciprocal pixel position, index map from hdf5 or gets it from
+    BeginRun transition from xtc2.
 
     Note that pixel_position_reciprocal is converted to the expected shape
     in get_pixel_position_reciprocal 
     """
-    comm = contexts.comm
-    rank = comm.rank
-    size = comm.size
+    # Pixel position in xtc2 file is used to calculate the pixel position
+    # reciprocal with the given per-shot wavelength.
+    pixel_position = None
+    if run is None:
+        pixel_position_reciprocal = get_pixel_position_reciprocal()
+        pixel_index_map = get_pixel_index_map()
+    else:
+        det = run.Detector("amopnccd")
+        
+        pixel_position_reciprocal = np.zeros((3,) + settings.reduced_det_shape)
+        if hasattr(run.beginruns[0].scan[0].raw, "pixel_position_reciprocal"):
+            load_pixel_position_reciprocal_psana(run, pixel_position_reciprocal)
+        
+        _pixel_index_map = run.beginruns[0].scan[0].raw.pixel_index_map
+        pixel_index_map = np.moveaxis(_pixel_index_map[:], -1, 0)
 
-    # Load intensity slices, reciprocal pixel position, index map
-    pixel_position_reciprocal = get_pixel_position_reciprocal(comm)
-    pixel_index_map = get_pixel_index_map(comm)
-    slices_ = get_slices(comm, N_images_per_rank)
-    N_images_local = slices_.shape[0]
+        if hasattr(run.beginruns[0].scan[0].raw, "pixel_position"):
+            pixel_position = run.beginruns[0].scan[0].raw.pixel_position
+
 
     if settings.use_single_prec:
         pixel_position_reciprocal = pixel_position_reciprocal.astype(np.float32)
 
-    return (pixel_position_reciprocal, pixel_index_map, slices_)
+    return (pixel_position_reciprocal, pixel_index_map, pixel_position)
 
 
 def bin_data(pixel_position_reciprocal=None, pixel_index_map=None, slices_=None):

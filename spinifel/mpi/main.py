@@ -5,7 +5,7 @@ import numpy as np
 import PyNVTX as nvtx
 import os
 
-from .prep import get_data, compute_mean_image, show_image, bin_data
+from .prep import get_data, get_pixel_info, compute_mean_image, show_image, bin_data
 from .phasing import phase
 
 from spinifel.sequential.orientation_matching import SNM
@@ -41,9 +41,8 @@ def main():
     logger.log(f"batch_size: {batch_size}")
 
     # Load unique set of intensity slices for each rank
-    (pixel_position_reciprocal, pixel_index_map, slices_) = get_data(
-        N_images_per_rank
-    )
+    slices_ = get_data(N_images_per_rank)
+    (pixel_position_reciprocal, pixel_index_map, _) = get_pixel_info()
     logger.log(f"slices_: {slices_.shape}")
 
     # Computes reciprocal distance and mean image then save to .png

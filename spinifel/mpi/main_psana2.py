@@ -11,7 +11,7 @@ import numpy as np
 import PyNVTX as nvtx
 import os
 
-from .prep import compute_mean_image, show_image, bin_data
+from .prep import compute_mean_image, show_image, bin_data, get_pixel_info
 from .phasing import phase
 
 from spinifel.sequential.orientation_matching import SNM
@@ -84,12 +84,12 @@ def main():
     logger.log("In MPI main")
     if settings.use_psana:
         logger.log("Using psana")
-    logger.log(f"comm.size : {comm.size:d}")
-    logger.log(f"#workers  : {N_big_data_nodes:d}")
-    logger.log(f"writerrank: {writer_rank}")
-    logger.log(f"#img/rank : {N_images_per_rank}")
-    logger.log(f"PS_SMD_N_EVENTS: {os.environ.get('PS_SMD_N_EVENTS','10000')}")
-    logger.log(f"ps batch_size: {settings.ps_batch_size}")
+        logger.log(f"PS_SMD_N_EVENTS: {os.environ.get('PS_SMD_N_EVENTS','10000')}")
+        logger.log(f"ps batch_size  : {settings.ps_batch_size}")
+        logger.log(f"#bdcores       : {N_big_data_nodes:d}")
+    logger.log(f"comm.size      : {comm.size:d}")
+    logger.log(f"writerrank     : {writer_rank}")
+    logger.log(f"#img/rank      : {N_images_per_rank}")
 
     # Skip this data saving and ac calculation in test mode
     generation = 0
@@ -121,21 +121,11 @@ def main():
     # Obtain run-related info.
     run = next(ds.runs())
     det = run.Detector("amopnccd")
-
-    _pixel_index_map = run.beginruns[0].scan[0].raw.pixel_index_map
-    pixel_index_map = np.moveaxis(_pixel_index_map[:], -1, 0)
-    raw_pixel_index_map = pixel_index_map
-
-    pixel_position_reciprocal = np.zeros((3,) + settings.reduced_det_shape)
-    if hasattr(run.beginruns[0].scan[0].raw, "pixel_position_reciprocal"):
-        load_pixel_position_reciprocal_psana(run, pixel_position_reciprocal)
-        if settings.use_single_prec:
-            pixel_position_reciprocal = pixel_position_reciprocal.astype(np.float32)
-        raw_pixel_position_reciprocal = pixel_position_reciprocal
-
-    pixel_position = None
-    if hasattr(run.beginruns[0].scan[0].raw, "pixel_position"):
-        pixel_position = run.beginruns[0].scan[0].raw.pixel_position
+    (pixel_position_reciprocal, pixel_index_map, pixel_position) = get_pixel_info(run)
+    raw_pixel_position_reciprocal = np.zeros(pixel_position_reciprocal.shape, dtype=pixel_position_reciprocal.dtype)
+    raw_pixel_position_reciprocal[:] = pixel_position_reciprocal
+    raw_pixel_index_map = np.zeros(pixel_index_map.shape, dtype=pixel_index_map.dtype)
+    raw_pixel_index_map[:] = pixel_index_map
 
     # Allocate image array to max no. images specified
     data_type = getattr(np, settings.data_type_str)
@@ -187,7 +177,8 @@ def main():
                 _pixel_position_reciprocal[:], -1, 0
             )
             # Keeps a copy prior to binning
-            raw_pixel_position_reciprocal = pixel_position_reciprocal
+            raw_pixel_position_reciprocal = np.zeros(pixel_position_reciprocal.shape, dtype=pixel_position_reciprocal.dtype)
+            raw_pixel_position_reciprocal[:] = pixel_position_reciprocal
 
         # Start collecting slices only until max and count no. of processed
         # images. This no. is no longer increased when i_evt exceeds N_images_max.
