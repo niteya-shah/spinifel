@@ -102,6 +102,7 @@ PACKAGE_LIST=(
 
     # transitive dependencies
     kiwisolver=1.4.2 # from matplotlib # https://gitlab.osti.gov/mtip/spinifel/-/issues/61
+    cryptography=38.0.4 # https://gitlab.osti.gov/mtip/spinifel/-/issues/63
 )
 
 
