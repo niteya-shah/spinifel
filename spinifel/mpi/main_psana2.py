@@ -48,6 +48,30 @@ def log_cuda_mem_info(logger):
         )
 
 
+class Container:
+    def __init__(self):
+        pass
+
+class EventManager:
+    def __init__(self, run=None,photon=False):
+        self.run = run
+        self.photon = photon
+        self.det = None
+        if run is not None:
+            self.det = run.Detector("amopnccd")
+    def events(self):
+        if self.run is not None:
+            for evt in self.run.events():
+                evt_cner = Container()
+                img = self.det.raw.calib(evt)
+                setattr(evt_cner, 'slice', img) 
+                setattr(evt_cner, 'timestamp', evt.timestamp)
+                if self.photon:
+                    photon_energy = self.det.raw.photon_energy(evt)
+                    setattr(evt_cner, 'photon_energy', photon_energy)
+                yield evt_cner
+
+
 @nvtx.annotate("mpi/main.py", is_prefix=True)
 def main():
     assert settings.use_psana
@@ -120,7 +144,7 @@ def main():
 
     # Obtain run-related info.
     run = next(ds.runs())
-    det = run.Detector("amopnccd")
+    evt_man = EventManager(run)
     (pixel_position_reciprocal, pixel_index_map, pixel_position) = get_pixel_info(run)
     raw_pixel_position_reciprocal = np.zeros(pixel_position_reciprocal.shape, dtype=pixel_position_reciprocal.dtype)
     raw_pixel_position_reciprocal[:] = pixel_position_reciprocal
@@ -155,14 +179,14 @@ def main():
 
     logger.log(f"Initialized in {timer.lap():.2f}s.")
     # Looping over events and run spinifel when receive enough events
-    for i_evt, evt in enumerate(run.events()):
+    for i_evt, evt in enumerate(evt_man.events()):
         # Quit reading when max generations reached
         if generation == N_generations:
             ds.terminate()
 
         # Only need to do once for data that needs to convert pixel_position
         if pixel_position_reciprocal is None:
-            photon_energy = det.raw.photon_energy(evt)
+            photon_energy =  evt.photon_energy
 
             # Calculate pixel position in reciprocal space
             from skopi.beam import convert
@@ -183,7 +207,7 @@ def main():
         # Start collecting slices only until max and count no. of processed
         # images. This no. is no longer increased when i_evt exceeds N_images_max.
         if i_evt < N_images_max:
-            raw_slices_[cn_new_events] = det.raw.calib(evt)
+            raw_slices_[cn_new_events] = evt.slice #det.raw.calib(evt)
             cn_new_events += 1
             if i_evt and (i_evt + 1) % N_images_per_rank == 0:
                 cn_processed_events = i_evt + 1
