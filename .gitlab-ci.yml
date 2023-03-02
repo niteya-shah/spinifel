@@ -73,7 +73,7 @@ variables:
 
 .mpi_hdf5_test_script: &mpi_hdf5_test_script
   script:
-    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi runtime.N_images_per_rank=2000
+    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi
 
 .mpi_xtc2_test_script: &mpi_xtc2_test_script
   script:
@@ -93,7 +93,7 @@ variables:
 
 .finufft_test_script: &finufft_test_script
   script:
-    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi runtime.use_cufinufft=false fsc.fsc_min_cc=0.6 fsc.fsc_min_change_cc=0.1 runtime.use_single_prec=false
+    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi runtime.use_cuda=false runtime.use_cufinufft=false fsc.fsc_min_cc=0.6 fsc.fsc_min_change_cc=0.1 runtime.use_single_prec=false
 
 .nocuda_test_script: &nocuda_test_script
   script:
