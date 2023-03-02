@@ -11,7 +11,7 @@ import numpy as np
 import PyNVTX as nvtx
 import os
 
-from .prep import compute_mean_image, show_image, bin_data, get_pixel_info
+from .prep import compute_mean_image, show_image, bin_data, get_pixel_info, get_data
 from .phasing import phase
 
 from spinifel.sequential.orientation_matching import SNM
@@ -59,6 +59,7 @@ class EventManager:
         self.det = None
         if run is not None:
             self.det = run.Detector("amopnccd")
+        self.h5py_read_number = 0
     def events(self):
         if self.run is not None:
             for evt in self.run.events():
@@ -70,12 +71,23 @@ class EventManager:
                     photon_energy = self.det.raw.photon_energy(evt)
                     setattr(evt_cner, 'photon_energy', photon_energy)
                 yield evt_cner
+        else:
+            N_images_per_rank = settings.N_images_per_rank
+            while True:
+                try:
+                    slices_ = get_data(N_images_per_rank, read_number=self.h5py_read_number)
+                except Exception:
+                    break
+                # Increment read number so we read the next N_images_per_rank for this rank
+                self.h5py_read_number +=1       
+                for slice_ in slices_:
+                    evt_cner = Container()
+                    setattr(evt_cner, 'slice', slice_) 
+                    yield evt_cner
 
 
 @nvtx.annotate("mpi/main.py", is_prefix=True)
 def main():
-    assert settings.use_psana
-
     comm = contexts.comm
 
     timer = utils.Timer()
@@ -90,18 +102,23 @@ def main():
 
     # BigData cores are those excluding Smd0, EventBuilder, & Server cores.
     N_big_data_nodes = comm.size - (1 + settings.ps_eb_nodes + settings.ps_srv_nodes)
-    # Writer rank is the first bigdata core
-    writer_rank = 1 + settings.ps_eb_nodes
 
-    # Reading input images using psana2
-    from psana import DataSource
-
-    ds = DataSource(
-        exp=settings.ps_exp,
-        run=settings.ps_runnum,
-        dir=settings.ps_dir,
-        batch_size=settings.ps_batch_size,
-    )
+    # Reading input images using psana2 or h5py
+    if settings.use_psana:
+        from psana import DataSource
+        ds = DataSource(
+            exp=settings.ps_exp,
+            run=settings.ps_runnum,
+            dir=settings.ps_dir,
+            batch_size=settings.ps_batch_size,
+        )
+        run = next(ds.runs())
+        # Writer rank is the first bigdata core
+        writer_rank = 1 + settings.ps_eb_nodes
+    else:
+        ds = None
+        run = None
+        writer_rank = 0
 
     # Setup logger for all worker ranks
     logger = utils.Logger(contexts.is_worker, myrank=comm.rank)
@@ -142,9 +159,10 @@ def main():
     final_cc, delta_cc = 0.0, 1.0
     resolution = 0.0
 
-    # Obtain run-related info.
-    run = next(ds.runs())
+    # Create event generator from either psana2 ds or h5py
     evt_man = EventManager(run)
+    
+    # Obtain run-related info.
     (pixel_position_reciprocal, pixel_index_map, pixel_position) = get_pixel_info(run)
     raw_pixel_position_reciprocal = np.zeros(pixel_position_reciprocal.shape, dtype=pixel_position_reciprocal.dtype)
     raw_pixel_position_reciprocal[:] = pixel_position_reciprocal
@@ -182,7 +200,10 @@ def main():
     for i_evt, evt in enumerate(evt_man.events()):
         # Quit reading when max generations reached
         if generation == N_generations:
-            ds.terminate()
+            if settings.use_psana:
+                ds.terminate()
+            else:
+                break
 
         # Only need to do once for data that needs to convert pixel_position
         if pixel_position_reciprocal is None:
@@ -225,11 +246,11 @@ def main():
             and cn_processed_events % N_images_per_rank == 0
             and generation < N_generations
         ):
-            logger.log(f"#" * 42)
+            logger.log(f"#" * 45)
             logger.log(
-                f"##### Generation {generation}/{N_generations} Slices:{cn_processed_events}/{N_images_max}#####"
+                f"##### Generation {generation}/{N_generations} Slices:{cn_processed_events}/{N_images_max} #####"
             )
-            logger.log(f"#" * 42)
+            logger.log(f"#" * 45)
             logger.log(f"Loaded in {timer.lap():.2f}s.")
 
             # Computes reciprocal distance and mean of new images then save to .png
@@ -390,13 +411,17 @@ def main():
 
             # In test mode, we supply some correct orientations to guarantee convergence
             if int(os.environ.get("SPINIFEL_TEST_FLAG", "0")) and generation == 0:
-                logger.log(
-                    f"****WARNING**** In Test Mode - supplying {settings.fsc_fraction_known_orientations*100:.1f}% correct orientations"
-                )
                 N_supply = int(
                     settings.fsc_fraction_known_orientations * orientations.shape[0]
                 )
-                orientations[:N_supply] = get_known_orientations()[:N_supply]
+                comm_compute = contexts.comm_compute  # safe for psana2
+                known_orientations = get_known_orientations()
+                i_start = comm_compute.rank * N_images_per_rank
+                i_end = i_start + N_supply
+                logger.log(
+                    f"****WARNING**** In Test Mode - supplying {i_start}-{i_end} correct orientations"
+                )
+                orientations[:N_supply,:] = known_orientations[i_start:i_end,:]
 
             logger.log(f"Orientations matched in {timer.lap():.2f}s.")
 
@@ -509,7 +534,10 @@ def main():
                         f"Stopping criteria met! Algorithm converged at resolution: {resolution:.2f} with cc: {final_cc:.3f}."
                     )
                     flag_converged = True
-                    ds.terminate()
+                    if settings.use_psana:
+                        ds.terminate()
+                    else:
+                        break
 
             logger.log(f"Check convergence done in {timer.lap():.2f}s.")
             # Keeps record of last seen slice and reset processed event counter

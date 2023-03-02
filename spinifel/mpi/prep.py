@@ -48,13 +48,12 @@ def get_orientations_prior(comm, N_images_per_rank):
 
 
 @nvtx.annotate("mpi/prep.py", is_prefix=True)
-def get_slices(comm, N_images_per_rank):
+def get_slices(comm, N_images_per_rank, read_number):
     """Each rank loads intensity slices from input hdf5 file."""
     data_type = getattr(np, settings.data_type_str)
     slices_ = np.zeros((N_images_per_rank,) + settings.det_shape, dtype=data_type)
-    i_start = comm.rank * N_images_per_rank
+    i_start = (comm.size * read_number * N_images_per_rank) + (comm.rank * N_images_per_rank)
     i_end = i_start + N_images_per_rank
-    print(f"get_slices rank={comm.rank} st={i_start} en={i_end}", flush=True)
     prep.load_slices(slices_, i_start, i_end)
     return slices_
 
@@ -108,11 +107,11 @@ def show_image(
 
 
 @nvtx.annotate("mpi/prep.py", is_prefix=True)
-def get_data(N_images_per_rank):
+def get_data(N_images_per_rank, read_number=0):
     """
     Load intensity slices
     """
-    slices_ = get_slices(contexts.comm, N_images_per_rank)
+    slices_ = get_slices(contexts.comm, N_images_per_rank, read_number)
     return slices_
 
 

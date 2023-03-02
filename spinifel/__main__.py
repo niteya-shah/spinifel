@@ -21,10 +21,11 @@ if __name__ == "__main__":
     elif settings.mode == "mpi":
         # Two input types (hdf5 and xtc2) are supported in mpi mode. 
         # If use_psana is set in toml file, we assume input type is xtc2.
-        if settings.use_psana:
-            from .mpi import main_psana2 as main
-        else:
-            from .mpi import main
+        #if settings.use_psana:
+        #    from .mpi import main_psana2 as main
+        #else:
+        #    from .mpi import main
+        from .mpi import main_psana2 as main
 
         main()
     elif settings.mode == "legion":
