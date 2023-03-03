@@ -130,8 +130,6 @@ def get_pixel_info(run=None):
         pixel_position_reciprocal = get_pixel_position_reciprocal()
         pixel_index_map = get_pixel_index_map()
     else:
-        det = run.Detector("amopnccd")
-        
         pixel_position_reciprocal = np.zeros((3,) + settings.reduced_det_shape)
         if hasattr(run.beginruns[0].scan[0].raw, "pixel_position_reciprocal"):
             load_pixel_position_reciprocal_psana(run, pixel_position_reciprocal)

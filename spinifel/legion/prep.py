@@ -117,7 +117,7 @@ def load_slices_psana2(slices, rank, N_images_per_rank, smd_chunk, run):
     if settings.verbosity > 0:
         print(f"{socket.gethostname()} load_slices_psana2, rank = {rank}", flush=True)
 
-    det = run.Detector("amopnccd")
+    det = run.Detector(settings.ps_detname)
     for smd_batch in smd_batches_without_transitions(smd_chunk, run):
         for evt in batch_events(smd_batch, run):
             raw = det.raw.calib(evt)

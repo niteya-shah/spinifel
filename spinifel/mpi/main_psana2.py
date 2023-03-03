@@ -58,7 +58,7 @@ class EventManager:
         self.photon = photon
         self.det = None
         if run is not None:
-            self.det = run.Detector("amopnccd")
+            self.det = run.Detector(settings.ps_detname)
         self.h5py_read_number = 0
     def events(self):
         if self.run is not None:
