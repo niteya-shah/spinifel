@@ -11,7 +11,7 @@ from spinifel.extern.nufft_ext import NUFFT
 
 @nvtx.annotate("sequential/main.py", is_prefix=True)
 def main():
-    logger = utils.Logger(True)
+    logger = utils.Logger(True, settings)
     logger.log("In sequential main")
 
     N_images = settings.N_images_per_rank

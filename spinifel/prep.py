@@ -7,7 +7,9 @@ import PyNVTX as nvtx
 
 from matplotlib.colors import LogNorm
 
-from spinifel import settings
+from spinifel import settings, utils
+
+logger = utils.Logger(True, settings)
 
 
 @nvtx.annotate("prep.py", is_prefix=True)
@@ -101,9 +103,9 @@ def clipping(arr, n):
             sb // 2 - sb // n : sb // 2 + sb // n,
         ]
     else:
-        print(
+        logger.log(
             "Clipping function doesn't currently accept a detector with %i panels"
-            % narr.shape[1]
+            % narr.shape[1],
         )
     return narr
 

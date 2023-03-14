@@ -2,14 +2,14 @@
 # -*- coding: utf-8 -*-
 
 
-from . import settings
+from . import settings, utils
 
 if __name__ == "__main__":
 
-    if settings.verbose:
-        print(settings)
+    logger = utils.Logger(True, settings)
+    logger.log(settings, level=1)
 
-    print(f"Runtime MODE = {settings.mode}")
+    logger.log(f"Runtime MODE = {settings.mode}", level=1)
 
     # DON'T use top-level imports here ... sequential, mpi, and legion have
     # incompatible imports for the time being (this might change in future)
@@ -29,6 +29,6 @@ if __name__ == "__main__":
 
         main()
     elif settings.mode == "toml":
-        print(settings.as_toml())
+        logger.log(settings.as_toml())
     else:
-        print(f"Didin't do anything, because settings.mode={settings.mode}")
+        logger.log(f"Didin't do anything, because settings.mode={settings.mode}")

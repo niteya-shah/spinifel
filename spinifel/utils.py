@@ -44,16 +44,19 @@ class Timer:
 
 
 class Logger:
-    def __init__(self, active, myrank=None):
+    def __init__(self, active, settings, myrank=None):
         self.active = active
         self.myrank = myrank
+        self.settings = settings
 
-    def log(self, msg):
+    def log(self, msg, level=0):
         if self.active:
             if self.myrank is None:
-                print(msg, flush=True)
+                if level <= self.settings.verbosity:
+                    print(f"{msg}", flush=True)
             else:
-                print(f"rank:{self.myrank} {msg}", flush=True)
+                if level <= self.settings.verbosity:
+                    print(f"rank:{self.myrank} {msg}", flush=True)
 
 
 class Singleton(type):

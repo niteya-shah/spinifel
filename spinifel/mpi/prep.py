@@ -42,7 +42,6 @@ def get_orientations_prior(comm, N_images_per_rank):
     orientations_prior = np.zeros((N_images_per_rank, 4), dtype=data_type)
     i_start = comm.rank * N_images_per_rank
     i_end = i_start + N_images_per_rank
-    print(f"get_orientations_prior rank={comm.rank} st={i_start} en={i_end}")
     prep.load_orientations_prior(orientations_prior, i_start, i_end)
     return orientations_prior
 

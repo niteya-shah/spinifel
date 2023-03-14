@@ -39,12 +39,14 @@ def log_cuda_mem_info(logger):
     if settings.use_cuda:
         (free, total) = cuda.mem_get_info()
         logger.log(
-            f"Global memory occupancy: {free*100/total:.2f}% free ({free/1e9:.2f}/{total/1e9:.2f} GB)"
+            f"Global memory occupancy: {free*100/total:.2f}% free ({free/1e9:.2f}/{total/1e9:.2f} GB)", 
+            level=1
         )
         mempool_used = mempool.used_bytes() * 1e-9
         mempool_total = mempool.total_bytes() * 1e-9
         logger.log(
-            f"|-->Cupy: {mempool_used=:.2f}GB {mempool_total=:.2f}GB {pinned_mempool.n_free_blocks()=:d}"
+            f"|-->Cupy: {mempool_used=:.2f}GB {mempool_total=:.2f}GB {pinned_mempool.n_free_blocks()=:d}",
+            level=1
         )
 
 
@@ -121,7 +123,7 @@ def main():
         writer_rank = 0
 
     # Setup logger for all worker ranks
-    logger = utils.Logger(contexts.is_worker, myrank=comm.rank)
+    logger = utils.Logger(contexts.is_worker, settings, myrank=comm.rank)
     logger.log("In MPI main")
     if settings.use_psana:
         logger.log("Using psana")
@@ -137,9 +139,8 @@ def main():
     reference_dict = {"reference": None, "dist_recip_max": None}
     if settings.load_gen > 0:  # Load input from previous generation
         generation = settings.load_gen
-        print(
+        logger.log(
             f"Loading checkpoint: {checkpoint.generate_checkpoint_name(settings.out_dir, settings.load_gen, settings.tag_gen)}",
-            flush=True,
         )
         myRes = checkpoint.load_checkpoint(
             settings.out_dir, settings.load_gen, settings.tag_gen
@@ -551,10 +552,10 @@ def main():
             log_cuda_mem_info(logger)
             if settings.use_cuda:
                 if last_seen_slice + 1 < N_images_max:
-                    logger.log("Free GPUArrays and cufinufft plans")
+                    logger.log("Free GPUArrays and cufinufft plans", level=1)
                     nufft.free_gpuarrays_and_cufinufft_plans()
                     log_cuda_mem_info(logger)
-                    logger.log("Free cupy memory pools")
+                    logger.log("Free cupy memory pools", level=1)
                     del nufft
                     del mg
                     del snm
@@ -566,7 +567,7 @@ def main():
                     # new nufft, etc. can be reallocated in the next generation.
                     nufft = None
 
-            logger.log(f"Free memory done in {timer.lap():.2f}s.")
+            logger.log(f"Free memory done in {timer.lap():.2f}s.", level=1)
             # Update generation
             generation += 1
 

@@ -601,10 +601,10 @@ class SpinifelSettings(metaclass=Singleton):
             if key not in environ:
                 continue
 
-            print(
-                f"WARNING! The environment variable {key} supersedes all "
-                f"other inputs for this setting. If this is unintensional "
-                f"unset {key}."
+            logger.log(
+                f"WARNING! The environment variable {key} supersedes all "+"\n"+    \
+                f"other inputs for this setting. If this is unintensional "+"\n"+   \
+                f"unset {key}.",
             )
 
             name, env_parser = self.__environ[key]

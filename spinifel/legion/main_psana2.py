@@ -46,7 +46,7 @@ from .fsc import init_fsc_task, compute_fsc_task, check_convergence_task
 
 @nvtx.annotate("legion/main.py", is_prefix=True)
 def load_psana():
-    logger = utils.Logger(True)
+    logger = utils.Logger(True, settings)
     assert settings.use_psana == True
     # Reading input images using psana2
     # assert settings.ps_smd_n_events == settings.N_images_per_rank
@@ -176,7 +176,7 @@ def main_spinifel(
     phased_regions_dict,
 ):
 
-    logger = utils.Logger(True)
+    logger = utils.Logger(True, settings)
     timer = utils.Timer()
     curr_gen = 0
     fsc = {}
@@ -273,7 +273,7 @@ def main_spinifel(
 # read the data and run the main algorithm. This can be repeated
 @nvtx.annotate("legion/main.py", is_prefix=True)
 def main():
-    logger = utils.Logger(True)
+    logger = utils.Logger(True, settings)
     logger.log("In Legion Psana2 with Streaming")
     ds = None
     timer = utils.Timer()

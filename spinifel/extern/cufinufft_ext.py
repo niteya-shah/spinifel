@@ -5,11 +5,10 @@
 """Manages external libraries"""
 
 
-from logging import getLogger
 from sys import getsizeof
 import numpy as np
 import PyNVTX as nvtx
-from spinifel import SpinifelSettings, SpinifelContexts, Profiler
+from spinifel import SpinifelSettings, SpinifelContexts, Profiler, Logger
 from .util import transpose, CUFINUFFTRequiredButNotFound
 
 
@@ -20,6 +19,7 @@ from .util import transpose, CUFINUFFTRequiredButNotFound
 settings = SpinifelSettings()
 context = SpinifelContexts()
 profiler = Profiler()
+logger = Logger(True, settings)
 
 
 # ______________________________________________________________________________
@@ -45,32 +45,29 @@ def pts_to_gpu(data, H_, K_, L_, logger):
     if not isinstance(H_, GPUArray):
         H_gpu = to_gpu(H_)
         gpu_free, gpu_total = context.cuda_mem_info()
-        logger.debug(
-            (
-                f"H={getsizeof(H_)/1e9:.2f}GB copied ",
-                f"gpu_free={gpu_free/1e9:.2f}GB ",
+        logger.log(
+                f"H={getsizeof(H_)/1e9:.2f}GB copied "+"\n"+    \
+                f"gpu_free={gpu_free/1e9:.2f}GB "+"\n"+         \
                 f"gpu_total={gpu_total/1e9:.2f}GB",
-            )
+                level=1
         )
 
         K_gpu = to_gpu(K_)
         gpu_free, gpu_total = context.cuda_mem_info()
-        logger.debug(
-            (
-                f"K={getsizeof(K_)/1e9:.2f}GB copied ",
-                f"gpu_free={gpu_free/1e9:.2f}GB ",
+        logger.log(
+                f"K={getsizeof(K_)/1e9:.2f}GB copied "+"\n"+    \
+                f"gpu_free={gpu_free/1e9:.2f}GB "+"\n"+         \
                 f"gpu_total={gpu_total/1e9:.2f}GB",
-            )
+                level=1
         )
 
         L_gpu = to_gpu(L_)
         gpu_free, gpu_total = context.cuda_mem_info()
-        logger.debug(
-            (
-                f"L={getsizeof(L_)/1e9:.2f}GB copied ",
-                f"gpu_free={gpu_free/1e9:.2f}GB ",
+        logger.log(
+                f"K={getsizeof(L_)/1e9:.2f}GB copied "+"\n"+    \
+                f"gpu_free={gpu_free/1e9:.2f}GB "+"\n"+         \
                 f"gpu_total={gpu_total/1e9:.2f}GB",
-            )
+                level=1
         )
         data_gpu = to_gpu(data)
     else:
@@ -107,12 +104,10 @@ def nufft_3d_t1_cufinufft_v1(H_, K_, L_, nuvect, sign, eps, nx, ny, nz):
     dim = 3
     shape = (nx, ny, nz)
     dev_id = context.dev_id
-    logger = getLogger(__name__)
     complex_dtype = np.complex128
     dtype = np.float64
 
-    if settings.verbose:
-        print(f"Using v1 CUDA to solve the NUFFT 3D T1 on device {dev_id}")
+    logger.log(f"Using v1 CUDA to solve the NUFFT 3D T1 on device {dev_id}", level=1)
 
     # Ensure that H_, K_, and L_ have the same shape
     assert H_.shape == K_.shape == L_.shape
@@ -164,16 +159,15 @@ def nufft_3d_t2_cufinufft_v1(H_, K_, L_, ugrid, sign, eps, N):
 
     dim = 3
     dev_id = context.dev_id
-    logger = getLogger(__name__)
     complex_dtype = np.complex128
     dtype = np.float64
 
-    if settings.verbose:
-        print(f"Using v1 CUDA to solve the NUFFT 3D T2 on device {dev_id}")
+    logger.log(f"Using v1 CUDA to solve the NUFFT 3D T2 on device {dev_id}", level=1)
 
     gpu_free, gpu_total = context.cuda_mem_info()
-    logger.debug(
-        (f"init gpu_free={gpu_free/1e9:.2f}GB ", f"gpu_total={gpu_total/1e9:.2f}GB")
+    logger.log(
+        f"init gpu_free={gpu_free/1e9:.2f}GB "+"\n"+f"gpu_total={gpu_total/1e9:.2f}GB",
+        level=1
     )
 
     # Ensure that H_, K_, and L_ have the same shape
@@ -192,12 +186,11 @@ def nufft_3d_t2_cufinufft_v1(H_, K_, L_, ugrid, sign, eps, N):
 
     nuvect_gpu = GPUArray(shape=(N,), dtype=complex_dtype)
     gpu_free, gpu_total = context.cuda_mem_info()
-    logger.debug(
-        (
-            f"nuvect_gpu={getsizeof(nuvect_gpu)/1e9:.2f}GB ",
-            f"allocated gpu_free={gpu_free/1e9:.2f}GB ",
+    logger.log(
+            f"nuvect_gpu={getsizeof(nuvect_gpu)/1e9:.2f}GB "+"\n"+  \
+            f"allocated gpu_free={gpu_free/1e9:.2f}GB "+"\n"+       \
             f"gpu_total={gpu_total/1e9:.2f}GB",
-        )
+            level=1
     )
     nvtx.RangePop()
 
@@ -234,12 +227,10 @@ def nufft_3d_t1_cufinufft_v2(H_, K_, L_, nuvect, sign, eps, nx, ny, nz):
 
     shape = (nx, ny, nz)
     dev_id = context.dev_id
-    logger = getLogger(__name__)
     complex_dtype = np.complex128
     dtype = np.float64
 
-    if settings.verbose:
-        print(f"Using v2 CUDA to solve the NUFFT 3D T1 on device {dev_id}")
+    logger.log(f"Using v2 CUDA to solve the NUFFT 3D T1 on device {dev_id}", level=1)
 
     # Ensure that H_, K_, and L_ have the same shape
     assert H_.shape == K_.shape == L_.shape
@@ -285,16 +276,15 @@ def nufft_3d_t2_cufinufft_v2(H_, K_, L_, ugrid, sign, eps, N):
     """
 
     dev_id = context.dev_id
-    logger = getLogger(__name__)
     complex_dtype = np.complex128
     dtype = np.float64
 
-    if settings.verbose:
-        print(f"Using v2 CUDA to solve the NUFFT 3D T2 on device {dev_id}")
+    logger.log(f"Using v2 CUDA to solve the NUFFT 3D T2 on device {dev_id}", level=1)
 
     gpu_free, gpu_total = context.cuda_mem_info()
-    logger.debug(
-        (f"init gpu_free={gpu_free/1e9:.2f}GB ", f"gpu_total={gpu_total/1e9:.2f}GB")
+    logger.log(
+        f"init gpu_free={gpu_free/1e9:.2f}GB "+"\n"+f"gpu_total={gpu_total/1e9:.2f}GB",
+        level=1
     )
 
     # Ensure that H_, K_, and L_ have the same shape
@@ -313,12 +303,11 @@ def nufft_3d_t2_cufinufft_v2(H_, K_, L_, ugrid, sign, eps, N):
 
     nuvect_gpu = GPUArray(shape=(N,), dtype=complex_dtype)
     gpu_free, gpu_total = context.cuda_mem_info()
-    logger.debug(
-        (
-            f"nuvect_gpu={getsizeof(nuvect_gpu)/1e9:.2f}GB ",
-            f"allocated gpu_free={gpu_free/1e9:.2f}GB ",
+    logger.log(
+            f"nuvect_gpu={getsizeof(nuvect_gpu)/1e9:.2f}GB "+"\n"+  \
+            f"allocated gpu_free={gpu_free/1e9:.2f}GB "+"\n"+       \
             f"gpu_total={gpu_total/1e9:.2f}GB",
-        )
+            level=1
     )
     nvtx.RangePop()
 

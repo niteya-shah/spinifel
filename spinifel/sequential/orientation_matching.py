@@ -6,9 +6,11 @@ import logging
 
 from spinifel import settings, utils, autocorrelation
 import spinifel.sequential.nearest_neighbor as nn
-from spinifel import utils, autocorrelation, SpinifelSettings
+from spinifel import utils, autocorrelation, SpinifelSettings, Logger
 
 settings = SpinifelSettings()
+logger = Logger(True, settings)
+
 if settings.use_cupy:
     import os
 
@@ -175,8 +177,9 @@ class SNM:
         en_match = time.monotonic()
         match_time += en_match - match_start
 
-        print(
-            f"|-->Match tot:{en_match-st_init:.2f}s. slice={slices_time:.2f}s. match={match_time:.2f}s. slice_oh={slice_init-st_init:.2f}s. match_oh={match_oth_time:.2f}s."
+        logger.log(
+            f"Match tot:{en_match-st_init:.2f}s. slice={slices_time:.2f}s. match={match_time:.2f}s. slice_oh={slice_init-st_init:.2f}s. match_oh={match_oth_time:.2f}s.",
+            level=1
         )
         return self.nufft.ref_orientations[index]
 
@@ -202,7 +205,6 @@ def slicing_and_match(
     :return ref_orientations: array of quaternions matched to slices_
     """
     st_init = time.monotonic()
-    logger = logging.getLogger(__name__)
     Mquat = settings.Mquat
     M = 4 * Mquat + 1
     N_orientations = settings.N_orientations
@@ -218,7 +220,7 @@ def slicing_and_match(
     if ref_orientations is None:
         ref_orientations = skp.get_uniform_quat(N_orientations, True)
     else:
-        print(
+        logger.log(
             f"Warning: {ref_orientations.shape[0]} referenced orientations were given (unit test)."
         )
     ref_rotmat = np.array(
@@ -255,7 +257,7 @@ def slicing_and_match(
     # Imaginary part ~ numerical error
     model_slices_new = model_slices_new.reshape((N_orientations, N_pixels))
     data_model_scaling_ratio = slices_.std() / model_slices_new.std()
-    print(f"Data/Model std ratio: {data_model_scaling_ratio}.", flush=True)
+    logger.log(f"Data/Model std ratio: {data_model_scaling_ratio}.", level=1)
     model_slices_new *= data_model_scaling_ratio
 
     # Calculate Euclidean distance in batch to avoid running out of GPU Memory
@@ -263,7 +265,8 @@ def slicing_and_match(
     index = nn.nearest_neighbor(model_slices_new, slices_, N_batch_size)
     en_match = time.monotonic()
 
-    print(
-        f"Match tot:{en_match-st_init:.2f}s. slice={en_slice-st_slice:.2f}s. match={en_match-st_match:.2f}s. slice_oh={st_slice-st_init:.2f}s. match_oh={st_match-en_slice:.2f}s."
+    logger.log(
+        f"Match tot:{en_match-st_init:.2f}s. slice={en_slice-st_slice:.2f}s. match={en_match-st_match:.2f}s. slice_oh={st_slice-st_init:.2f}s. match_oh={st_match-en_slice:.2f}s.",
+        level=1
     )
     return ref_orientations[index]

@@ -8,7 +8,7 @@
 import numpy as np
 import skopi as skp
 import PyNVTX as nvtx
-from spinifel import SpinifelSettings, SpinifelContexts, Profiler, settings
+from spinifel import SpinifelSettings, SpinifelContexts, Profiler, settings, utils
 from .extern import nufft_3d_t1, nufft_3d_t2
 
 
@@ -19,12 +19,13 @@ from .extern import nufft_3d_t1, nufft_3d_t2
 settings = SpinifelSettings()
 context = SpinifelContexts()
 profiler = Profiler()
+logger = utils.Logger(True, settings)
 
 
 xp = np
 if settings.use_cupy:
     if settings.verbose:
-        print(f"Using CuPy for FFTs.")
+        logger.log(f"Using CuPy for FFTs.", level=1)
     import cupy as xp
 
 
@@ -276,8 +277,9 @@ def gen_nonuniform_positions(orientations, pixel_position_reciprocal):
         )
     else:
         rotmat = np.zeros((0, 3, 3))
-        print(
-            "WARNING: gen_nonuniform_positions got empty orientation - returning h,k,l for Null rotation"
+        logger.log(
+            "WARNING: gen_nonuniform_positions got empty orientation - returning h,k,l for Null rotation",
+            level=1
         )
 
     # TODO: How to ensure we support all formats of pixel_position reciprocal
