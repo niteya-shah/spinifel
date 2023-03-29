@@ -76,10 +76,8 @@ class EventManager:
         else:
             N_images_per_rank = settings.N_images_per_rank
             while True:
-                try:
+                if N_images_per_rank * self.h5py_read_number < settings.N_images_max:
                     slices_ = get_data(N_images_per_rank, read_number=self.h5py_read_number)
-                except Exception:
-                    break
                 # Increment read number so we read the next N_images_per_rank for this rank
                 self.h5py_read_number +=1       
                 for slice_ in slices_:
@@ -528,11 +526,11 @@ def main():
                 final_cc = comm_compute.bcast(final_cc, root=0)
                 delta_cc = comm_compute.bcast(delta_cc, root=0)
                 logger.log(
-                    f"Check convergence resolution: {resolution:.2f} with cc: {final_cc:.3f} delta_cc:{delta_cc:.5f}."
+                    f"Check convergence resolution: {resolution:.2f} with cc: {final_cc:.3f} delta_cc:{delta_cc:.5f}.", level=1
                 )
                 if final_cc > min_cc and delta_cc < min_change_cc:
                     logger.log(
-                        f"Stopping criteria met! Algorithm converged at resolution: {resolution:.2f} with cc: {final_cc:.3f}."
+                        f"Stopping criteria met! Algorithm converged at resolution: {resolution:.2f} with cc: {final_cc:.3f}.", level=1
                     )
                     flag_converged = True
                     if settings.use_psana:
