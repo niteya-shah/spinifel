@@ -111,7 +111,7 @@ def nufft_3d_t1_cufinufft_v1(H_, K_, L_, nuvect, sign, eps, nx, ny, nz):
     complex_dtype = np.complex128
     dtype = np.float64
 
-    if settings.verbose:
+    if settings.verbosity > 0:
         print(f"Using v1 CUDA to solve the NUFFT 3D T1 on device {dev_id}")
 
     # Ensure that H_, K_, and L_ have the same shape
@@ -168,7 +168,7 @@ def nufft_3d_t2_cufinufft_v1(H_, K_, L_, ugrid, sign, eps, N):
     complex_dtype = np.complex128
     dtype = np.float64
 
-    if settings.verbose:
+    if settings.verbosity > 0:
         print(f"Using v1 CUDA to solve the NUFFT 3D T2 on device {dev_id}")
 
     gpu_free, gpu_total = context.cuda_mem_info()
@@ -238,7 +238,7 @@ def nufft_3d_t1_cufinufft_v2(H_, K_, L_, nuvect, sign, eps, nx, ny, nz):
     complex_dtype = np.complex128
     dtype = np.float64
 
-    if settings.verbose:
+    if settings.verbosity > 0:
         print(f"Using v2 CUDA to solve the NUFFT 3D T1 on device {dev_id}")
 
     # Ensure that H_, K_, and L_ have the same shape
@@ -289,7 +289,7 @@ def nufft_3d_t2_cufinufft_v2(H_, K_, L_, ugrid, sign, eps, N):
     complex_dtype = np.complex128
     dtype = np.float64
 
-    if settings.verbose:
+    if settings.verbosity > 0:
         print(f"Using v2 CUDA to solve the NUFFT 3D T2 on device {dev_id}")
 
     gpu_free, gpu_total = context.cuda_mem_info()

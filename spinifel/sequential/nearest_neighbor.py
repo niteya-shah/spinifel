@@ -36,7 +36,7 @@ else:
 KNN_LOADER = find_spec(knn_string)
 KNN_AVAILABLE = KNN_LOADER is not None
 
-if settings.verbose:
+if settings.verbosity > 0:
     print(f"pyCudaKNearestNeighbors is available: {KNN_AVAILABLE}")
 
 if settings.use_cuda and KNN_AVAILABLE:
@@ -98,7 +98,7 @@ def nearest_neighbor(model_slices, slices, batch_size):
     # detector size (total pixels) should be >= 16 to use CUDA code
     if settings.use_cuda and slices.shape[1] >= 16:
         deviceId = context.dev_id
-        if settings.verbose:
+        if settings.verbosity > 0:
             print(
                 f"Using CUDA  to calculate Euclidean distance and heap sort (batch_size={batch_size})"
             )
@@ -119,7 +119,7 @@ def nearest_neighbor(model_slices, slices, batch_size):
             euDist, slices.shape[0], model_slices.shape[0], slices.shape[1], deviceId
         )
     else:
-        if settings.verbose:
+        if settings.verbosity > 0:
             print("Using sklearn Euclidean Distance and numpy argmin")
         euDist = euclidean_distances(model_slices, slices)
         index = np.argmin(euDist, axis=0)

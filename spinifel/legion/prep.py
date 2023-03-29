@@ -559,7 +559,7 @@ def setup_objects_task(pixel_position, pixel_distance, slices):
     global all_objs
     N_images_per_rank = slices.ispace.domain.extent[0]
 
-    if settings.verbose and settings.use_cupy:
+    if settings.verbosity > 0 and settings.use_cupy:
         mem0 = cuda.mem_get_info()
         print(
             f"{socket.gethostname()}: gpu memory: in setup_objects_task = {(mem0[1]-mem0[0])/1e9:.2f}GB ,gpu_total={mem0[1]/1e9:.2f}GB",
@@ -571,7 +571,7 @@ def setup_objects_task(pixel_position, pixel_distance, slices):
         if settings.cupy_mempool_clear:
             mempool = cupy.get_default_memory_pool()
             mempool.free_all_blocks()
-            if settings.verbose:
+            if settings.verbosity > 0:
                 mem0 = cuda.mem_get_info()
                 print(
                     f"{socket.gethostname()}: gpu memory: after free cupy mempool in setup_objects_task = {(mem0[1]-mem0[0])/1e9:.2f}GB ,gpu_total={mem0[1]/1e9:.2f}GB",
@@ -605,7 +605,7 @@ def setup_objects_task(pixel_position, pixel_distance, slices):
     )
     done = True
 
-    if settings.verbose and settings.use_cupy:
+    if settings.verbosity > 0 and settings.use_cupy:
         mem0 = cuda.mem_get_info()
         print(
             f"{socket.gethostname()}: gpu memory: after allocation in setup_objects_task = {(mem0[1]-mem0[0])/1e9:.2f}GB ,gpu_total={mem0[1]/1e9:.2f}GB"

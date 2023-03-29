@@ -23,7 +23,7 @@ profiler = Profiler()
 
 xp = np
 if settings.use_cupy:
-    if settings.verbose:
+    if settings.verbosity > 0:
         print(f"Using CuPy for FFTs.")
     import cupy as xp
 

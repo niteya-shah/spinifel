@@ -4,7 +4,7 @@ from spinifel.legion import main
 
 
 if __name__ == '__main__':
-    if settings.verbose:
+    if settings.verbosity > 0 :
         print(settings)
     if settings.mode == "legion_psana2":
         from spinifel.legion import main_psana2

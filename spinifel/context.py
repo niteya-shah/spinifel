@@ -98,7 +98,7 @@ class SpinifelContexts(metaclass=Singleton):
         # register(MPI.Finalize)
         register(goodbye)
 
-        if settings.verbose:
+        if settings.verbosity > 0:
             print(f"MPI has been initialized on rank {self.rank}")
 
         self._mpi_initialized = True
@@ -130,7 +130,7 @@ class SpinifelContexts(metaclass=Singleton):
             register(self.ctx.pop)
 
         settings = SpinifelSettings()
-        if settings.verbose:
+        if settings.verbosity > 0:
             print(
                 f"Rank {self.rank} assigned to device {self.dev_id} (total devices: {drv.Device.count()})"
             )

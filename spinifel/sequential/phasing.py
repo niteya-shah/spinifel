@@ -8,12 +8,12 @@ from spinifel import SpinifelSettings, settings, image
 
 xp = np
 if settings.use_cupy:
-    if settings.verbose:
+    if settings.verbosity > 0:
         print(f"Using CuPy for FFTs.")
     import cupy as xp
     from cupyx.scipy.ndimage import gaussian_filter
 else:
-    if settings.verbose:
+    if settings.verbosity > 0:
         print(f"Using NumPy for FFTs.")
     from scipy.ndimage import gaussian_filter
 
@@ -268,7 +268,7 @@ def phase(
     ER_loop(nER, rho_, amplitudes_, amp_mask_, support_, rho_max)
 
     if settings.use_cupy:
-        if settings.verbose:
+        if settings.verbosity > 0:
             print(f"Converting CuPy arrays to NumPy arrays.")
         rho_ = xp.asnumpy(rho_)
         amplitudes_ = xp.asnumpy(amplitudes_)

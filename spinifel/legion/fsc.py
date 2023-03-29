@@ -18,7 +18,7 @@ if settings.use_cupy:
 @nvtx.annotate("legion/fsc.py", is_prefix=True)
 def init_fsc_task(pixel_distance):
     fsc = {}
-    if settings.verbose:
+    if settings.verbosity > 0:
         print(f"started init_fsc Task", flush=True)
 
     dist_recip_max = np.max(pixel_distance.reciprocal)
@@ -31,7 +31,7 @@ def init_fsc_task(pixel_distance):
     fsc["dist_recip_max"] = dist_recip_max
     fsc["converge"] = False
 
-    if settings.verbose:
+    if settings.verbosity > 0:
         print(f"finished init_fsc Task", flush=True)
     return fsc
 
@@ -40,7 +40,7 @@ def init_fsc_task(pixel_distance):
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/fsc.py", is_prefix=True)
 def compute_fsc_task(phased, fsc):
-    if settings.verbose:
+    if settings.verbosity > 0:
         timer = utils.Timer()
     fsc_dict = fsc.get()
     prev_cc = fsc_dict["final"]
@@ -61,7 +61,7 @@ def compute_fsc_task(phased, fsc):
         mempool = cupy.get_default_memory_pool()
         mempool.free_all_blocks()
 
-    if settings.verbose:
+    if settings.verbosity > 0:
         print(
             f"FSC clear_cupy_mempool:{settings.cupy_mempool_clear} completed in: {timer.lap():.2f}s.",
             flush=True,

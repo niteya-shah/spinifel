@@ -186,7 +186,7 @@ def main_spinifel(
 
     if settings.chk_convergence and settings.pdb_path.is_file():
         fsc = init_fsc_task(pixel_distance)
-        if settings.verbose:
+        if settings.verbosity > 0:
             print(f"initialized FSC", flush=True)
 
     # not supported for streaming/psana mode since image data grows
@@ -329,7 +329,7 @@ def main():
             )
         if cur_batch_size == max_batch_size:
             end_gen = N_generations
-        if settings.verbose:
+        if settings.verbosity > 0:
             print(
                 f"cur_batch_size = {cur_batch_size}, batch_size = {batch_size}, N_image_batches_max={settings.N_image_batches_max}, max_batch_size={max_batch_size}, start_gen={start_gen}, end_gen={end_gen}",
                 flush=True,
