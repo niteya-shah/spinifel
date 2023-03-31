@@ -595,11 +595,9 @@ class SpinifelSettings(metaclass=Singleton):
             setattr(self, attr, parser(val))
 
         for key in self.__environ:
-
             if key not in environ:
                 continue
-
-            logger.log(
+            print(
                 f"WARNING! The environment variable {key} supersedes all "+"\n"+    \
                 f"other inputs for this setting. If this is unintensional "+"\n"+   \
                 f"unset {key}.",

@@ -24,8 +24,7 @@ logger = utils.Logger(True, settings)
 
 xp = np
 if settings.use_cupy:
-    if settings.verbosity > 0:
-        logger.log(f"Using CuPy for FFTs.", level=1)
+    logger.log(f"Using CuPy for FFTs.", level=1)
     import cupy as xp
 
 

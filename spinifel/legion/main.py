@@ -95,7 +95,7 @@ def main_task(pixel_position, pixel_distance, pixel_index, slices, slices_p, gro
     for generation in range(curr_gen, N_generations + 1):
         logger.log(f"#" * 40)
         logger.log(
-            f"##### Generation {generation}/{N_generations}: Group {group_idx}  #####"
+            f"##### Generation {generation}/{N_generations}: pos {group_idx}  #####"
         )
         logger.log(f"#" * 40)
 

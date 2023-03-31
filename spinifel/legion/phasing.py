@@ -6,9 +6,10 @@ import PyNVTX as nvtx
 import pygion
 from pygion import task, Region, RO, RW, WD, Tunable, Partition, Region, execution_fence
 
-from spinifel import settings
+from spinifel import settings, utils
 from spinifel.prep import save_mrc
 from spinifel.sequential.phasing import phase as sequential_phase
+from . import prep as gprep
 from . import utils as lgutils
 
 
@@ -72,14 +73,12 @@ def prev_phase_task(prev_phased, phased):
 @task(leaf=True, privileges=[RO])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/phasing.py", is_prefix=True)
-def new_phase_select(summary):
+def new_phase_select(summary,group_idx):
     iref = np.argmin(summary.skews)
     ref_rank = summary.rank[iref]
-    if settings.verbosity > 0:
-        print(
-            f"Keeping result from rank {ref_rank}: skew={summary.skews[ref_rank]:.2f}",
-            flush=True,
-        )
+    logger = utils.Logger(True,settings)
+    logger.log(
+        f"Keeping result from rank {ref_rank+group_idx}: skew={summary.skews[ref_rank]:.2f}",level=1)
     return ref_rank
 
 
@@ -138,8 +137,8 @@ def new_phase_gauss(rho_):
 def new_phase_gen0_task(
     solved, phased_part, summary, generation, idx, num_procs, group_idx
 ):
-    if settings.verbosity > 0:
-        print("Starting phasing", flush=True)
+    logger = gprep.all_objs["logger"]
+    logger.log("Starting phasing", level=1)
     # shrinkwrap weight range: 0.5 to 1.5
     weight = 0.5 + idx / num_procs
     method = "std"
@@ -158,8 +157,7 @@ def new_phase_gen0_task(
     summary.height[0] = np.max(ydata)
     summary.width[0] = float(fit_c)
     summary.skews[0] = skew(ydata)
-    if settings.verbosity > 0:
-        print("Finishing phasing", flush=True)
+    logger.log("Finishing phasing", level=1)
 
 
 @task(leaf=True, privileges=[RO("ac"), RO("support_", "rho_"), WD, WD])
@@ -167,8 +165,8 @@ def new_phase_gen0_task(
 def new_phase_gen_task(
     solved, phased, summary, phased_part, generation, idx, num_procs, group_idx
 ):
-    if settings.verbosity > 0:
-        print("Starting phasing", flush=True)
+    logger = gprep.all_objs["logger"]
+    logger.log("Starting phasing", level=1)
     # shrinkwrap weight range: 0.5 to 1.5
     weight = 0.5 + idx / num_procs
     method = "std"
@@ -180,21 +178,19 @@ def new_phase_gen_task(
     summary.height[0] = np.max(ydata)
     summary.width[0] = float(fit_c)
     summary.skews[0] = skew(ydata)
-    if settings.verbosity > 0:
-        print("Finishing phasing", flush=True)
+    logger.log("Finishing phasing", level=1)
 
 
 @task(leaf=True, privileges=[RO("ac"), WD("ac", "support_", "rho_")])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/phasing.py", is_prefix=True)
 def phase_gen0_task(solved, phased):
-    if settings.verbosity > 0:
-        print("Starting phasing", flush=True)
+    logger = gprep.all_objs["logger"]
+    logger.log("Starting phasing",level=1)
     phased.ac[:], phased.support_[:], phased.rho_[:] = sequential_phase(
         0, solved.ac, None, None
     )
-    if settings.verbosity > 0:
-        print("Finishing phasing", flush=True)
+    logger.log("Finishing phasing",level=1)
 
 
 @nvtx.annotate("legion/phasing.py", is_prefix=True)
@@ -246,7 +242,7 @@ def new_phase(generation, solved, group_idx=0, phased_regions_dict=None):
             )
 
     summary_phase = phased_regions_dict["summary"]
-    iref = new_phase_select(summary_phase)
+    iref = new_phase_select(summary_phase,group_idx)
 
     phased_region = phased_regions_dict["phased"]
     phased_all_region = phased_regions_dict["multi_phase"]
