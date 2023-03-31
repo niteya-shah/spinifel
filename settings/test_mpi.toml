@@ -4,7 +4,7 @@
 [debug]
 test = "CI settings"
 verbose = true
-verbosity = 0
+verbosity = 1
 use_callmonitor = false
 
 [data]
@@ -23,6 +23,7 @@ ps_srv_nodes = 0
 ps_dir = "${test_data_dir}/3IYF/xtc2"       # This tests mpi/main using xtc2 w/o streaming
 exp = "xpptut15"
 runnum = 1
+detname = "amopnccd"                      
 
 [runtime]
 N_images_per_rank = 1000

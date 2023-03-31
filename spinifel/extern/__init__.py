@@ -8,7 +8,7 @@
 from cufinufft import cufinufft
 from importlib.metadata import version
 
-from spinifel import SpinifelSettings, SpinifelContexts, Profiler
+from spinifel import SpinifelSettings, SpinifelContexts, Profiler, Logger
 from .util import (
     CUFINUFFTRequiredButNotFound,
     CUFINUFFTVersionUnsupported,
@@ -23,6 +23,7 @@ from .util import (
 settings = SpinifelSettings()
 context = SpinifelContexts()
 profiler = Profiler()
+logger = Logger(True, settings)
 
 
 # ______________________________________________________________________________
@@ -62,10 +63,10 @@ else:
 #
 
 if settings.use_cuda and settings.use_cufinufft:
-    print("Orientation Matching: USING_CUDA")
+    logger.log("Orientation Matching: USING_CUDA", level=1)
 
     if context.cufinufft_available:
-        print("++++++++++++++++++++: USING_CUFINUFFT")
+        logger.log(f"++++++++++++++++++++: USING_CUFINUFFT version={version('cufinufft')}", level=1)
         if version("cufinufft") == "1.1":
             nufft_3d_t1 = nufft_3d_t1_cufinufft_v1
             nufft_3d_t2 = nufft_3d_t2_cufinufft_v1
@@ -78,7 +79,7 @@ if settings.use_cuda and settings.use_cufinufft:
         raise CUFINUFFTRequiredButNotFound
 else:
     if context.finufftpy_available:
-        print("++++++++++++++++++++: USING_FINUFFTPY")
+        logger.log("++++++++++++++++++++: USING_FINUFFTPY", level=1)
         if version("finufftpy") == "1.1.2":
             nufft_3d_t1 = nufft_3d_t1_finufft_v1
             nufft_3d_t2 = nufft_3d_t2_finufft_v1

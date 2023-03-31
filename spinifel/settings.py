@@ -220,8 +220,10 @@ class SpinifelSettings(metaclass=Singleton):
             ),
             "_ps_srv_nodes": ("psana", "ps_srv_nodes", int, 0, "no. of server cores"),
             "_ps_exp": ("psana", "exp", str, "xpptut1", "PSANA experiment name"),
-            "_ps_batch_size": ("psana", "ps_batch_size", int, 100, "PSANA batch size"),
+            "_ps_runnum": ("psana", "runnum", int, 1, "PSANA experiment number"),
             "_ps_dir": ("psana", "ps_dir", str, "", "PSANA xtc2 directory"),
+            "_ps_detname": ("psana", "detname", str, "amopnccd", "PSANA detector name"),
+            "_ps_batch_size": ("psana", "ps_batch_size", int, 100, "PSANA batch size"),
             "_ps_parallel": (
                 "psana",
                 "ps_parallel",
@@ -229,9 +231,6 @@ class SpinifelSettings(metaclass=Singleton):
                 "legion",
                 "Use legion or mpi mode for PSANA",
             ),
-            "_ps_runnum": ("psana", "runnum", int, 1, "PSANA experiment number"),
-            "_ps_batch_size": ("psana", "ps_batch_size", int, 100, "PSANA batch size"),
-            "_ps_dir": ("psana", "ps_dir", str, "", "PSANA xtc2 directory"),
             "_use_callmonitor": (
                 "debug",
                 "use_callmonitor",
@@ -600,10 +599,10 @@ class SpinifelSettings(metaclass=Singleton):
             if key not in environ:
                 continue
 
-            print(
-                f"WARNING! The environment variable {key} supersedes all "
-                f"other inputs for this setting. If this is unintensional "
-                f"unset {key}."
+            logger.log(
+                f"WARNING! The environment variable {key} supersedes all "+"\n"+    \
+                f"other inputs for this setting. If this is unintensional "+"\n"+   \
+                f"unset {key}.",
             )
 
             name, env_parser = self.__environ[key]

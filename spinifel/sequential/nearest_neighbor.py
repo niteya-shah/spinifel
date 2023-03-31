@@ -4,7 +4,7 @@ import numpy as np
 import PyNVTX as nvtx
 
 from sklearn.metrics.pairwise import euclidean_distances
-from spinifel import SpinifelSettings, SpinifelContexts
+from spinifel import SpinifelSettings, SpinifelContexts, Logger
 
 
 # ______________________________________________________________________________
@@ -13,6 +13,7 @@ from spinifel import SpinifelSettings, SpinifelContexts
 
 context = SpinifelContexts()
 settings = SpinifelSettings()
+logger = Logger(True, settings)
 
 rank = context.rank
 
@@ -37,7 +38,7 @@ KNN_LOADER = find_spec(knn_string)
 KNN_AVAILABLE = KNN_LOADER is not None
 
 if settings.verbosity > 0:
-    print(f"pyCudaKNearestNeighbors is available: {KNN_AVAILABLE}")
+    logger.log(f"pyCudaKNearestNeighbors is available: {KNN_AVAILABLE}", level=1)
 
 if settings.use_cuda and KNN_AVAILABLE:
     if settings.use_single_prec:
@@ -98,11 +99,12 @@ def nearest_neighbor(model_slices, slices, batch_size):
     # detector size (total pixels) should be >= 16 to use CUDA code
     if settings.use_cuda and slices.shape[1] >= 16:
         deviceId = context.dev_id
-        if settings.verbosity > 0:
-            print(
-                f"Using CUDA  to calculate Euclidean distance and heap sort (batch_size={batch_size})"
-            )
-            print(f"Rank {rank} using deviceId {deviceId}")
+        logger.log(
+            f"Using CUDA  to calculate Euclidean distance and heap sort (batch_size={batch_size})",
+            level=1
+        )
+        logger.log(f"Rank {rank} using deviceId {deviceId}", level=1)
+
 
         # Calculate Euclidean distance in batch to avoid running out of GPU
         # Memory
@@ -119,8 +121,7 @@ def nearest_neighbor(model_slices, slices, batch_size):
             euDist, slices.shape[0], model_slices.shape[0], slices.shape[1], deviceId
         )
     else:
-        if settings.verbosity > 0:
-            print("Using sklearn Euclidean Distance and numpy argmin")
+        logger.log("Using sklearn Euclidean Distance and numpy argmin", level=1)
         euDist = euclidean_distances(model_slices, slices)
         index = np.argmin(euDist, axis=0)
 
@@ -132,6 +133,6 @@ def nearest_neighbor(model_slices, slices, batch_size):
         meanMinDist = np.mean(minDist)
         stdMinDist = np.std(minDist)
         if rank == 0:
-            print(f"OM mean, std: {meanMinDist}, {stdMinDist}")
+            logger.log(f"OM mean, std: {meanMinDist}, {stdMinDist}")
 
     return index

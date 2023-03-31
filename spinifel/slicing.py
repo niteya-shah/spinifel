@@ -2,7 +2,9 @@ import numpy as np
 import skopi as skp
 import PyNVTX as nvtx
 
-from spinifel import autocorrelation
+from spinifel import autocorrelation, settings, utils
+
+logger = utils.Logger(True, settings)
 
 
 @nvtx.annotate("slicing.py", is_prefix=True)
@@ -39,12 +41,12 @@ def gen_model_slices(
             ac, H_, K_, L_, 1, ac_support_size, N, reciprocal_extent, True
         )
     elif override_forward_with == "cpu":
-        print(f"gen_model_slices override using forward_cpu")
+        logger.log(f"gen_model_slices override using forward_cpu", level=1)
         nuvect = autocorrelation.forward_cpu(
             ac, H_, K_, L_, 1, ac_support_size, N, reciprocal_extent, True
         )
     elif override_forward_with == "gpu":
-        print(f"gen_model_slices override using forward_gpu")
+        logger.log(f"gen_model_slices override using forward_gpu", level=1)
         nuvect = autocorrelation.forward_gpu(
             ac, H_, K_, L_, 1, ac_support_size, N, reciprocal_extent, True
         )

@@ -15,6 +15,9 @@ from .settings import SpinifelSettings
 from .context import SpinifelContexts, Profiler
 
 
+from .utils import Logger
+
+
 # ______________________________________________________________________________
 # Initialize the state of the SpinifelSettings/Contexts singleton classes
 #

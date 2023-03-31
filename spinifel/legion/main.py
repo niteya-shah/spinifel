@@ -31,7 +31,7 @@ from .fsc import init_fsc_task, compute_fsc_task, check_convergence_task
 
 @nvtx.annotate("legion/main.py", is_prefix=True)
 def load_psana():
-    logger = utils.Logger(True)
+    logger = utils.Logger(True, settings)
     assert settings.use_psana == True
     # Reading input images using psana2
     # For now, we use one smd chunk per node just to keep things simple.
@@ -61,7 +61,7 @@ def load_psana():
 @task(inner=True, privileges=[RO, RO, RO, RO])
 @lgutils.gpu_task_wrapper
 def main_task(pixel_position, pixel_distance, pixel_index, slices, slices_p, group_idx):
-    logger = utils.Logger(True)
+    logger = utils.Logger(True, settings)
     timer = utils.Timer()
     curr_gen = 0
     fsc = {}
@@ -124,7 +124,7 @@ def main_task(pixel_position, pixel_distance, pixel_index, slices, slices_p, gro
 
         # check for convergence
         if settings.pdb_path.is_file() and settings.chk_convergence:
-            logger.log(f"checking convergence: FSC calculation", flush=True)
+            logger.log(f"checking convergence: FSC calculation")
             fsc = compute_fsc_task(phased, fsc)
             converge = check_convergence_task(fsc)
             converge = converge.get()
@@ -144,7 +144,7 @@ def main_task(pixel_position, pixel_distance, pixel_index, slices, slices_p, gro
 # read the data and run the main algorithm. This can be repeated
 @nvtx.annotate("legion/main.py", is_prefix=True)
 def main():
-    logger = utils.Logger(True)
+    logger = utils.Logger(True, settings)
     logger.log("In Legion main")
     ds = None
     timer = utils.Timer()

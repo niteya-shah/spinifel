@@ -40,9 +40,6 @@ def nufft_3d_t1_finufft_v1(x, y, z, nuvect, sign, eps, nx, ny, nz):
     Version 1 of fiNUFFT 3D type 1
     """
 
-    # if settings.verbose:
-    #    print("Using CPU to solve the NUFFT 3D T1")
-
     # Ensure that x, y, and z have the same shape
     assert x.shape == y.shape == z.shape
 
@@ -67,9 +64,6 @@ def nufft_3d_t2_finufft_v1(x, y, z, ugrid, sign, eps, n):
     """
     Version 1 of fiNUFFT 3D type 2
     """
-
-    # if settings.verbose:
-    #    print("Using CPU to solve the NUFFT 3D T2")
 
     # Ensure that x, y, and z have the same shape
     assert x.shape == y.shape == z.shape

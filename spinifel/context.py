@@ -11,7 +11,7 @@ from functools import wraps
 from callmonitor import intercept as cm_intercept
 
 from .settings import SpinifelSettings
-from .utils import Singleton
+from .utils import Singleton, Logger
 
 MPI4PY_AVAILABLE = False
 if find_spec("mpi4py") is not None:
@@ -33,7 +33,6 @@ if find_spec("pycuda") is not None:
 def goodbye():
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
-    print(f"MPI will be finalized on rank {rank}")
     comm.Barrier()
     # MPI.Finalize()
 
@@ -59,6 +58,8 @@ class SpinifelContexts(metaclass=Singleton):
         self._dev_id = 0
         self._cuda_initialized = False
         self.ctx = None
+        self.settings = SpinifelSettings()
+        self.logger = Logger(True, self.settings)
 
     def init_mpi(self):
         """
@@ -76,10 +77,8 @@ class SpinifelContexts(metaclass=Singleton):
         if not MPI.Is_initialized():
             MPI.Init()
 
-        settings = SpinifelSettings()
-
         self._psana_excl_ranks = []
-        if settings.use_psana:
+        if self.settings.use_psana:
             # A _comm_compute is created here to include only the worker ranks.
             from psana.psexp.tools import (
                 get_excl_ranks,
@@ -97,9 +96,9 @@ class SpinifelContexts(metaclass=Singleton):
 
         # register(MPI.Finalize)
         register(goodbye)
-
         if settings.verbosity > 0:
-            print(f"MPI has been initialized on rank {self.rank}")
+            self.logger.log(f"MPI will be finalized on rank {self.rank}", level=1)
+            self.logger.log(f"MPI has been initialized on rank {self.rank}", level=1)
 
         self._mpi_initialized = True
 
@@ -119,21 +118,19 @@ class SpinifelContexts(metaclass=Singleton):
 
         drv.init()
 
-        settings = SpinifelSettings()
         self._dev_id = self.rank % drv.Device.count()
 
         dev = drv.Device(self.dev_id)
         self.ctx = dev.retain_primary_context()
 
-        if settings.mode != "legion" and settings.mode != "legion_psana2":
+        if self.settings.mode != "legion" and self.settings.mode != "legion_psana2":
             self.ctx.push()
             register(self.ctx.pop)
 
-        settings = SpinifelSettings()
-        if settings.verbosity > 0:
-            print(
-                f"Rank {self.rank} assigned to device {self.dev_id} (total devices: {drv.Device.count()})"
-            )
+        self.logger.log(
+            f"Rank {self.rank} assigned to device {self.dev_id} (total devices: {drv.Device.count()})",
+            level=1
+        )
 
         self._cuda_initialized = True
 

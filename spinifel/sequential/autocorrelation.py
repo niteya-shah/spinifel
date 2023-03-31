@@ -12,6 +12,8 @@ from spinifel import settings, utils, image, autocorrelation
 from spinifel import SpinifelSettings
 
 settings = SpinifelSettings()
+logger = utils.Logger(True, settings)
+
 if settings.use_cupy:
     import os
 
@@ -100,7 +102,7 @@ class Merge:
             )
         else:
             rotmat = np.zeros((0, 3, 3))
-            print(
+            logger.log(
                 "WARNING: gen_nonuniform_positions got empty orientation - returning h,k,l for Null rotation"
             )
 

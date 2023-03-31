@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 from mpi4py import MPI
 
-from spinifel import settings, contexts
+from spinifel import settings, contexts, utils
 from spinifel.sequential.phasing import phase as sequential_phase
 
 
@@ -13,6 +13,7 @@ def phase(generation, ac, support_=None, rho_=None):
     """Phase retrieval by Rank0 and broadcast to all ranks."""
 
     comm = contexts.comm_compute
+    logger = utils.Logger(True, settings, myrank=comm.rank)
 
     weight = 0.5 + comm.rank / comm.size  # shrinkwrap weight range: 0.5 to 1.5
     method = "std"
@@ -46,11 +47,12 @@ def phase(generation, ac, support_=None, rho_=None):
         ranks, heights, widths, skews = [np.array(el) for el in zip(*summary)]
         iref = np.argmin(skews)
         ref_rank = ranks[iref]
-        print(f"heights: {heights}")
-        print(f"widths: {widths}")
-        print(f"skews: {skews}")
-        print(
-            f"Keeping result from rank {ref_rank}: skew={skews[iref]:.2f}", flush=True
+        logger.log(f"Skewness summary:", level=1)
+        logger.log(f"heights: {heights}", level=1)
+        logger.log(f"widths: {widths}", level=1)
+        logger.log(f"skews: {skews}", level=1)
+        logger.log(
+            f"Keeping result from rank {ref_rank}: skew={skews[iref]:.2f}", level=1
         )
     else:
         ref_rank = -1

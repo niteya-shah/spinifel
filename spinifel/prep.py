@@ -7,7 +7,9 @@ import PyNVTX as nvtx
 
 from matplotlib.colors import LogNorm
 
-from spinifel import settings
+from spinifel import settings, utils
+
+logger = utils.Logger(True, settings)
 
 
 @nvtx.annotate("prep.py", is_prefix=True)
@@ -101,9 +103,9 @@ def clipping(arr, n):
             sb // 2 - sb // n : sb // 2 + sb // n,
         ]
     else:
-        print(
+        logger.log(
             "Clipping function doesn't currently accept a detector with %i panels"
-            % narr.shape[1]
+            % narr.shape[1],
         )
     return narr
 
@@ -131,6 +133,10 @@ def binning_index(arr):
 
 @nvtx.annotate("prep.py", is_prefix=True)
 def load_pixel_position_reciprocal(pixel_position_reciprocal):
+    """
+    Load 3D pixel position reciprocal from hdf5 file.
+    Reshapes the ndarray to (3, 1, nRows, nCols)
+    """
     with h5py.File(settings.data_path, "r") as h5f:
         _pixel_position_reciprocal = h5f["pixel_position_reciprocal"][:]
         if _pixel_position_reciprocal.shape[0] == 3:

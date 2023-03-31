@@ -14,9 +14,11 @@ import numpy as np
 from spinifel.sequential.autocorrelation import Merge
 
 
-from spinifel import SpinifelSettings
+from spinifel import SpinifelSettings, Logger
 
 settings = SpinifelSettings()
+logger = Logger(True, settings)
+
 if settings.use_cupy:
     import os
 
@@ -119,9 +121,9 @@ class MergeMPI(Merge):
             self.nuvect_Db, H_, K_, L_, ac_support, self.use_reciprocal_symmetry, self.M
         ).reshape(-1)
         if xp.sum(xp.isnan(uvect_ADb)) > 0:
-            print(
+            logger.log(
                 "Warning: nans in the adjoint calculation; intensities may be too large",
-                flush=True,
+                level=1,
             )
         d = self.alambda * uvect_ADb + self.rlambda * x0
 
@@ -161,7 +163,7 @@ class MergeMPI(Merge):
         ret, info = cg(W, d, x0=x0, maxiter=self.maxiter, callback=self.callback)
 
         if info != 0:
-            print(f"WARNING: CG did not converge at rlambda = {self.rlambda}")
+            logger.log(f"WARNING: CG did not converge at rlambda = {self.rlambda}", level=1)
 
         v1 = norm(ret)
         v2 = norm(W * ret - d)
@@ -172,7 +174,7 @@ class MergeMPI(Merge):
 
         # Rank0 gathers rlambda, solution norm, residual norm from all ranks
         summary = self.comm.gather((self.comm.rank, self.rlambda, v1, v2), root=0)
-        print("summary =", summary)
+        logger.log(f"{summary=}", level=1)
         if self.comm.rank == 0:
             ranks, lambdas, v1s, v2s = [np.array(el) for el in zip(*summary)]
 
@@ -183,9 +185,9 @@ class MergeMPI(Merge):
             else:
                 iref = np.argmin(v1s + v2s)
             self.ref_rank = ranks[iref]
-            print(
+            logger.log(
                 f"Keeping result from rank {self.ref_rank}: v1={v1s[iref]} and v2={v2s[iref]}",
-                flush=True,
+                level=1,
             )
         else:
             self.ref_rank = -1
@@ -200,9 +202,9 @@ class MergeMPI(Merge):
         image.show_volume(
             ac, self.Mquat, f"autocorrelation_{generation}_{self.comm.rank}.png"
         )
-        print(
+        logger.log(
             f"Rank {self.comm.rank} got AC in {self.callback.counter} iterations.",
-            flush=True,
+            level=1,
         )
         self.comm.Bcast(ac, root=self.ref_rank)
 

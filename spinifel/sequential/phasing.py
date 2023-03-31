@@ -2,19 +2,19 @@ import os
 import numpy as np
 import PyNVTX as nvtx
 
-from spinifel import SpinifelSettings, settings, image
+from spinifel import SpinifelSettings, settings, image, utils
 
 # settings = SpinifelSettings()
+logger = utils.Logger(True, settings)
 
 xp = np
 if settings.use_cupy:
-    if settings.verbosity > 0:
-        print(f"Using CuPy for FFTs.")
+    logger.log(f"Using CuPy for FFTs.", level=1)
     import cupy as xp
     from cupyx.scipy.ndimage import gaussian_filter
 else:
-    if settings.verbosity > 0:
-        print(f"Using NumPy for FFTs.")
+    logger.log(f"Using NumPy for FFTs.", level=1)
+
     from scipy.ndimage import gaussian_filter
 
 if settings.use_single_prec:
@@ -268,8 +268,9 @@ def phase(
     ER_loop(nER, rho_, amplitudes_, amp_mask_, support_, rho_max)
 
     if settings.use_cupy:
-        if settings.verbosity > 0:
-            print(f"Converting CuPy arrays to NumPy arrays.")
+
+        logger.log(f"Converting CuPy arrays to NumPy arrays.", level=1)
+
         rho_ = xp.asnumpy(rho_)
         amplitudes_ = xp.asnumpy(amplitudes_)
         amp_mask_ = xp.asnumpy(amp_mask_)

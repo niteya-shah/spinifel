@@ -39,7 +39,7 @@ fi
 
 # Set job submisson command
 if [[ ${target} = *"summit"* || ${target} = *"ascent"* ]]; then
-    export SPINIFEL_TEST_LAUNCHER="jsrun -n2 -a1 -g1"
+    export SPINIFEL_TEST_LAUNCHER="jsrun -n1 -a1 -g1"
     export SPINIFEL_PSANA2_LAUNCHER="jsrun -n3 -g1"
 elif [[ ${target} = *"cgpu"* || ${target} = *"perlmutter"* ]]; then
     export SPINIFEL_TEST_LAUNCHER="srun -n1 -G1"
@@ -54,11 +54,11 @@ fi
 
 
 # test_mpi_hdf5
-$SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi runtime.N_images_per_rank=2000
+$SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi
 
 
 # test_finufft
-$SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi runtime.use_cufinufft=false fsc.fsc_min_cc=0.6 fsc.fsc_min_change_cc=0.1 runtime.use_single_prec=false
+$SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi runtime.use_cuda=false runtime.use_cufinufft=false fsc.fsc_min_cc=0.6 fsc.fsc_min_change_cc=0.1 runtime.use_single_prec=false
 
 
 # test_legion
@@ -70,6 +70,6 @@ $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mo
 
 
 # test_mpi_xtc2
-$SPINIFEL_PSANA2_LAUNCHER python -u -m spinifel --settings=./settings/test_mpi.toml --mode=mpi psana.enable=true
+$SPINIFEL_PSANA2_LAUNCHER python -u -m spinifel --default-settings=test_mpi.toml --mode=mpi psana.enable=true
 
 
