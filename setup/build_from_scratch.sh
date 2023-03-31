@@ -63,32 +63,46 @@ rm conda-installer.sh
 
 source $CONDA_ROOT/etc/profile.d/conda.sh
 
+# Unfortunately, some packages need to be pinned to specific hashes
+# (not merely versions) because these break on Summit/Ascent. This is
+# inherently unportable (the hash relies on the architecture), so we
+# have to make sure we specify this only for the affected architectures.
+if [[ $(uname -p) = "ppc64le" ]]; then
+    ppc64le_target=1
+fi
+
+# IMPORTANT: We pin ALL of our dependencies, otherwise we see repeated
+# issues like https://gitlab.osti.gov/mtip/spinifel/-/issues/61 .
 PACKAGE_LIST=(
     python=$PYVER
-    matplotlib
-    numpy
-    scipy
-    pytest
-    h5py
+    matplotlib=3.5.1 # https://gitlab.osti.gov/mtip/spinifel/-/issues/54
+    numpy=1.22.3
+    scipy=1.7.3${ppc64le_target+=py38he743248_0} # https://gitlab.osti.gov/mtip/spinifel/-/issues/54
+    pytest=7.1.2
+    h5py=3.7.0
 
-    cffi  # Legion
-    pybind11  # FINUFFT
-    numba  # skopi 
-    scikit-learn  # skopi
-    tqdm  # convenience
+    cffi=1.15.1  # Legion
+    pybind11=2.9.2  # FINUFFT
+    numba=0.56.3  # skopi
+    scikit-learn=1.1.3  # skopi
+    tqdm=4.64.1  # convenience
 
     # lcls2
-    setuptools=46.4.0  # temp need specific version
-    cmake
-    cython
-    mongodb
-    pymongo
-    curl
-    rapidjson
-    ipython
-    requests
-    mypy
-    prometheus_client
+    setuptools=46.4.0
+    cmake=3.22.1
+    cython=0.29.32
+    mongodb=4.0.3
+    pymongo=3.12.0
+    curl=7.85.0
+    rapidjson=1.1.0
+    ipython=8.6.0
+    requests=2.28.1
+    mypy=0.910
+    prometheus_client=0.14.1
+
+    # transitive dependencies
+    kiwisolver=1.4.2 # from matplotlib # https://gitlab.osti.gov/mtip/spinifel/-/issues/61
+    cryptography=38.0.4 # https://gitlab.osti.gov/mtip/spinifel/-/issues/63
 )
 
 
@@ -144,18 +158,9 @@ fi
 pip install --no-cache-dir callmonitor
 pip install --no-cache-dir PyNVTX
 
-#-------------------------------------------------------------------------------
-
-
-#_______________________________________________________________________________
-# Install UCX
-
-if [[ $GASNET_CONDUIT = "ucx" ]]
-then
-    ./rebuild_ucx.sh
-    export GASNET_EXTRA_CONFIGURE_ARGS="--with-ucx-home=$LEGION_INSTALL_DIR --with-mpi-cc=$CC"
-    export CROSS_CONFIGURE=
-fi
+# Pin sckit-learn to 1.0.2 w/o breaking psana (see issue #51)
+conda remove --force -y scikit-learn
+conda install --freeze-installed -y scikit-learn=1.0.2
 
 #-------------------------------------------------------------------------------
 
@@ -267,8 +272,10 @@ fi
 # not others). What we've got right now is far too indiscriminant. But
 # as an immediate hack, we'll just put this as late in the build as
 # possible so that we hope we don't mess with anything important.
+#
+# *Only required for Summit and not Ascent.
 
-if [[ ${target} = *"summit"* || ${target} = *"ascent"* ]]
+if [[ ${target} = *"summit"* ]]
 then
     ${root_dir}/../scripts/fix_lib_olcf.sh
 fi
@@ -285,4 +292,6 @@ echo "Done. Please run 'source setup/env.sh' to use this build."
 
 # Restore the LD_PRELOAD variable
 export LD_PRELOAD=$__LD_PRELOAD
+
+
 export popd

@@ -21,6 +21,12 @@ elif [[ ${target} = "psbuild"* ]]; then
     make -j${THREADS:-8} site=psbuild lib
 elif [[ ${target} = *"crusher"* ]]; then
     make -j${THREADS:-8} site=olcf_crusher 
+elif [[ ${target} = "g0"*".stanford.edu" ]]; then # sapling
+    export NVCCFLAGS="-std=c++17 -ccbin=${CXX} -O3 ${NVARCH} -Wno-deprecated-gpu-targets --compiler-options=-fPIC --default-stream per-thread -Xcompiler "\"${CXXFLAGS}\"
+    make -j${THREADS:-8}
+elif [[ ${target} = "darwin"* ]]; then
+    export NVCCFLAGS="-std=c++17 -ccbin=${CXX} -O3 ${NVARCH} -Wno-deprecated-gpu-targets --compiler-options=-fPIC --default-stream per-thread -Xcompiler "\"${CXXFLAGS}\"
+    make -j
 else
     echo "Cannot build cuFINUFFT for this architecture"
     exit
@@ -29,12 +35,12 @@ fi
 echo CUFINUFFT_DIR is $CUFINUFFT_DIR
 
 if [[ ${target} = "psbuild"* ]]; then
-    conda install -y -c conda-forge pycuda
+    conda install -y -c conda-forge pycuda=2022.1
     LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CUFINUFFT_DIR:/opt/nvidia/usr/lib64 pip install --no-cache-dir .
 elif [[ ${target} = *"crusher"* ]]; then
     LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CUFINUFFT_DIR pip install --no-cache-dir .
 else
-    pip install --no-cache-dir pycuda
+    pip install --no-cache-dir pycuda==2022.1
     LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CUFINUFFT_DIR pip install --no-cache-dir .
 fi
 

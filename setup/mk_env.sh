@@ -66,8 +66,8 @@ export CXX=CC
 export CRAYPE_LINK_TYPE=dynamic # allow dynamic linking
 
 # compilers for mpi4py
-export MPI4PY_CC="$(which cc)"
-export MPI4PY_MPICC="$(which cc) --shared"
+export MPI4PY_CC="\$(which cc)"
+export MPI4PY_MPICC="\$(which cc) --shared"
 
 # disable Cori-specific Python environment
 unset PYTHONSTARTUP
@@ -107,20 +107,23 @@ module load PrgEnv-gnu
 module load cudatoolkit
 module load cpe-cuda
 module load cray-fftw
+module load cray-pmi # for GASNet
+module load evp-patch # workaround for recent Perlmutter issue
 
 export CC=cc
 export CXX=CC
 export CRAYPE_LINK_TYPE=dynamic # allow dynamic linking
 
 # compilers for mpi4py
-export MPI4PY_CC="$(which cc)"
-export MPI4PY_MPICC="$(which cc) --shared"
+export MPI4PY_CC="\$(which cc)"
+export MPI4PY_MPICC="\$(which cc) --shared"
 
 # Make sure Cray-FFTW get loaded first to avoid Conda's MKL
 export LD_PRELOAD="\${FFTW_DIR}/libfftw3.so"
 
 export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
-export GASNET_CONDUIT=ucx
+export GASNET_CONDUIT=${GASNET_CONDUIT:-ofi-slingshot11}
+export LEGION_GASNET_CONDUIT=${LEGION_GASNET_CONDUIT:-ofi}
 EOF
 elif [[ ${target} = *"summit"* || ${target} = *"ascent"* ]]; then
     cat >> env.sh <<EOF
@@ -204,8 +207,8 @@ export CXX=CC
 export CRAYPE_LINK_TYPE=dynamic # allow dynamic linking
 
 # compilers for mpi4py
-export MPI4PY_CC="$(which cc)"
-export MPI4PY_MPICC="$(which cc) --shared"
+export MPI4PY_CC="\$(which cc)"
+export MPI4PY_MPICC="\$(which cc) --shared"
 
 # Make sure Cray-FFTW get loaded first to avoid Conda's MKL
 export LD_PRELOAD="\${FFTW_DIR}/libfftw3.so"
@@ -227,14 +230,29 @@ export CXX=CC
 export CRAYPE_LINK_TYPE=dynamic # allow dynamic linking
 
 # compilers for mpi4py
-export MPI4PY_CC="$(which cc)"
-export MPI4PY_MPICC="$(which cc) --shared"
+export MPI4PY_CC="\$(which cc)"
+export MPI4PY_MPICC="\$(which cc) --shared"
 
 # Make sure Cray-FFTW get loaded first to avoid Conda's MKL
 export LD_PRELOAD="\${FFTW_DIR}/libfftw3.so"
 
 export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
-export GASNET_CONDUIT=${GASNET_CONDUIT:-ucx}
+export GASNET_CONDUIT=${GASNET_CONDUIT:-ofi-slingshot10}
+export LEGION_GASNET_CONDUIT=${LEGION_GASNET_CONDUIT:-ofi}
+EOF
+elif [[ $(hostname --fqdn) = *"darwin"* ]]; then
+    cat >> env.sh <<EOF
+module load gcc
+module load cuda
+module load openmpi
+
+export CC=gcc
+export CXX=g++
+# compilers for mpi4py
+export MPI4PY_CC=gcc
+export MPI4PY_MPICC=\$(which mpicc)
+
+export CUPY_LDFLAGS=-L\${CUDA_ROOT}/lib64/stubs
 EOF
 else
     echo "I don't know how to build it on this machine..."
@@ -248,6 +266,7 @@ export LG_RT_DIR="${LG_RT_DIR:-${root_dir}/legion/runtime}"
 export LEGION_DEBUG=0
 
 export PYVER=3.8
+export PYVER_FULL=3.8.13
 
 export LEGION_INSTALL_DIR="${root_dir}/install"
 pathappend \${LEGION_INSTALL_DIR}/bin

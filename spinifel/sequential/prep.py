@@ -1,12 +1,11 @@
 import h5py
 import matplotlib.pyplot as plt
-import numpy             as np
-import PyNVTX            as nvtx
+import numpy as np
+import PyNVTX as nvtx
 
 from matplotlib.colors import LogNorm
 
 from spinifel import settings, prep, image
-
 
 
 @nvtx.annotate("sequential/prep.py", is_prefix=True)
@@ -15,11 +14,11 @@ def get_pixel_position_reciprocal():
     Return pixel positions in reciprocal space.
     """
     pixel_position_type = getattr(np, settings.pixel_position_type_str)
-    pixel_position_reciprocal = np.zeros(settings.pixel_position_shape,
-                                         dtype=pixel_position_type)
+    pixel_position_reciprocal = np.zeros(
+        settings.pixel_position_shape, dtype=pixel_position_type
+    )
     prep.load_pixel_position_reciprocal(pixel_position_reciprocal)
     return pixel_position_reciprocal
-
 
 
 @nvtx.annotate("sequential/prep.py", is_prefix=True)
@@ -28,11 +27,9 @@ def get_pixel_index_map():
     Return pixel coordinates indexes from psana geometry.
     """
     pixel_index_type = getattr(np, settings.pixel_index_type_str)
-    pixel_index_map = np.zeros(settings.pixel_index_shape,
-                               dtype=pixel_index_type)
+    pixel_index_map = np.zeros(settings.pixel_index_shape, dtype=pixel_index_type)
     prep.load_pixel_index_map(pixel_index_map)
     return pixel_index_map
-
 
 
 @nvtx.annotate("sequential/prep.py", is_prefix=True)
@@ -45,8 +42,7 @@ def get_slices(N_images, ds):
     :return slices_: data images
     """
     data_type = getattr(np, settings.data_type_str)
-    slices_ = np.zeros((N_images,) + settings.det_shape,
-                       dtype=data_type)
+    slices_ = np.zeros((N_images,) + settings.det_shape, dtype=data_type)
     if ds is None:
         prep.load_slices(slices_, 0, N_images)
     else:
@@ -59,7 +55,6 @@ def get_slices(N_images, ds):
                 if i >= N_images:
                     return slices_
     return slices_
-
 
 
 @nvtx.annotate("sequential/prep.py", is_prefix=True)
@@ -83,8 +78,7 @@ def get_data(N_images, ds):
     image.show_image(pixel_index_map, slices_[0], "image_0.png")
     image.show_image(pixel_index_map, mean_image, "mean_image.png")
 
-    pixel_distance_reciprocal = prep.compute_pixel_distance(
-        pixel_position_reciprocal)
+    pixel_distance_reciprocal = prep.compute_pixel_distance(pixel_position_reciprocal)
     prep.export_saxs(pixel_distance_reciprocal, mean_image, "saxs.png")
 
     pixel_position_reciprocal = prep.binning_mean(pixel_position_reciprocal)
@@ -95,11 +89,12 @@ def get_data(N_images, ds):
     image.show_image(pixel_index_map, slices_[0], "image_binned_0.png")
     image.show_image(pixel_index_map, mean_image, "mean_image_binned.png")
 
-    pixel_distance_reciprocal = prep.compute_pixel_distance(
-        pixel_position_reciprocal)
+    pixel_distance_reciprocal = prep.compute_pixel_distance(pixel_position_reciprocal)
     prep.export_saxs(pixel_distance_reciprocal, mean_image, "saxs_binned.png")
 
-    return (pixel_position_reciprocal,
-            pixel_distance_reciprocal,
-            pixel_index_map,
-            slices_)
+    return (
+        pixel_position_reciprocal,
+        pixel_distance_reciprocal,
+        pixel_index_map,
+        slices_,
+    )
