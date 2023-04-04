@@ -544,11 +544,9 @@ def solve(
 
     def W_matvec(uvect):
         """Define W part of the W @ x = d problem."""
-        assert use_reciprocal_symmetry, "Complex AC are not supported."
-        assert np.all(np.isreal(uvect))
-
-        uvect_ADA = gprep.all_objs["mg"].core_problem_convolution_spinifel(
-            uvect, M, uregion_ups.F_conv_, M_ups, ac.support, use_reciprocal_symmetry, True)
+        uvect_ADA = gprep.all_objs["mg"].core_problem_convolution(
+            uvect, xp.array(uregion_ups.F_conv_), xp.array(ac.support)
+        )
         uvect_FDF = gprep.all_objs["mg"].fourier_reg(uvect, xp.array(ac.support))
         uvect = alambda * uvect_ADA + rlambda * uvect + flambda * uvect_FDF
         return uvect
@@ -729,3 +727,4 @@ def solve_ac(
     # return results_p[iref.get()], solve_ac_dict
     ac_result_task(results_r, results, results_p, iref, group_idx, point=group_idx)
     return results_r, solve_ac_dict
+

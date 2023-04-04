@@ -6,7 +6,7 @@ from matplotlib.colors import LogNorm, SymLogNorm
 from scipy.ndimage import gaussian_filter
 
 
-from spinifel import settings, utils, image, autocorrelation, contexts
+from spinifel import settings, utils, image, contexts
 import skopi as skp
 import PyNVTX as nvtx
 

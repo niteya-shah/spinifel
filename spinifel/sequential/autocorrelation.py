@@ -7,12 +7,13 @@ from matplotlib.colors import LogNorm, SymLogNorm
 
 import numpy as np
 from scipy.ndimage import gaussian_filter
-from spinifel import settings, utils, image, autocorrelation
+from spinifel import settings, utils, image
 
 from spinifel import SpinifelSettings
 
 settings = SpinifelSettings()
 logger = utils.Logger(True, settings)
+import time
 
 if settings.use_cupy:
     import os
@@ -36,6 +37,13 @@ if settings.use_single_prec:
 else:
     f_type = xp.float64
     c_type = xp.complex128
+
+if settings.use_fftx:
+    if settings.verbose:
+        print(f"Using FFTX for FFTs.")
+    import fftx as fftxp
+    # fftx_options_cuda = {'cuda' : True}
+    # fftx_options_nocuda = {'cuda' : False}
 
 
 class Merge:
@@ -126,103 +134,45 @@ class Merge:
         # shape->[N_images] x det_shape
         return H, K, L
 
+    def _fftn(self, ugrid):
+        # Calculate fft of the shifted ugrid. 
+        start_time = time.time()
+        ugrid_shifted = xp.fft.ifftshift(ugrid)
+        if settings.use_fftx:
+            fftxp.utils.print_array_info(xp, ugrid_shifted, "DATA shifted ugrid")
+            F_ugrid = fftxp.fft.fftn(ugrid_shifted)
+            #FIXME Mona finds better way to compare fftx and numpy
+            #fftxp.utils.print_diff(xp, F_ugrid_np, F_ugrid, "F_ugrid")
+        else:
+            F_ugrid = xp.fft.fftn(ugrid_shifted)  # / M**3
+        logger.log(f"[fftn] ORDER ugrid_shifted is {ugrid_shifted.flags.c_contiguous} TIME: {time.time()-start_time:.5f}s.", level=2)
+        return F_ugrid
+
+    def _ifftn(self, F_reg):
+        start_time = time.time()
+        if settings.use_fftx:
+            fftxp.utils.print_array_info(xp, F_reg, "DATA F_reg")
+            reg = xp.fft.fftshift(fftxp.fft.ifftn(F_reg))
+            #FIXME Mona finds better way to compare fftx and numpy
+            #fftxp.utils.print_diff(np, reg_inversed, reg_inversed_fftx, "reg_inversed")
+        else:
+            reg = xp.fft.fftshift(xp.fft.ifftn(F_reg))
+        logger.log(f"[ifftn] ORDER F_reg is {F_reg.flags.c_contiguous} TIME: {time.time()-start_time:.5f}s.", level=2)
+        return reg
+
+
     @nvtx.annotate("sequential/autocorrelation.py::modified", is_prefix=True)
     def fourier_reg(self, uvect, support):
         ugrid = uvect.reshape((self.M,) * 3) * support
         if self.use_reciprocal_symmetry:
             assert xp.all(xp.isreal(ugrid))
-        
-        # Calculate fft of the shifted ugrid. 
-        if settings.use_fftx:
-            ugrid_shifted = np.fft.ifftshift(ugrid)
-            print(f"calling fftn in fourier_reg in sequential/autocorrelation.py {ugrid_shifted.flags.c_contiguous=}")
-            start_time = time.time()
-            F_ugrid_np = xp.fft.fftn(xp.fft.ifftshift(ugrid))  # / M**3
-            end_time = time.time()
-            np_time = end_time - start_time
-            start_time = time.time()
-            F_ugrid = fftxp.fft.fftn(ugrid_shifted)
-            end_time = time.time()
-            fftxp_time = end_time - start_time
-            fftxp.utils.print_diff(np, F_ugrid_np, F_ugrid,
-                                   "F_ugrid")
-            print(f"FULL TIME F_ugrid_fftx: np {np_time} fftxp {fftxp_time}")
-            fftxp.utils.print_array_info(np, np.fft.ifftshift(ugrid), "DATA shifted ugrid")
-        else:
-            F_ugrid = xp.fft.fftn(xp.fft.ifftshift(ugrid))  # / M**3
-        
-
+        F_ugrid = self._fftn(ugrid)
         F_reg = F_ugrid * xp.fft.ifftshift(self.F_antisupport)
-        
-        start_time = time.time()
-        reg_inversed = xp.fft.ifftn(F_reg)
-        end_time = time.time()
-        np_time = end_time - start_time
-        if settings.use_fftx:
-            print(f"ORDER ifftn F_reg is {F_reg.flags.c_contiguous}")
-            start_time = time.time()
-            reg_inversed_fftx = fftxp.fft.ifftn(F_reg)
-            end_time = time.time()
-            fftxp_time = end_time - start_time
-            fftxp.utils.print_diff(np, reg_inversed, reg_inversed_fftx, "reg_inversed")
-            print(f"FULL TIME reg_inversed: np {np_time} fftxp {fftxp_time}")
-            fftxp.utils.print_array_info(np, F_reg, "DATA F_reg")
-            reg_inversed = reg_inversed_fftx
-
-        reg = xp.fft.fftshift(reg_inversed)
+        reg = self._ifftn(F_reg)
         uvect = (reg * support).reshape(-1)
         if self.use_reciprocal_symmetry:
             uvect = uvect.real
 
-@nvtx.annotate("sequential/autocorrelation.py", is_prefix=True)
-def setup_linops(H, K, L, data,
-                 ac_support, weights, x0,
-                 M, N, reciprocal_extent,
-                 rlambda, flambda,
-                 use_reciprocal_symmetry):
-    """Define W and d parts of the W @ x = d problem.
-
-    W = A_adj*Da*A + rl*I  + fl*F_adj*Df*F
-    d = A_adj*Da*b + rl*x0 + 0
-
-    Where:
-        A represents the NUFFT operator
-        A_adj its adjoint
-        I the identity
-        F the FFT operator
-        F_adj its atjoint
-        Da, Df weights
-        b the data
-        x0 the initial guess (ac_estimate)
-    """
-    H_ = H.flatten() / reciprocal_extent * np.pi / settings.oversampling
-    K_ = K.flatten() / reciprocal_extent * np.pi / settings.oversampling
-    L_ = L.flatten() / reciprocal_extent * np.pi / settings.oversampling
-
-    lu = np.linspace(-np.pi, np.pi, M)
-    Hu_, Ku_, Lu_ = np.meshgrid(lu, lu, lu, indexing='ij')
-    Qu_ = np.sqrt(Hu_**2 + Ku_**2 + Lu_**2)
-    F_antisupport = Qu_ > np.pi / settings.oversampling
-    assert np.all(F_antisupport == F_antisupport[::-1, :, :])
-    assert np.all(F_antisupport == F_antisupport[:, ::-1, :])
-    assert np.all(F_antisupport == F_antisupport[:, :, ::-1])
-    assert np.all(F_antisupport == F_antisupport[::-1, ::-1, ::-1])
-
-    # Using upsampled convolution technique instead of ADA
-    M_ups = settings.M_ups
-    ugrid_conv = autocorrelation.adjoint(
-        np.ones_like(data), H_, K_, L_, 1, M_ups,
-        reciprocal_extent, use_reciprocal_symmetry)
-    print(f'calling fftn in setup_linops in sequential/autocorrelation.py')
-    F_ugrid_conv_ = np.fft.fftn(np.fft.ifftshift(ugrid_conv)) / M**3
-
-    def W_matvec(uvect):
-        """Define W part of the W @ x = d problem."""
-        uvect_ADA = autocorrelation.core_problem_convolution_spinifel(
-            uvect, M, F_ugrid_conv_, M_ups, ac_support, use_reciprocal_symmetry, True)
-        uvect_FDF = autocorrelation.fourier_reg(
-            uvect, ac_support, F_antisupport, M, use_reciprocal_symmetry)
-        uvect = uvect_ADA + rlambda*uvect + flambda*uvect_FDF
         return uvect
 
     def core_problem_convolution(self, uvect, F_ugrid_conv_, ac_support):
@@ -232,9 +182,9 @@ def setup_linops(H, K, L, data,
         ugrid_ups = xp.zeros((self.M_ups,) * 3, dtype=uvect.dtype)
         ugrid_ups[: self.M, : self.M, : self.M] = ugrid
         # Convolution = Fourier multiplication
-        F_ugrid_ups = xp.fft.fftn(xp.fft.ifftshift(ugrid_ups))
+        F_ugrid_ups = self._fftn(ugrid_ups)
         F_ugrid_conv_out_ups = F_ugrid_ups * F_ugrid_conv_
-        ugrid_conv_out_ups = xp.fft.fftshift(xp.fft.ifftn(F_ugrid_conv_out_ups))
+        ugrid_conv_out_ups = self._ifftn(F_ugrid_conv_out_ups)
         # Downsample
         ugrid_conv_out = ugrid_conv_out_ups[: self.M, : self.M, : self.M]
         ugrid_conv_out *= ac_support
@@ -257,8 +207,7 @@ def setup_linops(H, K, L, data,
                 self.nuvect, H_, K_, L_, 1, self.use_reciprocal_symmetry, self.M_ups
             )
         )
-
-        F_ugrid_conv_ = xp.fft.fftn(xp.fft.ifftshift(ugrid_conv)) / self.M**3
+        F_ugrid_conv_ = self._fftn(ugrid_conv) / self.M**3
 
         def W_matvec(uvect):
             """Define W part of the W @ x = d problem."""
@@ -314,3 +263,4 @@ def setup_linops(H, K, L, data,
         it_number = self.callback.counter
 
         return ac
+
