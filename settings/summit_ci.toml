@@ -7,8 +7,8 @@ verbosity = 0
 use_callmonitor = false
 
 [data]
-in_dir = "/gpfs/wolf/chm137/proj-shared/spinifel_data"
-out_dir = "/gpfs/wolf/chm137/proj-shared/ci/${CI_PIPELINE_ID}/spinifel_output"
+in_dir = "${test_data_dir}/2CEX/"
+out_dir = "${out_dir}"
 name = "2CEX-10k-2.h5"
 
 [psana]
