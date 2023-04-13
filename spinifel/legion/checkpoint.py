@@ -11,9 +11,10 @@ from . import utils as lgutils
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/checkpoint.py", is_prefix=True)
 def checkpoint_load_task(phased, orientations, out_dir, load_gen, tag_gen):
-    print(
+    logger = utils.Logger(True, settings)
+    logger.log(
         f"Loading checkpoint: {checkpoint.generate_checkpoint_name(out_dir, load_gen, tag_gen)}",
-        flush=True,
+        level=1,
     )
     myRes = checkpoint.load_checkpoint(out_dir, load_gen, tag_gen)
     # Unpack dictionary

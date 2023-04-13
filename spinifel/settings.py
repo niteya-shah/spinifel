@@ -156,7 +156,6 @@ class SpinifelSettings(metaclass=Singleton):
 
         self.__properties = {
             "_test": ("debug", "test", str, "", "test field used for debugging"),
-            "_verbose": ("debug", "verbose", parse_bool, False, "is verbosity > 0"),
             "_verbosity": ("debug", "verbosity", int, 0, "reporting verbosity"),
             "_checkpoint": (
                 "debug",
@@ -483,14 +482,13 @@ class SpinifelSettings(metaclass=Singleton):
 
         self.__environ = {
             "TEST": ("_test", get_str),
-            "VERBOSE": ("_verbose", get_bool),
             "DATA_DIR": ("_data_dir", get_path),
             "PDB_PATH": ("_pdb_path", get_path),
             "DATA_FILENAME": ("_data_filename", get_str),
             "USE_PSANA": ("_use_psana", get_bool),
             "OUT_DIR": ("_out_dir", get_path),
             "N_IMAGES_PER_RANK": ("_N_images_per_rank", get_int),
-            "VERBOSITY": ("_verbose", get_int),
+            "VERBOSITY": ("_verbosity", get_int),
             "USE_CUDA": ("_use_cuda", get_bool),
             "DEVICES_PER_RS": ("_devices_per_node", get_int),
             "USE_CUFINUFFT": ("_use_cufinufft", get_bool),
@@ -597,11 +595,9 @@ class SpinifelSettings(metaclass=Singleton):
             setattr(self, attr, parser(val))
 
         for key in self.__environ:
-
             if key not in environ:
                 continue
-
-            logger.log(
+            print(
                 f"WARNING! The environment variable {key} supersedes all "+"\n"+    \
                 f"other inputs for this setting. If this is unintensional "+"\n"+   \
                 f"unset {key}.",
@@ -665,24 +661,10 @@ class SpinifelSettings(metaclass=Singleton):
         return isinstance(getattr(type(self), attr, None), property)
 
     @property
-    def verbose(self):
-        """
-        is verbosity > 0
-        """
-        return (
-            self._verbose
-            or self._verbosity > 0  # noqa: E1101 pylint: disable=no-member
-        )  # noqa: E1101 pylint: disable=no-member
-
-    @property
     def verbosity(self):
         """
         reporting verbosity
         """
-        if self._verbosity == 0:  # noqa: E1101  pylint: disable=no-member
-            if self._verbose:  # noqa: E1101 pylint: disable=no-member
-                return 1
-            return 0
         return self._verbosity  # noqa: E1101 pylint: disable=no-member
 
     @property
