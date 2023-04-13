@@ -122,8 +122,8 @@ def right_hand_ADb_task(
     slices, uregion, nonuniform_v, ac, M, use_reciprocal_symmetry, ready_obj
 ):
     ready = ready_obj.get()
-    if settings.verbosity > 0:
-        print(f"{socket.gethostname()} started ADb.", flush=True)
+    logger = gprep.all_objs["logger"]
+    logger.log(f"{socket.gethostname()} started ADb.",level=1)
     autocorr = gprep.all_objs["mg"]
     ac_support = xp.array(ac.support)
     adj = autocorr.nufft.adjoint(
@@ -139,8 +139,7 @@ def right_hand_ADb_task(
         adj = adj.get()
 
     uregion.ADb[:] = adj
-    if settings.verbosity > 0:
-        print(f"{socket.gethostname()} computed ADb.", flush=True)
+    logger.log(f"{socket.gethostname()} computed ADb.",level=1)
 
 
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
@@ -177,8 +176,8 @@ def prep_Fconv_task(
     ready_obj,
 ):
     ready = ready_obj.get()
-    if settings.verbosity > 0:
-        print(f"{socket.gethostname()} started Fconv.", flush=True)
+    logger = gprep.all_objs["logger"]
+    logger.log(f"{socket.gethostname()} started Fconv.", level=1)
     autocorr = gprep.all_objs["mg"]
     conv_ups = autocorr.nufft.adjoint(
         autocorr.nuvect,
@@ -193,8 +192,7 @@ def prep_Fconv_task(
     if not isinstance(f_conv, np.ndarray):
         f_conv = f_conv.get()
     uregion_ups.F_conv_[:] = f_conv
-    if settings.verbosity > 0:
-        print(f"{socket.gethostname()} computed Fconv.", flush=True)
+    logger.log(f"{socket.gethostname()} computed Fconv.", level=1)
 
 
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
@@ -539,8 +537,8 @@ def solve(
     maxiter,
     group_idx,
 ):
-    if settings.verbosity > 0:
-        print(f"Rank {rank} Group ID {group_idx} started solve", flush=True)
+    logger = gprep.all_objs["logger"]
+    logger.log(f" pos: {group_idx} started solve", level=1)
 
     def W_matvec(uvect):
         """Define W part of the W @ x = d problem."""
@@ -560,8 +558,7 @@ def solve(
     d = alambda * ADb + rlambda * x0
     callback = gprep.all_objs["mg"].callback
     ret, info = cg(W, d, x0=x0, maxiter=maxiter, callback=callback)
-    if info != 0 and settings.verbosity > 0:
-        print(f"WARNING: CG did not converge at rlambda = {rlambda}", flush=True)
+    logger.log(f"WARNING: CG did not converge at rlambda = {rlambda}",level=1)
 
     ac_res = ret.reshape((M,) * 3)
     if not isinstance(ac_res, np.ndarray):
@@ -570,8 +567,7 @@ def solve(
         assert np.all(np.isreal(ac_res))
     result.ac[:] = np.ascontiguousarray(ac_res.real)
     it_number = callback.counter
-    if settings.verbosity > 0:
-        print(f"Rank {rank} Group ID {group_idx} recovered AC in {it_number} iterations.", flush=True)
+    logger.log(f"pos:{group_idx} recovered AC in {it_number} iterations.", level=1)
     image.show_volume(
         ac_res.real, settings.Mquat, f"autocorrelation_{generation}_{rank}.png"
     )

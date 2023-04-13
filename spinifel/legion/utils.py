@@ -131,7 +131,7 @@ def create_max_region(maxImagesPerRank, fieldsDict, secShape, nPoints):
     shape_total = (N_images,) + secShape
     region = Region(shape_total, fieldsDict)
 
-    if settings.verbose:
+    if settings.verbosity > 0:
         print(
             f" region = {region.ispace.bounds}, max_images_per_rank = {maxImagesPerRank}, n_points={nPoints}",
             flush=True,
@@ -150,7 +150,7 @@ def union_partitions_with_stride(
         region, [nPoints], stride * np.eye(len(shape_total), 1), shape_local
     )
 
-    if settings.verbose:
+    if settings.verbosity > 0:
         for i in range(nPoints):
             print(
                 f"Union: region_p[{i}] = {region_p[i].ispace.domain.extent}, {region_p[i].ispace.bounds}",

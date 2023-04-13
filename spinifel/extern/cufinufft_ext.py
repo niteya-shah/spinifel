@@ -107,7 +107,8 @@ def nufft_3d_t1_cufinufft_v1(H_, K_, L_, nuvect, sign, eps, nx, ny, nz):
     complex_dtype = np.complex128
     dtype = np.float64
 
-    logger.log(f"Using v1 CUDA to solve the NUFFT 3D T1 on device {dev_id}", level=1)
+    if settings.verbosity > 0:
+        logger.log(f"Using v1 CUDA to solve the NUFFT 3D T1 on device {dev_id}", level=1)
 
     # Ensure that H_, K_, and L_ have the same shape
     assert H_.shape == K_.shape == L_.shape

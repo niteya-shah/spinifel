@@ -52,11 +52,11 @@ def match(
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
 def match_task(phased, orientations, slices, ready_obj):
-    if settings.verbosity > 0:
-        print(f"{socket.gethostname()} starts Orientation Matching", flush=True)
+
     if ready_obj is not None:
         ready_obj = ready_obj.get()
+    logger = gprep.all_objs["logger"]
+    logger.log(f"{socket.gethostname()} starts Orientation Matching",level=1)
     snm = gprep.all_objs["snm"]
     orientations.quaternions[:] = snm.slicing_and_match(phased.ac)
-    if settings.verbosity > 0:
-        print(f"{socket.gethostname()} finished Orientation Matching.", flush=True)
+    logger.log(f"{socket.gethostname()} finished Orientation Matching.",level=1)
