@@ -210,6 +210,11 @@ class SpinifelSettings(metaclass=Singleton):
                 parse_bool, False,
                 "use fftx wherever possible"
             ),
+            "_use_pygpu": (
+                "runtime", "use_pygpu",
+                parse_bool, False,
+                "use pygpu instead of pycuda"
+            ),
             "_ps_smd_n_events": (
                 "psana",
                 "ps_smd_n_events",
