@@ -120,7 +120,7 @@ conda install -y bitstruct krtc -c conda-forge
 
 # Important: install CuPy first, it is now a dependency for mpi4py (at least in some cases)
 (
-    if [[ $(hostname --fqdn) = *".crusher."* ]]; then
+    if [[ $(hostname --fqdn) = *".crusher."* || $(hostname --fqdn) = *".frontier."* ]]; then
         export CUPY_INSTALL_USE_HIP=1
         export ROCM_HOME=$ROCM_PATH
         export HCC_AMDGPU_TARGET=gfx90a
@@ -161,6 +161,13 @@ pip install --no-cache-dir PyNVTX
 # Pin sckit-learn to 1.0.2 w/o breaking psana (see issue #51)
 conda remove --force -y scikit-learn
 conda install --freeze-installed -y scikit-learn=1.0.2
+
+# Extra for frontier/crusher new unsolved issue
+if [[ ${target} = *".crusher."* || ${target} = *".frontier."* ]]
+then
+    conda install -y -c conda-forge libssh
+    conda install -y -c conda-forge libssh=0.10.4
+fi
 
 #-------------------------------------------------------------------------------
 
