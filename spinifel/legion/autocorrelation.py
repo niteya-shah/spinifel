@@ -28,7 +28,6 @@ if settings.use_cupy:
     import os
 
     os.environ["CUPY_ACCELERATORS"] = "cub"
-    from pycuda import gpuarray
     from cupyx.scipy.sparse.linalg import LinearOperator, cg
 
     # from cupyx.scipy.ndimage import gaussian_filter
