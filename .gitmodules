@@ -16,7 +16,6 @@
 [submodule "setup/cufinufft"]
 	path = setup/cufinufft
 	url = https://github.com/darrenjhsu/cufinufft.git
-	branch = djh/PyBindGPU
 [submodule "setup/skopi"]
 	path = setup/skopi
 	url = https://github.com/chuckie82/skopi.git
@@ -26,4 +25,3 @@
 [submodule "setup/PybindGPU"]
 	path = setup/PybindGPU
 	url = https://github.com/darrenjhsu/PybindGPU.git
-	branch = crusher
