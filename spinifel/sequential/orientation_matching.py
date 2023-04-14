@@ -16,7 +16,10 @@ if settings.use_cupy:
 
     os.environ["CUPY_ACCELERATORS"] = "cub"
 
-    from pycuda import gpuarray
+    if settings.use_pygpu:
+        from PyGPU import to_gpu
+    else:
+        from pycuda.gpuarray import to_gpu
 
     from cupyx.scipy.sparse.linalg import LinearOperator, cg
     from cupy.linalg import norm
@@ -31,7 +34,10 @@ else:
     xp = np
 
 if settings.use_cufinufft:
-    from pycuda import gpuarray
+    if settings.use_pygpu:
+        from PyGPU import to_gpu
+    else:
+        from pycuda.gpuarray import to_gpu
 
 if settings.use_single_prec:
     f_type = xp.float32
@@ -133,7 +139,7 @@ class SNM:
         if not hasattr(self, "dist"):
             self.dist = xp.empty((self.N_orientations, self.N_slices), dtype=f_type)
         if settings.use_cufinufft:
-            ugrid = gpuarray.to_gpu(ac.astype(c_type))
+            ugrid = to_gpu(ac.astype(c_type))
         else:
             ugrid = ac.astype(c_type)
         slices_time = 0
