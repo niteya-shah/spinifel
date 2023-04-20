@@ -81,7 +81,15 @@ variables:
 
 .legion_test_script: &legion_test_script
   script:
-    - PYTHONPATH="$PYTHONPATH:$EXTERNAL_WORKDIR:$PWD/mpi4py_poison_wrapper" $SPINIFEL_TEST_LAUNCHER legion_python -ll:py 1 -ll:csize 8192 legion_main.py --default-settings=summit_ci.toml --mode=legion
+    - PYTHONPATH="$PYTHONPATH:$EXTERNAL_WORKDIR:$PWD/mpi4py_poison_wrapper" $SPINIFEL_TEST_LAUNCHER legion_python -ll:py 1 -ll:pyomp=2  -ll:csize 8192 legion_main.py --default-settings=summit_ci.toml --mode=legion
+
+.legion_hdf5_test_script: &legion_hdf5_test_script
+  script:
+    - PYTHONPATH="$PYTHONPATH:$EXTERNAL_WORKDIR:$PWD/mpi4py_poison_wrapper" $SPINIFEL_TEST_LAUNCHER legion_python -ll:py 1 -ll:pyomp=2  -ll:csize 8192 legion_main.py --default-settings=test_mpi.toml --mode=legion
+
+.legion_xtc2_test_script: &legion_xtc2_test_script
+  script:
+    - PS_PARALLEL="legion" $SPINIFEL_PSANA2_LAUNCHER legion_python -ll:py 1  -ll:pyomp=2 --default-settings=test_mpi.toml --mode=legion psana.enable=true psana.ps_smd_n_events=1000
 
 .sequential_test_script: &sequential_test_script
   script:
@@ -153,6 +161,23 @@ test_mpi_hdf5_ascent:
 
 test_mpi_xtc2_ascent:
   <<: [*test_rules, *test_before_script, *mpi_xtc2_test_script]
+  stage: test
+  tags:
+    - batch
+  variables:
+    <<: [*ascent_variables]
+
+
+test_legion_hdf5_ascent:
+  <<: [*test_rules, *test_before_script, *legion_hdf5_test_script]
+  stage: test
+  tags:
+    - batch
+  variables:
+    <<: [*ascent_variables]
+
+test_legion_xtc2_ascent:
+  <<: [*test_rules, *test_before_script, *legion_xtc2_test_script]
   stage: test
   tags:
     - batch
