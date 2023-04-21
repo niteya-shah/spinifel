@@ -236,29 +236,6 @@ export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
 export GASNET_CONDUIT=${GASNET_CONDUIT:-ofi-slingshot11}
 export LEGION_GASNET_CONDUIT=${LEGION_GASNET_CONDUIT:-ofi}
 EOF
-elif [[ $(hostname --fqdn) = *".frontier."* ]]; then
-    cat >> env.sh <<EOF
-module load PrgEnv-gnu
-module load rocm/5.4.3
-#module use /ccs/proj/chm137/shared/stf006/djh992/llvm_bjoo/modules # Copied from crusher
-#module load amd-llvm    # loading this changed rocm to 5.30 on frontier
-module load cray-fftw
-
-export CC=cc
-export CXX=CC
-export CRAYPE_LINK_TYPE=dynamic # allow dynamic linking
-
-# compilers for mpi4py
-export MPI4PY_CC="\$(which cc)"
-export MPI4PY_MPICC="\$(which cc) --shared"
-
-# Make sure Cray-FFTW get loaded first to avoid Conda's MKL
-export LD_PRELOAD="\${FFTW_DIR}/libfftw3.so"
-
-export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
-export GASNET_CONDUIT=${GASNET_CONDUIT:-ofi-slingshot11}
-export LEGION_GASNET_CONDUIT=${LEGION_GASNET_CONDUIT:-ofi}
-EOF
 elif [[ $(hostname --fqdn) = *".spock."* ]]; then
     cat >> env.sh <<EOF
 module load wget
