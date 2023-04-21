@@ -9,11 +9,6 @@ source "$root_dir"/env.sh
 target=${SPINIFEL_TARGET:-${NERSC_HOST:-$(hostname --fqdn)}}
 echo $target
 
-# ***TMP*** Checking out specific branch from a forked gitsubmodule
-pushd "$root_dir"/PybindGPU
-git checkout crusher
-popd
-
 pushd "$root_dir"/PybindGPU/PyGPU
 
 if [[ ${target} = *"crusher"* || ${target} = *"frontier"* ]]; then
