@@ -16,8 +16,8 @@ popd
 
 pushd "$root_dir"/PybindGPU/PyGPU
 
-if [[ ${target} = *"crusher"* ]]; then
-    make 
+if [[ ${target} = *"crusher"* || ${target} = *"frontier"* ]]; then
+    make
 elif [[ ${target} = *"spock"* ]]; then
     echo "Currently unsupported"
     exit
@@ -27,7 +27,7 @@ else
 fi
 popd
 pushd "$root_dir"/PybindGPU
-if [[ ${target} = *"crusher"* ]]; then
+if [[ ${target} = *"crusher"* || ${target} = *"frontier"* ]]; then
     pip install --no-cache-dir -e .
 fi
 popd

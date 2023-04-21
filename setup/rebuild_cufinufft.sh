@@ -10,10 +10,6 @@ target=${SPINIFEL_TARGET:-${NERSC_HOST:-$(hostname --fqdn)}}
 echo $target
 pushd "$root_dir"/cufinufft
 
-# ***TMP*** Checking out specific branch from a forked gitsubmodule
-git checkout djh/PyBindGPU
-
-
 if [[ ${target} = "cgpu"* ]]; then
     make -j${THREADS:-8} site=nersc_cgpu lib
 elif [[ ${target} = "perlmutter"* ]]; then
