@@ -64,9 +64,9 @@ def get_random_orientations(N_images_per_rank, group_idx=0):
         N_images_per_rank, fields_dict, sec_shape
     )
     execution_fence(block=True)
-    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get() // settings.N_conformations
+    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
     for i in range(N_procs):
-        gen_random_orientations(orientations_p[i], N_images_per_rank, point=i+group_idx)
+        gen_random_orientations(orientations_p[i], N_images_per_rank, point=i)
     return orientations, orientations_p
 
 
@@ -87,16 +87,16 @@ def get_nonuniform_positions_v(
 ):
     for i in range(N_procs):
         gen_nonuniform_positions_v(
-            nonuniform_p[i], nonuniform_v_p[i], reciprocal_extent, point=i+group_idx
-        )
+            nonuniform_p[i], nonuniform_v_p[i], reciprocal_extent, point=i)
 
 
 @task(leaf=True, privileges=[RO, WD])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
-def gen_nonuniform_positions(orientations, nonuniform, ready_obj):
+def gen_nonuniform_positions(orientations, nonuniform, ready_obj,conf_idx):
     ready = ready_obj.get()
-    autocorr = gprep.all_objs["mg"]
+    gall = gprep.get_gprep(conf_idx)
+    autocorr = gall["mg"]
     (
         nonuniform.H[:],
         nonuniform.K[:],
@@ -110,8 +110,7 @@ def get_nonuniform_positions(ac_dict, N_procs, ready_objs, group_idx):
     nonuniform_p = ac_dict["nonuniform_p"]
     for i in range(N_procs):
         gen_nonuniform_positions(
-            orientations_p[i], nonuniform_p[i], ready_objs[i], point=i+group_idx
-        )
+            orientations_p[i], nonuniform_p[i], ready_objs[i], group_idx, point=i)
 
 
 # equivalent to setup_linops
@@ -119,12 +118,11 @@ def get_nonuniform_positions(ac_dict, N_procs, ready_objs, group_idx):
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def right_hand_ADb_task(
-    slices, uregion, nonuniform_v, ac, M, use_reciprocal_symmetry, ready_obj
-):
+        slices, uregion, nonuniform_v, ac, M, use_reciprocal_symmetry, ready_obj,conf_idx=0):
     ready = ready_obj.get()
-    logger = gprep.all_objs["logger"]
+    logger = gprep.get_gprep(conf_idx)["logger"]
     logger.log(f"{socket.gethostname()} started ADb.",level=1)
-    autocorr = gprep.all_objs["mg"]
+    autocorr = gprep.get_gprep(conf_idx)["mg"]
     ac_support = xp.array(ac.support)
     adj = autocorr.nufft.adjoint(
         autocorr.nuvect_Db,
@@ -144,9 +142,8 @@ def right_hand_ADb_task(
 
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def right_hand(
-        slices_p, uregion_p, nonuniform_v_p, ac, M, use_reciprocal_symmetry, ready_objs, group_idx
-):
-    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get() // settings.N_conformations
+        slices_p, uregion_p, nonuniform_v_p, ac, M, use_reciprocal_symmetry, ready_objs, group_idx):
+    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
 
     for i in range(N_procs):
         right_hand_ADb_task(
@@ -157,28 +154,29 @@ def right_hand(
             M,
             use_reciprocal_symmetry,
             ready_objs[i],
-            point=i+group_idx,
-        )
+            group_idx,
+            point=i)
 
 
 @task(leaf=True, privileges=[WD, RO])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def prep_Fconv_task(
-    uregion_ups,
-    nonuniform_v,
-    weights,
-    M_ups,
-    Mtot,
-    N,
-    reciprocal_extent,
-    use_reciprocal_symmetry,
-    ready_obj,
+        uregion_ups,
+        nonuniform_v,
+        weights,
+        M_ups,
+        Mtot,
+        N,
+        reciprocal_extent,
+        use_reciprocal_symmetry,
+        ready_obj,
+        conf_idx=0
 ):
     ready = ready_obj.get()
-    logger = gprep.all_objs["logger"]
+    logger = gprep.get_gprep(conf_idx)["logger"]
     logger.log(f"{socket.gethostname()} started Fconv.", level=1)
-    autocorr = gprep.all_objs["mg"]
+    autocorr = gprep.get_gprep(conf_idx)["mg"]
     conv_ups = autocorr.nufft.adjoint(
         autocorr.nuvect,
         nonuniform_v.H,
@@ -209,7 +207,7 @@ def prep_Fconv(
     ready_objs,
     group_idx,
 ):
-    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get() // settings.N_conformations
+    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
     for i in range(N_procs):
         prep_Fconv_task(
             uregion_ups[i],
@@ -221,8 +219,7 @@ def prep_Fconv(
             reciprocal_extent,
             use_reciprocal_symmetry,
             ready_objs[i],
-            point=i+group_idx,
-        )
+            point=i)
 
 
 @task(leaf=True, privileges=[WD, RO])
@@ -292,7 +289,7 @@ def prepare_solve_all_gens(slices_p, solve_dict, str_mode=False):
 
     if solve_dict is None:
         solve_dict = {}
-    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get() // settings.N_conformations
+    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
     N_images_per_rank = slices_p[0].ispace.domain.extent[0]
     M = settings.M
 
@@ -400,7 +397,7 @@ def create_solve_regions_multiple():
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def create_solve_regions():
     solve_dict = {}
-    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get() // settings.N_conformations
+    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
     M = settings.M
     cmpx_type = None
     np_complx_type = None
@@ -475,7 +472,7 @@ def prepare_solve(
 ):
 
     N_images_per_rank = slices_p[0].ispace.domain.extent[0]
-    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get() // settings.N_conformations
+    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
     ac = solve_ac_dict["ac"]
     nonuniform = solve_ac_dict["nonuniform"]
     nonuniform_p = solve_ac_dict["nonuniform_p"]
@@ -537,15 +534,15 @@ def solve(
     maxiter,
     group_idx,
 ):
-    logger = gprep.all_objs["logger"]
+    logger = gprep.get_gprep(group_idx)["logger"]
     logger.log(f" pos: {group_idx} started solve", level=1)
 
     def W_matvec(uvect):
         """Define W part of the W @ x = d problem."""
-        uvect_ADA = gprep.all_objs["mg"].core_problem_convolution(
+        uvect_ADA = gprep.get_gprep(group_idx)["mg"].core_problem_convolution(
             uvect, xp.array(uregion_ups.F_conv_), xp.array(ac.support)
         )
-        uvect_FDF = gprep.all_objs["mg"].fourier_reg(uvect, xp.array(ac.support))
+        uvect_FDF = gprep.get_gprep(group_idx)["mg"].fourier_reg(uvect, xp.array(ac.support))
         uvect = alambda * uvect_ADA + rlambda * uvect + flambda * uvect_FDF
         return uvect
 
@@ -556,7 +553,7 @@ def solve(
     ADb = uregion.ADb.reshape(-1)
     ADb = xp.array(ADb)
     d = alambda * ADb + rlambda * x0
-    callback = gprep.all_objs["mg"].callback
+    callback = gprep.get_gprep(group_idx)["mg"].callback
     ret, info = cg(W, d, x0=x0, maxiter=maxiter, callback=callback)
     logger.log(f"WARNING: CG did not converge at rlambda = {rlambda}",level=1)
 
@@ -567,11 +564,11 @@ def solve(
         assert np.all(np.isreal(ac_res))
     result.ac[:] = np.ascontiguousarray(ac_res.real)
     it_number = callback.counter
-    logger.log(f"pos:{group_idx} recovered AC in {it_number} iterations.", level=1)
+    logger.log(f"conf:{group_idx} recovered AC in {it_number} iterations.", level=1)
     image.show_volume(
-        ac_res.real, settings.Mquat, f"autocorrelation_{generation}_{rank}.png"
+        ac_res.real, settings.Mquat, f"autocorrelation_conf_{group_idx}_{generation}_{rank}.png"
     )
-    #    if settings.debug_image:
+    #  if settings.debug_image:
     v1 = norm(ret)
     v2 = norm(W * ret - d)
     if not isinstance(v1, np.ndarray) and not isinstance(v1, float):
@@ -625,17 +622,17 @@ def pixel_distance_rp_max_task(pixel_distance):
 
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def solve_ac(
-    solve_ac_dict,
-    generation,
-    pixel_position,
-    pixel_distance,
-    slices_p,
-    ready_objs,
-    group_idx=0,
-    orientations=None,
-    orientations_p=None,
-    phased=None,
-    str_mode=False,
+        solve_ac_dict,
+        generation,
+        pixel_position,
+        pixel_distance,
+        slices_p,
+        ready_objs,
+        group_idx,
+        orientations=None,
+        orientations_p=None,
+        phased=None,
+        str_mode=False,
 ):
 
     M = settings.M
@@ -643,7 +640,7 @@ def solve_ac(
     Mtot = M**3
     N_images_per_rank = slices_p[0].ispace.domain.extent[0]
     N = N_images_per_rank * utils.prod(settings.reduced_det_shape)
-    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get() // settings.N_conformations
+    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
     use_reciprocal_symmetry = True
     maxiter = settings.solve_ac_maxiter
     fill_orientations = False
@@ -681,8 +678,7 @@ def solve_ac(
 
     weights = 1
     prepare_solve(
-        solve_ac_dict, slices_p, weights, M, Mtot, M_ups, N, use_reciprocal_symmetry, group_idx,
-    )
+        solve_ac_dict, slices_p, weights, M, Mtot, M_ups, N, use_reciprocal_symmetry, group_idx)
 
     results = solve_ac_dict["results"]
     results_p = solve_ac_dict["results_p"]
@@ -715,11 +711,59 @@ def solve_ac(
             use_reciprocal_symmetry,
             maxiter,
             group_idx,
-            point=group_idx+i,
-        )
+            point=i)
 
     iref = select_ac(generation, summary)
     # remove blocking call
     # return results_p[iref.get()], solve_ac_dict
     ac_result_task(results_r, results, results_p, iref, group_idx, point=group_idx)
     return results_r, solve_ac_dict
+
+
+# phased is an array of regions
+# orientations is an array of regions
+# orientations_p is an array of partitions
+# read_objs is an array of ready_objs
+# solve_ac_dict is an array of solve_ac dictionaries
+@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
+def solve_ac_conf(
+    solve_ac_dict,
+    generation,
+    pixel_position,
+    pixel_distance,
+    slices_p,
+    ready_objs,
+    orientations=None,
+    orientations_p=None,
+    phased=None,
+    str_mode=False,
+):
+    create_regions = False
+    if phased is None:
+        create_regions = True
+        assert(solve_ac_dict == None)
+        assert(orientations == None)
+        assert(orientations_p == None)
+    solve_ac_array = []
+    result_array = []
+    for i in range(settings.N_conformations):
+        if create_regions == False:
+            results, solve_ac_dict[i] = solve_ac(solve_ac_dict[i],
+                                                 generation, pixel_position,
+                                                 pixel_distance,
+                                                 slices_p, ready_objs, i,
+                                                 orientations[i], orientations_p[i],
+                                                 phased[i], str_mode)
+            result_array.append(results)
+        else:
+            results, solve_ac_dict_entry = solve_ac(solve_ac_dict, generation, pixel_position,
+                                                    pixel_distance,
+                                                    slices_p, ready_objs, i,
+                                                    orientations, orientations_p, phased, str_mode)
+            solve_ac_array.append(solve_ac_dict_entry)
+            result_array.append(results)
+
+    if create_regions:
+        return result_array, solve_ac_array
+
+    return result_array, solve_ac_dict
