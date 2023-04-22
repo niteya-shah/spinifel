@@ -18,6 +18,7 @@ if settings.use_cupy:
     import pycuda.driver as cuda
 
 all_objs = {}
+multiple_all_objs = []
 
 psana = None
 if settings.use_psana:
@@ -137,11 +138,11 @@ def load_slices_psana2(slices, rank, N_images_per_rank, smd_chunk, run):
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def load_slices_hdf5(slices, rank, N_images_per_rank):
     logger = utils.Logger(True, settings)
-    logger.log(f"{socket.gethostname()} rank:{rank} loading slices.", level=1)
+    logger.log(f"{socket.gethostname()} rank:{rank} loading {N_images_per_rank} slices.", level=1)
     i_start = rank * N_images_per_rank
     i_end = i_start + N_images_per_rank
     prep.load_slices(slices.data, i_start, i_end)
-    logger.log(f"{socket.gethostname()} rank:{rank} loaded slices.", level=1)
+    logger.log(f"{socket.gethostname()} rank:{rank} loaded {N_images_per_rank} slices.", level=1)
 
 
 @nvtx.annotate("legion/prep.py", is_prefix=True)
@@ -547,6 +548,14 @@ def load_image_batch(run, gen_run, gen_smd, slices_p):
     return gen_run, gen_smd, run
 
 
+@nvtx.annotate("legion/prep.py", is_prefix=True)
+def get_gprep(conf_idx):
+    global all_objs
+    global multiple_all_objs
+    if settings.N_conformations > 1:
+        return multiple_all_objs[conf_idx]
+    return all_objs
+
 @task(leaf=True, privileges=[RO, RO, RO])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/prep.py", is_prefix=True)
@@ -606,13 +615,83 @@ def setup_objects_task(pixel_position, pixel_distance, slices, idx):
     return done
 
 
+#-------------------------------------------------------------
+# if conformations is set create an array of objects, one for
+# each conformation
+#-------------------------------------------------------------
+def setup_objects(pixel_position, pixel_distance, slices, idx):
+    all_objs = {}
+    N_images_per_rank = slices.ispace.domain.extent[0]
+
+    # create a logger object per point
+    logger = utils.Logger(True, settings,idx)
+    logger.log(f"entered setup_objects {idx}")
+
+    all_objs["logger"] = logger
+    if settings.use_cupy:
+        mem0 = cuda.mem_get_info()
+        logger.log(
+            f"{socket.gethostname()}: gpu memory: in setup_objects_task = {(mem0[1]-mem0[0])/1e9:.2f}GB ,gpu_total={mem0[1]/1e9:.2f}GB",level=1)
+
+    # release all memory used by cupy aggressively
+    if settings.use_cupy:
+        if settings.cupy_mempool_clear:
+            mempool = cupy.get_default_memory_pool()
+            mempool.free_all_blocks()
+            mem0 = cuda.mem_get_info()
+            logger.log(
+                f"{socket.gethostname()}: gpu memory: after free cupy mempool in setup_objects_task = {(mem0[1]-mem0[0])/1e9:.2f}GB ,gpu_total={mem0[1]/1e9:.2f}GB", level=1)
+
+    all_objs["nufft"] = NUFFT(
+        settings,
+        pixel_position.reciprocal,
+        pixel_distance.reciprocal,
+        N_images_per_rank,
+    )
+
+    all_objs["snm"] = SNM(
+        settings,
+        slices.data,
+        pixel_position.reciprocal,
+        pixel_distance.reciprocal,
+        all_objs["nufft"],
+    )
+
+    all_objs["mg"] = Merge(
+        settings,
+        slices.data,
+        pixel_position.reciprocal,
+        pixel_distance.reciprocal,
+        all_objs["nufft"],
+    )
+    if settings.use_cupy:
+        mem0 = cuda.mem_get_info()
+        logger.log(f"{socket.gethostname()}: gpu memory: after allocation in setup_objects_task = {(mem0[1]-mem0[0])/1e9:.2f}GB ,gpu_total={mem0[1]/1e9:.2f}GB", level=1)
+    return all_objs
+
+
+@task(leaf=True, privileges=[RO, RO, RO])
+@lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/prep.py", is_prefix=True)
-def prep_objects(pixel_position, pixel_distance, slices, N_procs, group_idx=0):
+def setup_objects_task_conf(pixel_position, pixel_distance, slices, idx, num_conformations):
+    global multiple_all_objs
+    all_objs = {}
+    N_images_per_rank = slices.ispace.domain.extent[0]
+    for i in range(num_conformations):
+        all_objs = setup_objects(pixel_position, pixel_distance, slices,idx)
+        multiple_all_objs.append(all_objs)
+    done = True
+    return done
+
+# added idx option for conformation number
+@nvtx.annotate("legion/prep.py", is_prefix=True)
+def prep_objects(pixel_position, pixel_distance, slices, N_procs):
     done_list = []
     for i in range(N_procs):
-        done = setup_objects_task(
-            pixel_position, pixel_distance, slices[i], i+group_idx, point=i + group_idx
-        )
+        if settings.N_conformations > 1:
+            done = setup_objects_task_conf(pixel_position, pixel_distance, slices[i], i, settings.N_conformations, point=i)
+        else:
+            done = setup_objects_task(pixel_position, pixel_distance, slices[i], i, point=i)
         done_list.append(done)
     for i in range(N_procs):
         assert done_list[i].get() == True

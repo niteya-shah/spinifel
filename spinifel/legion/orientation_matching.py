@@ -7,9 +7,6 @@ from spinifel import settings, utils
 from . import utils as lgutils
 from . import prep as gprep
 
-# from spinifel import utils
-
-
 @nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
 def create_orientations_rp(n_images_per_rank):
     # quaternions are always double precision
@@ -19,17 +16,19 @@ def create_orientations_rp(n_images_per_rank):
     return orientations, orientations_p
 
 
+# The reference orientations don't have to match exactly between ranks.
+# Each rank aligns its own slices.
+# We can call the sequential function on each rank, provided that the
+# cost of generating the model_slices isn't prohibitive.
 @nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
 def match(
-    phased, orientations_p, slices_p, n_images_per_rank, group_idx, ready_objs=None
-):
-    # The reference orientations don't have to match exactly between ranks.
-    # Each rank aligns its own slices.
-    # We can call the sequential function on each rank, provided that the
-    # cost of generating the model_slices isn't prohibitive.
+        phased, orientations_p, slices_p, n_images_per_rank,
+        conf_id=None, ready_objs=None):
 
-    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get() // settings.N_conformations
-
+    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
+    multiple_conf = None
+    if settings.N_conformations > 1:
+        multiple_conf = conf_id
     for idx in range(N_procs):
         # Ideally, the location (point) should be deduced from the
         # location of the slices.
@@ -40,23 +39,56 @@ def match(
                 orientations_p[i],
                 slices_p[i],
                 ready_objs[i],
-                point=i + group_idx,
-            )
+                multiple_conf,
+                point=i)
         else:
             match_task(
-                phased, orientations_p[i], slices_p[i], None, point=i + group_idx
-            )
+                phased,
+                orientations_p[i],
+                slices_p[i],
+                None,
+                multiple_conf,
+                point=i)
 
 
 @task(leaf=True, privileges=[RO("ac"), WD("quaternions"), RO("data")])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
-def match_task(phased, orientations, slices, ready_obj):
+def match_task(phased, orientations, slices, ready_obj, conf_idx):
+    snm = None
+    logger = None
 
     if ready_obj is not None:
         ready_obj = ready_obj.get()
-    logger = gprep.all_objs["logger"]
+    # multiple conformations?
+    mult_conf = False
+    if conf_idx is not None:
+        mult_conf = True
+        logger = gprep.multiple_all_objs[conf_idx]["logger"]
+        snm = gprep.multiple_all_objs[conf_idx]["snm"]
+    else:
+        logger = gprep.all_objs["logger"]
+        snm = gprep.all_objs["snm"]
+
     logger.log(f"{socket.gethostname()} starts Orientation Matching",level=1)
-    snm = gprep.all_objs["snm"]
+
     orientations.quaternions[:] = snm.slicing_and_match(phased.ac)
     logger.log(f"{socket.gethostname()} finished Orientation Matching.",level=1)
+
+
+# The reference orientations don't have to match exactly
+# between ranks.
+# Each rank aligns its own slices.
+# We can call the sequential function on each rank,
+# provided that the
+# cost of generating the model_slices isn't prohibitive.
+@nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
+def match_conf(phased, orientations_p, slices_p, n_images_per_rank, ready_objs=None):
+    is_ready = False
+    if ready_objs != None:
+        is_ready = True
+    for i in range(settings.N_conformations):
+        if is_ready:
+            match(phased[i], orientations_p[i], slices_p, n_images_per_rank, i, None)
+        else:
+            match(phased[i], orientations_p[i], slices_p, n_images_per_rank, i, ready_objs[i])
