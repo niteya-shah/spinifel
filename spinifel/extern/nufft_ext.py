@@ -81,36 +81,47 @@ class NUFFT:
         if settings.use_cufinufft:
             # Store resused datastructures in memory so that we don't
             # constantly deallocate and realloate them
-            self.H_f = gpuarray.empty(
+            self.H_f = gpuarray.GPUArray(
                 shape=(self.N_pixels * self.N_batch_size,), dtype=f_type
             )
-            self.K_f = gpuarray.empty(
+            self.K_f = gpuarray.GPUArray(
                 shape=(self.N_pixels * self.N_batch_size,), dtype=f_type
             )
-            self.L_f = gpuarray.empty(
+            self.L_f = gpuarray.GPUArray(
                 shape=(self.N_pixels * self.N_batch_size,), dtype=f_type
             )
 
-            self.H_a = gpuarray.empty(
+            self.H_a = gpuarray.GPUArray(
                 shape=(self.N_pixels * self.N_images,), dtype=f_type
             )
-            self.K_a = gpuarray.empty(
+            self.K_a = gpuarray.GPUArray(
                 shape=(self.N_pixels * self.N_images,), dtype=f_type
             )
-            self.L_a = gpuarray.empty(
+            self.L_a = gpuarray.GPUArray(
                 shape=(self.N_pixels * self.N_images,), dtype=f_type
             )
 
             # Store memory that we have to send to the gpu constantly in pinned
             # memory.
-            self.HKL_mat = pycuda.driver.pagelocked_empty(
-                (
-                    self.ref_rotmat.shape[1],
-                    self.ref_rotmat.shape[0],
-                    *pixel_position_reciprocal.shape[1:],
-                ),
-                f_type,
-            )
+            if settings.use_pygpu:
+                HKL_mat_alloc = gpuarray.gpuarray.PagelockedAllocator(
+                    (
+                        self.ref_rotmat.shape[1],
+                        self.ref_rotmat.shape[0],
+                        *pixel_position_reciprocal.shape[1:],
+                    ),
+                    f_type,
+                )
+                self.HKL_mat = gpuarray.GPUArray(allocator=HKL_mat_alloc).get()
+            else:
+                self.HKL_mat = pycuda.driver.pagelocked_empty(
+                    (
+                        self.ref_rotmat.shape[1],
+                        self.ref_rotmat.shape[0],
+                        *pixel_position_reciprocal.shape[1:],
+                    ),
+                    f_type,
+                )
         elif context.finufftpy_available:
             self.H_f = np.empty((self.N_pixels * self.N_batch_size,), dtype=f_type)
             self.K_f = np.empty((self.N_pixels * self.N_batch_size,), dtype=f_type)
@@ -153,13 +164,13 @@ class NUFFT:
             self.L_a.gpudata.free()
             # Store reused datastructures in memory so that we don't
             # constantly deallocate and realloate them
-            self.H_a = gpuarray.empty(
+            self.H_a = gpuarray.GPUArray(
                 shape=(self.N_pixels * self.N_images,), dtype=f_type
             )
-            self.K_a = gpuarray.empty(
+            self.K_a = gpuarray.GPUArray(
                 shape=(self.N_pixels * self.N_images,), dtype=f_type
             )
-            self.L_a = gpuarray.empty(
+            self.L_a = gpuarray.GPUArray(
                 shape=(self.N_pixels * self.N_images,), dtype=f_type
             )
         elif context.finufftpy_available:
