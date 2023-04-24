@@ -12,15 +12,9 @@ from eval.align import align_volumes
 if settings.use_cupy:
     import cupy
 
-
-@task(privileges=[RO])
-@lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/fsc.py", is_prefix=True)
-def init_fsc_task(pixel_distance):
+def init_fsc(pixel_distance):
     fsc = {}
-    logger = utils.Logger(True,settings)
-    logger.log(f"started init_fsc Task", level=1)
-
     dist_recip_max = np.max(pixel_distance.reciprocal)
     fsc["reference"] = compute_reference(settings.pdb_path, settings.M, dist_recip_max)
     fsc["final"] = 0.0
@@ -30,18 +24,30 @@ def init_fsc_task(pixel_distance):
     fsc["min_change_cc"] = settings.fsc_min_change_cc
     fsc["dist_recip_max"] = dist_recip_max
     fsc["converge"] = False
+    return fsc
+
+@task(leaf=True, privileges=[RO])
+@lgutils.gpu_task_wrapper
+@nvtx.annotate("legion/fsc.py", is_prefix=True)
+def init_fsc_task(pixel_distance):
+    logger = utils.Logger(True,settings)
+    logger.log(f"started init_fsc Task", level=1)
+    fsc = init_fsc(pixel_distance)
     logger.log(f"finished init_fsc Task", level=1)
     return fsc
 
 
-@task(privileges=[RO("rho_")])
+@task(leaf=True,privileges=[RO("rho_")])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/fsc.py", is_prefix=True)
-def compute_fsc_task(phased, fsc):
+def compute_fsc_task(phased, fsc, conf_id=None):
     logger = utils.Logger(True,settings)
     if settings.verbosity > 0:
         timer = utils.Timer()
     fsc_dict = fsc.get()
+    # for multiple conformations - index into the array
+    #if conf_id is not None:
+    #fsc_dict = fsc_dict[conf_id]
     prev_cc = fsc_dict["final"]
     rho = np.fft.ifftshift(phased.rho_)
     ali_volume, ali_reference, final_cc = align_volumes(
@@ -81,8 +87,17 @@ def compute_fsc_task(phased, fsc):
                 level=1)
     return fsc_dict
 
+@nvtx.annotate("legion/fsc.py", is_prefix=True)
+def compute_fsc_conf(phased_conf, fsc):
+    fsc_dict_array = []
+    for i in range(settings.N_conformations):
+        # each task returns a future
+        # create an array of futures
+        fsc_dict_val = compute_fsc_task(phased_conf[i], fsc[i], i, point=0)
+        fsc_dict_array.append(fsc_dict_val)
+    return fsc_dict_array
 
-@task
+@task(leaf=True)
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/fsc.py", is_prefix=True)
 def check_convergence_task(fsc):
@@ -90,4 +105,18 @@ def check_convergence_task(fsc):
     fsc_dict = fsc.get()
     if fsc_dict["converge"] == True:
         converge = True
+    return converge
+
+@nvtx.annotate("legion/fsc.py", is_prefix=True)
+def check_convergence_conf(fsc):
+    fsc_converge_array = []
+    converge = True
+    for i in range(settings.N_conformations):
+        fsc_converge = check_convergence_task(fsc[i], point=0)
+        fsc_converge_array.append(fsc_converge)
+
+    for i in range(settings.N_conformations):
+        fsc_converge = fsc_converge_array[i].get()
+        if fsc_converge == False:
+            converge = False
     return converge

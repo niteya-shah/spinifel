@@ -26,7 +26,7 @@ from .orientation_matching import match, create_orientations_rp, match_conf
 from . import mapper
 from . import checkpoint
 from . import utils as lgutils
-from .fsc import init_fsc_task, compute_fsc_task, check_convergence_task
+from .fsc import init_fsc_task, compute_fsc_task, check_convergence_task, compute_fsc_conf, check_convergence_conf
 
 
 @nvtx.annotate("legion/main.py", is_prefix=True)
@@ -141,13 +141,15 @@ def main_task_conf(pixel_position, pixel_distance, pixel_index, slices, slices_p
     logger = utils.Logger(True, settings)
     timer = utils.Timer()
     curr_gen = 0
-    fsc = {}
+    fsc = []
     total_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
     ready_objs = prep_objects(pixel_position, pixel_distance, slices_p, total_procs)
 
     if settings.pdb_path.is_file() and settings.chk_convergence:
-        logger.log("Warning: FSC computation not done for multiple conformations")
-        #fsc = init_fsc_task(pixel_distance, point=0)
+        for i in range (settings.N_conformations):
+            # an array of futures
+            fsc_future_entry = init_fsc_task(pixel_distance,point=0)
+            fsc.append(fsc_future_entry)
 
     solved, solve_ac_dict = solve_ac_conf(
         None, 0, pixel_position, pixel_distance, slices_p, ready_objs)
@@ -196,13 +198,11 @@ def main_task_conf(pixel_position, pixel_distance, pixel_index, slices, slices_p
 
         # check for convergence
         if settings.pdb_path.is_file() and settings.chk_convergence:
-            logger.log("Warning: FSC not done for multiple conformations")
-            #logger.log(f"checking convergence: FSC calculation")
-            #fsc = compute_fsc_task(phased, fsc)
-            #converge = check_convergence_task(fsc)
-            #converge = converge.get()
-            #if converge:
-            #   break
+            logger.log(f"checking convergence: FSC calculation")
+            fsc = compute_fsc_conf(phased, fsc)
+            converge = check_convergence_conf(fsc)
+            if converge:
+                break
     execution_fence(block=True)
 
     if settings.must_converge and settings.chk_convergence:
