@@ -15,7 +15,7 @@ export PYCUDA_CACHE_DIR="/tmp"
 
 
 # Set internet proxy for summit and ascent. Psana2 needs this access.
-if [[ ${target} = *"summit"* || ${target} = *"ascent"* ]]; then
+if [[ ${target} = *"summit"* || ${target} = *"ascent"* || ${target} = *"crusher"* || ${target} = *"frontier"* ]]; then
     export all_proxy=socks://proxy.ccs.ornl.gov:3128/
     export ftp_proxy=ftp://proxy.ccs.ornl.gov:3128/
     export http_proxy=http://proxy.ccs.ornl.gov:3128/

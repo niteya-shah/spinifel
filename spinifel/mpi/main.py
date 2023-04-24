@@ -28,7 +28,8 @@ from .test_util import get_known_orientations
 import gc
 
 if settings.use_cuda:
-    import pycuda.driver as cuda
+    if not settings.use_pygpu:
+        import pycuda.driver as cuda
     import cupy
 
     mempool = cupy.get_default_memory_pool()
@@ -37,11 +38,12 @@ if settings.use_cuda:
 
 def log_cuda_mem_info(logger):
     if settings.use_cuda:
-        (free, total) = cuda.mem_get_info()
-        logger.log(
-            f"Global memory occupancy: {free*100/total:.2f}% free ({free/1e9:.2f}/{total/1e9:.2f} GB)", 
-            level=1
-        )
+        if not settings.use_pygpu:
+            (free, total) = cuda.mem_get_info()
+            logger.log(
+                f"Global memory occupancy: {free*100/total:.2f}% free ({free/1e9:.2f}/{total/1e9:.2f} GB)", 
+                level=1
+            )
         mempool_used = mempool.used_bytes() * 1e-9
         mempool_total = mempool.total_bytes() * 1e-9
         logger.log(

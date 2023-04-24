@@ -17,7 +17,7 @@ if settings.use_cupy:
     os.environ["CUPY_ACCELERATORS"] = "cub"
 
     if settings.use_pygpu:
-        from PyGPU import to_gpu
+        from PybindGPU import to_gpu
     else:
         from pycuda.gpuarray import to_gpu
 
@@ -35,7 +35,7 @@ else:
 
 if settings.use_cufinufft:
     if settings.use_pygpu:
-        from PyGPU import to_gpu
+        from PybindGPU import to_gpu
     else:
         from pycuda.gpuarray import to_gpu
 

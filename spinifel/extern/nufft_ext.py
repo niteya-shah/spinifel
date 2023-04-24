@@ -12,9 +12,11 @@ context = SpinifelContexts()
 profiler = Profiler()
 
 if settings.use_cufinufft:
-    import pycuda.gpuarray as gpuarray
-    import pycuda.driver as cuda
-    import pycuda
+    if settings.use_pygpu:
+        import PybindGPU  as gpuarray
+    else:
+        import pycuda.gpuarray as gpuarray
+        import pycuda
 
     import cupy as cp
     from cufinufft import cufinufft
