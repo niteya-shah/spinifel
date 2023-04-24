@@ -32,20 +32,20 @@ variables:
 # this configuration is intended for use at Crusher / https://code.olcf.ornl.gov
 .crusher_variables: &crusher_variables
   SCHEDULER_PARAMETERS: "-A CHM137_crusher -t 1:30:00 -N 1 -p batch"
-  EXTERNAL_WORKDIR: /gpfs/alpine/chm137/proj-shared/ci/${CI_PIPELINE_ID}
+  EXTERNAL_WORKDIR: /lustre/orion/proj-shared/chm137/ci/${CI_PIPELINE_ID}
 
   # launcher for tests
   SPINIFEL_TEST_LAUNCHER: "srun -n1"
 
   # for script test
-  DATA_DIR: /gpfs/alpine/chm137/proj-shared/spinifel_data
+  DATA_DIR: /lustre/orion/proj-shared/chm137/spinifel_data
   DATA_FILENAME: 2CEX-10k-2.h5
-  out_dir: /gpfs/alpine/chm137/proj-shared/ci/${CI_PIPELINE_ID}/spinifel_output
-  CUPY_CACHE_DIR: /gpfs/alpine/chm137/proj-shared/ci/${CI_PIPELINE_ID}/cupy_cache
-  PYCUDA_CACHE_DIR: /gpfs/wolf/chm137/proj-shared/ci/${CI_PIPELINE_ID}
+  out_dir: /lustre/orion/proj-shared/chm137/ci/${CI_PIPELINE_ID}/spinifel_output
+  CUPY_CACHE_DIR: /lustre/orion/proj-shared/chm137/ci/${CI_PIPELINE_ID}/cupy_cache
+  PYCUDA_CACHE_DIR: /lustre/orion/proj-shared/chm137/ci/${CI_PIPELINE_ID}
 
   # for pytest
-  test_data_dir: /gpfs/alpine/chm137/proj-shared/spinifel_data/testdata
+  test_data_dir: /lustre/orion/proj-shared/chm137/spinifel_data/testdata
 
   IS_CRUSHER_JOB: 1
 
