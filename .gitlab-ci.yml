@@ -100,6 +100,10 @@ variables:
   script:
     - PYTHONPATH="$PYTHONPATH:$EXTERNAL_WORKDIR:$PWD/mpi4py_poison_wrapper" $SPINIFEL_TEST_LAUNCHER_MULTI legion_python -ll:py 1  -ll:pyomp 2 -ll:csize 16384 legion_main.py  --default-settings=test_mpi.toml --mode=legion psana.enable=true psana.ps_smd_n_events=1000
 
+.legion_multiconf_multirank_test_script: &legion_multiconf_multirank_test_script
+  script:
+    - PYTHONPATH="$PYTHONPATH:$EXTERNAL_WORKDIR:$PWD/mpi4py_poison_wrapper" $SPINIFEL_TEST_LAUNCHER_MULTI legion_python -ll:py 1  -ll:pyomp 2 -ll:csize 16384 legion_main.py  --default-settings=test_mpi.toml --mode=legion algorithm.N_conformations=2
+
 .sequential_test_script: &sequential_test_script
   script:
     - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=sequential
@@ -200,6 +204,14 @@ test_legion_xtc2_multirank_ascent:
     - batch
   variables:
     <<: [*ascent_variables, *legion_psana2_variables]
+
+test_legion_multiconf_multirank_ascent:
+  <<: [*test_rules, *test_before_script, *legion_multiconf_multirank_test_script]
+  stage: test
+  tags:
+    - batch
+  variables:
+    <<: [*ascent_variables]
 
 test_legion_ascent:
  <<: [*test_rules, *test_before_script, *legion_test_script]
