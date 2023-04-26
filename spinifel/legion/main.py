@@ -22,7 +22,7 @@ from spinifel.prep import save_mrc
 from .prep import get_data, prep_objects
 from .autocorrelation import solve_ac, solve_ac_conf
 from .phasing import new_phase, create_phased_regions, phased_output, new_phase_conf, phased_output_conf
-from .orientation_matching import match, create_orientations_rp, match_conf
+from .orientation_matching import match, create_orientations_rp, match_conf, create_min_dist_rp
 from . import mapper
 from . import checkpoint
 from . import utils as lgutils
@@ -159,12 +159,23 @@ def main_task_conf(pixel_position, pixel_distance, pixel_index, slices, slices_p
     orientations = []
     orientations_p = []
 
+    # create orientation regions for each conformation
     for i in range(settings.N_conformations):
         orientation_region, orientation_part = create_orientations_rp(
             settings.N_images_per_rank
         )
         orientations.append(orientation_region)
         orientations_p.append(orientation_part)
+
+    # create min_dist -> N_procs x N_images_per_rank x N_conformations
+    # create partitions
+    # min_dist_p -> N_procs x N_conformations [N_images_per_rank]
+    # min_dist_proc -> N_procs [N_images_per_rank x N_conformations]
+    min_dist, min_dist_p, min_dist_proc, conf, conf_p = create_min_dist_rp(
+        settings.N_images_per_rank, settings.N_conformations
+    )
+    # all partitions/regions need to be ready/available
+    execution_fence(block=True)
 
     N_generations = settings.N_generations
     for generation in range(curr_gen, N_generations + 1):
@@ -175,7 +186,7 @@ def main_task_conf(pixel_position, pixel_distance, pixel_index, slices, slices_p
         logger.log(f"#" * 40)
 
         # Orientation matching
-        match_conf(phased, orientations_p, slices_p, settings.N_images_per_rank,ready_objs)
+        match_conf(phased, orientations_p, slices_p, min_dist_p, min_dist_proc, conf_p, settings.N_images_per_rank, ready_objs)
 
         # Solve autocorrelation
         solved, solve_ac_dict = solve_ac_conf(

@@ -48,6 +48,21 @@ def create_distributed_region(N_images_per_rank, fields_dict, sec_shape):
     )
     return region, region_p
 
+# returns 2 partitions -> one based on N_parts and another based on N_procs
+@nvtx.annotate("legion/utils.py", is_prefix=True)
+def create_distributed_region_with_num_parts(N_images_per_rank, N_parts, fields_dict, sec_shape):
+    N_images = N_parts * N_images_per_rank
+    shape_total = (N_images,) + sec_shape
+    shape_local = (N_images_per_rank,) + sec_shape
+    region = Region(shape_total, fields_dict)
+    region_p = Partition.restrict(
+        region, [N_parts], N_images_per_rank * np.eye(len(shape_total), 1),
+        shape_local
+    )
+    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
+    region_p2 = Partition.equal(region, N_procs)
+    return region, region_p, region_p2
+
 
 @nvtx.annotate("legion/utils.py", is_prefix=True)
 def create_partition_with_offset(
