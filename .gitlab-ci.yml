@@ -102,7 +102,7 @@ variables:
 
 .legion_multiconf_multirank_test_script: &legion_multiconf_multirank_test_script
   script:
-    - PYTHONPATH="$PYTHONPATH:$EXTERNAL_WORKDIR:$PWD/mpi4py_poison_wrapper" $SPINIFEL_TEST_LAUNCHER_MULTI legion_python -ll:py 1  -ll:pyomp 2 -ll:csize 16384 legion_main.py  --default-settings=test_mpi.toml --mode=legion algorithm.N_conformations=2
+    - PYTHONPATH="$PYTHONPATH:$EXTERNAL_WORKDIR:$PWD/mpi4py_poison_wrapper" $SPINIFEL_TEST_LAUNCHER_MULTI legion_python -ll:py 1  -ll:pyomp 2 -ll:csize 16384 legion_main.py  --default-settings=test_mpi.toml --mode=legion algorithm.N_conformations=3
 
 .sequential_test_script: &sequential_test_script
   script:
