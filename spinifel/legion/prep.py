@@ -156,7 +156,7 @@ def get_slices(ds):
     pixel_position = None
     pixel_index = None
     if ds is not None:
-        n_nodes = Tunable.select(Tunable.NODE_COUNT).get() // settings.N_conformations
+        n_nodes = Tunable.select(Tunable.NODE_COUNT).get()
         chunk_i = 0
         val = 0
         for run in ds.runs():
@@ -223,7 +223,7 @@ def reduce_mean_image(slices, mean_image, nprocs):
 def compute_mean_image(slices, slices_p):
     mean_image = Region(lgutils.get_region_shape(slices)[1:], {"data": pygion.float32})
     pygion.fill(mean_image, "data", 0.0)
-    nprocs = Tunable.select(Tunable.GLOBAL_PYS).get() // settings.N_conformations
+    nprocs = Tunable.select(Tunable.GLOBAL_PYS).get()
     logger = utils.Logger(True, settings)
     for i, sl in enumerate(slices_p):
         logger.log(f"{socket.gethostname()} rank:{i} compute_mean_image", level=1)
@@ -337,7 +337,7 @@ def export_saxs(pixel_distance, mean_image, name):
 def init_partitions_regions_psana2():
     # minimum batch size = n_images_per_rank
     n_images_per_rank = settings.N_images_per_rank
-    n_points = Tunable.select(Tunable.GLOBAL_PYS).get() // settings.N_conformations
+    n_points = Tunable.select(Tunable.GLOBAL_PYS).get()
 
     # batch size
     batch_size = settings.N_images_per_rank
@@ -448,7 +448,7 @@ def load_pixel_data(ds):
     pixel_position = None
     pixel_index = None
     assert ds is not None
-    n_nodes = Tunable.select(Tunable.NODE_COUNT).get() // settings.N_conformations
+    n_nodes = Tunable.select(Tunable.NODE_COUNT).get()
     gen_run = ds.runs()
     for run in gen_run:
         # load pixel index map and pixel position reciprocal only once
@@ -524,7 +524,7 @@ def process_data(
 def load_image_batch(run, gen_run, gen_smd, slices_p):
     # create a new region of full size and load the images
     assert gen_run is not None
-    n_nodes = Tunable.select(Tunable.NODE_COUNT).get() // settings.N_conformations
+    n_nodes = Tunable.select(Tunable.NODE_COUNT).get()
     chunk_i = 0
     if run is None:
         run = next(gen_run)
