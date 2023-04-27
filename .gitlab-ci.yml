@@ -100,9 +100,18 @@ variables:
   script:
     - PYTHONPATH="$PYTHONPATH:$EXTERNAL_WORKDIR:$PWD/mpi4py_poison_wrapper" $SPINIFEL_TEST_LAUNCHER_MULTI legion_python -ll:py 1  -ll:pyomp 2 -ll:csize 16384 legion_main.py  --default-settings=test_mpi.toml --mode=legion psana.enable=true psana.ps_smd_n_events=1000
 
+.legion_xtc2_stream_multirank_test_script: &legion_xtc2_stream_multirank_test_script
+  script:
+    - PYTHONPATH="$PYTHONPATH:$EXTERNAL_WORKDIR:$PWD/mpi4py_poison_wrapper" $SPINIFEL_TEST_LAUNCHER_MULTI legion_python -ll:py 1  -ll:pyomp 2 -ll:csize 32768 legion_main.py  --default-settings=test_mpi.toml --mode=legion_psana2 psana.enable=true psana.ps_smd_n_events=1000 algorithm.N_gens_stream=2 algorithm.N_images_max=4000
+
+
+.legion_xtc2_multiconf_multirank_test_script: &legion_xtc2_multiconf_multirank_test_script
+  script:
+    - PYTHONPATH="$PYTHONPATH:$EXTERNAL_WORKDIR:$PWD/mpi4py_poison_wrapper" $SPINIFEL_TEST_LAUNCHER_MULTI legion_python -ll:py 1  -ll:pyomp 2 -ll:csize 32768 legion_main.py  --default-settings=test_mpi.toml --mode=legion psana.enable=true psana.ps_smd_n_events=1000 algorithm.N_conformations=3
+
 .legion_multiconf_multirank_test_script: &legion_multiconf_multirank_test_script
   script:
-    - PYTHONPATH="$PYTHONPATH:$EXTERNAL_WORKDIR:$PWD/mpi4py_poison_wrapper" $SPINIFEL_TEST_LAUNCHER_MULTI legion_python -ll:py 1  -ll:pyomp 2 -ll:csize 16384 legion_main.py  --default-settings=test_mpi.toml --mode=legion algorithm.N_conformations=3
+    - PYTHONPATH="$PYTHONPATH:$EXTERNAL_WORKDIR:$PWD/mpi4py_poison_wrapper" $SPINIFEL_TEST_LAUNCHER_MULTI legion_python -ll:py 1  -ll:pyomp 2 -ll:csize 32768 legion_main.py  --default-settings=test_mpi.toml --mode=legion algorithm.N_conformations=3
 
 .sequential_test_script: &sequential_test_script
   script:
@@ -199,6 +208,22 @@ test_legion_hdf5_multirank_ascent:
 
 test_legion_xtc2_multirank_ascent:
   <<: [*test_rules, *test_before_script, *legion_xtc2_multirank_test_script]
+  stage: test
+  tags:
+    - batch
+  variables:
+    <<: [*ascent_variables, *legion_psana2_variables]
+
+test_legion_xtc2_stream_multirank_ascent:
+  <<: [*test_rules, *test_before_script, *legion_xtc2_stream_multirank_test_script]
+  stage: test
+  tags:
+    - batch
+  variables:
+    <<: [*ascent_variables, *legion_psana2_variables]
+
+test_legion_xtc2_multiconf_multirank_ascent:
+  <<: [*test_rules, *test_before_script, *legion_xtc2_multiconf_multirank_test_script]
   stage: test
   tags:
     - batch
