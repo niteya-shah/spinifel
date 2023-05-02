@@ -2,7 +2,7 @@ import numpy as np
 import PyNVTX as nvtx
 import pygion
 import math
-from pygion import task, RO
+from pygion import task, RO, Tunable
 from spinifel import settings
 from spinifel import utils
 from . import utils as lgutils
@@ -87,6 +87,7 @@ def compute_fsc_task(phased, fsc):
 @nvtx.annotate("legion/fsc.py", is_prefix=True)
 def compute_fsc_conf(phased_conf, fsc):
     fsc_dict_array = []
+    total_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
     for i in range(settings.N_conformations):
         # each task returns a future
         # create an array of futures
@@ -108,6 +109,7 @@ def check_convergence_task(fsc):
 def check_convergence_conf(fsc):
     fsc_converge_array = []
     converge = True
+    total_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
     for i in range(settings.N_conformations):
         fsc_converge = check_convergence_task(fsc[i], point=0)
         fsc_converge_array.append(fsc_converge)
@@ -116,4 +118,5 @@ def check_convergence_conf(fsc):
         fsc_converge = fsc_converge_array[i].get()
         if fsc_converge == False:
             converge = False
+            return converge
     return converge

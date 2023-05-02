@@ -19,7 +19,7 @@ from pygion import (
 from spinifel import settings, utils, contexts, checkpoint
 from spinifel.prep import save_mrc
 
-from .prep import get_data, prep_objects
+from .prep import get_data, prep_objects, prep_objects_multiple
 from .autocorrelation import solve_ac, solve_ac_conf
 from .phasing import new_phase, create_phased_regions, phased_output, new_phase_conf, phased_output_conf
 from .orientation_matching import match, create_orientations_rp, match_conf, create_min_dist_rp
@@ -95,7 +95,7 @@ def main_task(pixel_position, pixel_distance, pixel_index, slices, slices_p):
         logger.log(f"#" * 40)
 
         # Orientation matching
-        match(phased, orientations_p, slices_p, settings.N_images_per_rank)
+        match(phased, orientations_p, slices_p, settings.N_images_per_rank, ready_objs)
 
         # Solve autocorrelation
         solved, solve_ac_dict = solve_ac(
@@ -143,7 +143,7 @@ def main_task_conf(pixel_position, pixel_distance, pixel_index, slices, slices_p
     curr_gen = 0
     fsc = []
     total_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
-    ready_objs = prep_objects(pixel_position, pixel_distance, slices_p, total_procs)
+    ready_objs = prep_objects_multiple(pixel_position, pixel_distance, slices_p, total_procs)
 
     if settings.pdb_path.is_file() and settings.chk_convergence:
         for i in range (settings.N_conformations):
@@ -171,9 +171,15 @@ def main_task_conf(pixel_position, pixel_distance, pixel_index, slices, slices_p
     # create partitions
     # min_dist_p -> N_procs x N_conformations [N_images_per_rank]
     # min_dist_proc -> N_procs [N_images_per_rank x N_conformations]
-    min_dist, min_dist_p, min_dist_proc, conf, conf_p = create_min_dist_rp(
+    conf_regions_dict = create_min_dist_rp(
         settings.N_images_per_rank, settings.N_conformations
     )
+    min_dist =  conf_regions_dict["min_dist"]
+    min_dist_p = conf_regions_dict["min_dist_p"]
+    min_dist_proc = conf_regions_dict["min_dist_proc"]
+    conf = conf_regions_dict["conf"]
+    conf_p = conf_regions_dict["conf_p"]
+
     # all partitions/regions need to be ready/available
     execution_fence(block=True)
 
@@ -239,20 +245,10 @@ def main():
         # Load unique set of intensity slices for python process
         (pixel_position, pixel_distance, pixel_index, slices, slices_p) = get_data(ds)
     logger.log(f"Loaded in {timer.lap():.2f}s.")
-
-    if settings.N_conformations == 1:
-        main_task(
-            pixel_position,
-            pixel_distance,
-            pixel_index,
-            slices,
-            slices_p
-        )
-    else:
-        main_task_conf(pixel_position,
-                       pixel_distance,
-                       pixel_index,
-                       slices,
-                       slices_p)
+    main_task_conf(pixel_position,
+                   pixel_distance,
+                   pixel_index,
+                   slices,
+                   slices_p)
 
 

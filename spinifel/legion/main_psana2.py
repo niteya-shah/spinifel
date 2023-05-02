@@ -26,23 +26,35 @@ from .prep import (
     load_pixel_data,
     process_data,
     prep_objects,
+    prep_objects_multiple,
 )
 from .utils import union_partitions_with_stride, fill_region, dump_single_partition
 from .autocorrelation import (
-    solve_ac,
+    solve_ac_conf,
     fill_autocorrelation_regions,
-    create_solve_regions,
+    create_solve_regions_multiple,
     get_random_orientations,
     pixel_distance_rp_max_task,
     prepare_solve_all_gens,
+    init_ac_persistent_regions,
+
 )
-from .phasing import phased_output, new_phase, fill_phase_regions, create_phase_regions
-from .orientation_matching import match, create_orientations_rp
+from .phasing import (
+    phased_output_conf,
+    new_phase_conf,
+    create_phase_regions_multiple,
+)
+
+from .orientation_matching import (
+    match_conf,
+    create_orientations_rp,
+    create_min_dist_rp,
+)
+
 from . import mapper
 from . import checkpoint
 from . import utils as lgutils
-from .fsc import init_fsc_task, compute_fsc_task, check_convergence_task
-
+from .fsc import init_fsc_task, compute_fsc_conf, check_convergence_conf
 
 @nvtx.annotate("legion/main.py", is_prefix=True)
 def load_psana():
@@ -174,60 +186,91 @@ def main_spinifel(
     start_gen,
     end_gen,
     phased_regions_dict,
+    fsc_array
 ):
 
     logger = utils.Logger(True, settings)
     timer = utils.Timer()
     curr_gen = 0
-    fsc = {}
     total_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
     ready_objs = []
-    ready_objs = prep_objects(pixel_position, pixel_distance, slices_p, total_procs)
+    ready_objs = prep_objects_multiple(pixel_position, pixel_distance, slices_p, total_procs)
 
-    if settings.chk_convergence and settings.pdb_path.is_file():
-        fsc = init_fsc_task(pixel_distance)
-        logger.log(f"initialized FSC", level=settings.verbosity)
+    # regions specific to to multiple conformations
+    min_dist = None
+    min_dist_p = None
+    min_dist_proc = None
+    conf = None
+    conf_p = None
+    fsc = fsc_array
+
+    # regions/partitions related to multiple conformations
+    conf_regions_dict = {}
+    if settings.N_conformations > 1:
+        conf_regions_dict = create_min_dist_rp(n_images_per_rank,
+                                               settings.N_conformations)
+        min_dist =  conf_regions_dict["min_dist"]
+        min_dist_p = conf_regions_dict["min_dist_p"]
+        min_dist_proc = conf_regions_dict["min_dist_proc"]
+        conf = conf_regions_dict["conf"]
+        conf_p = conf_regions_dict["conf_p"]
+
+    # regions related to phasing for multiple conformations
+    phased = []
+    for i in range(settings.N_conformations):
+        phased.append(phased_regions_dict[i]["phased"])
+
 
     # not supported for streaming/psana mode since image data grows
     assert settings.load_gen == -1
 
+    # orientations for each conformation
+    orientations_a = []
+    orientations_a_p = []
+    phased = []
     if start_gen == 0:
-        solved, solve_ac_dict = solve_ac(
+        solved, solve_ac_dict = solve_ac_conf(
             solve_ac_dict,
             0,
             pixel_position,
             pixel_distance,
             slices_p,
             ready_objs,
-            0,
             None,
             None,
             None,
             True,
         )
 
-        phased, phased_regions_dict = new_phase(
+        phased, phased_regions_dict = new_phase_conf(
             start_gen, solved, phased_regions_dict
         )
-        phased_output(phased, start_gen, 0)
+        phased_output_conf(phased, start_gen)
+
+        for i in range(settings.N_conformations):
+            orientations_a.append(solve_ac_dict[i]["orientations"])
+            orientations_a_p.append(solve_ac_dict[i]["orientations_p"])
 
         # make sure all partitions are valid
         execution_fence(block=True)
     else:  # streaming
-        phased = phased_regions_dict["phased"]
+        # setup non-persistent  regions/partitions per conformation
+        # i.e. those that are dependent on number of images per rank
+        # or array of conformations
+        for i in range(settings.N_conformations):
+            phased.append(phased_regions_dict[i]["phased"])
 
-        # setup new regions based on n_images_per_rank
-        orientations, orientations_p = get_random_orientations(n_images_per_rank)
-        solve_ac_dict = prepare_solve_all_gens(slices_p, solve_ac_dict, True)
-        solve_ac_dict["orientations"] = orientations
-        solve_ac_dict["orientations_p"] = orientations_p
-        solve_ac_dict["slices_p"] = slices_p
-        solve_ac_dict["ready_objs"] = ready_objs
+            # setup new regions based on n_images_per_rank
+            orientations, orientations_p = get_random_orientations(n_images_per_rank)
+            solve_ac_dict[i] = prepare_solve_all_gens(slices_p, solve_ac_dict[i], True)
+            orientations_a.append(orientations)
+            orientations_a_p.append(orientations_p)
+            solve_ac_dict[i]["orientations"] = orientations
+            solve_ac_dict[i]["orientations_p"] = orientations_p
+            solve_ac_dict[i]["slices_p"] = slices_p
+            solve_ac_dict[i]["ready_objs"] = ready_objs
         # make sure all partitions are valid
         execution_fence(block=True)
-
-    orientations = solve_ac_dict["orientations"]
-    orientations_p = solve_ac_dict["orientations_p"]
 
     curr_gen = curr_gen + 1 + start_gen
     N_generations = end_gen
@@ -238,36 +281,38 @@ def main_spinifel(
         logger.log(f"##### Generation {generation}/{N_generations} #####")
         logger.log(f"#" * 27)
 
-        # Orientation matching
-        match(phased, orientations_p, slices_p, n_images_per_rank,None, ready_objs)
+        match_conf(phased, orientations_a_p, slices_p, min_dist_p, min_dist_proc, conf_p, n_images_per_rank, ready_objs)
         # Solve autocorrelation
-        solved, solve_ac_dict = solve_ac(
+        solved, solve_ac_dict = solve_ac_conf(
             solve_ac_dict,
             generation,
             pixel_position,
             pixel_distance,
             slices_p,
             ready_objs,
-            0,
-            orientations,
-            orientations_p,
+            orientations_a,
+            orientations_a_p,
             phased,
         )
-        phased, phased_regions_dict = new_phase(
+        phased, phased_regions_dict = new_phase_conf(
             generation, solved, phased_regions_dict
         )
-        phased_output(phased, generation, 0)
+        phased_output_conf(phased, generation)
 
         if settings.pdb_path.is_file() and settings.chk_convergence:
-            fsc = compute_fsc_task(phased, fsc)
-            converge = check_convergence_task(fsc)
-            converge = converge.get()
+            fsc = compute_fsc_conf(phased, fsc)
+            converge = check_convergence_conf(fsc)
             if converge:
                 break
-    # fill regions so they get garbage collected
-    fill_region(orientations, 0)
-    fill_autocorrelation_regions(solve_ac_dict, True)
 
+    # fill regions so they get garbage collected
+    # regions are based on number of images per rank
+    for i in range(settings.N_conformations):
+        fill_region(orientations_a[i], 0)
+        fill_autocorrelation_regions(solve_ac_dict[i], True)
+    if settings.N_conformations > 1:
+        fill_region(min_dist, 0.0)
+        fill_region(conf, 0)
 
 # read the data and run the main algorithm. This can be repeated
 @nvtx.annotate("legion/main.py", is_prefix=True)
@@ -301,14 +346,24 @@ def main():
     n_points = Tunable.select(Tunable.GLOBAL_PYS).get()
     solve_ac_dict = None
 
-    # reuse across streams
-    phased_regions_dict = create_phase_regions()
+    # reuse across stream
+    phased_regions_dict = create_phase_regions_multiple()
+
     # reuse regions across streams
-    solve_ac_dict = create_solve_regions()
+    solve_ac_dict = create_solve_regions_multiple()
+
     # reuse dictionary items across streams
-    solve_ac_dict["pixel_position"] = pixel_position
-    solve_ac_dict["pixel_distance"] = pixel_distance
-    solve_ac_dict["reciprocal_extent"] = pixel_distance_rp_max_task(pixel_distance)
+    init_ac_persistent_regions(solve_ac_dict, pixel_position, pixel_distance)
+
+
+    # initialize fsc per conformation
+    fsc = []
+    if settings.chk_convergence and settings.pdb_path.is_file():
+        for i in range(settings.N_conformations):
+            fsc_future_entry = init_fsc_task(pixel_distance)
+            fsc.append(fsc_future_entry)
+        logger.log(f"initialized FSC", level=1)
+
     N_generations = settings.N_generations
     N_gens_stream = settings.N_gens_stream
     assert N_gens_stream <= N_generations
@@ -341,6 +396,7 @@ def main():
             start_gen,
             end_gen,
             phased_regions_dict,
+            fsc
         )
         start_gen = end_gen
         end_gen = min(N_generations, end_gen + N_gens_stream)

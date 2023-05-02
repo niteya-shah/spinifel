@@ -16,9 +16,10 @@ from . import utils as lgutils
 @nvtx.annotate("legion/phasing.py", is_prefix=True)
 def create_phase_regions_multiple():
     N_groups = settings.N_conformations
+    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
     phased_regions = []
     for i in range(N_groups):
-        phased_regions.append(create_phase_regions())
+        phased_regions.append(create_phased_regions(N_procs))
     return phased_regions
 
 
@@ -189,13 +190,6 @@ def phase_gen0_task(solved, phased, conf_idx):
 
 
 @nvtx.annotate("legion/phasing.py", is_prefix=True)
-def create_phase_regions():
-    num_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
-    phased_regions_dict = create_phased_regions(num_procs)
-    return phased_regions_dict
-
-
-@nvtx.annotate("legion/phasing.py", is_prefix=True)
 def new_phase(generation, solved,  phased_regions_dict=None, conf=0):
     num_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
     if generation == 0:
@@ -294,8 +288,5 @@ def phased_output(phased, generation, conf):
 # launch the output task for multiple conformations
 @nvtx.annotate("legion/phasing.py", is_prefix=True)
 def phased_output_conf(phased, generation):
-    if settings.N_conformations == 1:
-        phased_output_task(phased, generation, 0, point=0)
-    else:
-        for i in range(settings.N_conformations):
-            phased_output_task(phased[i],generation,i,point=i)
+    for i in range(settings.N_conformations):
+        phased_output_task(phased[i],generation,i,point=i)

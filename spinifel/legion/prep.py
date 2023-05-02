@@ -550,11 +550,8 @@ def load_image_batch(run, gen_run, gen_smd, slices_p):
 
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def get_gprep(conf_idx):
-    global all_objs
     global multiple_all_objs
-    if settings.N_conformations > 1:
-        return multiple_all_objs[conf_idx]
-    return all_objs
+    return multiple_all_objs[conf_idx]
 
 @task(leaf=True, privileges=[RO, RO, RO])
 @lgutils.gpu_task_wrapper
@@ -692,6 +689,21 @@ def prep_objects(pixel_position, pixel_distance, slices, N_procs):
             done = setup_objects_task_conf(pixel_position, pixel_distance, slices[i], i, settings.N_conformations, point=i)
         else:
             done = setup_objects_task(pixel_position, pixel_distance, slices[i], i, point=i)
+        done_list.append(done)
+    for i in range(N_procs):
+        assert done_list[i].get() == True
+    return done_list
+
+
+# added idx option for conformation number
+@nvtx.annotate("legion/prep.py", is_prefix=True)
+def prep_objects_multiple(pixel_position, pixel_distance, slices, N_procs):
+    done_list = []
+    global multiple_all_objs
+    # reset
+    multiple_all_objs = []
+    for i in range(N_procs):
+        done = setup_objects_task_conf(pixel_position, pixel_distance, slices[i], i, settings.N_conformations, point=i)
         done_list.append(done)
     for i in range(N_procs):
         assert done_list[i].get() == True

@@ -30,10 +30,17 @@ def create_min_dist_rp(n_images_per_rank, n_conf):
         n_images_per_rank,  n_parts, {"min_dist": float_type}, () )
 
     conf, conf_p = lgutils.create_distributed_region(
-        n_images_per_rank, {"conf_id": pygion.int32}, ()
+        n_images_per_rank*n_conf, {"conf_id": pygion.float32}, ()
     )
 
-    return min_dist, min_dist_p, min_dist_proc, conf, conf_p
+    multiple_conf_regions = {}
+    multiple_conf_regions["min_dist"] = min_dist
+    multiple_conf_regions["min_dist_p"] = min_dist_p
+    multiple_conf_regions["min_dist_proc"] = min_dist_proc
+    multiple_conf_regions["conf"] = conf
+    multiple_conf_regions["conf_p"] = conf_p
+    return multiple_conf_regions
+#return min_dist, min_dist_p, min_dist_proc, conf, conf_p
 
 
 # The reference orientations don't have to match exactly between ranks.
@@ -42,13 +49,9 @@ def create_min_dist_rp(n_images_per_rank, n_conf):
 # cost of generating the model_slices isn't prohibitive.
 @nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
 def match(
-        phased, orientations_p, slices_p, n_images_per_rank,
-        conf_id=None, ready_objs=None):
+        phased, orientations_p, slices_p, n_images_per_rank,ready_objs=None,stream=False):
 
     N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
-    multiple_conf = None
-    if settings.N_conformations > 1:
-        multiple_conf = conf_id
     for idx in range(N_procs):
         # Ideally, the location (point) should be deduced from the
         # location of the slices.
@@ -59,7 +62,7 @@ def match(
                 orientations_p[i],
                 slices_p[i],
                 ready_objs[i],
-                multiple_conf,
+                stream,
                 point=i)
         else:
             match_task(
@@ -67,21 +70,25 @@ def match(
                 orientations_p[i],
                 slices_p[i],
                 None,
-                multiple_conf,
+                stream,
                 point=i)
 
 
 @task(leaf=True, privileges=[RO("ac"), WD("quaternions"), RO("data")])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
-def match_task(phased, orientations, slices, ready_obj, conf_idx):
+def match_task(phased, orientations, slices, ready_obj, stream=False):
     snm = None
     logger = None
 
     if ready_obj is not None:
         ready_obj = ready_obj.get()
-    logger = gprep.all_objs["logger"]
-    snm = gprep.all_objs["snm"]
+    if stream:
+        logger = gprep.multiple_all_objs[0]["logger"]
+        snm = gprep.multiple_all_objs[0]["snm"]
+    else:
+        logger = gprep.all_objs["logger"]
+        snm = gprep.all_objs["snm"]
 
     logger.log(f"{socket.gethostname()} starts Orientation Matching",level=1)
     orientations.quaternions[:] = snm.slicing_and_match(phased.ac)
@@ -142,24 +149,29 @@ def match_single_conf(
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
 def select_conf_task(dist_r, conf):
-    a = settings.N_images_per_rank
+    a = conf.ispace.domain.extent[0]//settings.N_conformations
     b = settings.N_conformations
-    x = dist_r.min_dist.reshape(b,a)
     logger = gprep.multiple_all_objs[0]["logger"]
+    # shape of x -> [N_conformations,N_images_per_proc]
+    x = dist_r.min_dist.reshape(b,a)
     logger.log(f"x = {x.shape}, {x.dtype}", level=2)
-    logger.log(f"x = {x}", level=2)
-    conf.conf_id[:] = np.argmin(x, axis=0)
+    # shape of conf and dist_r -> [N_conformations*N_images_per_proc]
+    logger.log(f"dist_r = {dist_r.min_dist.shape}, {dist_r.min_dist.dtype}", level=2)
     logger.log(f"conf_id = {conf.conf_id.shape}, {conf.conf_id.dtype}", level=2)
-    logger.log(f"conf_ids = {conf.conf_id}", level=2)
+    conf.conf_id[:] = (x/x.sum(axis=0)*100).reshape(a*b)
+    logger.log(f"conf_ids = {conf.conf_id}", level=3)
 
 #min_dist is a region -> N_conformations x N_images_per_rank x N_ranks
 #conf_p is a region/partition -> for each N_images_per_rank return the index for the conformation it belongs to
 @nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
 def match_conf(phased, orientations_p, slices_p, min_dist_p, min_dist_proc, conf_p, n_images_per_rank, ready_objs):
-    for i in range(settings.N_conformations):
-        match_single_conf(phased[i], orientations_p[i], slices_p, min_dist_p, n_images_per_rank, i, settings.N_conformations, ready_objs)
-
-    # determine which conformation each diffraction pattern belongs to
-    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
-    for i in range(N_procs):
-        select_conf_task(min_dist_proc[i], conf_p[i], point=i)
+    # need to select_conf_task if N_conformations > 1
+    if settings.N_conformations > 1:
+        for i in range(settings.N_conformations):
+            match_single_conf(phased[i], orientations_p[i], slices_p, min_dist_p, n_images_per_rank, i, settings.N_conformations, ready_objs)
+            # determine which conformation each diffraction pattern belongs to
+        N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
+        for i in range(N_procs):
+            select_conf_task(min_dist_proc[i], conf_p[i], point=i)
+    else:
+        match(phased[0], orientations_p[0], slices_p, n_images_per_rank,ready_objs, True)
