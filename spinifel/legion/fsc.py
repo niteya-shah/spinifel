@@ -36,8 +36,6 @@ def init_fsc_task(pixel_distance):
     logger = utils.Logger(True,settings)
     logger.log(f"started init_fsc Task", level=1)
     fsc = init_fsc(pixel_distance)
-=======
->>>>>>> development
     logger.log(f"finished init_fsc Task", level=1)
     return fsc
 
