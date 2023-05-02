@@ -206,14 +206,13 @@ def main_spinifel(
 
     # regions/partitions related to multiple conformations
     conf_regions_dict = {}
-    if settings.N_conformations > 1:
-        conf_regions_dict = create_min_dist_rp(n_images_per_rank,
-                                               settings.N_conformations)
-        min_dist =  conf_regions_dict["min_dist"]
-        min_dist_p = conf_regions_dict["min_dist_p"]
-        min_dist_proc = conf_regions_dict["min_dist_proc"]
-        conf = conf_regions_dict["conf"]
-        conf_p = conf_regions_dict["conf_p"]
+    conf_regions_dict = create_min_dist_rp(n_images_per_rank,
+                                           settings.N_conformations)
+    min_dist =  conf_regions_dict["min_dist"]
+    min_dist_p = conf_regions_dict["min_dist_p"]
+    min_dist_proc = conf_regions_dict["min_dist_proc"]
+    conf = conf_regions_dict["conf"]
+    conf_p = conf_regions_dict["conf_p"]
 
     # regions related to phasing for multiple conformations
     phased = []
@@ -236,6 +235,7 @@ def main_spinifel(
             pixel_distance,
             slices_p,
             ready_objs,
+            conf_p,
             None,
             None,
             None,
@@ -290,6 +290,7 @@ def main_spinifel(
             pixel_distance,
             slices_p,
             ready_objs,
+            conf_p,
             orientations_a,
             orientations_a_p,
             phased,
@@ -310,9 +311,8 @@ def main_spinifel(
     for i in range(settings.N_conformations):
         fill_region(orientations_a[i], 0)
         fill_autocorrelation_regions(solve_ac_dict[i], True)
-    if settings.N_conformations > 1:
-        fill_region(min_dist, 0.0)
-        fill_region(conf, 0)
+    fill_region(min_dist, 0.0)
+    fill_region(conf, 0)
 
 # read the data and run the main algorithm. This can be repeated
 @nvtx.annotate("legion/main.py", is_prefix=True)

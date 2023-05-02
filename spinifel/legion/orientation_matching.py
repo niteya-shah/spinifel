@@ -33,6 +33,9 @@ def create_min_dist_rp(n_images_per_rank, n_conf):
         n_images_per_rank*n_conf, {"conf_id": pygion.float32}, ()
     )
 
+    # initialize conf - initially - equal weights
+    lgutils.fill_region(conf, 1.0/n_conf*100)
+
     multiple_conf_regions = {}
     multiple_conf_regions["min_dist"] = min_dist
     multiple_conf_regions["min_dist_p"] = min_dist_p
@@ -154,10 +157,10 @@ def select_conf_task(dist_r, conf):
     logger = gprep.multiple_all_objs[0]["logger"]
     # shape of x -> [N_conformations,N_images_per_proc]
     x = dist_r.min_dist.reshape(b,a)
-    logger.log(f"x = {x.shape}, {x.dtype}", level=2)
+    logger.log(f"select_conf_task:x = {x.shape}, {x.dtype}", level=2)
     # shape of conf and dist_r -> [N_conformations*N_images_per_proc]
-    logger.log(f"dist_r = {dist_r.min_dist.shape}, {dist_r.min_dist.dtype}", level=2)
-    logger.log(f"conf_id = {conf.conf_id.shape}, {conf.conf_id.dtype}", level=2)
+    logger.log(f"select_conf_task:dist_r = {dist_r.min_dist.shape}, {dist_r.min_dist.dtype}", level=2)
+    logger.log(f"select_conf_task:conf_id = {conf.conf_id.shape}, {conf.conf_id.dtype}", level=2)
     conf.conf_id[:] = (x/x.sum(axis=0)*100).reshape(a*b)
     logger.log(f"conf_ids = {conf.conf_id}", level=3)
 
@@ -169,7 +172,7 @@ def match_conf(phased, orientations_p, slices_p, min_dist_p, min_dist_proc, conf
     if settings.N_conformations > 1:
         for i in range(settings.N_conformations):
             match_single_conf(phased[i], orientations_p[i], slices_p, min_dist_p, n_images_per_rank, i, settings.N_conformations, ready_objs)
-            # determine which conformation each diffraction pattern belongs to
+        # determine which conformation each diffraction pattern belongs to
         N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
         for i in range(N_procs):
             select_conf_task(min_dist_proc[i], conf_p[i], point=i)

@@ -145,20 +145,8 @@ def main_task_conf(pixel_position, pixel_distance, pixel_index, slices, slices_p
     total_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
     ready_objs = prep_objects_multiple(pixel_position, pixel_distance, slices_p, total_procs)
 
-    if settings.pdb_path.is_file() and settings.chk_convergence:
-        for i in range (settings.N_conformations):
-            # an array of futures
-            fsc_future_entry = init_fsc_task(pixel_distance,point=0)
-            fsc.append(fsc_future_entry)
-
-    solved, solve_ac_dict = solve_ac_conf(
-        None, 0, pixel_position, pixel_distance, slices_p, ready_objs)
-    phased, phased_regions_dict = new_phase_conf(0, solved)
-    phased_output_conf(phased, 0)
-    curr_gen += 1
     orientations = []
     orientations_p = []
-
     # create orientation regions for each conformation
     for i in range(settings.N_conformations):
         orientation_region, orientation_part = create_orientations_rp(
@@ -183,6 +171,18 @@ def main_task_conf(pixel_position, pixel_distance, pixel_index, slices, slices_p
     # all partitions/regions need to be ready/available
     execution_fence(block=True)
 
+    if settings.pdb_path.is_file() and settings.chk_convergence:
+        for i in range (settings.N_conformations):
+            # an array of futures
+            fsc_future_entry = init_fsc_task(pixel_distance,point=0)
+            fsc.append(fsc_future_entry)
+
+    solved, solve_ac_dict = solve_ac_conf(
+        None, 0, pixel_position, pixel_distance, slices_p, ready_objs, conf_p)
+    phased, phased_regions_dict = new_phase_conf(0, solved)
+    phased_output_conf(phased, 0)
+    curr_gen += 1
+
     N_generations = settings.N_generations
     for generation in range(curr_gen, N_generations + 1):
         logger.log(f"#" * 40)
@@ -202,9 +202,10 @@ def main_task_conf(pixel_position, pixel_distance, pixel_index, slices, slices_p
             pixel_distance,
             slices_p,
             ready_objs,
+            conf_p,
             orientations,
             orientations_p,
-            phased,
+            phased
         )
 
         phased, phased_regions_dict = new_phase_conf(
