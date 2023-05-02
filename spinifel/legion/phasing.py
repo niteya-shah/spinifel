@@ -162,6 +162,7 @@ def new_phase_gen0_task(
 @lgutils.gpu_task_wrapper
 def new_phase_gen_task(solved, phased, summary, phased_part, generation, idx, num_procs, conf):
     logger = gprep.get_gprep(conf)["logger"]
+
     logger.log("Starting phasing", level=1)
     # shrinkwrap weight range: 0.5 to 1.5
     weight = 0.5 + idx / num_procs
@@ -182,6 +183,7 @@ def new_phase_gen_task(solved, phased, summary, phased_part, generation, idx, nu
 @nvtx.annotate("legion/phasing.py", is_prefix=True)
 def phase_gen0_task(solved, phased, conf_idx):
     logger = gprep.get_gprep(conf_idx)["logger"]
+
     logger.log("Starting phasing",level=1)
     phased.ac[:], phased.support_[:], phased.rho_[:] = sequential_phase(
         0, solved.ac, None, None

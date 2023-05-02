@@ -219,6 +219,10 @@ def main_spinifel(
     for i in range(settings.N_conformations):
         phased.append(phased_regions_dict[i]["phased"])
 
+    if settings.chk_convergence and settings.pdb_path.is_file():
+        fsc = init_fsc_task(pixel_distance)
+        logger.log(f"initialized FSC", level=settings.verbosity)
+
 
     # not supported for streaming/psana mode since image data grows
     assert settings.load_gen == -1

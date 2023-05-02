@@ -178,3 +178,14 @@ def match_conf(phased, orientations_p, slices_p, min_dist_p, min_dist_proc, conf
             select_conf_task(min_dist_proc[i], conf_p[i], point=i)
     else:
         match(phased[0], orientations_p[0], slices_p, n_images_per_rank,ready_objs, True)
+=======
+def match_task(phased, orientations, slices, ready_obj):
+
+    if ready_obj is not None:
+        ready_obj = ready_obj.get()
+    logger = gprep.all_objs["logger"]
+    logger.log(f"{socket.gethostname()} starts Orientation Matching",level=1)
+    snm = gprep.all_objs["snm"]
+    orientations.quaternions[:] = snm.slicing_and_match(phased.ac)
+    logger.log(f"{socket.gethostname()} finished Orientation Matching.",level=1)
+>>>>>>> development

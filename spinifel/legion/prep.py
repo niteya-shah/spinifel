@@ -224,6 +224,7 @@ def compute_mean_image(slices, slices_p):
     mean_image = Region(lgutils.get_region_shape(slices)[1:], {"data": pygion.float32})
     pygion.fill(mean_image, "data", 0.0)
     nprocs = Tunable.select(Tunable.GLOBAL_PYS).get()
+
     logger = utils.Logger(True, settings)
     for i, sl in enumerate(slices_p):
         logger.log(f"{socket.gethostname()} rank:{i} compute_mean_image", level=1)

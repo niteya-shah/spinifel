@@ -15,6 +15,9 @@ if settings.use_cupy:
 @nvtx.annotate("legion/fsc.py", is_prefix=True)
 def init_fsc(pixel_distance):
     fsc = {}
+    logger = utils.Logger(True,settings)
+    logger.log(f"started init_fsc Task", level=1)
+
     dist_recip_max = np.max(pixel_distance.reciprocal)
     fsc["reference"] = compute_reference(settings.pdb_path, settings.M, dist_recip_max)
     fsc["final"] = 0.0
@@ -33,6 +36,8 @@ def init_fsc_task(pixel_distance):
     logger = utils.Logger(True,settings)
     logger.log(f"started init_fsc Task", level=1)
     fsc = init_fsc(pixel_distance)
+=======
+>>>>>>> development
     logger.log(f"finished init_fsc Task", level=1)
     return fsc
 

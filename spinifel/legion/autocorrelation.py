@@ -549,6 +549,7 @@ def solve(
     logger = gprep.get_gprep(group_idx)["logger"]
     logger.log(f"started solve:[n_conf,conf_index]: [{n_conf},{group_idx}],  conf_shape: {conf.conf_id.shape}, conf_dtype: {conf.conf_id.dtype}", level=2)
     logger.log(f"conf_id: {conf.conf_id}", level=2)
+
     def W_matvec(uvect):
         """Define W part of the W @ x = d problem."""
         uvect_ADA = gprep.get_gprep(group_idx)["mg"].core_problem_convolution(
