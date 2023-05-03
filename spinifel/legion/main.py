@@ -19,14 +19,14 @@ from pygion import (
 from spinifel import settings, utils, contexts, checkpoint
 from spinifel.prep import save_mrc
 
-from .prep import get_data, prep_objects
-from .autocorrelation import solve_ac
-from .phasing import new_phase, create_phased_regions, phased_output
-from .orientation_matching import match, create_orientations_rp
+from .prep import get_data, prep_objects, prep_objects_multiple
+from .autocorrelation import solve_ac, solve_ac_conf
+from .phasing import new_phase, create_phased_regions, phased_output, new_phase_conf, phased_output_conf
+from .orientation_matching import match, create_orientations_rp, match_conf, create_min_dist_rp
 from . import mapper
 from . import checkpoint
 from . import utils as lgutils
-from .fsc import init_fsc_task, compute_fsc_task, check_convergence_task
+from .fsc import init_fsc_task, compute_fsc_task, check_convergence_task, compute_fsc_conf, check_convergence_conf
 
 
 @nvtx.annotate("legion/main.py", is_prefix=True)
@@ -60,18 +60,16 @@ def load_psana():
 
 @task(inner=True, privileges=[RO, RO, RO, RO])
 @lgutils.gpu_task_wrapper
-def main_task(pixel_position, pixel_distance, pixel_index, slices, slices_p, group_idx):
+def main_task(pixel_position, pixel_distance, pixel_index, slices, slices_p):
     logger = utils.Logger(True, settings)
     timer = utils.Timer()
     curr_gen = 0
     fsc = {}
-    total_procs = Tunable.select(Tunable.GLOBAL_PYS).get() // settings.N_conformations
-    ready_objs = prep_objects(
-        pixel_position, pixel_distance, slices_p, total_procs, group_idx
-    )
+    total_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
+    ready_objs = prep_objects(pixel_position, pixel_distance, slices_p, total_procs)
 
     if settings.pdb_path.is_file() and settings.chk_convergence:
-        fsc = init_fsc_task(pixel_distance, point=group_idx)
+        fsc = init_fsc_task(pixel_distance, point=0)
     if settings.load_gen > 0:  # Load input from previous generation
         curr_gen = settings.load_gen
         phased, orientations, orientations_p = checkpoint.load_checkpoint(
@@ -83,24 +81,21 @@ def main_task(pixel_position, pixel_distance, pixel_index, slices, slices_p, gro
             settings.N_images_per_rank
         )
         solved, solve_ac_dict = solve_ac(
-            None, 0, pixel_position, pixel_distance, slices_p, ready_objs, group_idx
-        )
-        # async tasks logger.log(f"AC recovered in {timer.lap():.2f}s.")
-
-        phased, phased_regions_dict = new_phase(0, solved, group_idx)
-        phased_output(phased, 0, group_idx)
+            None, 0, pixel_position, pixel_distance, slices_p, ready_objs, 0)
+        phased, phased_regions_dict = new_phase(0, solved)
+        phased_output(phased, 0, settings.N_conformations)
     curr_gen += 1
 
     N_generations = settings.N_generations
     for generation in range(curr_gen, N_generations + 1):
         logger.log(f"#" * 40)
         logger.log(
-            f"##### Generation {generation}/{N_generations}: pos {group_idx}  #####"
+            f"##### Generation {generation}/{N_generations}: conf: 1  #####"
         )
         logger.log(f"#" * 40)
 
         # Orientation matching
-        match(phased, orientations_p, slices_p, settings.N_images_per_rank, group_idx)
+        match(phased, orientations_p, slices_p, settings.N_images_per_rank, ready_objs)
 
         # Solve autocorrelation
         solved, solve_ac_dict = solve_ac(
@@ -110,17 +105,17 @@ def main_task(pixel_position, pixel_distance, pixel_index, slices, slices_p, gro
             pixel_distance,
             slices_p,
             ready_objs,
-            group_idx,
+            0,
             orientations,
             orientations_p,
             phased,
         )
 
         phased, phased_regions_dict = new_phase(
-            generation, solved, group_idx, phased_regions_dict
+            generation, solved, phased_regions_dict
         )
         # async tasks logger.log(f"Problem phased in {timer.lap():.2f}s.")
-        phased_output(phased, generation, group_idx)
+        phased_output(phased, generation, 0)
 
         # check for convergence
         if settings.pdb_path.is_file() and settings.chk_convergence:
@@ -140,7 +135,102 @@ def main_task(pixel_position, pixel_distance, pixel_index, slices, slices_p, gro
     logger.log(f"Successfully completed in {timer.total():.2f}s.")
 
 
-# run this on all subgroups
+@task(inner=True, privileges=[RO, RO, RO, RO])
+@lgutils.gpu_task_wrapper
+def main_task_conf(pixel_position, pixel_distance, pixel_index, slices, slices_p):
+    logger = utils.Logger(True, settings)
+    timer = utils.Timer()
+    curr_gen = 0
+    fsc = []
+    total_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
+    ready_objs = prep_objects_multiple(pixel_position, pixel_distance, slices_p, total_procs)
+
+    orientations = []
+    orientations_p = []
+    # create orientation regions for each conformation
+    for i in range(settings.N_conformations):
+        orientation_region, orientation_part = create_orientations_rp(
+            settings.N_images_per_rank
+        )
+        orientations.append(orientation_region)
+        orientations_p.append(orientation_part)
+
+    # create min_dist -> N_procs x N_images_per_rank x N_conformations
+    # create partitions
+    # min_dist_p -> N_procs x N_conformations [N_images_per_rank]
+    # min_dist_proc -> N_procs [N_images_per_rank x N_conformations]
+    conf_regions_dict = create_min_dist_rp(
+        settings.N_images_per_rank, settings.N_conformations
+    )
+    min_dist =  conf_regions_dict["min_dist"]
+    min_dist_p = conf_regions_dict["min_dist_p"]
+    min_dist_proc = conf_regions_dict["min_dist_proc"]
+    conf = conf_regions_dict["conf"]
+    conf_p = conf_regions_dict["conf_p"]
+
+    # all partitions/regions need to be ready/available
+    execution_fence(block=True)
+
+    if settings.pdb_path.is_file() and settings.chk_convergence:
+        for i in range (settings.N_conformations):
+            # an array of futures
+            fsc_future_entry = init_fsc_task(pixel_distance,point=0)
+            fsc.append(fsc_future_entry)
+
+    solved, solve_ac_dict = solve_ac_conf(
+        None, 0, pixel_position, pixel_distance, slices_p, ready_objs, conf_p)
+    phased, phased_regions_dict = new_phase_conf(0, solved)
+    phased_output_conf(phased, 0)
+    curr_gen += 1
+
+    N_generations = settings.N_generations
+    for generation in range(curr_gen, N_generations + 1):
+        logger.log(f"#" * 40)
+        logger.log(
+            f"##### Generation {generation}/{N_generations}:  #####"
+        )
+        logger.log(f"#" * 40)
+
+        # Orientation matching
+        match_conf(phased, orientations_p, slices_p, min_dist_p, min_dist_proc, conf_p, settings.N_images_per_rank, ready_objs)
+
+        # Solve autocorrelation
+        solved, solve_ac_dict = solve_ac_conf(
+            solve_ac_dict,
+            generation,
+            pixel_position,
+            pixel_distance,
+            slices_p,
+            ready_objs,
+            conf_p,
+            orientations,
+            orientations_p,
+            phased
+        )
+
+        phased, phased_regions_dict = new_phase_conf(
+            generation, solved, phased_regions_dict
+        )
+        # async tasks logger.log(f"Problem phased in {timer.lap():.2f}s.")
+        phased_output_conf(phased, generation)
+
+        # check for convergence
+        if settings.pdb_path.is_file() and settings.chk_convergence:
+            logger.log(f"checking convergence: FSC calculation")
+            fsc = compute_fsc_conf(phased, fsc)
+            converge = check_convergence_conf(fsc)
+            if converge:
+                break
+    execution_fence(block=True)
+
+    if settings.must_converge and settings.chk_convergence:
+        assert settings.pdb_path.is_file()
+        assert converge == True
+
+    logger.log(f"Results saved in {settings.out_dir}")
+    logger.log(f"Successfully completed in {timer.total():.2f}s.")
+
+
 # read the data and run the main algorithm. This can be repeated
 @nvtx.annotate("legion/main.py", is_prefix=True)
 def main():
@@ -156,18 +246,10 @@ def main():
         # Load unique set of intensity slices for python process
         (pixel_position, pixel_distance, pixel_index, slices, slices_p) = get_data(ds)
     logger.log(f"Loaded in {timer.lap():.2f}s.")
-    global_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
-    assert global_procs % settings.N_conformations == 0
-    group_size = global_procs // settings.N_conformations
-    for i in range(settings.N_conformations):
-        # group <i> starts on processor group_idx
-        group_idx = i * group_size
-        main_task(
-            pixel_position,
-            pixel_distance,
-            pixel_index,
-            slices,
-            slices_p,
-            group_idx,
-            point=group_idx,
-        )
+    main_task_conf(pixel_position,
+                   pixel_distance,
+                   pixel_index,
+                   slices,
+                   slices_p)
+
+

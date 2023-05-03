@@ -12,13 +12,14 @@ from spinifel.sequential.phasing import phase as sequential_phase
 from . import prep as gprep
 from . import utils as lgutils
 
-
+# multiple conformations, phased region for each one
 @nvtx.annotate("legion/phasing.py", is_prefix=True)
 def create_phase_regions_multiple():
     N_groups = settings.N_conformations
+    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
     phased_regions = []
     for i in range(N_groups):
-        phased_regions.append(create_phase_regions())
+        phased_regions.append(create_phased_regions(N_procs))
     return phased_regions
 
 
@@ -73,12 +74,12 @@ def prev_phase_task(prev_phased, phased):
 @task(leaf=True, privileges=[RO])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/phasing.py", is_prefix=True)
-def new_phase_select(summary,group_idx):
+def new_phase_select(summary,conf):
     iref = np.argmin(summary.skews)
     ref_rank = summary.rank[iref]
     logger = utils.Logger(True,settings)
     logger.log(
-        f"Keeping result from rank {ref_rank+group_idx}: skew={summary.skews[ref_rank]:.2f}",level=1)
+        f"Keeping result from rank {ref_rank+conf}: skew={summary.skews[ref_rank]:.2f}",level=1)
     return ref_rank
 
 
@@ -105,9 +106,9 @@ def phased_result_subregion(results_p0, results):
 @task(inner=True, privileges=[WD, RO])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/phasing.py", is_prefix=True)
-def phased_result_task2(results_p0, results, results_p, iref, group_idx):
+def phased_result_task2(results_p0, results, results_p, iref, conf):
     indx = iref.get()
-    phased_result_subregion(results_p0, results_p[indx], point=group_idx)
+    phased_result_subregion(results_p0, results_p[indx], point=conf)
 
 
 # new phase algorithm
@@ -135,9 +136,8 @@ def new_phase_gauss(rho_):
 @task(leaf=True, privileges=[RO("ac"), WD, WD])
 @lgutils.gpu_task_wrapper
 def new_phase_gen0_task(
-    solved, phased_part, summary, generation, idx, num_procs, group_idx
-):
-    logger = gprep.all_objs["logger"]
+        solved, phased_part, summary, generation, idx, num_procs, conf_idx):
+    logger = gprep.get_gprep(conf_idx)["logger"]
     logger.log("Starting phasing", level=1)
     # shrinkwrap weight range: 0.5 to 1.5
     weight = 0.5 + idx / num_procs
@@ -148,9 +148,7 @@ def new_phase_gen0_task(
         None,
         None,
         method,
-        weight,
-        group_idx,
-    )
+        weight)
     # TODO mpi/legion to reuse the function
     ydata, fit_c = new_phase_gauss(phased_part.rho_)
     summary.rank[0] = idx
@@ -162,16 +160,15 @@ def new_phase_gen0_task(
 
 @task(leaf=True, privileges=[RO("ac"), RO("support_", "rho_"), WD, WD])
 @lgutils.gpu_task_wrapper
-def new_phase_gen_task(
-    solved, phased, summary, phased_part, generation, idx, num_procs, group_idx
-):
-    logger = gprep.all_objs["logger"]
+def new_phase_gen_task(solved, phased, summary, phased_part, generation, idx, num_procs, conf):
+    logger = gprep.get_gprep(conf)["logger"]
+
     logger.log("Starting phasing", level=1)
     # shrinkwrap weight range: 0.5 to 1.5
     weight = 0.5 + idx / num_procs
     method = "std"
     phased_part.ac[:], phased_part.support_[:], phased_part.rho_[:] = sequential_phase(
-        generation, solved.ac, phased.support_, phased.rho_, method, weight, group_idx
+        generation, solved.ac, phased.support_, phased.rho_, method, weight, conf
     )
     ydata, fit_c = new_phase_gauss(phased_part.rho_)
     summary.rank[0] = idx
@@ -184,8 +181,9 @@ def new_phase_gen_task(
 @task(leaf=True, privileges=[RO("ac"), WD("ac", "support_", "rho_")])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/phasing.py", is_prefix=True)
-def phase_gen0_task(solved, phased):
-    logger = gprep.all_objs["logger"]
+def phase_gen0_task(solved, phased, conf_idx):
+    logger = gprep.get_gprep(conf_idx)["logger"]
+
     logger.log("Starting phasing",level=1)
     phased.ac[:], phased.support_[:], phased.rho_[:] = sequential_phase(
         0, solved.ac, None, None
@@ -194,15 +192,8 @@ def phase_gen0_task(solved, phased):
 
 
 @nvtx.annotate("legion/phasing.py", is_prefix=True)
-def create_phase_regions():
-    num_procs = Tunable.select(Tunable.GLOBAL_PYS).get() // settings.N_conformations
-    phased_regions_dict = create_phased_regions(num_procs)
-    return phased_regions_dict
-
-
-@nvtx.annotate("legion/phasing.py", is_prefix=True)
-def new_phase(generation, solved, group_idx=0, phased_regions_dict=None):
-    num_procs = Tunable.select(Tunable.GLOBAL_PYS).get() // settings.N_conformations
+def new_phase(generation, solved,  phased_regions_dict=None, conf=0):
+    num_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
     if generation == 0:
         if phased_regions_dict is None:
             phased_regions_dict = create_phased_regions(num_procs)
@@ -218,8 +209,8 @@ def new_phase(generation, solved, group_idx=0, phased_regions_dict=None):
                 generation,
                 i,
                 num_procs,
-                group_idx,
-                point=i + group_idx,
+                conf,
+                point=i,
             )
     else:
         assert phased_regions_dict is not None
@@ -237,18 +228,17 @@ def new_phase(generation, solved, group_idx=0, phased_regions_dict=None):
                 generation,
                 i,
                 num_procs,
-                group_idx,
-                point=i + group_idx,
+                conf,
+                point=i
             )
 
     summary_phase = phased_regions_dict["summary"]
-    iref = new_phase_select(summary_phase,group_idx)
+    iref = new_phase_select(summary_phase,conf)
 
     phased_region = phased_regions_dict["phased"]
     phased_all_region = phased_regions_dict["multi_phase"]
     phased_all_part = phased_regions_dict["multi_phase_part"]
-
-    phased_result_task2(phased_region, phased_all_region, phased_all_part, iref, group_idx, point=group_idx)
+    phased_result_task2(phased_region, phased_all_region, phased_all_part, iref, conf, point=conf)
     return phased_region, phased_regions_dict
 
 
@@ -259,18 +249,46 @@ def fill_phase_regions(phased_regions_dict):
     lgutils.fill_region(phased_regions_dict["phased"], 0)
 
 
+# create an array of phased regions
+# size of the array = num conformations
+@nvtx.annotate("legion/phasing.py", is_prefix=True)
+def new_phase_conf(generation, solved, phased_regions_dict=None):
+    phased_conf = []
+    create_regions = False
+    if phased_regions_dict is None:
+        create_regions = True
+        phased_regions_dict = []
+
+    for i in range(settings.N_conformations):
+        if create_regions == False:
+            phased, phased_regions_dict[i] = new_phase(generation, solved[i], phased_regions_dict[i],i)
+            phased_conf.append(phased)
+        else:
+            phased, phased_regions_dict_entry = new_phase(generation, solved[i], None,i)
+            phased_regions_dict.append(phased_regions_dict_entry)
+            phased_conf.append(phased)
+
+    return phased_conf, phased_regions_dict
+
+
 @task(leaf=True, privileges=[RO("ac", "rho_")])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/phasing.py", is_prefix=True)
-def phased_output_task(phased, generation, group_idx):
+def phased_output_task(phased, generation, conf):
     rho = np.fft.ifftshift(phased.rho_)
     intensity = np.fft.ifftshift(np.abs(np.fft.fftshift(phased.ac) ** 2))
-    save_mrc(settings.out_dir / f"ac-{generation}-{group_idx}.mrc", phased.ac)
-    save_mrc(settings.out_dir / f"rho-{generation}-{group_idx}.mrc", rho)
-    save_mrc(settings.out_dir / f"intensity-{generation}-{group_idx}.mrc", intensity)
+    save_mrc(settings.out_dir / f"ac-{generation}-{conf}.mrc", phased.ac)
+    save_mrc(settings.out_dir / f"rho-{generation}-{conf}.mrc", rho)
+    save_mrc(settings.out_dir / f"intensity-{generation}-{conf}.mrc", intensity)
 
 
 # launch the output task
 @nvtx.annotate("legion/phasing.py", is_prefix=True)
-def phased_output(phased, generation, group_idx):
-    phased_output_task(phased, generation, group_idx, point=group_idx)
+def phased_output(phased, generation, conf):
+    phased_output_task(phased, generation, conf, point=conf)
+
+# launch the output task for multiple conformations
+@nvtx.annotate("legion/phasing.py", is_prefix=True)
+def phased_output_conf(phased, generation):
+    for i in range(settings.N_conformations):
+        phased_output_task(phased[i],generation,i,point=i)
