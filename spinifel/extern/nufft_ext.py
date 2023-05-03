@@ -104,14 +104,17 @@ class NUFFT:
             # Store memory that we have to send to the gpu constantly in pinned
             # memory.
             if settings.use_pygpu:
-                HKL_mat_alloc = gpuarray.gpuarray.PagelockedAllocator(
-                    (
-                        self.ref_rotmat.shape[1],
-                        self.ref_rotmat.shape[0],
-                        *pixel_position_reciprocal.shape[1:],
-                    ),
-                    f_type,
+                HKL_mat_alloc = gpuarray.Allocator(
+                    gpuarray.gpuarray.PagelockedAllocator(
+                        (
+                            self.ref_rotmat.shape[1],
+                            self.ref_rotmat.shape[0],
+                            *pixel_position_reciprocal.shape[1:],
+                        ),
+                        f_type,
+                    )
                 )
+
                 self.HKL_mat = gpuarray.GPUArray(allocator=HKL_mat_alloc).get()
             else:
                 self.HKL_mat = pycuda.driver.pagelocked_empty(
@@ -197,7 +200,17 @@ class NUFFT:
             :return arr
             """
             assert isinstance(arr, gpuarray.GPUArray)
-            return cp.asarray(arr)
+            if settings.use_pygpu:
+                # Create a memory chunk from raw pointer and its size.
+                mem = cp.cuda.UnownedMemory(arr.ptr, arr.nbytes, owner=arr)
+
+                # Wrap it as a MemoryPointer.
+                memptr = cp.cuda.MemoryPointer(mem, offset=0)
+
+                # Create an ndarray view backed by the memory pointer.
+                return cp.ndarray(arr.shape, dtype=arr.dtype, memptr=memptr)
+            else:
+                return cp.asarray(arr)
 
         @staticmethod
         @nvtx.annotate("sequential/autocorrelation.py::modified", is_prefix=True)
@@ -221,9 +234,12 @@ class NUFFT:
             else:
                 raise ValueError("arr order cannot be determined")
 
-            return gpuarray.GPUArray(
-                shape=shape, dtype=arr_dtype, allocator=alloc, order=order
-            )
+            if settings.use_pygpu:
+                return gpuarray.GPUArray(allocator=gpuarray.Allocator(arr)) 
+            else:
+                return gpuarray.GPUArray(
+                    shape=shape, dtype=arr_dtype, allocator=alloc, order=order
+                )
 
         def free_gpuarrays_and_cufinufft_plans(self):
             self.H_f.gpudata.free()
@@ -251,10 +267,17 @@ class NUFFT:
             assert H_.shape == K_.shape == L_.shape
 
             if use_recip_sym:
-                assert (ugrid.real == ugrid).get().all()
+                # TODO: We need to fix this when .real is availble in PybindGPU
+                if not settings.use_pygpu:
+                    assert (ugrid.real == ugrid).get().all()
 
             if support is not None:
-                ugrid *= support
+                if settings.use_pygpu:
+                    ugrid_cpu_arr = ugrid.get()
+                    ugrid_cpu_arr *= support
+                    ugrid.set(ugrid_cpu_arr)
+                else:
+                    ugrid *= support
 
             dev_id = cp.cuda.device.Device().id
 
