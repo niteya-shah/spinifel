@@ -235,6 +235,7 @@ def main_spinifel(
             slices_p,
             ready_objs,
             conf_p,
+            fsc,
             None,
             None,
             None,
@@ -242,7 +243,7 @@ def main_spinifel(
         )
 
         phased, phased_regions_dict = new_phase_conf(
-            start_gen, solved, phased_regions_dict
+            start_gen, solved, fsc, phased_regions_dict
         )
         phased_output_conf(phased, start_gen)
 
@@ -280,7 +281,7 @@ def main_spinifel(
         logger.log(f"##### Generation {generation}/{N_generations} #####")
         logger.log(f"#" * 27)
 
-        match_conf(phased, orientations_a_p, slices_p, min_dist_p, min_dist_proc, conf_p, n_images_per_rank, ready_objs)
+        match_conf(phased, orientations_a_p, slices_p, min_dist_p, min_dist_proc, conf_p, n_images_per_rank, ready_objs, fsc)
         # Solve autocorrelation
         solved, solve_ac_dict = solve_ac_conf(
             solve_ac_dict,
@@ -290,12 +291,13 @@ def main_spinifel(
             slices_p,
             ready_objs,
             conf_p,
+            fsc,
             orientations_a,
             orientations_a_p,
             phased,
         )
         phased, phased_regions_dict = new_phase_conf(
-            generation, solved, phased_regions_dict
+            generation, solved, fsc, phased_regions_dict
         )
         phased_output_conf(phased, generation)
 

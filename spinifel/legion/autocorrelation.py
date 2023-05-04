@@ -23,6 +23,7 @@ from spinifel import settings, utils, image
 from . import utils as lgutils
 from . import prep as gprep
 from scipy.ndimage import gaussian_filter
+from .fsc import check_convergence_task
 
 if settings.use_cupy:
     import os
@@ -753,6 +754,7 @@ def solve_ac_conf(
     slices_p,
     ready_objs,
     conf_p,
+    fsc,
     orientations=None,
     orientations_p=None,
     phased=None,
@@ -763,46 +765,54 @@ def solve_ac_conf(
     # solve ac dictionary is created at the start
     if phased is None and not str_mode:
         create_regions = True
-        assert(solve_ac_dict == None)
-        assert(orientations == None)
-        assert(orientations_p == None)
+        assert solve_ac_dict is None
+        assert orientations is None
+        assert orientations_p is None
     solve_ac_array = []
     result_array = []
+    logger = gprep.get_gprep(0)["logger"]
     for i in range(settings.N_conformations):
-        if str_mode:
-            if orientations is not None:
-                results, solve_ac_dict[i] = solve_ac(solve_ac_dict[i],
-                                                     generation, pixel_position,
-                                                     pixel_distance,
-                                                     slices_p, ready_objs, conf_p, i,
-                                                     orientations[i], orientations_p[i],
-                                                     phased[i], str_mode)
-                result_array.append(results)
-            else:
-                results, solve_ac_dict[i] = solve_ac(solve_ac_dict[i],
-                                                     generation, pixel_position,
-                                                     pixel_distance,
-                                                     slices_p, ready_objs, conf_p, i,
-                                                     None, None,
-                                                     None, str_mode)
-                result_array.append(results)
+        # check if converged
+        if len(fsc) > 0 and check_convergence_task(fsc[i]).get():
+            logger.log(f"conformation {i} HAS converged in solve_ac")
+            assert create_regions is False
+            results = solve_ac_dict[i]["results_r"]
+            result_array.append(results)
         else:
-            if create_regions == False:
-                results, solve_ac_dict[i] = solve_ac(solve_ac_dict[i],
-                                                     generation, pixel_position,
-                                                     pixel_distance,
-                                                     slices_p, ready_objs, conf_p, i,
-                                                     orientations[i], orientations_p[i],
-                                                     phased[i], str_mode)
-                result_array.append(results)
+            logger.log(f"conformation {i} has NOT converged in solve_ac")
+            if str_mode:
+                if orientations is not None:
+                    results, solve_ac_dict[i] = solve_ac(solve_ac_dict[i],
+                                                         generation, pixel_position,
+                                                         pixel_distance,
+                                                         slices_p, ready_objs, conf_p, i,
+                                                         orientations[i], orientations_p[i],
+                                                         phased[i], str_mode)
+                    result_array.append(results)
+                else:
+                    results, solve_ac_dict[i] = solve_ac(solve_ac_dict[i],
+                                                         generation, pixel_position,
+                                                         pixel_distance,
+                                                         slices_p, ready_objs, conf_p, i,
+                                                         None, None,
+                                                         None, str_mode)
+                    result_array.append(results)
             else:
-                results, solve_ac_dict_entry = solve_ac(solve_ac_dict, generation, pixel_position,
-                                                        pixel_distance,
-                                                        slices_p, ready_objs, conf_p, i,
-                                                        orientations, orientations_p, phased, str_mode)
-                solve_ac_array.append(solve_ac_dict_entry)
-                result_array.append(results)
-
+                if create_regions == False:
+                    results, solve_ac_dict[i] = solve_ac(solve_ac_dict[i],
+                                                         generation, pixel_position,
+                                                         pixel_distance,
+                                                         slices_p, ready_objs, conf_p, i,
+                                                         orientations[i], orientations_p[i],
+                                                         phased[i], str_mode)
+                    result_array.append(results)
+                else:
+                    results, solve_ac_dict_entry = solve_ac(solve_ac_dict, generation, pixel_position,
+                                                            pixel_distance,
+                                                            slices_p, ready_objs, conf_p, i,
+                                                            orientations, orientations_p, phased, str_mode)
+                    solve_ac_array.append(solve_ac_dict_entry)
+                    result_array.append(results)
     if create_regions:
         return result_array, solve_ac_array
 

@@ -178,8 +178,8 @@ def main_task_conf(pixel_position, pixel_distance, pixel_index, slices, slices_p
             fsc.append(fsc_future_entry)
 
     solved, solve_ac_dict = solve_ac_conf(
-        None, 0, pixel_position, pixel_distance, slices_p, ready_objs, conf_p)
-    phased, phased_regions_dict = new_phase_conf(0, solved)
+        None, 0, pixel_position, pixel_distance, slices_p, ready_objs, conf_p, fsc)
+    phased, phased_regions_dict = new_phase_conf(0, solved, fsc)
     phased_output_conf(phased, 0)
     curr_gen += 1
 
@@ -192,7 +192,7 @@ def main_task_conf(pixel_position, pixel_distance, pixel_index, slices, slices_p
         logger.log(f"#" * 40)
 
         # Orientation matching
-        match_conf(phased, orientations_p, slices_p, min_dist_p, min_dist_proc, conf_p, settings.N_images_per_rank, ready_objs)
+        match_conf(phased, orientations_p, slices_p, min_dist_p, min_dist_proc, conf_p, settings.N_images_per_rank, ready_objs, fsc)
 
         # Solve autocorrelation
         solved, solve_ac_dict = solve_ac_conf(
@@ -203,13 +203,14 @@ def main_task_conf(pixel_position, pixel_distance, pixel_index, slices, slices_p
             slices_p,
             ready_objs,
             conf_p,
+            fsc,
             orientations,
             orientations_p,
             phased
         )
 
         phased, phased_regions_dict = new_phase_conf(
-            generation, solved, phased_regions_dict
+            generation, solved, fsc, phased_regions_dict
         )
         # async tasks logger.log(f"Problem phased in {timer.lap():.2f}s.")
         phased_output_conf(phased, generation)

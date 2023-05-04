@@ -91,10 +91,16 @@ def compute_fsc_task(phased, fsc):
 def compute_fsc_conf(phased_conf, fsc):
     fsc_dict_array = []
     total_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
+    logger = utils.Logger(True,settings)
     for i in range(settings.N_conformations):
         # each task returns a future
         # create an array of futures
-        fsc_dict_val = compute_fsc_task(phased_conf[i], fsc[i], point=0)
+        if check_convergence_task(fsc[i]).get() is False:
+            logger.log(f"conformation {i} has NOT converged in compute_fsc_conf")
+            fsc_dict_val = compute_fsc_task(phased_conf[i], fsc[i], point=0)
+        else:
+            logger.log(f"conformation {i} HAS converged in compute_fsc_conf")
+            fsc_dict_val = fsc[i]
         fsc_dict_array.append(fsc_dict_val)
     return fsc_dict_array
 
