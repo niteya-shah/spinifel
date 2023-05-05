@@ -668,44 +668,24 @@ def setup_objects(pixel_position, pixel_distance, slices, idx):
     return all_objs
 
 
-@task(leaf=True, privileges=[RO, RO, RO])
+@task(leaf=True, privileges=[RO, RO, RO, WD])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/prep.py", is_prefix=True)
-def setup_objects_task_conf(pixel_position, pixel_distance, slices, idx, num_conformations):
+def setup_objects_task_conf(pixel_position, pixel_distance, slices, done_setup_p, idx, num_conformations):
     global multiple_all_objs
     all_objs = {}
     N_images_per_rank = slices.ispace.domain.extent[0]
     for i in range(num_conformations):
         all_objs = setup_objects(pixel_position, pixel_distance, slices,idx)
         multiple_all_objs.append(all_objs)
-    done = True
-    return done
+    done_setup_p.done[0] = True
 
 # added idx option for conformation number
 @nvtx.annotate("legion/prep.py", is_prefix=True)
-def prep_objects(pixel_position, pixel_distance, slices, N_procs):
-    done_list = []
-    for i in range(N_procs):
-        if settings.N_conformations > 1:
-            done = setup_objects_task_conf(pixel_position, pixel_distance, slices[i], i, settings.N_conformations, point=i)
-        else:
-            done = setup_objects_task(pixel_position, pixel_distance, slices[i], i, point=i)
-        done_list.append(done)
-    for i in range(N_procs):
-        assert done_list[i].get() == True
-    return done_list
-
-
-# added idx option for conformation number
-@nvtx.annotate("legion/prep.py", is_prefix=True)
-def prep_objects_multiple(pixel_position, pixel_distance, slices, N_procs):
+def prep_objects_multiple(pixel_position, pixel_distance, slices, done_setup_p, N_procs):
     done_list = []
     global multiple_all_objs
     # reset
     multiple_all_objs = []
     for i in range(N_procs):
-        done = setup_objects_task_conf(pixel_position, pixel_distance, slices[i], i, settings.N_conformations, point=i)
-        done_list.append(done)
-    for i in range(N_procs):
-        assert done_list[i].get() == True
-    return done_list
+        setup_objects_task_conf(pixel_position, pixel_distance, slices[i], done_setup_p[i], i, settings.N_conformations, point=i)

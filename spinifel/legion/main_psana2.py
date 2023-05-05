@@ -25,7 +25,6 @@ from .prep import (
     load_image_batch,
     load_pixel_data,
     process_data,
-    prep_objects,
     prep_objects_multiple,
 )
 from .utils import union_partitions_with_stride, fill_region, dump_single_partition
@@ -186,15 +185,16 @@ def main_spinifel(
     start_gen,
     end_gen,
     phased_regions_dict,
-    fsc_array
+    fsc_array,
+    ready_objs_p
 ):
 
     logger = utils.Logger(True, settings)
     timer = utils.Timer()
     curr_gen = 0
     total_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
-    ready_objs = []
-    ready_objs = prep_objects_multiple(pixel_position, pixel_distance, slices_p, total_procs)
+
+    prep_objects_multiple(pixel_position, pixel_distance, slices_p, ready_objs_p, total_procs)
 
     # regions specific to to multiple conformations
     min_dist = None
@@ -205,6 +205,7 @@ def main_spinifel(
     fsc = fsc_array
 
     # regions/partitions related to multiple conformations
+    # based on n_images_per_rank
     conf_regions_dict = {}
     conf_regions_dict = create_min_dist_rp(n_images_per_rank,
                                            settings.N_conformations)
@@ -233,7 +234,7 @@ def main_spinifel(
             pixel_position,
             pixel_distance,
             slices_p,
-            ready_objs,
+            ready_objs_p,
             conf_p,
             fsc,
             None,
@@ -268,7 +269,7 @@ def main_spinifel(
             solve_ac_dict[i]["orientations"] = orientations
             solve_ac_dict[i]["orientations_p"] = orientations_p
             solve_ac_dict[i]["slices_p"] = slices_p
-            solve_ac_dict[i]["ready_objs"] = ready_objs
+            solve_ac_dict[i]["ready_objs"] = ready_objs_p
         # make sure all partitions are valid
         execution_fence(block=True)
 
@@ -281,7 +282,7 @@ def main_spinifel(
         logger.log(f"##### Generation {generation}/{N_generations} #####")
         logger.log(f"#" * 27)
 
-        match_conf(phased, orientations_a_p, slices_p, min_dist_p, min_dist_proc, conf_p, n_images_per_rank, ready_objs, fsc)
+        match_conf(phased, orientations_a_p, slices_p, min_dist_p, min_dist_proc, conf_p, n_images_per_rank, ready_objs_p, fsc)
         # Solve autocorrelation
         solved, solve_ac_dict = solve_ac_conf(
             solve_ac_dict,
@@ -289,7 +290,7 @@ def main_spinifel(
             pixel_position,
             pixel_distance,
             slices_p,
-            ready_objs,
+            ready_objs_p,
             conf_p,
             fsc,
             orientations_a,
@@ -356,6 +357,10 @@ def main():
     # reuse dictionary items across streams
     init_ac_persistent_regions(solve_ac_dict, pixel_position, pixel_distance)
 
+    # reuse ready_objs_p across streams
+    ready_objs, ready_objs_p = lgutils.create_distributed_region(
+        Tunable.select(Tunable.GLOBAL_PYS).get(), {"done": pygion.bool_}, ()
+    )
 
     # initialize fsc per conformation
     fsc = []
@@ -397,7 +402,8 @@ def main():
             start_gen,
             end_gen,
             phased_regions_dict,
-            fsc
+            fsc,
+            ready_objs_p
         )
         start_gen = end_gen
         end_gen = min(N_generations, end_gen + N_gens_stream)

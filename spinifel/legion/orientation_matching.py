@@ -59,40 +59,27 @@ def fill_min_dist(min_dist_p, conf_idx, num_conf):
 # cost of generating the model_slices isn't prohibitive.
 @nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
 def match(
-        phased, orientations_p, slices_p, n_images_per_rank,ready_objs=None,stream=False):
+        phased, orientations_p, slices_p, n_images_per_rank,ready_objs,stream=False):
 
     N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
     for idx in range(N_procs):
         # Ideally, the location (point) should be deduced from the
         # location of the slices.
         i = N_procs - idx - 1
-        if ready_objs is not None:
-            match_task(
-                phased,
-                orientations_p[i],
-                slices_p[i],
-                ready_objs[i],
-                stream,
-                point=i)
-        else:
-            match_task(
-                phased,
-                orientations_p[i],
-                slices_p[i],
-                None,
-                stream,
-                point=i)
+        match_task(
+            phased,
+            orientations_p[i],
+            slices_p[i],
+            ready_objs[i],
+            stream,
+            point=i)
 
-
-@task(leaf=True, privileges=[RO("ac"), WD("quaternions"), RO("data")])
+@task(leaf=True, privileges=[RO("ac"), WD("quaternions"), RO("data"), RO])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
 def match_task(phased, orientations, slices, ready_obj, stream=False):
     snm = None
     logger = None
-
-    if ready_obj is not None:
-        ready_obj = ready_obj.get()
     if stream:
         logger = gprep.multiple_all_objs[0]["logger"]
         snm = gprep.multiple_all_objs[0]["snm"]
@@ -104,14 +91,12 @@ def match_task(phased, orientations, slices, ready_obj, stream=False):
     orientations.quaternions[:] = snm.slicing_and_match(phased.ac)
     logger.log(f"{socket.gethostname()} finished Orientation Matching.",level=1)
 
-@task(leaf=True, privileges=[RO("ac"), WD("quaternions"), RO("data"), WD("min_dist")])
+@task(leaf=True, privileges=[RO("ac"), WD("quaternions"), RO("data"), WD("min_dist"), RO])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
-def match_task_conf(phased, orientations, slices, dist, conf_idx, ready_obj):
+def match_task_conf(phased, orientations, slices, dist, ready_obj, conf_idx):
     snm = None
     logger = None
-    if ready_obj is not None:
-        ready_obj = ready_obj.get()
     logger = gprep.multiple_all_objs[conf_idx]["logger"]
     snm = gprep.multiple_all_objs[conf_idx]["snm"]
     logger.log(f"{socket.gethostname()} starts Orientation Matching",level=1)
@@ -125,7 +110,7 @@ def match_task_conf(phased, orientations, slices, dist, conf_idx, ready_obj):
 @nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
 def match_single_conf(
         phased, orientations_p, slices_p, dist_p, n_images_per_rank,
-        conf_idx, num_conf, ready_objs=None):
+        conf_idx, num_conf, ready_objs):
     N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
     logger = gprep.multiple_all_objs[conf_idx]["logger"]
     for idx in range(N_procs):
@@ -133,24 +118,14 @@ def match_single_conf(
         # location of the slices.
         i = N_procs - idx - 1
         dist_idx = i*num_conf + conf_idx
-        if ready_objs is not None:
-            match_task_conf(
-                phased,
-                orientations_p[i],
-                slices_p[i],
-                dist_p[dist_idx],
-                conf_idx,
-                ready_objs[i],
-                point=i)
-        else:
-            match_task_conf(
-                phased,
-                orientations_p[i],
-                slices_p[i],
-                dist_p[dist_idx],
-                conf_idx,
-                None,
-                point=i)
+        match_task_conf(
+            phased,
+            orientations_p[i],
+            slices_p[i],
+            dist_p[dist_idx],
+            ready_objs[i],
+            conf_idx,
+            point=i)
 
 # conf region contains the percentages for each diffraction image
 # and each conformation -

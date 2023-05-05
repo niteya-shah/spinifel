@@ -91,11 +91,10 @@ def get_nonuniform_positions_v(
             nonuniform_p[i], nonuniform_v_p[i], reciprocal_extent, point=i)
 
 
-@task(leaf=True, privileges=[RO, WD])
+@task(leaf=True, privileges=[RO, WD, RO])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def gen_nonuniform_positions(orientations, nonuniform, ready_obj,conf_idx):
-    ready = ready_obj.get()
     gall = gprep.get_gprep(conf_idx)
     autocorr = gall["mg"]
     (
@@ -115,12 +114,11 @@ def get_nonuniform_positions(ac_dict, N_procs, ready_objs, conf_idx):
 
 
 # equivalent to setup_linops
-@task(privileges=[RO, WD, RO, RO])
+@task(privileges=[RO, WD, RO, RO, RO])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def right_hand_ADb_task(
-        slices, uregion, nonuniform_v, ac, M, use_reciprocal_symmetry, ready_obj,conf_idx=0):
-    ready = ready_obj.get()
+        slices, uregion, nonuniform_v, ac, ready_obj, M, use_reciprocal_symmetry,conf_idx=0):
     logger = gprep.get_gprep(conf_idx)["logger"]
     logger.log(f"{socket.gethostname()} started ADb.",level=1)
     autocorr = gprep.get_gprep(conf_idx)["mg"]
@@ -152,29 +150,28 @@ def right_hand(
             uregion_p[i],
             nonuniform_v_p[i],
             ac,
+            ready_objs[i],
             M,
             use_reciprocal_symmetry,
-            ready_objs[i],
             group_idx,
             point=i)
 
 
-@task(leaf=True, privileges=[WD, RO])
+@task(leaf=True, privileges=[WD, RO, RO])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def prep_Fconv_task(
         uregion_ups,
         nonuniform_v,
+        ready_obj,
         weights,
         M_ups,
         Mtot,
         N,
         reciprocal_extent,
         use_reciprocal_symmetry,
-        ready_obj,
         conf_idx=0
 ):
-    ready = ready_obj.get()
     logger = gprep.get_gprep(conf_idx)["logger"]
     logger.log(f"{socket.gethostname()} started Fconv.", level=1)
     autocorr = gprep.get_gprep(conf_idx)["mg"]
@@ -213,13 +210,13 @@ def prep_Fconv(
         prep_Fconv_task(
             uregion_ups[i],
             nonuniform_v_p[i],
+            ready_objs[i],
             weights,
             M_ups,
             Mtot,
             N,
             reciprocal_extent,
             use_reciprocal_symmetry,
-            ready_objs[i],
             point=i)
 
 
@@ -523,7 +520,7 @@ def phased_to_constrains(phased, ac):
     ac.estimate[:] = phased.ac * ac.support
 
 
-@task(leaf=True, privileges=[RO, RO, RO, WD, WD, RO])
+@task(leaf=True, privileges=[RO, RO, RO, WD, WD, RO, RO])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def solve(
@@ -533,6 +530,7 @@ def solve(
     result,
     summary,
     conf,
+    ready_obj,
     M,
     M_ups,
     Mtot,
@@ -715,6 +713,7 @@ def solve_ac(
             results_p[i],
             summary_p[i],
             conf_p[i],
+            ready_objs[i],
             M,
             M_ups,
             Mtot,
@@ -770,7 +769,7 @@ def solve_ac_conf(
         assert orientations_p is None
     solve_ac_array = []
     result_array = []
-    logger = gprep.get_gprep(0)["logger"]
+    logger = utils.Logger(True, settings)
     for i in range(settings.N_conformations):
         # check if converged
         if len(fsc) > 0 and check_convergence_task(fsc[i]).get():

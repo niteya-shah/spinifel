@@ -19,7 +19,7 @@ from pygion import (
 from spinifel import settings, utils, contexts, checkpoint
 from spinifel.prep import save_mrc
 
-from .prep import get_data, prep_objects, prep_objects_multiple
+from .prep import get_data, prep_objects_multiple
 from .autocorrelation import solve_ac, solve_ac_conf
 from .phasing import new_phase, create_phased_regions, phased_output, new_phase_conf, phased_output_conf
 from .orientation_matching import match, create_orientations_rp, match_conf, create_min_dist_rp
@@ -57,84 +57,6 @@ def load_psana():
     (pixel_position, pixel_distance, pixel_index, slices, slices_p) = get_data(ds)
     return pixel_position, pixel_distance, pixel_index, slices, slices_p
 
-
-@task(inner=True, privileges=[RO, RO, RO, RO])
-@lgutils.gpu_task_wrapper
-def main_task(pixel_position, pixel_distance, pixel_index, slices, slices_p):
-    logger = utils.Logger(True, settings)
-    timer = utils.Timer()
-    curr_gen = 0
-    fsc = {}
-    total_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
-    ready_objs = prep_objects(pixel_position, pixel_distance, slices_p, total_procs)
-
-    if settings.pdb_path.is_file() and settings.chk_convergence:
-        fsc = init_fsc_task(pixel_distance, point=0)
-    if settings.load_gen > 0:  # Load input from previous generation
-        curr_gen = settings.load_gen
-        phased, orientations, orientations_p = checkpoint.load_checkpoint(
-            settings.out_dir, settings.load_gen
-        )
-        phased_region_dict = create_phased_regions(phased)
-    else:
-        orientations, orientations_p = create_orientations_rp(
-            settings.N_images_per_rank
-        )
-        solved, solve_ac_dict = solve_ac(
-            None, 0, pixel_position, pixel_distance, slices_p, ready_objs, 0)
-        phased, phased_regions_dict = new_phase(0, solved)
-        phased_output(phased, 0, settings.N_conformations)
-    curr_gen += 1
-
-    N_generations = settings.N_generations
-    for generation in range(curr_gen, N_generations + 1):
-        logger.log(f"#" * 40)
-        logger.log(
-            f"##### Generation {generation}/{N_generations}: conf: 1  #####"
-        )
-        logger.log(f"#" * 40)
-
-        # Orientation matching
-        match(phased, orientations_p, slices_p, settings.N_images_per_rank, ready_objs)
-
-        # Solve autocorrelation
-        solved, solve_ac_dict = solve_ac(
-            solve_ac_dict,
-            generation,
-            pixel_position,
-            pixel_distance,
-            slices_p,
-            ready_objs,
-            0,
-            orientations,
-            orientations_p,
-            phased,
-        )
-
-        phased, phased_regions_dict = new_phase(
-            generation, solved, phased_regions_dict
-        )
-        # async tasks logger.log(f"Problem phased in {timer.lap():.2f}s.")
-        phased_output(phased, generation, 0)
-
-        # check for convergence
-        if settings.pdb_path.is_file() and settings.chk_convergence:
-            logger.log(f"checking convergence: FSC calculation")
-            fsc = compute_fsc_task(phased, fsc)
-            converge = check_convergence_task(fsc)
-            converge = converge.get()
-            if converge:
-                break
-    execution_fence(block=True)
-
-    if settings.must_converge and settings.chk_convergence:
-        assert settings.pdb_path.is_file()
-        assert converge == True
-
-    logger.log(f"Results saved in {settings.out_dir}")
-    logger.log(f"Successfully completed in {timer.total():.2f}s.")
-
-
 @task(inner=True, privileges=[RO, RO, RO, RO])
 @lgutils.gpu_task_wrapper
 def main_task_conf(pixel_position, pixel_distance, pixel_index, slices, slices_p):
@@ -143,7 +65,10 @@ def main_task_conf(pixel_position, pixel_distance, pixel_index, slices, slices_p
     curr_gen = 0
     fsc = []
     total_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
-    ready_objs = prep_objects_multiple(pixel_position, pixel_distance, slices_p, total_procs)
+
+    ready_objs, ready_objs_p = lgutils.create_distributed_region(
+        Tunable.select(Tunable.GLOBAL_PYS).get(), {"done": pygion.bool_}, ()
+    )
 
     orientations = []
     orientations_p = []
@@ -171,6 +96,8 @@ def main_task_conf(pixel_position, pixel_distance, pixel_index, slices, slices_p
     # all partitions/regions need to be ready/available
     execution_fence(block=True)
 
+    prep_objects_multiple(pixel_position, pixel_distance, slices_p, ready_objs_p, total_procs)
+
     if settings.pdb_path.is_file() and settings.chk_convergence:
         for i in range (settings.N_conformations):
             # an array of futures
@@ -178,7 +105,7 @@ def main_task_conf(pixel_position, pixel_distance, pixel_index, slices, slices_p
             fsc.append(fsc_future_entry)
 
     solved, solve_ac_dict = solve_ac_conf(
-        None, 0, pixel_position, pixel_distance, slices_p, ready_objs, conf_p, fsc)
+        None, 0, pixel_position, pixel_distance, slices_p, ready_objs_p, conf_p, fsc)
     phased, phased_regions_dict = new_phase_conf(0, solved, fsc)
     phased_output_conf(phased, 0)
     curr_gen += 1
@@ -192,7 +119,7 @@ def main_task_conf(pixel_position, pixel_distance, pixel_index, slices, slices_p
         logger.log(f"#" * 40)
 
         # Orientation matching
-        match_conf(phased, orientations_p, slices_p, min_dist_p, min_dist_proc, conf_p, settings.N_images_per_rank, ready_objs, fsc)
+        match_conf(phased, orientations_p, slices_p, min_dist_p, min_dist_proc, conf_p, settings.N_images_per_rank, ready_objs_p, fsc)
 
         # Solve autocorrelation
         solved, solve_ac_dict = solve_ac_conf(
@@ -201,7 +128,7 @@ def main_task_conf(pixel_position, pixel_distance, pixel_index, slices, slices_p
             pixel_position,
             pixel_distance,
             slices_p,
-            ready_objs,
+            ready_objs_p,
             conf_p,
             fsc,
             orientations,
