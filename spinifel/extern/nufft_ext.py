@@ -104,7 +104,10 @@ class NUFFT:
             # Store memory that we have to send to the gpu constantly in pinned
             # memory.
             if settings.use_pygpu:
-                HKL_mat_alloc = gpuarray.Allocator(
+                # For PybindGPU, we need to keep the allocator alive by 
+                # assigning it to the class. Failing to do this will 
+                # result in segfault when trying to access self.HKL_mat.
+                self.HKL_mat_alloc = gpuarray.Allocator(
                     gpuarray.gpuarray.PagelockedAllocator(
                         (
                             self.ref_rotmat.shape[1],
@@ -115,7 +118,7 @@ class NUFFT:
                     )
                 )
 
-                self.HKL_mat = gpuarray.GPUArray(allocator=HKL_mat_alloc).get()
+                self.HKL_mat = gpuarray.GPUArray(allocator=self.HKL_mat_alloc).get()
             else:
                 self.HKL_mat = pycuda.driver.pagelocked_empty(
                     (
@@ -242,12 +245,13 @@ class NUFFT:
                 )
 
         def free_gpuarrays_and_cufinufft_plans(self):
-            self.H_f.gpudata.free()
-            self.K_f.gpudata.free()
-            self.L_f.gpudata.free()
-            self.H_a.gpudata.free()
-            self.K_a.gpudata.free()
-            self.L_a.gpudata.free()
+            if not settings.use_pygpu:
+                self.H_f.gpudata.free()
+                self.K_f.gpudata.free()
+                self.L_f.gpudata.free()
+                self.H_a.gpudata.free()
+                self.K_a.gpudata.free()
+                self.L_a.gpudata.free()
             if hasattr(self, "plan_f"):
                 del self.plan_f
             if hasattr(self, "plan_a"):
