@@ -118,6 +118,7 @@ class SNM:
         return orients, mindist
 
     @nvtx.annotate("sequential/orientation_matching.py::modified", is_prefix=True)
+
     # this is a place holder for conformation result based on
     # min distance values from each diffraction pattern
     # it needs to be updated

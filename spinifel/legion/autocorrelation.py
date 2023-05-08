@@ -172,6 +172,7 @@ def prep_Fconv_task(
         use_reciprocal_symmetry,
         conf_idx=0
 ):
+
     logger = gprep.get_gprep(conf_idx)["logger"]
     logger.log(f"{socket.gethostname()} started Fconv.", level=1)
     autocorr = gprep.get_gprep(conf_idx)["mg"]
@@ -518,6 +519,7 @@ def phased_to_constrains(phased, ac):
     ac_smoothed = gaussian_filter(phased.ac, 0.5)
     ac.support[:] = ac_smoothed > 1e-12
     ac.estimate[:] = phased.ac * ac.support
+
 
 
 @task(leaf=True, privileges=[RO, RO, RO, WD, WD, RO, RO])

@@ -253,6 +253,7 @@ def fill_phase_regions(phased_regions_dict):
 # create an array of phased regions
 # size of the array = num conformations
 @nvtx.annotate("legion/phasing.py", is_prefix=True)
+
 def new_phase_conf(generation, solved, fsc, phased_regions_dict=None):
     phased_conf = []
     create_regions = False

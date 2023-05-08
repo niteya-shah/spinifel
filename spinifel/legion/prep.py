@@ -667,7 +667,6 @@ def setup_objects(pixel_position, pixel_distance, slices, idx):
         logger.log(f"{socket.gethostname()}: gpu memory: after allocation in setup_objects_task = {(mem0[1]-mem0[0])/1e9:.2f}GB ,gpu_total={mem0[1]/1e9:.2f}GB", level=1)
     return all_objs
 
-
 @task(leaf=True, privileges=[RO, RO, RO, WD])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/prep.py", is_prefix=True)
@@ -683,6 +682,7 @@ def setup_objects_task_conf(pixel_position, pixel_distance, slices, done_setup_p
 # added idx option for conformation number
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def prep_objects_multiple(pixel_position, pixel_distance, slices, done_setup_p, N_procs):
+
     done_list = []
     global multiple_all_objs
     # reset

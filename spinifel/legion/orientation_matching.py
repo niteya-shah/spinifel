@@ -8,6 +8,7 @@ from . import utils as lgutils
 from . import prep as gprep
 from .fsc import check_convergence_task
 
+
 @nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
 def create_orientations_rp(n_images_per_rank):
     # quaternions are always double precision
@@ -60,7 +61,6 @@ def fill_min_dist(min_dist_p, conf_idx, num_conf):
 @nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
 def match(
         phased, orientations_p, slices_p, n_images_per_rank,ready_objs,stream=False):
-
     N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
     for idx in range(N_procs):
         # Ideally, the location (point) should be deduced from the
@@ -75,6 +75,7 @@ def match(
             point=i)
 
 @task(leaf=True, privileges=[RO("ac"), WD("quaternions"), RO("data"), RO])
+
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
 def match_task(phased, orientations, slices, ready_obj, stream=False):
@@ -111,6 +112,7 @@ def match_task_conf(phased, orientations, slices, dist, ready_obj, conf_idx):
 def match_single_conf(
         phased, orientations_p, slices_p, dist_p, n_images_per_rank,
         conf_idx, num_conf, ready_objs):
+
     N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
     logger = gprep.multiple_all_objs[conf_idx]["logger"]
     for idx in range(N_procs):

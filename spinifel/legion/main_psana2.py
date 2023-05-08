@@ -206,6 +206,7 @@ def main_spinifel(
 
     # regions/partitions related to multiple conformations
     # based on n_images_per_rank
+
     conf_regions_dict = {}
     conf_regions_dict = create_min_dist_rp(n_images_per_rank,
                                            settings.N_conformations)
