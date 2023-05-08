@@ -172,7 +172,6 @@ def prep_Fconv_task(
         use_reciprocal_symmetry,
         conf_idx=0
 ):
-
     logger = gprep.get_gprep(conf_idx)["logger"]
     logger.log(f"{socket.gethostname()} started Fconv.", level=1)
     autocorr = gprep.get_gprep(conf_idx)["mg"]
@@ -249,37 +248,60 @@ def prep_Fantisupport(uregion, M):
     assert np.all(Fantisup[:] == Fantisup[::-1, ::-1, ::-1])
 
 
-# garbage collect all autocorrelation regions
+# create all the region
+# initialize regions
+# str=True in streaming mode
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
-def fill_autocorrelation_regions(solve_dict, persist=False):
+def prepare_solve_all_merge(slices_p, solve_dict, str_mode=False):
+
     if solve_dict is None:
-        return
-    # garbage collect all regions or non-persistent regions
-    if persist == False:
-        if "uregion" in solve_dict:
-            pygion.fill(solve_dict["uregion"], "ADb", 0.0)
-            pygion.fill(solve_dict["uregion"], "F_antisupport", True)
-        if "uregion_ups" in solve_dict:
-            lgutils.fill_region_task(solve_dict["uregion_ups"], complex(0, 0))
-        if "ac" in solve_dict:
-            pygion.fill(solve_dict["ac"], "support", True)
-            pygion.fill(solve_dict["ac"], "estimate", 0.0)
-        if "summary" in solve_dict:
-            pygion.fill(solve_dict["summary"], "rank", 0)
-            pygion.fill(solve_dict["summary"], "rlambda", 0.0)
-            pygion.fill(solve_dict["summary"], "v1", 0.0)
-            pygion.fill(solve_dict["summary"], "v2", 0.0)
-        if "results" in solve_dict:
-            pygion.fill(solve_dict["results"], "ac", 0.0)
-        if "results_r" in solve_dict:
-            pygion.fill(solve_dict["results_r"], "ac", 0.0)
+        solve_dict = {}
+    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
+    N_images_per_rank = slices_p[0].ispace.domain.extent[0]
+    M = settings.M
 
-    if "nonuniform_v" in solve_dict:
-        lgutils.fill_region_task(solve_dict["nonuniform_v"], 0.0)
-    if "nonuniform" in solve_dict:
-        lgutils.fill_region_task(solve_dict["nonuniform"], 0.0)
+    cmpx_type = None
+    np_complx_type = None
+    if settings.use_single_prec:
+        cmpx_type = pygion.complex64
+        np_complx_type = (np.complex64,)
+        float_type = pygion.float32
+    else:
+        cmpx_type = pygion.complex128
+        np_complx_type = (np.complex128,)
+        float_type = pygion.float64
 
+    N_vals_per_rank = N_images_per_rank * utils.prod(settings.reduced_det_shape)
 
+    if str_mode == False:
+        # ac
+        ac = Region((M,) * 3, {"support": pygion.bool_, "estimate": pygion.float64})
+        solve_dict["ac"] = ac
+
+        # summary
+        summary = Region(
+            (N_procs,),
+            {
+                "rank": pygion.int32,
+                "rlambda": pygion.float64,
+                "v1": pygion.float64,
+                "v2": pygion.float64,
+            },
+        )
+        summary_p = Partition.equal(summary, (N_procs,))
+        solve_dict["summary"] = summary
+        solve_dict["summary_p"] = summary_p
+
+        results = Region((N_procs * M, M, M), {"ac": pygion.float64})
+        results_p = Partition.restrict(results, (N_procs,), [[M], [0], [0]], [M, M, M])
+        results_r = Region((M, M, M), {"ac": pygion.float64})
+        solve_dict["results"] = results
+        solve_dict["results_p"] = results_p
+        solve_dict["results_r"] = results_r
+
+    # create a dictionary of regions/partitions
+    return solve_dict
+ 
 # create all the region
 # initialize regions
 # str=True in streaming mode
@@ -399,8 +421,52 @@ def create_solve_regions_multiple():
     N_groups = settings.N_conformations
     solve_regions = []
     for i in range(N_groups):
-        solve_regions.append(create_solve_regions())
+        solve_regions.append(create_solve_regions_merge())
     return solve_regions
+
+# create persistent regions across streams
+@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
+def create_solve_regions_merge():
+    solve_dict = {}
+    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
+    M = settings.M
+    cmpx_type = None
+    np_complx_type = None
+    if settings.use_single_prec:
+        cmpx_type = pygion.complex64
+        np_complx_type = (np.complex64,)
+        float_type = pygion.float32
+    else:
+        cmpx_type = pygion.complex128
+        np_complx_type = (np.complex128,)
+        float_type = pygion.float64
+
+    # ac
+    ac = Region((M,) * 3, {"support": pygion.bool_, "estimate": pygion.float64})
+    solve_dict["ac"] = ac
+    # summary
+    summary = Region(
+        (N_procs,),
+        {
+            "rank": pygion.int32,
+            "rlambda": pygion.float64,
+            "v1": pygion.float64,
+            "v2": pygion.float64,
+        },
+    )
+    summary_p = Partition.equal(summary, (N_procs,))
+    solve_dict["summary"] = summary
+    solve_dict["summary_p"] = summary_p
+
+    results = Region((N_procs * M, M, M), {"ac": pygion.float64})
+    results_p = Partition.restrict(results, (N_procs,), [[M], [0], [0]], [M, M, M])
+    results_r = Region((M, M, M), {"ac": pygion.float64})
+    solve_dict["results"] = results
+    solve_dict["results_p"] = results_p
+    solve_dict["results_r"] = results_r
+    # create a dictionary of regions/partitions
+    return solve_dict
+
 
 # create persistent regions across streams
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
@@ -511,7 +577,6 @@ def prepare_solve(
         slices_p, uregion_p, nonuniform_v_p, ac, M, use_reciprocal_symmetry, ready_objs, group_idx
     )
 
-
 @task(leaf=True, privileges=[RO("ac"), WD("support", "estimate")])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
@@ -521,6 +586,51 @@ def phased_to_constrains(phased, ac):
     ac.estimate[:] = phased.ac * ac.support
 
 
+@task(leaf=True, privileges=[RO, WD, WD, RO, RO, RO])
+@lgutils.gpu_task_wrapper
+@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
+def solve_simple(
+    ac,
+    result,
+    summary,
+    conf,
+    ready_obj,
+    orientations,
+    M,
+    M_ups,
+    Mtot,
+    generation,
+    rank,
+    alambda,
+    rlambda,
+    flambda,
+    use_reciprocal_symmetry,
+    group_idx,
+    n_conf
+    ):
+    mg = gprep.get_gprep(group_idx)["mg"]
+    ret,W,d = mg.solve_ac_common(orientations.quaternions, ac.estimate, ac.support, rlambda, flambda)
+    if not isinstance(ret, np.ndarray):
+        ac_res = ret.get()
+    else:
+        ac_res = ret;
+    ac_res = ac_res.reshape((M,) * 3)
+    if use_reciprocal_symmetry:
+        assert np.all(np.isreal(ac_res))
+    ac_res = ac_res.real
+    result.ac[:] = np.ascontiguousarray(ac_res)
+    image.show_volume(
+        ac_res, settings.Mquat, f"autocorrelation_conf_{group_idx}_{generation}_{rank}.png"
+    )
+    v1 = norm(ret)
+    v2 = norm(W * ret - d)
+    if not isinstance(v1, np.ndarray) and not isinstance(v1, float):
+        v1 = v1.get()
+        v2 = v2.get()
+    summary.rank[0] = rank
+    summary.rlambda[0] = rlambda
+    summary.v1[0] = v1
+    summary.v2[0] = v2
 
 @task(leaf=True, privileges=[RO, RO, RO, WD, WD, RO, RO])
 @lgutils.gpu_task_wrapper
@@ -635,6 +745,96 @@ def pixel_distance_rp_max_task(pixel_distance):
 
 
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
+def solve_ac_merge(
+        solve_ac_dict,
+        generation,
+        pixel_position,
+        pixel_distance,
+        slices_p,
+        ready_objs,
+        conf_p,
+        group_idx,
+        orientations=None,
+        orientations_p=None,
+        phased=None,
+        str_mode=False
+):
+    M = settings.M
+    M_ups = settings.M_ups  # For upsampled convolution technique
+    Mtot = M**3
+    N_images_per_rank = slices_p[0].ispace.domain.extent[0]
+    N = N_images_per_rank * utils.prod(settings.reduced_det_shape)
+    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
+    use_reciprocal_symmetry = True
+    maxiter = settings.solve_ac_maxiter
+    fill_orientations = False
+
+    if str_mode == True:
+        solve_ac_dict["slices_p"] = slices_p
+        solve_ac_dict["ready_objs"] = ready_objs
+        if orientations is None:
+            orientations, orientations_p = get_random_orientations(N_images_per_rank)
+        solve_ac_dict["orientations"] = orientations
+        solve_ac_dict["orientations_p"] = orientations_p
+    elif orientations is None:
+        orientations, orientations_p = get_random_orientations(N_images_per_rank)
+        solve_ac_dict = prepare_solve_all_merge(slices_p, solve_ac_dict, str_mode)
+        solve_ac_dict["reciprocal_extent"] = pixel_distance_rp_max_task(pixel_distance)
+        solve_ac_dict["orientations"] = orientations
+        solve_ac_dict["orientations_p"] = orientations_p
+        solve_ac_dict["pixel_position"] = pixel_position
+        solve_ac_dict["pixel_distance"] = pixel_distance
+        solve_ac_dict["slices_p"] = slices_p
+        solve_ac_dict["ready_objs"] = ready_objs
+    else:
+        solve_ac_dict["orientations"] = orientations
+        solve_ac_dict["orientations_p"] = orientations_p
+
+    ac = solve_ac_dict["ac"]
+    if phased is None:
+        pygion.fill(ac, "support", 1)
+        pygion.fill(ac, "estimate", 0.0)
+    else:
+        phased_to_constrains(phased, ac)
+
+    weights = 1
+    results = solve_ac_dict["results"]
+    results_p = solve_ac_dict["results_p"]
+    results_r = solve_ac_dict["results_r"]
+
+    alambda = 1
+    rlambdas = Mtot / N * 2 ** (np.arange(N_procs) - N_procs / 2).astype(np.float)
+    flambdas = 1e5 * 10 ** (np.arange(N_procs) - N_procs // 2).astype(np.float)
+    summary_p = solve_ac_dict["summary_p"]
+    summary = solve_ac_dict["summary"]
+    reciprocal_extent = solve_ac_dict["reciprocal_extent"]
+    for i in range(N_procs):
+        solve_simple(
+            ac,
+            results_p[i],
+            summary_p[i],
+            conf_p[i],
+            ready_objs[i],
+            orientations_p[i],
+            M,
+            M_ups,
+            Mtot,
+            generation,
+            i,
+            alambda,
+            rlambdas[i],
+            flambdas[i],
+            use_reciprocal_symmetry,
+            group_idx,
+            settings.N_conformations,
+            point=i)
+    iref = select_ac(generation, summary)
+    # remove blocking call
+    # return results_p[iref.get()], solve_ac_dict
+    ac_result_task(results_r, results, results_p, iref, group_idx, point=group_idx)
+    return results_r, solve_ac_dict
+
+@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def solve_ac(
         solve_ac_dict,
         generation,
@@ -708,14 +908,13 @@ def solve_ac(
     summary = solve_ac_dict["summary"]
     reciprocal_extent = solve_ac_dict["reciprocal_extent"]
     for i in range(N_procs):
-        solve(
-            uregion_p[i],
-            uregion_ups_p[i],
+        solve_simple(
             ac,
             results_p[i],
             summary_p[i],
             conf_p[i],
             ready_objs[i],
+            orientations_p[i],
             M,
             M_ups,
             Mtot,
@@ -724,9 +923,7 @@ def solve_ac(
             alambda,
             rlambdas[i],
             flambdas[i],
-            reciprocal_extent,
             use_reciprocal_symmetry,
-            maxiter,
             group_idx,
             settings.N_conformations,
             point=i)
@@ -783,7 +980,7 @@ def solve_ac_conf(
             logger.log(f"conformation {i} has NOT converged in solve_ac")
             if str_mode:
                 if orientations is not None:
-                    results, solve_ac_dict[i] = solve_ac(solve_ac_dict[i],
+                    results, solve_ac_dict[i] = solve_ac_merge(solve_ac_dict[i],
                                                          generation, pixel_position,
                                                          pixel_distance,
                                                          slices_p, ready_objs, conf_p, i,
@@ -791,7 +988,7 @@ def solve_ac_conf(
                                                          phased[i], str_mode)
                     result_array.append(results)
                 else:
-                    results, solve_ac_dict[i] = solve_ac(solve_ac_dict[i],
+                    results, solve_ac_dict[i] = solve_ac_merge(solve_ac_dict[i],
                                                          generation, pixel_position,
                                                          pixel_distance,
                                                          slices_p, ready_objs, conf_p, i,
@@ -800,7 +997,7 @@ def solve_ac_conf(
                     result_array.append(results)
             else:
                 if create_regions == False:
-                    results, solve_ac_dict[i] = solve_ac(solve_ac_dict[i],
+                    results, solve_ac_dict[i] = solve_ac_merge(solve_ac_dict[i],
                                                          generation, pixel_position,
                                                          pixel_distance,
                                                          slices_p, ready_objs, conf_p, i,
@@ -808,7 +1005,7 @@ def solve_ac_conf(
                                                          phased[i], str_mode)
                     result_array.append(results)
                 else:
-                    results, solve_ac_dict_entry = solve_ac(solve_ac_dict, generation, pixel_position,
+                    results, solve_ac_dict_entry = solve_ac_merge(solve_ac_dict, generation, pixel_position,
                                                             pixel_distance,
                                                             slices_p, ready_objs, conf_p, i,
                                                             orientations, orientations_p, phased, str_mode)

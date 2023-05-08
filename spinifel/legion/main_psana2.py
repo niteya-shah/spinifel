@@ -30,11 +30,9 @@ from .prep import (
 from .utils import union_partitions_with_stride, fill_region, dump_single_partition
 from .autocorrelation import (
     solve_ac_conf,
-    fill_autocorrelation_regions,
     create_solve_regions_multiple,
     get_random_orientations,
     pixel_distance_rp_max_task,
-    prepare_solve_all_gens,
     init_ac_persistent_regions,
 
 )
@@ -264,7 +262,6 @@ def main_spinifel(
 
             # setup new regions based on n_images_per_rank
             orientations, orientations_p = get_random_orientations(n_images_per_rank)
-            solve_ac_dict[i] = prepare_solve_all_gens(slices_p, solve_ac_dict[i], True)
             orientations_a.append(orientations)
             orientations_a_p.append(orientations_p)
             solve_ac_dict[i]["orientations"] = orientations
@@ -313,7 +310,6 @@ def main_spinifel(
     # regions are based on number of images per rank
     for i in range(settings.N_conformations):
         fill_region(orientations_a[i], 0)
-        fill_autocorrelation_regions(solve_ac_dict[i], True)
     fill_region(min_dist, 0.0)
     fill_region(conf, 0)
 

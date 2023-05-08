@@ -174,7 +174,7 @@ class Merge:
             )
         )
 
-        F_ugrid_conv_ = xp.fft.fftn(xp.fft.ifftshift(ugrid_conv)) / self.M**3
+        F_ugrid_conv_ = xp.fft.fftn(xp.fft.ifftshift(ugrid_conv))
 
         def W_matvec(uvect):
             """Define W part of the W @ x = d problem."""
@@ -230,3 +230,24 @@ class Merge:
         it_number = self.callback.counter
 
         return ac
+
+    @nvtx.annotate("sequential/autocorrelation.py::modified", is_prefix=True)
+    def solve_ac_common(self, orientations, ac_estimate, ac_support, rlambda, flambda):
+        # ac_estimate is modified in place and hence its value changes for each
+        # run
+        self.rlambda = rlambda
+        self.flambda = flambda
+        H, K, L = self.get_non_uniform_positions(orientations)
+        ac_estimate = xp.array(ac_estimate)
+        ac_support = xp.array(ac_support)
+        x0 = ac_estimate.reshape(-1)
+        W, d = self.setup_linops(H, K, L, ac_support, x0)
+
+        ret, info = cg(W, d, x0=x0, maxiter=self.maxiter, callback=self.callback)
+        if info != 0:
+            print(f"WARNING: CG did not converge at rlambda = {self.rlambda}")
+        ac = ret.reshape((self.M,) * 3).get()
+        if self.use_reciprocal_symmetry:
+            assert np.all(np.isreal(ac))
+        it_number = self.callback.counter
+        return ret,W,d
