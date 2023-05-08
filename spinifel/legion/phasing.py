@@ -11,6 +11,7 @@ from spinifel.prep import save_mrc
 from spinifel.sequential.phasing import phase as sequential_phase
 from . import prep as gprep
 from . import utils as lgutils
+from .fsc import check_convergence_task
 
 # multiple conformations, phased region for each one
 @nvtx.annotate("legion/phasing.py", is_prefix=True)
@@ -252,21 +253,30 @@ def fill_phase_regions(phased_regions_dict):
 # create an array of phased regions
 # size of the array = num conformations
 @nvtx.annotate("legion/phasing.py", is_prefix=True)
-def new_phase_conf(generation, solved, phased_regions_dict=None):
+
+def new_phase_conf(generation, solved, fsc, phased_regions_dict=None):
     phased_conf = []
     create_regions = False
     if phased_regions_dict is None:
         create_regions = True
         phased_regions_dict = []
-
+    logger = gprep.get_gprep(0)["logger"]
     for i in range(settings.N_conformations):
-        if create_regions == False:
-            phased, phased_regions_dict[i] = new_phase(generation, solved[i], phased_regions_dict[i],i)
-            phased_conf.append(phased)
+        # check if conformation[i] has converged
+        # don't perform phasing for that conformation
+        if len(fsc) > 0 and check_convergence_task(fsc[i]).get():
+            assert create_regions is False
+            phased_conf.append(phased_regions_dict[i]["phased"])
+            logger.log(f"conformation {i} HAS converged in new_phase_conf")
         else:
-            phased, phased_regions_dict_entry = new_phase(generation, solved[i], None,i)
-            phased_regions_dict.append(phased_regions_dict_entry)
-            phased_conf.append(phased)
+            logger.log(f"conformation {i} has NOT converged in new_phase_conf")
+            if create_regions is False:
+                phased, phased_regions_dict[i] = new_phase(generation, solved[i], phased_regions_dict[i],i)
+                phased_conf.append(phased)
+            else:
+                phased, phased_regions_dict_entry = new_phase(generation, solved[i], None,i)
+                phased_regions_dict.append(phased_regions_dict_entry)
+                phased_conf.append(phased)
 
     return phased_conf, phased_regions_dict
 
