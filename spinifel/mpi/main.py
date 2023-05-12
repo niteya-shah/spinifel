@@ -27,6 +27,8 @@ from .test_util import get_known_orientations
 # For making sure that gpu memory is released.
 import gc
 
+import datetime
+
 if settings.use_cuda:
     if not settings.use_pygpu:
         import pycuda.driver as cuda
@@ -247,6 +249,7 @@ def main():
             and cn_processed_events % N_images_per_rank == 0
             and generation < N_generations
         ):
+            logger.log(f"datetime.datetime.now() = {str(datetime.datetime.now())}")
             logger.log(f"#" * 45)
             logger.log(
                 f"##### Generation {generation}/{N_generations} Slices:{cn_processed_events}/{N_images_max} #####"
