@@ -262,6 +262,15 @@ fi
 
 #-------------------------------------------------------------------------------
 
+#_______________________________________________________________________________
+# Only on djh/crusher branch, we need to build psana2 again - see issue#67 
+
+if [[ $(hostname --fqdn) = *".crusher."* || $(hostname --fqdn) = *".frontier."* ]]
+then
+    ./psana_clean_build.sh
+fi
+
+#-------------------------------------------------------------------------------
 
 #_______________________________________________________________________________
 # Overwrite the conda libraries with system libraries => don't let anaconda
