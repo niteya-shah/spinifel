@@ -23,11 +23,12 @@ if settings.use_cupy:
     import cupy as xp
 
     from cupy.cublas import gemm
+    from cupyx.scipy.special import softmax
 else:
     from scipy.linalg import norm
     from scipy.sparse.linalg import LinearOperator, cg
     from scipy.linalg.blas import dgemm as gemm
-
+    from scipy.special import softmax
     xp = np
 
 if settings.use_cufinufft:
@@ -122,8 +123,22 @@ class SNM:
     # this is a place holder for conformation result based on
     # min distance values from each diffraction pattern
     # it needs to be updated
-    def conformation_result(self, min_dist):
-        return min_dist/min_dist.sum(axis=0)*100
+    def conformation_result(self, min_dist, mode):
+        if mode == "max_likelihood":
+            min_d = xp.array(min_dist)
+            min_v = xp.min(min_d,axis=0).reshape(1,-1)
+            result = xp.where(min_d == min_v, 1.0, 0.0)
+            if not isinstance(result, np.ndarray):
+                result = result.get()
+            logger.log(f"conformation_result:mode = {mode}", level=2)
+            return result
+        else:
+            assert mode == "softmax"
+            result = softmax(xp.array(-min_dist), axis=0)
+            if not isinstance(result, np.ndarray):
+                result = result.get()
+            logger.log(f"conformation_result:mode = {mode}", level=2)
+            return result
 
     @nvtx.annotate("sequential/orientation_matching.py::modified", is_prefix=True)
     def slicing_and_match(self, ac):

@@ -623,8 +623,6 @@ def setup_objects(pixel_position, pixel_distance, slices, idx):
 
     # create a logger object per point
     logger = utils.Logger(True, settings,idx)
-    logger.log(f"entered setup_objects {idx}")
-
     all_objs["logger"] = logger
     if settings.use_cupy:
         mem0 = cuda.mem_get_info()

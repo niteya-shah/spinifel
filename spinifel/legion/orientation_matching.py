@@ -136,7 +136,7 @@ def match_single_conf(
 @task(leaf=True, privileges=[RO("min_dist"), WD("conf_id")])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
-def select_conf_task(dist_r, conf):
+def select_conf_task(dist_r, conf, mode):
     a = conf.ispace.domain.extent[0]//settings.N_conformations
     b = settings.N_conformations
     logger = gprep.multiple_all_objs[0]["logger"]
@@ -148,7 +148,7 @@ def select_conf_task(dist_r, conf):
     logger.log(f"select_conf_task:dist_r = {dist_r.min_dist.shape}, {dist_r.min_dist.dtype}", level=2)
     logger.log(f"select_conf_task:conf_id = {conf.conf_id.shape}, {conf.conf_id.dtype}", level=2)
     # the higher the conf_id value, the less likely
-    conf.conf_id[:] = snm.conformation_result(x).reshape(a*b)
+    conf.conf_id[:] = snm.conformation_result(x,mode).reshape(a*b)
     logger.log(f"conf_ids = {conf.conf_id}", level=3)
 
 #min_dist is a region -> N_conformations x N_images_per_rank x N_ranks
@@ -169,7 +169,7 @@ def match_conf(phased, orientations_p, slices_p, min_dist_p, min_dist_proc, conf
         N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
         # TODO initialize min_dist_proc to zero for those conformations that are completed
         for i in range(N_procs):
-            select_conf_task(min_dist_proc[i], conf_p[i], point=i)
+            select_conf_task(min_dist_proc[i], conf_p[i], settings.conformation_mode, point=i)
     else:
         match(phased[0], orientations_p[0], slices_p, n_images_per_rank,ready_objs, True)
 
