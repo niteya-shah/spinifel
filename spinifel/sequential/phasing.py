@@ -189,6 +189,15 @@ def step_phase(rho_, amplitudes_, amp_mask_, support_):
     end_time = time.time()
     xp_time = end_time - start_time
     if settings.use_fftx:
+        # Repeat, using FFTX instead of CuPy for FFTs only.
+        start_time = time.time()
+        fp_rho_hat_ = fftxp.fft.fftn(rho_)
+        fp_phases_ = xp.angle(fp_rho_hat_)
+        fp_rho_hat_mod_ = xp.where(amp_mask_, amplitudes_ * xp.exp(1j * fp_phases_), fp_rho_hat_)
+        fp_rho_mod_ = fftxp.fft.ifftn(fp_rho_hat_mod_).real
+        end_time = time.time()
+        fp_time = end_time - start_time
+        
         start_time = time.time()
         # rho_complex = rho_.astype(dtype=xp.complex128, order='C')
         # rho_mod_fftx = fftxp.kernels.step_phase_kernel(xp, rho_complex, amp_mask_, amplitudes_)
@@ -199,8 +208,10 @@ def step_phase(rho_, amplitudes_, amp_mask_, support_):
         end_time = time.time()
         fftxp_time = end_time - start_time
         # fftxp.utils.print_diff(xp, rho_mod_, rho_mod_fftx, "step_phase rho_mod_")
-        fftxp.utils.print_diff(xp, rho_mod_, phases_, "step_phase rho_mod_") # REUSE phases_ for rho_mod_fftx
-        print(f"FULL TIME step_phase: xp {xp_time} fftxp {fftxp_time}")
+        fftxp.utils.print_diff(xp, fp_rho_mod_, rho_mod_, "step_phase cupy_fftx_tfm__rho_mod_")
+        fftxp.utils.print_diff(xp, rho_mod_, phases_, "step_phase fftx_tfm_all_rho_mod_") # REUSE phases_ for rho_mod_fftx
+        fftxp.utils.print_diff(xp, fp_rho_mod_, phases_, "step_phase cupy_fftx_all_rho_mod_") # REUSE phases_ for rho_mod_fftx
+        print(f"FULL TIME step_phase: CuPy-FFT {xp_time} FFTX-FFT {fp_time} FFTX-all {fftxp_time}")
         fftxp.utils.print_array_info(xp, rho_, "DATA rho_")
         fftxp.utils.print_array_info(xp, rho_mod_, "DATA rho_mod_")
         # fftxp.utils.print_array_info(xp, rho_mod_fftx, "DATA rho_mod_fftx")
