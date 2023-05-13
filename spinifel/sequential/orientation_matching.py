@@ -115,6 +115,23 @@ class SNM:
         return self.euclidean_gemm(x, y, dist[start:end])
 
     @nvtx.annotate("sequential/orientation_matching.py::modified", is_prefix=True)
+    def slicing_and_match_with_min_dist(self, ac):
+
+        orients = self.slicing_and_match(ac)
+        mindist = self.dist.min(axis=0)
+        if not isinstance(mindist, np.ndarray):
+            mindist = mindist.get()
+        return orients, mindist
+
+    @nvtx.annotate("sequential/orientation_matching.py::modified", is_prefix=True)
+
+    # this is a place holder for conformation result based on
+    # min distance values from each diffraction pattern
+    # it needs to be updated
+    def conformation_result(self, min_dist):
+        return min_dist/min_dist.sum(axis=0)*100
+
+    @nvtx.annotate("sequential/orientation_matching.py::modified", is_prefix=True)
     def slicing_and_match(self, ac):
         """
         Determine orientations of the data images by minimizing the euclidean distance with the reference images

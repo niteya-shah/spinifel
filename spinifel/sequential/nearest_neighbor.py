@@ -37,7 +37,8 @@ else:
 KNN_LOADER = find_spec(knn_string)
 KNN_AVAILABLE = KNN_LOADER is not None
 
-logger.log(f"pyCudaKNearestNeighbors is available: {KNN_AVAILABLE}", level=1)
+if settings.verbosity > 0:
+    logger.log(f"pyCudaKNearestNeighbors is available: {KNN_AVAILABLE}", level=1)
 
 if settings.use_cuda and KNN_AVAILABLE:
     if settings.use_single_prec:
@@ -103,6 +104,7 @@ def nearest_neighbor(model_slices, slices, batch_size):
             level=1
         )
         logger.log(f"Rank {rank} using deviceId {deviceId}", level=1)
+
 
         # Calculate Euclidean distance in batch to avoid running out of GPU
         # Memory

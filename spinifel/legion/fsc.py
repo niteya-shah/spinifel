@@ -2,7 +2,7 @@ import numpy as np
 import PyNVTX as nvtx
 import pygion
 import math
-from pygion import task, RO
+from pygion import task, RO, Tunable
 from spinifel import settings
 from spinifel import utils
 from . import utils as lgutils
@@ -12,14 +12,11 @@ from eval.align import align_volumes
 if settings.use_cupy:
     import cupy
 
-
-@task(privileges=[RO])
-@lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/fsc.py", is_prefix=True)
-def init_fsc_task(pixel_distance):
+def init_fsc(pixel_distance):
     fsc = {}
-    if settings.verbose:
-        print(f"started init_fsc Task", flush=True)
+    logger = utils.Logger(True,settings)
+    logger.log(f"started init_fsc Task", level=1)
 
     dist_recip_max = np.max(pixel_distance.reciprocal)
     fsc["reference"] = compute_reference(settings.pdb_path, settings.M, dist_recip_max)
@@ -30,17 +27,25 @@ def init_fsc_task(pixel_distance):
     fsc["min_change_cc"] = settings.fsc_min_change_cc
     fsc["dist_recip_max"] = dist_recip_max
     fsc["converge"] = False
+    return fsc
 
-    if settings.verbose:
-        print(f"finished init_fsc Task", flush=True)
+@task(leaf=True, privileges=[RO])
+@lgutils.gpu_task_wrapper
+@nvtx.annotate("legion/fsc.py", is_prefix=True)
+def init_fsc_task(pixel_distance):
+    logger = utils.Logger(True,settings)
+    logger.log(f"started init_fsc Task", level=1)
+    fsc = init_fsc(pixel_distance)
+    logger.log(f"finished init_fsc Task", level=1)
     return fsc
 
 
-@task(privileges=[RO("rho_")])
+@task(leaf=True,privileges=[RO("rho_")])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/fsc.py", is_prefix=True)
 def compute_fsc_task(phased, fsc):
-    if settings.verbose:
+    logger = utils.Logger(True,settings)
+    if settings.verbosity > 0:
         timer = utils.Timer()
     fsc_dict = fsc.get()
     prev_cc = fsc_dict["final"]
@@ -61,11 +66,9 @@ def compute_fsc_task(phased, fsc):
         mempool = cupy.get_default_memory_pool()
         mempool.free_all_blocks()
 
-    if settings.verbose:
-        print(
-            f"FSC clear_cupy_mempool:{settings.cupy_mempool_clear} completed in: {timer.lap():.2f}s.",
-            flush=True,
-        )
+    if settings.verbosity > 0:
+        logger.log(
+            f"FSC clear_cupy_mempool:{settings.cupy_mempool_clear} completed in: {timer.lap():.2f}s.",level=1)
 
     min_cc = fsc_dict["min_cc"]
     delta_cc = final_cc - prev_cc
@@ -79,14 +82,29 @@ def compute_fsc_task(phased, fsc):
     else:
         if final_cc > min_cc and delta_cc < min_change_cc:
             fsc_dict["converge"] = True
-            print(
+            logger.log(
                 f"Stopping criteria met! Algorithm converged at resolution: {resolution:.2f} with cc: {final_cc:.3f}.",
-                flush=True,
-            )
+                level=1)
     return fsc_dict
 
+@nvtx.annotate("legion/fsc.py", is_prefix=True)
+def compute_fsc_conf(phased_conf, fsc):
+    fsc_dict_array = []
+    total_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
+    logger = utils.Logger(True,settings)
+    for i in range(settings.N_conformations):
+        # each task returns a future
+        # create an array of futures
+        if check_convergence_task(fsc[i]).get() is False:
+            logger.log(f"conformation {i} has NOT converged in compute_fsc_conf")
+            fsc_dict_val = compute_fsc_task(phased_conf[i], fsc[i], point=0)
+        else:
+            logger.log(f"conformation {i} HAS converged in compute_fsc_conf")
+            fsc_dict_val = fsc[i]
+        fsc_dict_array.append(fsc_dict_val)
+    return fsc_dict_array
 
-@task
+@task(leaf=True)
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/fsc.py", is_prefix=True)
 def check_convergence_task(fsc):
@@ -94,4 +112,20 @@ def check_convergence_task(fsc):
     fsc_dict = fsc.get()
     if fsc_dict["converge"] == True:
         converge = True
+    return converge
+
+@nvtx.annotate("legion/fsc.py", is_prefix=True)
+def check_convergence_conf(fsc):
+    fsc_converge_array = []
+    converge = True
+    total_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
+    for i in range(settings.N_conformations):
+        fsc_converge = check_convergence_task(fsc[i], point=0)
+        fsc_converge_array.append(fsc_converge)
+
+    for i in range(settings.N_conformations):
+        fsc_converge = fsc_converge_array[i].get()
+        if fsc_converge == False:
+            converge = False
+            return converge
     return converge

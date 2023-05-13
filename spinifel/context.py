@@ -97,10 +97,8 @@ class SpinifelContexts(metaclass=Singleton):
         # register(MPI.Finalize)
         register(goodbye)
         self.logger.log(f"MPI will be finalized on rank {self.rank}", level=1)
-
-        self.logger.log(f"MPI has been initialized on rank {self.rank}", level=1)
-
         self._mpi_initialized = True
+        self.logger.log(f"MPI has been initialized on rank {self.rank}", level=1)
 
     def init_cuda(self):
         """

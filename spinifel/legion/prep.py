@@ -6,7 +6,7 @@ import pygion
 import socket
 from pygion import task, Tunable, Partition, Region, WD, RO, RW, Reduce, IndexLaunch
 
-from spinifel import settings, prep, image
+from spinifel import settings, prep, image, utils
 
 from . import utils as lgutils
 from spinifel.extern.nufft_ext import NUFFT
@@ -18,6 +18,7 @@ if settings.use_cupy:
     import pycuda.driver as cuda
 
 all_objs = {}
+multiple_all_objs = []
 
 psana = None
 if settings.use_psana:
@@ -91,22 +92,21 @@ def get_pixel_index(run=None):
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def load_slices_psana(slices, rank, N_images_per_rank, smd_chunk, run):
     i = 0
+    logger = utils.Logger(True, settings)
     for smd_batch in smd_batches(smd_chunk, run):
         for evt in batch_events(smd_batch, run):
             raw = evt._dgrams[0].pnccdBack[0].raw
             try:
                 slices.data[i] = raw.image
-                print(f" {rank} loading {i}")
+                logger.log(f" {rank} loading {i}")
             except IndexError:
                 raise RuntimeError(f"Rank {rank} received too many events.")
             i += 1
             if i == N_images_per_rank:
-                print(
-                    f"Rank {rank} returning early i={i}, N_images_per_rank={N_images_per_rank}"
-                )
+                logger.log(
+                    f"Rank {rank} returning early i={i}, N_images_per_rank={N_images_per_rank}", level=1)
                 return
-    if settings.verbosity > 0:
-        print(f"{socket.gethostname()} loaded slices.", flush=True)
+    logger.log(f"{socket.gethostname()} loaded slices.", level=1)
 
 
 @task(leaf=True, privileges=[WD])
@@ -114,8 +114,8 @@ def load_slices_psana(slices, rank, N_images_per_rank, smd_chunk, run):
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def load_slices_psana2(slices, rank, N_images_per_rank, smd_chunk, run):
     i = 0
-    if settings.verbosity > 0:
-        print(f"{socket.gethostname()} load_slices_psana2, rank = {rank}", flush=True)
+    logger = utils.Logger(True, settings)
+    logger.log(f"{socket.gethostname()} rank:{rank} loading slices",level=1)
 
     det = run.Detector(settings.ps_detname)
     for smd_batch in smd_batches_without_transitions(smd_chunk, run):
@@ -130,21 +130,19 @@ def load_slices_psana2(slices, rank, N_images_per_rank, smd_chunk, run):
     if i < N_images_per_rank:
         for j in range(N_images_per_rank - i):
             slices.data[j + i] = slices.data[j + i - 1]
-    if settings.verbosity > 0:
-        print(f"{socket.gethostname()} loaded {i} slices.", flush=True)
+    logger.log(f"{socket.gethostname()} rank:{rank} loaded {i} slices.", level=1)
 
 
 @task(leaf=True, privileges=[WD])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def load_slices_hdf5(slices, rank, N_images_per_rank):
-    if settings.verbosity > 0:
-        print(f"{socket.gethostname()} loading slices.", flush=True)
+    logger = utils.Logger(True, settings)
+    logger.log(f"{socket.gethostname()} rank:{rank} loading {N_images_per_rank} slices.", level=1)
     i_start = rank * N_images_per_rank
     i_end = i_start + N_images_per_rank
     prep.load_slices(slices.data, i_start, i_end)
-    if settings.verbosity > 0:
-        print(f"{socket.gethostname()} loaded slices.", flush=True)
+    logger.log(f"{socket.gethostname()} rank:{rank} loaded {N_images_per_rank} slices.", level=1)
 
 
 @nvtx.annotate("legion/prep.py", is_prefix=True)
@@ -158,7 +156,7 @@ def get_slices(ds):
     pixel_position = None
     pixel_index = None
     if ds is not None:
-        n_nodes = Tunable.select(Tunable.NODE_COUNT).get() // settings.N_conformations
+        n_nodes = Tunable.select(Tunable.NODE_COUNT).get()
         chunk_i = 0
         val = 0
         for run in ds.runs():
@@ -193,13 +191,12 @@ def get_slices(ds):
 @task(leaf=True, privileges=[WD])
 @lgutils.gpu_task_wrapper
 def load_orientations_prior(orientations_prior, rank, N_images_per_rank):
-    if settings.verbosity > 0:
-        print(f"{socket.gethostname()} loading orientations.", flush=True)
+    logger = utils.Logger(True, settings)
+    logger.log(f"{socket.gethostname()} loading orientations.",level=1)
     i_start = rank * N_images_per_rank
     i_end = i_start + N_images_per_rank
     prep.load_orientations_prior(orientations_prior.quaternions, i_start, i_end)
-    if settings.verbosity > 0:
-        print(f"{socket.gethostname()} loaded orientations.", flush=True)
+    logger.log(f"{socket.gethostname()} loaded orientations.",level=1)
 
 
 def get_orientations_prior():
@@ -218,20 +215,19 @@ def get_orientations_prior():
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def reduce_mean_image(slices, mean_image, nprocs):
-    if settings.verbosity > 0:
-        print(f"{socket.gethostname()} reduce_mean_image {nprocs}", flush=True)
+    logger = utils.Logger(True, settings)
+    logger.log(f"{socket.gethostname()} reduce_mean_image num slices:{nprocs}",level=1)
     mean_image.data[:] += slices.data.mean(axis=0) / nprocs
-    if settings.verbosity > 0:
-        print(f"{socket.gethostname()} finished reduce_mean_image", flush=True)
-
 
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def compute_mean_image(slices, slices_p):
     mean_image = Region(lgutils.get_region_shape(slices)[1:], {"data": pygion.float32})
     pygion.fill(mean_image, "data", 0.0)
-    nprocs = Tunable.select(Tunable.GLOBAL_PYS).get() // settings.N_conformations
+    nprocs = Tunable.select(Tunable.GLOBAL_PYS).get()
+
+    logger = utils.Logger(True, settings)
     for i, sl in enumerate(slices_p):
-        print(f"{socket.gethostname()} compute_mean_image {i}", flush=True)
+        logger.log(f"{socket.gethostname()} rank:{i} compute_mean_image", level=1)
         reduce_mean_image(sl, mean_image, nprocs, point=i)
     return mean_image
 
@@ -342,7 +338,7 @@ def export_saxs(pixel_distance, mean_image, name):
 def init_partitions_regions_psana2():
     # minimum batch size = n_images_per_rank
     n_images_per_rank = settings.N_images_per_rank
-    n_points = Tunable.select(Tunable.GLOBAL_PYS).get() // settings.N_conformations
+    n_points = Tunable.select(Tunable.GLOBAL_PYS).get()
 
     # batch size
     batch_size = settings.N_images_per_rank
@@ -397,7 +393,8 @@ def init_partitions_regions_psana2():
 
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def get_data(ds):
-    print(f"{socket.gethostname()} loading slices.", flush=True)
+    logger = utils.Logger(True, settings)
+    logger.log(f"{socket.gethostname()} loading slices.", level=1)
 
     # if psana load pixel_position/pixel_index using first 'run'
     slices, slices_p, pixel_position, pixel_index = get_slices(ds)
@@ -452,7 +449,7 @@ def load_pixel_data(ds):
     pixel_position = None
     pixel_index = None
     assert ds is not None
-    n_nodes = Tunable.select(Tunable.NODE_COUNT).get() // settings.N_conformations
+    n_nodes = Tunable.select(Tunable.NODE_COUNT).get()
     gen_run = ds.runs()
     for run in gen_run:
         # load pixel index map and pixel position reciprocal only once
@@ -528,7 +525,7 @@ def process_data(
 def load_image_batch(run, gen_run, gen_smd, slices_p):
     # create a new region of full size and load the images
     assert gen_run is not None
-    n_nodes = Tunable.select(Tunable.NODE_COUNT).get() // settings.N_conformations
+    n_nodes = Tunable.select(Tunable.NODE_COUNT).get()
     chunk_i = 0
     if run is None:
         run = next(gen_run)
@@ -552,31 +549,36 @@ def load_image_batch(run, gen_run, gen_smd, slices_p):
     return gen_run, gen_smd, run
 
 
+@nvtx.annotate("legion/prep.py", is_prefix=True)
+def get_gprep(conf_idx):
+    global multiple_all_objs
+    return multiple_all_objs[conf_idx]
+
 @task(leaf=True, privileges=[RO, RO, RO])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/prep.py", is_prefix=True)
-def setup_objects_task(pixel_position, pixel_distance, slices):
+def setup_objects_task(pixel_position, pixel_distance, slices, idx):
     global all_objs
     N_images_per_rank = slices.ispace.domain.extent[0]
-
-    if settings.verbose and settings.use_cupy:
+    # create a logger object per point
+    if "logger" in all_objs:
+        logger = all_objs["logger"]
+    else:
+        logger = utils.Logger(True, settings,idx)
+        all_objs["logger"] = logger
+    if settings.use_cupy:
         mem0 = cuda.mem_get_info()
-        print(
-            f"{socket.gethostname()}: gpu memory: in setup_objects_task = {(mem0[1]-mem0[0])/1e9:.2f}GB ,gpu_total={mem0[1]/1e9:.2f}GB",
-            flush=True,
-        )
+        logger.log(
+            f"{socket.gethostname()}: gpu memory: in setup_objects_task = {(mem0[1]-mem0[0])/1e9:.2f}GB ,gpu_total={mem0[1]/1e9:.2f}GB",level=1)
 
     # release all memory used by cupy aggressively
     if settings.use_cupy:
         if settings.cupy_mempool_clear:
             mempool = cupy.get_default_memory_pool()
             mempool.free_all_blocks()
-            if settings.verbose:
-                mem0 = cuda.mem_get_info()
-                print(
-                    f"{socket.gethostname()}: gpu memory: after free cupy mempool in setup_objects_task = {(mem0[1]-mem0[0])/1e9:.2f}GB ,gpu_total={mem0[1]/1e9:.2f}GB",
-                    flush=True,
-                )
+            mem0 = cuda.mem_get_info()
+            logger.log(
+                f"{socket.gethostname()}: gpu memory: after free cupy mempool in setup_objects_task = {(mem0[1]-mem0[0])/1e9:.2f}GB ,gpu_total={mem0[1]/1e9:.2f}GB", level=1)
     # update nufft
     if "nufft" in all_objs:
         all_objs["nufft"].update_fields(N_images_per_rank)
@@ -605,22 +607,85 @@ def setup_objects_task(pixel_position, pixel_distance, slices):
     )
     done = True
 
-    if settings.verbose and settings.use_cupy:
+    if settings.use_cupy:
         mem0 = cuda.mem_get_info()
-        print(
-            f"{socket.gethostname()}: gpu memory: after allocation in setup_objects_task = {(mem0[1]-mem0[0])/1e9:.2f}GB ,gpu_total={mem0[1]/1e9:.2f}GB"
-        )
+        logger.log(f"{socket.gethostname()}: gpu memory: after allocation in setup_objects_task = {(mem0[1]-mem0[0])/1e9:.2f}GB ,gpu_total={mem0[1]/1e9:.2f}GB", level=1)
     return done
 
 
+#-------------------------------------------------------------
+# if conformations is set create an array of objects, one for
+# each conformation
+#-------------------------------------------------------------
+def setup_objects(pixel_position, pixel_distance, slices, idx):
+    all_objs = {}
+    N_images_per_rank = slices.ispace.domain.extent[0]
+
+    # create a logger object per point
+    logger = utils.Logger(True, settings,idx)
+    logger.log(f"entered setup_objects {idx}")
+
+    all_objs["logger"] = logger
+    if settings.use_cupy:
+        mem0 = cuda.mem_get_info()
+        logger.log(
+            f"{socket.gethostname()}: gpu memory: in setup_objects_task = {(mem0[1]-mem0[0])/1e9:.2f}GB ,gpu_total={mem0[1]/1e9:.2f}GB",level=1)
+
+    # release all memory used by cupy aggressively
+    if settings.use_cupy:
+        if settings.cupy_mempool_clear:
+            mempool = cupy.get_default_memory_pool()
+            mempool.free_all_blocks()
+            mem0 = cuda.mem_get_info()
+            logger.log(
+                f"{socket.gethostname()}: gpu memory: after free cupy mempool in setup_objects_task = {(mem0[1]-mem0[0])/1e9:.2f}GB ,gpu_total={mem0[1]/1e9:.2f}GB", level=1)
+
+    all_objs["nufft"] = NUFFT(
+        settings,
+        pixel_position.reciprocal,
+        pixel_distance.reciprocal,
+        N_images_per_rank,
+    )
+
+    all_objs["snm"] = SNM(
+        settings,
+        slices.data,
+        pixel_position.reciprocal,
+        pixel_distance.reciprocal,
+        all_objs["nufft"],
+    )
+
+    all_objs["mg"] = Merge(
+        settings,
+        slices.data,
+        pixel_position.reciprocal,
+        pixel_distance.reciprocal,
+        all_objs["nufft"],
+    )
+    if settings.use_cupy:
+        mem0 = cuda.mem_get_info()
+        logger.log(f"{socket.gethostname()}: gpu memory: after allocation in setup_objects_task = {(mem0[1]-mem0[0])/1e9:.2f}GB ,gpu_total={mem0[1]/1e9:.2f}GB", level=1)
+    return all_objs
+
+@task(leaf=True, privileges=[RO, RO, RO, WD])
+@lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/prep.py", is_prefix=True)
-def prep_objects(pixel_position, pixel_distance, slices, N_procs, group_idx=0):
+def setup_objects_task_conf(pixel_position, pixel_distance, slices, done_setup_p, idx, num_conformations):
+    global multiple_all_objs
+    all_objs = {}
+    N_images_per_rank = slices.ispace.domain.extent[0]
+    for i in range(num_conformations):
+        all_objs = setup_objects(pixel_position, pixel_distance, slices,idx)
+        multiple_all_objs.append(all_objs)
+    done_setup_p.done[0] = True
+
+# added idx option for conformation number
+@nvtx.annotate("legion/prep.py", is_prefix=True)
+def prep_objects_multiple(pixel_position, pixel_distance, slices, done_setup_p, N_procs):
+
     done_list = []
+    global multiple_all_objs
+    # reset
+    multiple_all_objs = []
     for i in range(N_procs):
-        done = setup_objects_task(
-            pixel_position, pixel_distance, slices[i], point=i + group_idx
-        )
-        done_list.append(done)
-    for i in range(N_procs):
-        assert done_list[i].get() == True
-    return done_list
+        setup_objects_task_conf(pixel_position, pixel_distance, slices[i], done_setup_p[i], i, settings.N_conformations, point=i)
