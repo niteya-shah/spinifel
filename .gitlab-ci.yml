@@ -494,4 +494,3 @@ cleanup_crusher:
     - crusher
   variables:
     <<: [*crusher_variables]
-
