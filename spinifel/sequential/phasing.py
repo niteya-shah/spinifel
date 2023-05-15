@@ -20,7 +20,7 @@ else:
     from scipy.ndimage import gaussian_filter
 
 if settings.use_fftx:
-    if settings.verbose:
+    if settings.verbosity > 0:
         print(f"Using FFTX for FFTs.")
         import fftx as fftxp
         # fftx_options_cuda = {'cuda' : True}

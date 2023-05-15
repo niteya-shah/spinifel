@@ -37,7 +37,7 @@ else:
     c_type = xp.complex128
 
 if settings.use_fftx:
-    if settings.verbose:
+    if settings.verbosity > 0:
         print(f"Using FFTX for FFTs.", flush=True)
     import fftx as fftxp
     # fftx_options_cuda = {'cuda' : True}
