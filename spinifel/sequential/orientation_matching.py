@@ -76,10 +76,25 @@ class SNM:
         self.slices_ = xp.array(
             slices_.reshape((self.N_slices, self.N_pixels)), dtype=f_type
         )
-        self.slices_2 = xp.square(self.slices_).sum(axis=1)
+        
         self.slices_std = self.slices_.std()
+        self.clip = settings.max_intensity_clip
+        self.slices_ = self.intensity_clip(self.slices_, self.clip)
+        
+        self.slices_2 = xp.square(self.slices_).sum(axis=1)
+        
         self.nufft = nufft
 
+    @nvtx.annotate("sequential/orientation_matching.py::modified", is_prefix=True)
+    def intensity_clip(self, data, thresh):
+        """
+        clip pixel intensities above threshold, i.e. pix_val = min(pix_val, thresh)
+        """
+        if thresh > 0:
+            ind = xp.where(data >= thresh)
+            data[ind] = thresh
+        return data
+        
     @nvtx.annotate("sequential/orientation_matching.py::modified", is_prefix=True)
     def euclidean_gemm(self, x, y, out):
         """
@@ -178,12 +193,17 @@ class SNM:
                 data_images = xp.array(data_images)
             if not settings.use_cupy and settings.use_cufinufft:
                 data_images = data_images.get()
+                
             data_images *= self.slices_std / data_images.std()
+            
+            data_images = self.intensity_clip(data_images, self.clip)
+            
             match_middle = time.monotonic()
             match_oth_time += match_middle - match_start
             self.euclidean_dist(
                 data_images, self.slices_, self.slices_2, self.dist, st_m, en_m
             )
+            
             match_time += time.monotonic() - match_middle
 
         match_start = time.monotonic()
