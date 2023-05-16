@@ -172,6 +172,7 @@ def prep_Fconv_task(
         use_reciprocal_symmetry,
         conf_idx=0
 ):
+
     logger = gprep.get_gprep(conf_idx)["logger"]
     logger.log(f"{socket.gethostname()} started Fconv.", level=1)
     autocorr = gprep.get_gprep(conf_idx)["mg"]
@@ -586,6 +587,7 @@ def phased_to_constrains(phased, ac):
     ac.estimate[:] = phased.ac * ac.support
 
 
+
 @task(leaf=True, privileges=[RO, WD, WD, RO, RO, RO])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
@@ -631,6 +633,7 @@ def solve_simple(
     summary.rlambda[0] = rlambda
     summary.v1[0] = v1
     summary.v2[0] = v2
+=======
 
 @task(leaf=True, privileges=[RO, RO, RO, WD, WD, RO, RO])
 @lgutils.gpu_task_wrapper
@@ -981,34 +984,34 @@ def solve_ac_conf(
             if str_mode:
                 if orientations is not None:
                     results, solve_ac_dict[i] = solve_ac_merge(solve_ac_dict[i],
-                                                         generation, pixel_position,
-                                                         pixel_distance,
-                                                         slices_p, ready_objs, conf_p, i,
-                                                         orientations[i], orientations_p[i],
-                                                         phased[i], str_mode)
+                                                               generation, pixel_position,
+                                                               pixel_distance,
+                                                               slices_p, ready_objs, conf_p, i,
+                                                               orientations[i], orientations_p[i],
+                                                               phased[i], str_mode)
                     result_array.append(results)
                 else:
                     results, solve_ac_dict[i] = solve_ac_merge(solve_ac_dict[i],
-                                                         generation, pixel_position,
-                                                         pixel_distance,
-                                                         slices_p, ready_objs, conf_p, i,
-                                                         None, None,
-                                                         None, str_mode)
+                                                               generation, pixel_position,
+                                                               pixel_distance,
+                                                               slices_p, ready_objs, conf_p, i,
+                                                               None, None,
+                                                               None, str_mode)
                     result_array.append(results)
             else:
                 if create_regions == False:
                     results, solve_ac_dict[i] = solve_ac_merge(solve_ac_dict[i],
-                                                         generation, pixel_position,
-                                                         pixel_distance,
-                                                         slices_p, ready_objs, conf_p, i,
-                                                         orientations[i], orientations_p[i],
-                                                         phased[i], str_mode)
+                                                               generation, pixel_position,
+                                                               pixel_distance,
+                                                               slices_p, ready_objs, conf_p, i,
+                                                               orientations[i], orientations_p[i],
+                                                               phased[i], str_mode)
                     result_array.append(results)
                 else:
                     results, solve_ac_dict_entry = solve_ac_merge(solve_ac_dict, generation, pixel_position,
-                                                            pixel_distance,
-                                                            slices_p, ready_objs, conf_p, i,
-                                                            orientations, orientations_p, phased, str_mode)
+                                                                  pixel_distance,
+                                                                  slices_p, ready_objs, conf_p, i,
+                                                                  orientations, orientations_p, phased, str_mode)
                     solve_ac_array.append(solve_ac_dict_entry)
                     result_array.append(results)
     if create_regions:

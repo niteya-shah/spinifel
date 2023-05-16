@@ -419,6 +419,13 @@ class SpinifelSettings(metaclass=Singleton):
                 1,
                 "Maximum number of image batches to load per iteration",
             ),
+            "_max_intensity_clip": (
+                "algorithm",
+                "max_intensity_clip",
+                float,
+                -1.,
+                "Clip maximum intensity. Set to negative value to not use it",
+            ),
             "_must_converge": (
                 "runtime",
                 "must_converge",
