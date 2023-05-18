@@ -199,14 +199,6 @@ fi
 
 
 #_______________________________________________________________________________
-# Install LCLS2 (aka PSANA2)
-
-./psana_clean_build.sh
-
-#-------------------------------------------------------------------------------
-
-
-#_______________________________________________________________________________
 # Rebuild FFTW (only needed on some systems -- that don't supply their own)
 
 if [[ ${target} = *"tulip"* || ${target} = *"jlse"* || ${target} = "g0"*".stanford.edu" || ${target} = "psbuild"* ]]; then
@@ -262,15 +254,14 @@ fi
 
 #-------------------------------------------------------------------------------
 
-#_______________________________________________________________________________
-# Only on djh/crusher branch, we need to build psana2 again - see issue#67 
 
-if [[ $(hostname --fqdn) = *".crusher."* || $(hostname --fqdn) = *".frontier."* ]]
-then
-    ./psana_clean_build.sh
-fi
+#_______________________________________________________________________________
+# Install LCLS2 (aka PSANA2)
+
+./psana_clean_build.sh
 
 #-------------------------------------------------------------------------------
+
 
 #_______________________________________________________________________________
 # Overwrite the conda libraries with system libraries => don't let anaconda
