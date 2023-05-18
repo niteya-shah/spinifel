@@ -15,7 +15,10 @@ from spinifel.sequential.autocorrelation import Merge
 
 if settings.use_cupy:
     import cupy
-    import pycuda.driver as cuda
+if settings.use_cuda:
+    if not settings.use_pygpu:
+        import pycuda.driver as cuda
+    import cupy
 
 all_objs = {}
 multiple_all_objs = []
@@ -566,13 +569,13 @@ def setup_objects_task(pixel_position, pixel_distance, slices, idx):
     else:
         logger = utils.Logger(True, settings,idx)
         all_objs["logger"] = logger
-    if settings.use_cupy:
+    if settings.use_cuda and not setting.use_pygpu:
         mem0 = cuda.mem_get_info()
         logger.log(
             f"{socket.gethostname()}: gpu memory: in setup_objects_task = {(mem0[1]-mem0[0])/1e9:.2f}GB ,gpu_total={mem0[1]/1e9:.2f}GB",level=1)
 
     # release all memory used by cupy aggressively
-    if settings.use_cupy:
+    if settings.use_cuda and not settings.use_pygpu:
         if settings.cupy_mempool_clear:
             mempool = cupy.get_default_memory_pool()
             mempool.free_all_blocks()
@@ -607,7 +610,7 @@ def setup_objects_task(pixel_position, pixel_distance, slices, idx):
     )
     done = True
 
-    if settings.use_cupy:
+    if settings.use_cuda and not settings.use_pygpu:
         mem0 = cuda.mem_get_info()
         logger.log(f"{socket.gethostname()}: gpu memory: after allocation in setup_objects_task = {(mem0[1]-mem0[0])/1e9:.2f}GB ,gpu_total={mem0[1]/1e9:.2f}GB", level=1)
     return done
@@ -626,13 +629,14 @@ def setup_objects(pixel_position, pixel_distance, slices, idx):
     logger.log(f"entered setup_objects {idx}")
 
     all_objs["logger"] = logger
-    if settings.use_cupy:
+
+    if settings.use_cuda and not settings.use_pygpu:
         mem0 = cuda.mem_get_info()
         logger.log(
             f"{socket.gethostname()}: gpu memory: in setup_objects_task = {(mem0[1]-mem0[0])/1e9:.2f}GB ,gpu_total={mem0[1]/1e9:.2f}GB",level=1)
 
     # release all memory used by cupy aggressively
-    if settings.use_cupy:
+    if settings.use_cuda and not settings.use_pygpu:
         if settings.cupy_mempool_clear:
             mempool = cupy.get_default_memory_pool()
             mempool.free_all_blocks()
@@ -662,7 +666,8 @@ def setup_objects(pixel_position, pixel_distance, slices, idx):
         pixel_distance.reciprocal,
         all_objs["nufft"],
     )
-    if settings.use_cupy:
+
+    if settings.use_cuda and not settings.use_pygpu:
         mem0 = cuda.mem_get_info()
         logger.log(f"{socket.gethostname()}: gpu memory: after allocation in setup_objects_task = {(mem0[1]-mem0[0])/1e9:.2f}GB ,gpu_total={mem0[1]/1e9:.2f}GB", level=1)
     return all_objs
