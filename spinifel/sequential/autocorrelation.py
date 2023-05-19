@@ -51,6 +51,7 @@ class Merge:
         # every time
         self.M = settings.M
         self.N_images = slices_.shape[0]
+
         self.N = np.prod(slices_.shape)
         self.reciprocal_extent = pixel_distance_reciprocal.max()
         self.use_reciprocal_symmetry = True
@@ -231,12 +232,34 @@ class Merge:
 
         return ac
 
+    # this is a place holder method for multiple conformations and
+    # needs to be UPDATED
+    # the weight argument is the conformation weight/value for each
+    # image. The algorithm used to compute weight is either
+    # softmax or max_likelihood and can be set
+    # via the algorithm.conf_mode options
+    # extract relevant slices and orientations based on weights we got back
+    # from orientation matching
+    # current support is for max_likelihood mode
     @nvtx.annotate("sequential/autocorrelation.py::modified", is_prefix=True)
-    def solve_ac_common(self, orientations, ac_estimate, ac_support, rlambda, flambda):
-        # ac_estimate is modified in place and hence its value changes for each
-        # run
+    def solve_ac_common(self, slices, orients, ac_estimate, ac_support, weights, rlambda, flambda):
         self.rlambda = rlambda
         self.flambda = flambda
+        wall = (weights==1).all()
+        # if algorithm.conf_mode == max_likelihood, extract relevant slices and orientations
+        if not wall:
+            orientations =  np.array(orients[np.where(weights == 1)])
+            data = np.array(slices[np.where(weights == 1)])
+        else:
+            orientations = orients
+            data = slices
+
+        data = np.array(data.reshape(-1), dtype=f_type)
+        self.nuvect_Db = xp.array((data).astype(c_type))
+        self.nuvect = xp.ones_like(data, dtype=c_type)
+        logger.log(f"solve_ac_common:[data]:{data.shape}, {data.dtype}",level=2)
+        logger.log(f"solve_ac_common:[orientations]:{orientations.shape}, {orientations.dtype}", level=2)
+
         H, K, L = self.get_non_uniform_positions(orientations)
         ac_estimate = xp.array(ac_estimate)
         ac_support = xp.array(ac_support)

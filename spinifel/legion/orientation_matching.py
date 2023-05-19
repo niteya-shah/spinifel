@@ -36,7 +36,7 @@ def create_min_dist_rp(n_images_per_rank, n_conf):
     )
 
     # initialize conf - initially - equal weights
-    lgutils.fill_region(conf, 1.0/n_conf*100)
+    lgutils.fill_region(conf, 1.0)
 
     multiple_conf_regions = {}
     multiple_conf_regions["min_dist"] = min_dist
@@ -75,7 +75,6 @@ def match(
             point=i)
 
 @task(leaf=True, privileges=[RO("ac"), WD("quaternions"), RO("data"), RO])
-
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
 def match_task(phased, orientations, slices, ready_obj, stream=False):

@@ -588,7 +588,7 @@ def phased_to_constrains(phased, ac):
 
 
 
-@task(leaf=True, privileges=[RO, WD, WD, RO, RO, RO])
+@task(leaf=True, privileges=[RO, WD, WD, RO, RO, RO, RO])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def solve_simple(
@@ -598,6 +598,7 @@ def solve_simple(
     conf,
     ready_obj,
     orientations,
+    slices,
     M,
     M_ups,
     Mtot,
@@ -611,7 +612,16 @@ def solve_simple(
     n_conf
     ):
     mg = gprep.get_gprep(group_idx)["mg"]
-    ret,W,d = mg.solve_ac_common(orientations.quaternions, ac.estimate, ac.support, rlambda, flambda)
+
+    logger = gprep.get_gprep(group_idx)["logger"]
+    logger.log(f"started solve:[n_conf,conf_index]: [{n_conf},{group_idx}],  conf_shape: {conf.conf_id.shape}, conf_dtype: {conf.conf_id.dtype}", level=2)
+    logger.log(f"conf_id: {conf.conf_id}", level=2)
+
+    N_images_per_rank = settings.N_images_per_rank
+    conf_local = conf.conf_id
+    conf_local = conf_local[group_idx*N_images_per_rank:group_idx*N_images_per_rank+N_images_per_rank]
+    ret,W,d = mg.solve_ac_common(slices.data, orientations.quaternions, ac.estimate,
+                                 ac.support, conf_local, rlambda, flambda)
     if not isinstance(ret, np.ndarray):
         ac_res = ret.get()
     else:
@@ -633,7 +643,6 @@ def solve_simple(
     summary.rlambda[0] = rlambda
     summary.v1[0] = v1
     summary.v2[0] = v2
-=======
 
 @task(leaf=True, privileges=[RO, RO, RO, WD, WD, RO, RO])
 @lgutils.gpu_task_wrapper
@@ -819,6 +828,7 @@ def solve_ac_merge(
             conf_p[i],
             ready_objs[i],
             orientations_p[i],
+            slices_p[i],
             M,
             M_ups,
             Mtot,

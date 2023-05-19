@@ -26,6 +26,7 @@ from .prep import (
     load_pixel_data,
     process_data,
     prep_objects_multiple,
+    prep_objects_select_multiple,
 )
 from .utils import union_partitions_with_stride, fill_region, dump_single_partition
 from .autocorrelation import (
@@ -281,6 +282,10 @@ def main_spinifel(
         logger.log(f"#" * 27)
 
         match_conf(phased, orientations_a_p, slices_p, min_dist_p, min_dist_proc, conf_p, n_images_per_rank, ready_objs_p, fsc)
+
+        # update fields related to conformations
+        prep_objects_select_multiple(slices_p, ready_objs_p, conf_p, total_procs)
+
         # Solve autocorrelation
         solved, solve_ac_dict = solve_ac_conf(
             solve_ac_dict,

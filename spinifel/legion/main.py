@@ -19,7 +19,7 @@ from pygion import (
 from spinifel import settings, utils, contexts, checkpoint
 from spinifel.prep import save_mrc
 
-from .prep import get_data, prep_objects_multiple
+from .prep import get_data, prep_objects_multiple, prep_objects_select_multiple
 from .autocorrelation import solve_ac, solve_ac_conf
 from .phasing import new_phase, create_phased_regions, phased_output, new_phase_conf, phased_output_conf
 from .orientation_matching import match, create_orientations_rp, match_conf, create_min_dist_rp
@@ -120,6 +120,9 @@ def main_task_conf(pixel_position, pixel_distance, pixel_index, slices, slices_p
 
         # Orientation matching
         match_conf(phased, orientations_p, slices_p, min_dist_p, min_dist_proc, conf_p, settings.N_images_per_rank, ready_objs_p, fsc)
+
+        # update fields related to conformations
+        prep_objects_select_multiple(slices_p, ready_objs_p, conf_p, total_procs)
 
         # Solve autocorrelation
         solved, solve_ac_dict = solve_ac_conf(
