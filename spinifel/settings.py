@@ -285,7 +285,7 @@ class SpinifelSettings(metaclass=Singleton):
                 "algorithm",
                 "conformation_mode",
                 str,
-                "softmax",
+                "max_likelihood",
                 "Conformation mode: 'softmax' or 'max_likelihood'",
             ),
             "_data_field_name": (
