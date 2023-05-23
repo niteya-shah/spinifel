@@ -47,6 +47,7 @@ from .orientation_matching import (
     match_conf,
     create_orientations_rp,
     create_min_dist_rp,
+    init_conf,
 )
 
 from . import mapper
@@ -228,6 +229,14 @@ def main_spinifel(
     orientations_a_p = []
     phased = []
     if start_gen == 0:
+        # make sure all partitions are valid
+        execution_fence(block=True)
+
+        # initialize conf to random values
+        init_conf(conf_p, n_images_per_rank)
+        if settings.N_conformations > 1:
+            prep_objects_select_multiple(slices_p, ready_objs_p, conf_p, total_procs)
+
         solved, solve_ac_dict = solve_ac_conf(
             solve_ac_dict,
             0,
@@ -254,6 +263,7 @@ def main_spinifel(
 
         # make sure all partitions are valid
         execution_fence(block=True)
+
     else:  # streaming
         # setup non-persistent  regions/partitions per conformation
         # i.e. those that are dependent on number of images per rank
@@ -272,6 +282,12 @@ def main_spinifel(
         # make sure all partitions are valid
         execution_fence(block=True)
 
+        # initialize conf to random values
+        init_conf(conf_p, n_images_per_rank)
+        if settings.N_conformations > 1:
+            prep_objects_select_multiple(slices_p, ready_objs_p, conf_p, total_procs)
+
+
     curr_gen = curr_gen + 1 + start_gen
     N_generations = end_gen
     N_gens_stream = settings.N_gens_stream
@@ -284,7 +300,8 @@ def main_spinifel(
         match_conf(phased, orientations_a_p, slices_p, min_dist_p, min_dist_proc, conf_p, n_images_per_rank, ready_objs_p, fsc)
 
         # update fields related to conformations
-        prep_objects_select_multiple(slices_p, ready_objs_p, conf_p, total_procs)
+        if settings.N_conformations > 1:
+            prep_objects_select_multiple(slices_p, ready_objs_p, conf_p, total_procs)
 
         # Solve autocorrelation
         solved, solve_ac_dict = solve_ac_conf(

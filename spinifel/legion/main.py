@@ -22,7 +22,7 @@ from spinifel.prep import save_mrc
 from .prep import get_data, prep_objects_multiple, prep_objects_select_multiple
 from .autocorrelation import solve_ac, solve_ac_conf
 from .phasing import new_phase, create_phased_regions, phased_output, new_phase_conf, phased_output_conf
-from .orientation_matching import match, create_orientations_rp, match_conf, create_min_dist_rp
+from .orientation_matching import match, create_orientations_rp, match_conf, create_min_dist_rp, init_conf
 from . import mapper
 from . import checkpoint
 from . import utils as lgutils
@@ -98,6 +98,12 @@ def main_task_conf(pixel_position, pixel_distance, pixel_index, slices, slices_p
 
     prep_objects_multiple(pixel_position, pixel_distance, slices_p, ready_objs_p, total_procs)
 
+    # initialize conf/conf_p with random 0/1 values
+    init_conf(conf_p, settings.N_images_per_rank)
+
+    if settings.N_conformations > 1:
+        prep_objects_select_multiple(slices_p, ready_objs_p, conf_p, total_procs)
+
     if settings.pdb_path.is_file() and settings.chk_convergence:
         for i in range (settings.N_conformations):
             # an array of futures
@@ -122,7 +128,8 @@ def main_task_conf(pixel_position, pixel_distance, pixel_index, slices, slices_p
         match_conf(phased, orientations_p, slices_p, min_dist_p, min_dist_proc, conf_p, settings.N_images_per_rank, ready_objs_p, fsc)
 
         # update fields related to conformations
-        prep_objects_select_multiple(slices_p, ready_objs_p, conf_p, total_procs)
+        if settings.N_conformations > 1:
+            prep_objects_select_multiple(slices_p, ready_objs_p, conf_p, total_procs)
 
         # Solve autocorrelation
         solved, solve_ac_dict = solve_ac_conf(

@@ -34,10 +34,6 @@ def create_min_dist_rp(n_images_per_rank, n_conf):
     conf, conf_p = lgutils.create_distributed_region(
         n_images_per_rank*n_conf, {"conf_id": pygion.float32}, ()
     )
-
-    # initialize conf - initially - equal weights
-    lgutils.fill_region(conf, 1.0)
-
     multiple_conf_regions = {}
     multiple_conf_regions["min_dist"] = min_dist
     multiple_conf_regions["min_dist_p"] = min_dist_p
@@ -45,6 +41,34 @@ def create_min_dist_rp(n_images_per_rank, n_conf):
     multiple_conf_regions["conf"] = conf
     multiple_conf_regions["conf_p"] = conf_p
     return multiple_conf_regions
+
+# initialize conf with random values
+@nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
+@lgutils.gpu_task_wrapper
+@task(leaf=True, privileges=[WD])
+def init_conf_task(conf, num_images, num_conf, mode):
+    x = conf.conf_id.reshape(num_conf,num_images)
+    # randomly select a particular conformation for each diffraction pattern
+    # a = number of images
+    arg_index = np.random.choice(num_conf,num_images)
+    for i in range(num_conf):
+        x[i] = np.where(arg_index==i, 1.0, 0.0)
+    conf.conf_id[:] = x.reshape(num_conf*num_images)
+
+# initialize conf with random values
+@nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
+def init_conf(conf_p, num_images):
+    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
+    num_conf = settings.N_conformations
+    mode = settings.conformation_mode
+    # if single conformation - all images belong to it
+    # if testing mode - all images belong to all conformations
+    if num_conf == 1 or mode == "test_debug":
+        for i in range (N_procs):
+            pygion.fill(conf_p[i], "conf_id", 1.0)
+    else:
+        for i in range (N_procs):
+            init_conf_task(conf_p[i], num_images, num_conf, mode, point=i)
 
 # this needs to be updated with the right value
 @nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
@@ -148,7 +172,6 @@ def select_conf_task(dist_r, conf, mode):
     logger.log(f"select_conf_task:conf_id = {conf.conf_id.shape}, {conf.conf_id.dtype}", level=2)
     # the higher the conf_id value, the less likely
     conf.conf_id[:] = snm.conformation_result(x,mode).reshape(a*b)
-    logger.log(f"conf_ids = {conf.conf_id}", level=3)
 
 #min_dist is a region -> N_conformations x N_images_per_rank x N_ranks
 #conf_p is a region/partition -> for each N_images_per_rank return the index for the conformation it belongs to

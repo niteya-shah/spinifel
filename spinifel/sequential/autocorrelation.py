@@ -246,7 +246,10 @@ class Merge:
         self.rlambda = rlambda
         self.flambda = flambda
         wall = (weights==1).all()
-        # if algorithm.conf_mode == max_likelihood, extract relevant slices and orientations
+        num_images = np.sum(weights,dtype=np.int64)
+        logger.log(f"solve_ac_common:[wall]:{wall}, num_images:{num_images}",level=2)
+
+        # if algorithm.conf_mode == max_likelihood/test_debug, extract relevant slices and orientations
         if not wall:
             orientations =  np.array(orients[np.where(weights == 1)])
             data = np.array(slices[np.where(weights == 1)])
