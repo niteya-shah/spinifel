@@ -4,7 +4,7 @@ variables:
 
 # this configuration is intended for use at Ascent / https://code.ornl.gov
 .ascent_variables: &ascent_variables
-  SCHEDULER_PARAMETERS: "-P CHM137 -W 2:30 -nnodes 1 -alloc_flags gpumps"
+  SCHEDULER_PARAMETERS: "-P CHM137 -W 2:00 -nnodes 1 -alloc_flags gpumps"
   EXTERNAL_WORKDIR: /gpfs/wolf/chm137/proj-shared/ci/${CI_PIPELINE_ID}
 
   # launcher for tests
@@ -39,7 +39,7 @@ variables:
 
 # this configuration is intended for use at Crusher / https://code.olcf.ornl.gov
 .crusher_variables: &crusher_variables
-  SCHEDULER_PARAMETERS: "-A CHM137_crusher -t 2:30:00 -N 1 -p batch"
+  SCHEDULER_PARAMETERS: "-A CHM137_crusher -t 2:00:00 -N 1 -p batch"
   EXTERNAL_WORKDIR: /lustre/orion/proj-shared/chm137/ci/${CI_PIPELINE_ID}
 
   # launcher for tests
