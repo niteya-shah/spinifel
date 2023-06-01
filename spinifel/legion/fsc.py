@@ -13,13 +13,13 @@ if settings.use_cupy:
     import cupy
 
 @nvtx.annotate("legion/fsc.py", is_prefix=True)
-def init_fsc(pixel_distance):
+def init_fsc(pixel_distance, filename):
     fsc = {}
     logger = utils.Logger(True,settings)
     logger.log(f"started init_fsc Task", level=1)
 
     dist_recip_max = np.max(pixel_distance.reciprocal)
-    fsc["reference"] = compute_reference(settings.pdb_path, settings.M, dist_recip_max)
+    fsc["reference"] = compute_reference(filename, settings.M, dist_recip_max)
     fsc["final"] = 0.0
     fsc["delta"] = 1.0
     fsc["res"] = 0.0
@@ -32,10 +32,10 @@ def init_fsc(pixel_distance):
 @task(leaf=True, privileges=[RO])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/fsc.py", is_prefix=True)
-def init_fsc_task(pixel_distance):
+def init_fsc_task(pixel_distance, filename):
     logger = utils.Logger(True,settings)
     logger.log(f"started init_fsc Task", level=1)
-    fsc = init_fsc(pixel_distance)
+    fsc = init_fsc(pixel_distance,filename)
     logger.log(f"finished init_fsc Task", level=1)
     return fsc
 
@@ -76,6 +76,9 @@ def compute_fsc_task(phased, fsc):
     fsc_dict["delta"] = delta_cc
     fsc_dict["res"] = resolution
     fsc_dict["final"] = final_cc
+    logger.log(
+        f"FSC: Check convergence resolution: {resolution:.2f} with cc: {final_cc:.3f} delta_cc:{delta_cc:.5f}.", level=1
+    )
     # no change in vals
     if math.isclose(final_cc, min_cc) and math.isclose(delta_cc, min_change_cc):
         return fsc_dict
@@ -96,10 +99,10 @@ def compute_fsc_conf(phased_conf, fsc):
         # each task returns a future
         # create an array of futures
         if check_convergence_task(fsc[i]).get() is False:
-            logger.log(f"conformation {i} has NOT converged in compute_fsc_conf")
+            logger.log(f"FSC:conformation {i} has NOT converged in compute_fsc_conf")
             fsc_dict_val = compute_fsc_task(phased_conf[i], fsc[i], point=0)
         else:
-            logger.log(f"conformation {i} HAS converged in compute_fsc_conf")
+            logger.log(f"FSC:conformation {i} HAS converged in compute_fsc_conf")
             fsc_dict_val = fsc[i]
         fsc_dict_array.append(fsc_dict_val)
     return fsc_dict_array
@@ -129,3 +132,33 @@ def check_convergence_conf(fsc):
             converge = False
             return converge
     return converge
+
+# if multiple pdb files exist for multiple conformations
+# pdb_path is a directory name else pdb_path is a filename
+@nvtx.annotate("legion/fsc.py", is_prefix=True)
+def initialize_fsc(pixel_distance):
+    fsc = []
+    logger = utils.Logger(True,settings)
+    if settings.N_conformations == 1:
+        if settings.pdb_path.is_file() and settings.chk_convergence:
+            filename = settings.pdb_path
+            logger.log(f"fsc filename: {filename}", level=2)
+            fsc_future_entry = init_fsc_task(pixel_distance,filename, point=0)
+            fsc.append(fsc_future_entry)
+    else: # multiple conformations
+        if settings.pdb_path.is_dir() and settings.chk_convergence:
+            num_entries = 0
+            for filename in settings.pdb_path.iterdir():
+                logger.log(f"fsc filename: {filename}", level=2)
+                # an array of futures
+                fsc_future_entry = init_fsc_task(pixel_distance,filename, point=0)
+                fsc.append(fsc_future_entry)
+                num_entries = num_entries+ 1
+            assert num_entries == settings.N_conformations
+
+        if settings.pdb_path.is_file() and settings.chk_convergence:
+            filename = settings.pdb_path
+            for i in range(settings.N_conformations):
+                fsc_future_entry = init_fsc_task(pixel_distance,filename, point=0)
+                fsc.append(fsc_future_entry)
+    return fsc

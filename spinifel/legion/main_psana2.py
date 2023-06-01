@@ -53,7 +53,7 @@ from .orientation_matching import (
 from . import mapper
 from . import checkpoint
 from . import utils as lgutils
-from .fsc import init_fsc_task, compute_fsc_conf, check_convergence_conf
+from .fsc import init_fsc_task, compute_fsc_conf, check_convergence_conf, initialize_fsc
 
 @nvtx.annotate("legion/main.py", is_prefix=True)
 def load_psana():
@@ -322,7 +322,7 @@ def main_spinifel(
         )
         phased_output_conf(phased, generation)
 
-        if settings.pdb_path.is_file() and settings.chk_convergence:
+        if settings.chk_convergence and len(fsc) > 0:
             fsc = compute_fsc_conf(phased, fsc)
             converge = check_convergence_conf(fsc)
             if converge:
@@ -382,12 +382,7 @@ def main():
     )
 
     # initialize fsc per conformation
-    fsc = []
-    if settings.chk_convergence and settings.pdb_path.is_file():
-        for i in range(settings.N_conformations):
-            fsc_future_entry = init_fsc_task(pixel_distance)
-            fsc.append(fsc_future_entry)
-        logger.log(f"initialized FSC", level=1)
+    fsc = initialize_fsc(pixel_distance)
 
     N_generations = settings.N_generations
     N_gens_stream = settings.N_gens_stream

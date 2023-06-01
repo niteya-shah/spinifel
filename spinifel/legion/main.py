@@ -2,6 +2,7 @@ import numpy as np
 import PyNVTX as nvtx
 import os
 import pygion
+import pathlib
 
 from pygion import (
     acquire,
@@ -26,7 +27,7 @@ from .orientation_matching import match, create_orientations_rp, match_conf, cre
 from . import mapper
 from . import checkpoint
 from . import utils as lgutils
-from .fsc import init_fsc_task, compute_fsc_task, check_convergence_task, compute_fsc_conf, check_convergence_conf
+from .fsc import init_fsc_task, compute_fsc_task, check_convergence_task, compute_fsc_conf, check_convergence_conf, initialize_fsc
 
 
 @nvtx.annotate("legion/main.py", is_prefix=True)
@@ -63,7 +64,6 @@ def main_task_conf(pixel_position, pixel_distance, pixel_index, slices, slices_p
     logger = utils.Logger(True, settings)
     timer = utils.Timer()
     curr_gen = 0
-    fsc = []
     total_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
 
     ready_objs, ready_objs_p = lgutils.create_distributed_region(
@@ -104,11 +104,7 @@ def main_task_conf(pixel_position, pixel_distance, pixel_index, slices, slices_p
     if settings.N_conformations > 1:
         prep_objects_select_multiple(slices_p, ready_objs_p, conf_p, total_procs)
 
-    if settings.pdb_path.is_file() and settings.chk_convergence:
-        for i in range (settings.N_conformations):
-            # an array of futures
-            fsc_future_entry = init_fsc_task(pixel_distance,point=0)
-            fsc.append(fsc_future_entry)
+    fsc = initialize_fsc(pixel_distance)
 
     solved, solve_ac_dict = solve_ac_conf(
         None, 0, pixel_position, pixel_distance, slices_p, ready_objs_p, conf_p, fsc)
@@ -153,7 +149,7 @@ def main_task_conf(pixel_position, pixel_distance, pixel_index, slices, slices_p
         phased_output_conf(phased, generation)
 
         # check for convergence
-        if settings.pdb_path.is_file() and settings.chk_convergence:
+        if settings.chk_convergence and len(fsc) > 0:
             logger.log(f"checking convergence: FSC calculation")
             fsc = compute_fsc_conf(phased, fsc)
             converge = check_convergence_conf(fsc)
