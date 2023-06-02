@@ -43,11 +43,22 @@ variables:
   EXTERNAL_WORKDIR: /lustre/orion/proj-shared/chm137/ci/${CI_PIPELINE_ID}
 
   # launcher for tests
-  SPINIFEL_TEST_LAUNCHER: "srun -n1"
+  SPINIFEL_TEST_LAUNCHER: "srun -n1 --gpus-per-task 1"
+  SPINIFEL_TEST_LAUNCHER_MULTI: "srun -n2 --gpus-per-task 1"
+  SPINIFEL_PSANA2_LAUNCHER: "srun -n4 --gpus-per-task 1"
+
+  # spinifel legion
+  SPINIFEL_LEGION: "legion_python -ll:py 1  -ll:pyomp 2 -ll:csize 32768 legion_main.py  --default-settings=test_mpi.toml"
+
+  # for mpi-xtc2 tests
+  SPINIFEL_TEST_FLAG: 1
+  all_proxy: "socks://proxy.ccs.ornl.gov:3128/"
+  ftp_proxy: "ftp://proxy.ccs.ornl.gov:3128/"
+  http_proxy: "http://proxy.ccs.ornl.gov:3128/"
+  https_proxy: "http://proxy.ccs.ornl.gov:3128/"
+  no_proxy: "localhost,127.0.0.0/8,*.ccs.ornl.gov"
 
   # for script test
-  DATA_DIR: /lustre/orion/proj-shared/chm137/spinifel_data
-  DATA_FILENAME: 2CEX-10k-2.h5
   out_dir: /lustre/orion/proj-shared/chm137/ci/${CI_PIPELINE_ID}/spinifel_output
   CUPY_CACHE_DIR: /lustre/orion/proj-shared/chm137/ci/${CI_PIPELINE_ID}/cupy_cache
   PYCUDA_CACHE_DIR: /lustre/orion/proj-shared/chm137/ci/${CI_PIPELINE_ID}
@@ -328,8 +339,81 @@ unit_test_crusher:
   variables:
     <<: [*crusher_variables]
 
-test_mpi_crusher:
+test_mpi_hdf5_crusher:
   <<: [*test_rules, *test_before_script, *mpi_hdf5_test_script]
+  stage: test
+  tags:
+    - slurm
+    - crusher
+  variables:
+    <<: [*crusher_variables]
+
+test_mpi_xtc2_crusher:
+  <<: [*test_rules, *test_before_script, *mpi_xtc2_test_script]
+  stage: test
+  tags:
+    - slurm
+    - crusher
+  variables:
+    <<: [*crusher_variables]
+
+
+test_legion_hdf5_crusher:
+  <<: [*test_rules, *test_before_script, *legion_hdf5_test_script]
+  stage: test
+  tags:
+    - slurm
+    - crusher
+  variables:
+    <<: [*crusher_variables]
+
+test_legion_hdf5_multirank_crusher:
+  <<: [*test_rules, *test_before_script, *legion_hdf5_multirank_test_script]
+  stage: test
+  tags:
+    - slurm
+    - crusher
+  variables:
+    <<: [*crusher_variables]
+
+test_legion_xtc2_multirank_crusher:
+  <<: [*test_rules, *test_before_script, *legion_xtc2_multirank_test_script]
+  stage: test
+  tags:
+    - slurm
+    - crusher
+  variables:
+    <<: [*crusher_variables, *legion_psana2_variables]
+
+test_legion_xtc2_stream_multirank_crusher:
+  <<: [*test_rules, *test_before_script, *legion_xtc2_stream_multirank_test_script]
+  stage: test
+  tags:
+    - slurm
+    - crusher
+  variables:
+    <<: [*crusher_variables, *legion_psana2_variables]
+
+test_legion_xtc2_stream_multiconf_multirank_crusher:
+  <<: [*test_rules, *test_before_script, *legion_xtc2_stream_multiconf_multirank_test_script]
+  stage: test
+  tags:
+    - slurm
+    - crusher
+  variables:
+    <<: [*crusher_variables, *legion_psana2_variables]
+
+test_legion_xtc2_multiconf_multirank_crusher:
+  <<: [*test_rules, *test_before_script, *legion_xtc2_multiconf_multirank_test_script]
+  stage: test
+  tags:
+    - slurm
+    - crusher
+  variables:
+    <<: [*crusher_variables, *legion_psana2_variables]
+
+test_legion_multiconf_multirank_crusher:
+  <<: [*test_rules, *test_before_script, *legion_multiconf_multirank_test_script]
   stage: test
   tags:
     - slurm
