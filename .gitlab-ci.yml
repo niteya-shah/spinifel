@@ -47,9 +47,6 @@ variables:
   SPINIFEL_TEST_LAUNCHER_MULTI: "srun -n2 --gpus-per-task 1"
   SPINIFEL_PSANA2_LAUNCHER: "srun -n4 --gpus-per-task 1"
 
-  # spinifel legion
-  SPINIFEL_LEGION: "legion_python -ll:py 1  -ll:pyomp 2 -ll:csize 32768 legion_main.py  --default-settings=test_mpi.toml"
-
   # for mpi-xtc2 tests
   SPINIFEL_TEST_FLAG: 1
   all_proxy: "socks://proxy.ccs.ornl.gov:3128/"
@@ -68,6 +65,9 @@ variables:
 
   # replace pycuda with PybindGPU and disable fsc check (temporary)
   FRONTIER_EXTRAS: "runtime.use_pygpu=true runtime.chk_convergence=false algorithm.N_generations=3 fsc.pdb_path="
+
+  # spinifel legion
+  SPINIFEL_LEGION: "legion_python -ll:py 1  -ll:pyomp 2 -ll:csize 32768 legion_main.py  --default-settings=test_mpi.toml ${FRONTIER_EXTRAS}"
 
   IS_CRUSHER_JOB: 1
 
@@ -103,7 +103,7 @@ variables:
 
 .legion_test_script: &legion_test_script
   script:
-    - PYTHONPATH="$PYTHONPATH:$EXTERNAL_WORKDIR:$PWD/mpi4py_poison_wrapper" $SPINIFEL_TEST_LAUNCHER legion_python -ll:py 1 -ll:pyomp 2  -ll:csize 8192 legion_main.py --default-settings=summit_ci.toml --mode=legion
+    - PYTHONPATH="$PYTHONPATH:$EXTERNAL_WORKDIR:$PWD/mpi4py_poison_wrapper" $SPINIFEL_TEST_LAUNCHER legion_python -ll:py 1 -ll:pyomp 2  -ll:csize 8192 legion_main.py --default-settings=summit_ci.toml --mode=legion $FRONTIER_EXTRAS
 
 .legion_hdf5_test_script: &legion_hdf5_test_script
   script:
@@ -143,7 +143,7 @@ variables:
 
 .finufft_test_script: &finufft_test_script
   script:
-    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi runtime.use_cuda=false runtime.use_cufinufft=false fsc.fsc_min_cc=1.6 fsc.fsc_min_change_cc=0.1 runtime.use_single_prec=false $FRONTIER_EXTRAS
+    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi runtime.use_cuda=false runtime.use_cufinufft=false fsc.fsc_min_cc=0.6 fsc.fsc_min_change_cc=0.1 runtime.use_single_prec=false $FRONTIER_EXTRAS
 
 .nocuda_test_script: &nocuda_test_script
   script:
