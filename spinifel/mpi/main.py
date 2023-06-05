@@ -138,7 +138,7 @@ def main():
 
     # Skip this data saving and ac calculation in test mode
     generation = 0
-    reference_dict = {"reference": None, "dist_recip_max": None}
+    reference_dict = {}
     if settings.load_gen > 0:  # Load input from previous generation
         generation = settings.load_gen
         logger.log(
@@ -356,6 +356,7 @@ def main():
                 logger.log(f"AC recovered in {timer.lap():.2f}s.")
 
                 # If the pdb file is given, the writer rank will calculate this
+                reference, dist_recip_max = (None, None)
                 if (
                     settings.pdb_path.is_file()
                     and settings.chk_convergence
@@ -366,8 +367,8 @@ def main():
                         settings.pdb_path, settings.M, dist_recip_max
                     )
                     logger.log(f"Reference created in {timer.lap():.2f}s.")
-                    reference_dict["reference"] = reference
-                    reference_dict["dist_recip_max"] = dist_recip_max
+                reference_dict["reference"] = reference
+                reference_dict["dist_recip_max"] = dist_recip_max
 
                 # If the checkpoint is set, the writer rank will calculate this
                 if settings.checkpoint and comm.rank == writer_rank:
