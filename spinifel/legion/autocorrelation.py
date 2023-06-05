@@ -23,7 +23,7 @@ from spinifel import settings, utils, image
 from . import utils as lgutils
 from . import prep as gprep
 from scipy.ndimage import gaussian_filter
-from .fsc import check_convergence_task
+from .fsc import check_convergence_single_conf
 
 if settings.use_cupy:
     import os
@@ -982,13 +982,14 @@ def solve_ac_conf(
     logger = utils.Logger(True, settings)
     for i in range(settings.N_conformations):
         # check if converged
-        if len(fsc) > 0 and check_convergence_task(fsc[i]).get():
+        if len(fsc) > 0 and check_convergence_single_conf(fsc[i]):
             logger.log(f"conformation {i} HAS converged in solve_ac")
             assert create_regions is False
             results = solve_ac_dict[i]["results_r"]
             result_array.append(results)
         else:
-            logger.log(f"conformation {i} has NOT converged in solve_ac")
+            if len(fsc) > 0:
+                logger.log(f"conformation {i} has NOT converged in solve_ac")
             if str_mode:
                 if orientations is not None:
                     results, solve_ac_dict[i] = solve_ac_merge(solve_ac_dict[i],

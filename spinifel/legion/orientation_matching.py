@@ -6,7 +6,7 @@ from pygion import task, RO, WD, IndexLaunch, Tunable, LayoutConstraint, SOA_C, 
 from spinifel import settings, utils
 from . import utils as lgutils
 from . import prep as gprep
-from .fsc import check_convergence_task
+from .fsc import check_convergence_single_conf
 
 
 @nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
@@ -182,11 +182,12 @@ def match_conf(phased, orientations_p, slices_p, min_dist_p, min_dist_proc, conf
     if settings.N_conformations > 1:
         for i in range(settings.N_conformations):
             # check fsc future values -> if convergence has failed then continue with match
-            if len(fsc) > 0 and check_convergence_task(fsc[i]).get():
+            if len(fsc) > 0 and check_convergence_single_conf(fsc[i]):
                 logger.log(f"conformation {i} HAS converged in orientation_matching check")
                 fill_min_dist(min_dist_p, i, settings.N_conformations)
             else:
-                logger.log(f"conformation {i} has NOT converged in orientation_matching check")
+                if len(fsc) > 0:
+                    logger.log(f"conformation {i} has NOT converged in orientation_matching check")
                 match_single_conf(phased[i], orientations_p[i], slices_p, min_dist_p, n_images_per_rank, i, settings.N_conformations, ready_objs)
         N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
         # TODO initialize min_dist_proc to zero for those conformations that are completed

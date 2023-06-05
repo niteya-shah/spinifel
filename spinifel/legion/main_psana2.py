@@ -53,7 +53,7 @@ from .orientation_matching import (
 from . import mapper
 from . import checkpoint
 from . import utils as lgutils
-from .fsc import init_fsc_task, compute_fsc_conf, check_convergence_conf, initialize_fsc
+from .fsc import init_fsc_task, compute_fsc_conf, check_convergence_conf, initialize_fsc, compute_fsc_conf_all, check_convergence_all_conf
 
 @nvtx.annotate("legion/main.py", is_prefix=True)
 def load_psana():
@@ -323,8 +323,8 @@ def main_spinifel(
         phased_output_conf(phased, generation)
 
         if settings.chk_convergence and len(fsc) > 0:
-            fsc = compute_fsc_conf(phased, fsc)
-            converge = check_convergence_conf(fsc)
+            fsc = compute_fsc_conf_all(phased, fsc)
+            converge = check_convergence_all_conf(fsc)
             if converge:
                 break
 

@@ -27,7 +27,7 @@ from .orientation_matching import match, create_orientations_rp, match_conf, cre
 from . import mapper
 from . import checkpoint
 from . import utils as lgutils
-from .fsc import init_fsc_task, compute_fsc_task, check_convergence_task, compute_fsc_conf, check_convergence_conf, initialize_fsc
+from .fsc import init_fsc_task, compute_fsc_task, check_convergence_task, compute_fsc_conf, check_convergence_conf, initialize_fsc, compute_fsc_conf_all, check_convergence_all_conf
 
 
 @nvtx.annotate("legion/main.py", is_prefix=True)
@@ -151,8 +151,8 @@ def main_task_conf(pixel_position, pixel_distance, pixel_index, slices, slices_p
         # check for convergence
         if settings.chk_convergence and len(fsc) > 0:
             logger.log(f"checking convergence: FSC calculation")
-            fsc = compute_fsc_conf(phased, fsc)
-            converge = check_convergence_conf(fsc)
+            fsc = compute_fsc_conf_all(phased, fsc)
+            converge = check_convergence_all_conf(fsc)
             if converge:
                 break
     execution_fence(block=True)
