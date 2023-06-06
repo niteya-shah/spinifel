@@ -257,11 +257,12 @@ class Merge:
             orientations = orients
             data = slices
 
-        data = np.array(data.reshape(-1), dtype=f_type)
-        self.nuvect_Db = xp.array((data).astype(c_type))
-        self.nuvect = xp.ones_like(data, dtype=c_type)
-        logger.log(f"solve_ac_common:[data]:{data.shape}, {data.dtype}",level=2)
-        logger.log(f"solve_ac_common:[orientations]:{orientations.shape}, {orientations.dtype}", level=2)
+        if settings.N_conformations > 1:
+            data = np.array(data.reshape(-1), dtype=f_type)
+            self.nuvect_Db = xp.array((data).astype(c_type))
+            self.nuvect = xp.ones_like(data, dtype=c_type)
+            logger.log(f"solve_ac_common:[data]:{data.shape}, {data.dtype}",level=2)
+            logger.log(f"solve_ac_common:[orientations]:{orientations.shape}, {orientations.dtype}", level=2)
 
         H, K, L = self.get_non_uniform_positions(orientations)
         ac_estimate = xp.array(ac_estimate)

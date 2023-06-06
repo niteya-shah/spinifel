@@ -21,7 +21,7 @@ from spinifel import settings, utils, contexts, checkpoint
 from spinifel.prep import save_mrc
 
 from .prep import get_data, prep_objects_multiple, prep_objects_select_multiple
-from .autocorrelation import solve_ac, solve_ac_conf
+from .autocorrelation import solve_ac_conf
 from .phasing import new_phase, create_phased_regions, phased_output, new_phase_conf, phased_output_conf
 from .orientation_matching import match, create_orientations_rp, match_conf, create_min_dist_rp, init_conf
 from . import mapper

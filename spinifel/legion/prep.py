@@ -668,6 +668,8 @@ def setup_objects(pixel_position, pixel_distance, slices, idx, N_images_per_rank
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def setup_objects_task_conf(pixel_position, pixel_distance, slices, done_setup_p, idx, num_conformations):
     global multiple_all_objs
+    # reset
+    multiple_all_objs = []
     all_objs = {}
     N_images_per_rank = slices.ispace.domain.extent[0]
     for i in range(num_conformations):
@@ -678,11 +680,6 @@ def setup_objects_task_conf(pixel_position, pixel_distance, slices, done_setup_p
 # added idx option for conformation number
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def prep_objects_multiple(pixel_position, pixel_distance, slices, done_setup_p, N_procs):
-
-    done_list = []
-    global multiple_all_objs
-    # reset
-    multiple_all_objs = []
     for i in range(N_procs):
         setup_objects_task_conf(pixel_position, pixel_distance, slices[i], done_setup_p[i], i, settings.N_conformations, point=i)
 
