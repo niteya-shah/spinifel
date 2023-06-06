@@ -71,6 +71,10 @@ variables:
 
   IS_CRUSHER_JOB: 1
 
+# FIXME: due to an underlying network bug, Legion must run on 2+ nodes
+.crusher_variables_legion: &crusher_variables_legion
+  SCHEDULER_PARAMETERS: "-A CHM137_crusher -t 2:00:00 -N 2 -p batch"
+
 
 # scripts for the various test stages
 .build_script: &build_script
@@ -365,7 +369,7 @@ test_legion_hdf5_crusher:
     - slurm
     - crusher
   variables:
-    <<: [*crusher_variables]
+    <<: [*crusher_variables_legion]
 
 test_legion_hdf5_multirank_crusher:
   <<: [*test_rules, *test_before_script, *legion_hdf5_multirank_test_script]
@@ -374,7 +378,7 @@ test_legion_hdf5_multirank_crusher:
     - slurm
     - crusher
   variables:
-    <<: [*crusher_variables]
+    <<: [*crusher_variables_legion]
 
 test_legion_xtc2_multirank_crusher:
   <<: [*test_rules, *test_before_script, *legion_xtc2_multirank_test_script]
@@ -383,7 +387,7 @@ test_legion_xtc2_multirank_crusher:
     - slurm
     - crusher
   variables:
-    <<: [*crusher_variables, *legion_psana2_variables]
+    <<: [*crusher_variables_legion, *legion_psana2_variables]
 
 test_legion_xtc2_stream_multirank_crusher:
   <<: [*test_rules, *test_before_script, *legion_xtc2_stream_multirank_test_script]
@@ -392,7 +396,7 @@ test_legion_xtc2_stream_multirank_crusher:
     - slurm
     - crusher
   variables:
-    <<: [*crusher_variables, *legion_psana2_variables]
+    <<: [*crusher_variables_legion, *legion_psana2_variables]
 
 test_legion_xtc2_stream_multiconf_multirank_crusher:
   <<: [*test_rules, *test_before_script, *legion_xtc2_stream_multiconf_multirank_test_script]
@@ -401,7 +405,7 @@ test_legion_xtc2_stream_multiconf_multirank_crusher:
     - slurm
     - crusher
   variables:
-    <<: [*crusher_variables, *legion_psana2_variables]
+    <<: [*crusher_variables_legion, *legion_psana2_variables]
 
 test_legion_xtc2_multiconf_multirank_crusher:
   <<: [*test_rules, *test_before_script, *legion_xtc2_multiconf_multirank_test_script]
@@ -410,7 +414,7 @@ test_legion_xtc2_multiconf_multirank_crusher:
     - slurm
     - crusher
   variables:
-    <<: [*crusher_variables, *legion_psana2_variables]
+    <<: [*crusher_variables_legion, *legion_psana2_variables]
 
 test_legion_multiconf_multirank_crusher:
   <<: [*test_rules, *test_before_script, *legion_multiconf_multirank_test_script]
@@ -419,7 +423,7 @@ test_legion_multiconf_multirank_crusher:
     - slurm
     - crusher
   variables:
-    <<: [*crusher_variables]
+    <<: [*crusher_variables_legion]
 
 test_legion_crusher:
  <<: [*test_rules, *test_before_script, *legion_test_script]
@@ -428,7 +432,7 @@ test_legion_crusher:
    - slurm
    - crusher
  variables:
-   <<: [*crusher_variables]
+   <<: [*crusher_variables_legion]
 
 # TODO: suggest deprecating
 #test_sequential_crusher:
