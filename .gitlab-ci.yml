@@ -362,15 +362,15 @@ test_mpi_xtc2_crusher:
   variables:
     <<: [*crusher_variables]
 
-
-test_legion_hdf5_crusher:
-  <<: [*test_rules, *test_before_script, *legion_hdf5_test_script]
-  stage: test
-  tags:
-    - slurm
-    - crusher
-  variables:
-    <<: [*crusher_variables_legion]
+# disable single rank tests for legion/crusher until gasnet issue is resolved
+#test_legion_hdf5_crusher:
+#  <<: [*test_rules, *test_before_script, *legion_hdf5_test_script]
+#  stage: test
+#  tags:
+#    - slurm
+#    - crusher
+#  variables:
+#    <<: [*crusher_variables_legion]
 
 test_legion_hdf5_multirank_crusher:
   <<: [*test_rules, *test_before_script, *legion_hdf5_multirank_test_script]
@@ -426,14 +426,15 @@ test_legion_multiconf_multirank_crusher:
   variables:
     <<: [*crusher_variables_legion]
 
-test_legion_crusher:
- <<: [*test_rules, *test_before_script, *legion_test_script]
- stage: test
- tags:
-   - slurm
-   - crusher
- variables:
-   <<: [*crusher_variables_legion]
+# disable single rank tests for legion/crusher until gasnet issue is resolved
+#test_legion_crusher:
+# <<: [*test_rules, *test_before_script, *legion_test_script]
+# stage: test
+# tags:
+#   - slurm
+#   - crusher
+# variables:
+#   <<: [*crusher_variables_legion]
 
 # TODO: suggest deprecating
 #test_sequential_crusher:
