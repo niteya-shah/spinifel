@@ -73,6 +73,7 @@ variables:
 
 # FIXME: due to an underlying network bug, Legion must run on 2+ nodes
 .crusher_variables_legion: &crusher_variables_legion
+  <<: [*crusher_variables]
   SCHEDULER_PARAMETERS: "-A CHM137_crusher -t 2:00:00 -N 2 -p batch"
 
 
