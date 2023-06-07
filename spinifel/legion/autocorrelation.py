@@ -7,6 +7,7 @@ import socket
 
 from pygion import (
     task,
+    Future,
     IndexLaunch,
     Partition,
     Region,
@@ -24,6 +25,7 @@ from . import utils as lgutils
 from . import prep as gprep
 from scipy.ndimage import gaussian_filter
 from .fsc import check_convergence_single_conf
+from spinifel.sequential.autocorrelation import ac_with_noise
 
 if settings.use_cupy:
     import os
@@ -159,6 +161,7 @@ def create_solve_regions_merge():
             "rlambda": pygion.float64,
             "v1": pygion.float64,
             "v2": pygion.float64,
+            "image_set": pygion.bool_,
         },
     )
     summary_p = Partition.equal(summary, (N_procs,))
@@ -182,8 +185,6 @@ def phased_to_constrains(phased, ac):
     ac_smoothed = gaussian_filter(phased.ac, 0.5)
     ac.support[:] = ac_smoothed > 1e-12
     ac.estimate[:] = phased.ac * ac.support
-
-
 
 @task(leaf=True, privileges=[RO, WD, WD, RO, RO, RO, RO])
 @lgutils.gpu_task_wrapper
@@ -214,45 +215,98 @@ def solve_simple(
     N_images_per_rank = slices.ispace.domain.extent[0]
     conf_local = conf.conf_id
     conf_local = conf_local[group_idx*N_images_per_rank:group_idx*N_images_per_rank+N_images_per_rank]
-    ret,W,d = mg.solve_ac_common(slices.data, orientations.quaternions, ac.estimate,
-                                 ac.support, conf_local, rlambda, flambda)
-    if not isinstance(ret, np.ndarray):
-        ac_res = ret.get()
-    else:
-        ac_res = ret;
-    ac_res = ac_res.reshape((M,) * 3)
-    if use_reciprocal_symmetry:
-        assert np.all(np.isreal(ac_res))
-    ac_res = ac_res.real
-    result.ac[:] = np.ascontiguousarray(ac_res)
-    image.show_volume(
-        ac_res, settings.Mquat, f"autocorrelation_conf_{group_idx}_{generation}_{rank}.png"
-    )
-    v1 = norm(ret)
-    v2 = norm(W * ret - d)
-    if not isinstance(v1, np.ndarray) and not isinstance(v1, float):
-        v1 = v1.get()
-        v2 = v2.get()
-    summary.rank[0] = rank
-    summary.rlambda[0] = rlambda
-    summary.v1[0] = v1
-    summary.v2[0] = v2
 
+    num_images = np.sum(conf_local, dtype=np.int64)
+    # initialize image_set field to False and update summary to
+    # default values and return
+    if num_images == 0:
+        summary.rank[0] = rank
+        summary.rlambda[0] = rlambda
+        summary.v1[0] = 1000.0
+        summary.v2[0] = 1000.0
+        summary.image_set[0] = False
+        result.ac[:] = 1.0
+    else:
+        ret,W,d = mg.solve_ac_common(slices.data, orientations.quaternions, ac.estimate,
+                                 ac.support, conf_local, rlambda, flambda)
+        if not isinstance(ret, np.ndarray):
+            ac_res = ret.get()
+        else:
+            ac_res = ret;
+        ac_res = ac_res.reshape((M,) * 3)
+        if use_reciprocal_symmetry:
+            assert np.all(np.isreal(ac_res))
+        ac_res = ac_res.real
+        result.ac[:] = np.ascontiguousarray(ac_res)
+        image.show_volume(
+            ac_res, settings.Mquat, f"autocorrelation_conf_{group_idx}_{generation}_{rank}.png"
+        )
+        v1 = norm(ret)
+        v2 = norm(W * ret - d)
+        if not isinstance(v1, np.ndarray) and not isinstance(v1, float):
+            v1 = v1.get()
+            v2 = v2.get()
+        summary.rank[0] = rank
+        summary.rlambda[0] = rlambda
+        summary.v1[0] = v1
+        summary.v2[0] = v2
+        summary.image_set[0] = True
 
 @task(leaf=True, privileges=[None, RO])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
-def select_ac(generation, summary):
-    iref = 0
-    if generation == 0:
-        # Heuristic: retain rank with highest lambda and high v1.
-        idx = summary.v1 >= np.mean(summary.v1)
-        imax = np.argmax(summary.rlambda[idx])
-        iref = np.arange(len(summary.rank), dtype=np.int)[idx][imax]
+def check_multiple_conf_summary(generation, summary):
+    # generation 0 will always have non-empty diffraction patterns
+    # if any summary result has non-empty differaction patterns
+    any_val = np.any(summary.image_set)
+    if generation == 0 or any_val:
+        return True
+    # we have empty diffraction patterns from all ranks for this
+    # conformation
     else:
-        # Take corner of L-curve: min (v1+v2)
-        iref = np.argmin(summary.v1 + summary.v2)
-    return iref
+        return False
+
+# copy ac with noise
+# this needs to be updated
+@task(leaf=True, privileges=[RW, RO])
+@lgutils.gpu_task_wrapper
+@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
+def copy_ac_with_noise(results_p0, results_conf, copy_status_dst, copy_status_src, src_id, dst_id):
+    # do we need to copy and is this a valid 'ac' to copy from?
+    if copy_status_dst.get() is not True and copy_status_src.get() is True:
+        logger = utils.Logger(True, settings)
+        logger.log(f"copying AC with noise for conformation {dst_id} from conformation {src_id}", level=2)
+        results_p0.ac[:] = ac_with_noise(results_conf.ac)
+        return True
+    # if we don't need to copy
+    elif copy_status_dst.get() is True:
+        return True
+    else:
+        # we didn't copy and we still need to find a valid 'ac'
+        return False
+
+@task(leaf=True, privileges=[None, RO])
+@lgutils.gpu_task_wrapper
+@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
+def select_ac(generation, summary, conf_ok):
+    iref = 0
+    if conf_ok.get() is not True:
+        return -1
+    else:
+        if generation == 0:
+            # Heuristic: retain rank with highest lambda and high v1.
+            idx = summary.v1 >= np.mean(summary.v1)
+            imax = np.argmax(summary.rlambda[idx])
+            iref = np.arange(len(summary.rank), dtype=np.int)[idx][imax]
+        else:
+            # deal with ranks that don't have any diffraction patterns due to
+            # multiple conformations
+            # discard the rank(s) with empty diffraction patterns
+            max_val = np.max(summary.v1 + summary.v2)
+            vals = np.where(summary.image_set is True, summary.v1 + summary.v2, max_val)
+            # Take corner of L-curve: min (v1+v2)
+            iref = np.argmin(summary.v1 + summary.v2)
+        return iref
 
 
 @task(leaf=True, privileges=[WD, RO])
@@ -268,7 +322,11 @@ def ac_result_subregion(results_p0, results):
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def ac_result_task(results_p0, results, results_p, iref, group_idx):
     indx = iref.get()
-    ac_result_subregion(results_p0, results_p[indx], point=group_idx)
+    # initialize the region - it will use a copy with noise
+    if indx == -1:
+        pygion.fill(results_p0, "ac", 0.0)
+    else:
+        ac_result_subregion(results_p0, results_p[indx], point=group_idx)
 
 
 @task(leaf=True, privileges=[RO("reciprocal")])
@@ -312,7 +370,6 @@ def solve_ac_merge(
         solve_ac_dict["orientations_p"] = orientations_p
     elif orientations is None:
         orientations, orientations_p = get_random_orientations(N_images_per_rank)
-        #solve_ac_dict = prepare_solve_all_merge(slices_p, solve_ac_dict, str_mode)
         solve_ac_dict = create_solve_regions_merge();
         solve_ac_dict["reciprocal_extent"] = pixel_distance_rp_max_task(pixel_distance)
         solve_ac_dict["orientations"] = orientations
@@ -364,11 +421,14 @@ def solve_ac_merge(
             group_idx,
             settings.N_conformations,
             point=i)
-    iref = select_ac(generation, summary)
+
+    # check if all ranks for this conformation
+    conf_ok = check_multiple_conf_summary(generation, summary)
+    iref = select_ac(generation, summary, conf_ok)
     # remove blocking call
     # return results_p[iref.get()], solve_ac_dict
     ac_result_task(results_r, results, results_p, iref, group_idx, point=group_idx)
-    return results_r, solve_ac_dict
+    return results_r, solve_ac_dict, conf_ok
 
 # phased is an array of regions
 # orientations is an array of regions
@@ -403,6 +463,7 @@ def solve_ac_conf(
         assert orientations_p is None
     solve_ac_array = []
     result_array = []
+    conf_ok_array = []
     logger = utils.Logger(True, settings)
     for i in range(settings.N_conformations):
         # check if converged
@@ -411,42 +472,56 @@ def solve_ac_conf(
             assert create_regions is False
             results = solve_ac_dict[i]["results_r"]
             result_array.append(results)
+            conf_ok_array.append(Future(True, pygion.bool_))
         else:
             if len(fsc) > 0:
                 logger.log(f"conformation {i} has NOT converged in solve_ac")
             if str_mode:
                 if orientations is not None:
-                    results, solve_ac_dict[i] = solve_ac_merge(solve_ac_dict[i],
+                    results, solve_ac_dict[i], conf_ok = solve_ac_merge(solve_ac_dict[i],
                                                                generation, pixel_position,
                                                                pixel_distance,
                                                                slices_p, ready_objs, conf_p, i,
                                                                orientations[i], orientations_p[i],
                                                                phased[i], str_mode)
                     result_array.append(results)
+                    conf_ok_array.append(conf_ok)
                 else:
-                    results, solve_ac_dict[i] = solve_ac_merge(solve_ac_dict[i],
+                    results, solve_ac_dict[i], conf_ok = solve_ac_merge(solve_ac_dict[i],
                                                                generation, pixel_position,
                                                                pixel_distance,
                                                                slices_p, ready_objs, conf_p, i,
                                                                None, None,
                                                                None, str_mode)
                     result_array.append(results)
+                    conf_ok_array.append(conf_ok)
             else:
                 if create_regions == False:
-                    results, solve_ac_dict[i] = solve_ac_merge(solve_ac_dict[i],
+                    results, solve_ac_dict[i], conf_ok = solve_ac_merge(solve_ac_dict[i],
                                                                generation, pixel_position,
                                                                pixel_distance,
                                                                slices_p, ready_objs, conf_p, i,
                                                                orientations[i], orientations_p[i],
                                                                phased[i], str_mode)
                     result_array.append(results)
+                    conf_ok_array.append(conf_ok)
                 else:
-                    results, solve_ac_dict_entry = solve_ac_merge(solve_ac_dict, generation, pixel_position,
+                    results, solve_ac_dict_entry, conf_ok = solve_ac_merge(solve_ac_dict, generation, pixel_position,
                                                                   pixel_distance,
                                                                   slices_p, ready_objs, conf_p, i,
                                                                   orientations, orientations_p, phased, str_mode)
                     solve_ac_array.append(solve_ac_dict_entry)
                     result_array.append(results)
+                    conf_ok_array.append(conf_ok)
+
+    # handle the case of empty diffraction images in a particular conformation
+    # copy 'ac' with noise from another
+    if settings.N_conformations > 1:
+        for i in range(settings.N_conformations):
+            for j in range(settings.N_conformations):
+                if i != j:
+                    conf_ok_array[i] = copy_ac_with_noise(result_array[i], result_array[j], conf_ok_array[i], conf_ok_array[j], j, i)
+
     if create_regions:
         return result_array, solve_ac_array
 

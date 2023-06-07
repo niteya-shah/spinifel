@@ -278,3 +278,9 @@ class Merge:
             assert np.all(np.isreal(ac))
         it_number = self.callback.counter
         return ret,W,d
+
+@nvtx.annotate("sequential/autocorrelation.py::modified", is_prefix=True)
+def ac_with_noise(ac):
+    mu,sigma = 0.0, 0.001 # mean and standard deviation
+    noise = np.random.normal(mu,sigma, ac.shape)
+    return ac + noise
