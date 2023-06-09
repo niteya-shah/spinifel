@@ -419,6 +419,20 @@ class SpinifelSettings(metaclass=Singleton):
                 -1.,
                 "Clip maximum intensity. Set to negative value to not use it",
             ),
+            "_use_network_prior": (
+                "algorithm",
+                "use_network_prior",
+                parse_bool,
+                False,
+                "Whether to use network prior",
+            ),
+            "_network_path": (
+                "algorithm",
+                "network_path",
+                str,
+                "./",
+                "Path to network model",
+            ),
             "_must_converge": (
                 "runtime",
                 "must_converge",

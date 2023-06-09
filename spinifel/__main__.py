@@ -24,6 +24,12 @@ if __name__ == "__main__":
         from .mpi import main
 
         main()
+    elif settings.mode == "mpi_network":
+        # Two input types (hdf5 and xtc2) are supported in mpi mode. 
+        # If use_psana is set in toml file, we assume input type is xtc2.
+        from .mpi_network import main
+
+        main()
     elif settings.mode == "legion":
         from .legion import main
 
