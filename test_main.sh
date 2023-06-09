@@ -43,9 +43,11 @@ fi
 # Set job submisson command
 if [[ ${target} = *"summit"* || ${target} = *"ascent"* ]]; then
     export SPINIFEL_TEST_LAUNCHER="jsrun -n1 -a1 -g1"
+    export SPINIFEL_LEGION_LAUNCHER="jsrun -n1 -a1 -g1"
     export SPINIFEL_PSANA2_LAUNCHER="jsrun -n3 -g1"
 elif [[ ${target} = *"cgpu"* || ${target} = *"perlmutter"* || ${target} = *"frontier"* ]]; then
     export SPINIFEL_TEST_LAUNCHER="srun -n1 -G1"
+    export SPINIFEL_LEGION_LAUNCHER="srun -N2 -n2 -G2"
     export SPINIFEL_PSANA2_LAUNCHER="srun -n3 -G3"
 fi
 
@@ -55,13 +57,23 @@ if [ ! -d "${out_dir}" ]; then
     mkdir -p ${out_dir}
 fi
 
+
 # Tests pygpu and disable skopi
 if [[ ${target} = *"frontier"* ]]; then
-    FRONTIER_EXTRAS="runtime.use_pygpu=true fsc.pdb_path="
+    FRONTIER_EXTRAS="runtime.use_pygpu=true"
 fi
 
+
+#DEBUG_FLAG="-Xfaulthandler"
+
+
+# unittest
+pytest -s spinifel/tests/test_main.py
+
+export USE_CUPY=1
+
 # test_mpi_hdf5
-$SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi $FRONTIER_EXTRAS
+$SPINIFEL_TEST_LAUNCHER python $DEBUG_FLAG -m spinifel --default-settings=test_mpi.toml --mode=mpi $FRONTIER_EXTRAS
 
 
 # test_finufft
@@ -69,7 +81,7 @@ $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mo
 
 
 # test_legion
-PYTHONPATH="$PYTHONPATH:$EXTERNAL_WORKDIR:$PWD/mpi4py_poison_wrapper" $SPINIFEL_TEST_LAUNCHER legion_python -ll:py 1 -ll:csize 8192 legion_main.py --default-settings=summit_ci.toml --mode=legion $FRONTIER_EXTRAS
+PYTHONPATH="$PYTHONPATH:$EXTERNAL_WORKDIR:$PWD/mpi4py_poison_wrapper" $SPINIFEL__LAUNCHER legion_python -ll:py 1 -ll:csize 8192 legion_main.py --default-settings=summit_ci.toml --mode=legion $FRONTIER_EXTRAS
 
 
 # test_nocuda
