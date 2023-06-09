@@ -76,7 +76,7 @@ def fill_min_dist(min_dist_p, conf_idx, num_conf):
     N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
     for i in range (N_procs):
         dist_idx = i*num_conf + conf_idx
-        pygion.fill(min_dist_p[dist_idx], "min_dist", 0.0)
+        pygion.fill(min_dist_p[dist_idx], "min_dist", 1000000000.0)
 
 # The reference orientations don't have to match exactly between ranks.
 # Each rank aligns its own slices.
@@ -152,10 +152,7 @@ def match_single_conf(
             conf_idx,
             point=i)
 
-# conf region contains the percentages for each diffraction image
-# and each conformation -
-# the higher the value, the less likely it is going to belong
-# to that conformation
+
 @task(leaf=True, privileges=[RO("min_dist"), WD("conf_id")])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
