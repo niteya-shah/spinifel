@@ -83,7 +83,6 @@ PACKAGE_LIST=(
 
     cffi=1.15.1  # Legion
     pybind11=2.9.2  # FINUFFT
-    numba=0.56.3  # skopi
     scikit-learn=1.1.3  # skopi
     tqdm=4.64.1  # convenience
 
@@ -157,6 +156,7 @@ fi
 # Install pip packages
 pip install --no-cache-dir callmonitor
 pip install --no-cache-dir PyNVTX
+pip install --no-cache-dir gdown
 
 # Pin sckit-learn to 1.0.2 w/o breaking psana (see issue #51)
 conda remove --force -y scikit-learn
