@@ -319,7 +319,7 @@ def main():
 
             # Create an operating window into all the slices
             slices_ = all_slices_[:cn_processed_events, :]
-            # print("shape of slices_", slices_.shape)
+
             logger.log(f"Images prepared in {timer.lap():.2f}s.")
 
             # Intitilize merge and orientation matching

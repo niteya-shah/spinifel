@@ -419,6 +419,13 @@ class SpinifelSettings(metaclass=Singleton):
                 -1.,
                 "Clip maximum intensity. Set to negative value to not use it",
             ),
+            "_typ_intensity_clip": (
+                "algorithm",
+                "typ_intensity_clip",
+                str,
+                "abs",
+                "Type of clip maximum intensity. Can be 'abs' or 'rel'",
+            ),
             "_use_network_prior": (
                 "algorithm",
                 "use_network_prior",

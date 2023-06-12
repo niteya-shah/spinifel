@@ -39,8 +39,7 @@ N_clipping = 0
 N_binning = 0
 N_orientations = 10000  # model_slices
 N_batch_size = 1000
-N_images_max = 10000
-max_intensity_clip = 0.5
+N_images_max = 5000
 typ_intensity_clip = "rel"
 network_path = "${network_model_path}"
 
