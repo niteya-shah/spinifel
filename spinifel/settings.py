@@ -281,6 +281,13 @@ class SpinifelSettings(metaclass=Singleton):
                 1,
                 "Number of conformations",
             ),
+            "_conformation_mode": (
+                "algorithm",
+                "conformation_mode",
+                str,
+                "max_likelihood",
+                "Conformation mode: 'softmax', 'max_likelihood' or 'test_debug'",
+            ),
             "_data_field_name": (
                 "detector",
                 "data_field_name",

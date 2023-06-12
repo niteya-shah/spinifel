@@ -143,12 +143,14 @@ class NUFFT:
     def update_fields(self, n_images_per_rank):
         if self.N_images == n_images_per_rank:  # nothing to update
             return
+        n_images_old = self.N_images
         self.N_images = n_images_per_rank
         if settings.use_cufinufft:
-            # force deletion of H_a, K_a, L_a
-            self.H_a.gpudata.free()
-            self.K_a.gpudata.free()
-            self.L_a.gpudata.free()
+            # force deletion of H_a, K_a, L_a if they haven't already been deleted
+            if not n_images_old == 0:
+                self.H_a.gpudata.free()
+                self.K_a.gpudata.free()
+                self.L_a.gpudata.free()
             # Store reused datastructures in memory so that we don't
             # constantly deallocate and realloate them
             self.H_a = gpuarray.empty(
