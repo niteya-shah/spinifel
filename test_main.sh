@@ -81,7 +81,7 @@ $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mo
 
 
 # test_legion
-PYTHONPATH="$PYTHONPATH:$EXTERNAL_WORKDIR:$PWD/mpi4py_poison_wrapper" $SPINIFEL__LAUNCHER legion_python -ll:py 1 -ll:csize 8192 legion_main.py --default-settings=summit_ci.toml --mode=legion $FRONTIER_EXTRAS
+PYTHONPATH="$PYTHONPATH:$EXTERNAL_WORKDIR:$PWD/mpi4py_poison_wrapper" $SPINIFEL_LEGION_LAUNCHER legion_python -ll:py 1 -ll:csize 8192 legion_main.py --default-settings=summit_ci.toml --mode=legion $FRONTIER_EXTRAS
 
 
 # test_nocuda
