@@ -291,6 +291,13 @@ class SpinifelSettings(metaclass=Singleton):
                 1,
                 "Number of conformations",
             ),
+            "_conformation_mode": (
+                "algorithm",
+                "conformation_mode",
+                str,
+                "max_likelihood",
+                "Conformation mode: 'softmax', 'max_likelihood' or 'test_debug'",
+            ),
             "_data_field_name": (
                 "detector",
                 "data_field_name",
@@ -421,6 +428,13 @@ class SpinifelSettings(metaclass=Singleton):
                 int,
                 1,
                 "Maximum number of image batches to load per iteration",
+            ),
+            "_max_intensity_clip": (
+                "algorithm",
+                "max_intensity_clip",
+                float,
+                -1.,
+                "Clip maximum intensity. Set to negative value to not use it",
             ),
             "_must_converge": (
                 "runtime",

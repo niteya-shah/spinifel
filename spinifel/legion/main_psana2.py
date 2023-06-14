@@ -26,15 +26,14 @@ from .prep import (
     load_pixel_data,
     process_data,
     prep_objects_multiple,
+    prep_objects_select_multiple,
 )
 from .utils import union_partitions_with_stride, fill_region, dump_single_partition
 from .autocorrelation import (
     solve_ac_conf,
-    fill_autocorrelation_regions,
     create_solve_regions_multiple,
     get_random_orientations,
     pixel_distance_rp_max_task,
-    prepare_solve_all_gens,
     init_ac_persistent_regions,
 
 )
@@ -48,12 +47,13 @@ from .orientation_matching import (
     match_conf,
     create_orientations_rp,
     create_min_dist_rp,
+    init_conf,
 )
 
 from . import mapper
 from . import checkpoint
 from . import utils as lgutils
-from .fsc import init_fsc_task, compute_fsc_conf, check_convergence_conf
+from .fsc import init_fsc_task, compute_fsc_conf, check_convergence_conf, initialize_fsc, compute_fsc_conf_all, check_convergence_all_conf
 
 @nvtx.annotate("legion/main.py", is_prefix=True)
 def load_psana():
@@ -229,6 +229,14 @@ def main_spinifel(
     orientations_a_p = []
     phased = []
     if start_gen == 0:
+        # make sure all partitions are valid
+        execution_fence(block=True)
+
+        # initialize conf to random values
+        init_conf(conf_p, n_images_per_rank)
+        if settings.N_conformations > 1:
+            prep_objects_select_multiple(slices_p, ready_objs_p, conf_p, total_procs)
+
         solved, solve_ac_dict = solve_ac_conf(
             solve_ac_dict,
             0,
@@ -255,6 +263,7 @@ def main_spinifel(
 
         # make sure all partitions are valid
         execution_fence(block=True)
+
     else:  # streaming
         # setup non-persistent  regions/partitions per conformation
         # i.e. those that are dependent on number of images per rank
@@ -264,7 +273,6 @@ def main_spinifel(
 
             # setup new regions based on n_images_per_rank
             orientations, orientations_p = get_random_orientations(n_images_per_rank)
-            solve_ac_dict[i] = prepare_solve_all_gens(slices_p, solve_ac_dict[i], True)
             orientations_a.append(orientations)
             orientations_a_p.append(orientations_p)
             solve_ac_dict[i]["orientations"] = orientations
@@ -273,6 +281,12 @@ def main_spinifel(
             solve_ac_dict[i]["ready_objs"] = ready_objs_p
         # make sure all partitions are valid
         execution_fence(block=True)
+
+        # initialize conf to random values
+        init_conf(conf_p, n_images_per_rank)
+        if settings.N_conformations > 1:
+            prep_objects_select_multiple(slices_p, ready_objs_p, conf_p, total_procs)
+
 
     curr_gen = curr_gen + 1 + start_gen
     N_generations = end_gen
@@ -284,6 +298,11 @@ def main_spinifel(
         logger.log(f"#" * 27)
 
         match_conf(phased, orientations_a_p, slices_p, min_dist_p, min_dist_proc, conf_p, n_images_per_rank, ready_objs_p, fsc)
+
+        # update fields related to conformations
+        if settings.N_conformations > 1:
+            prep_objects_select_multiple(slices_p, ready_objs_p, conf_p, total_procs)
+
         # Solve autocorrelation
         solved, solve_ac_dict = solve_ac_conf(
             solve_ac_dict,
@@ -303,9 +322,9 @@ def main_spinifel(
         )
         phased_output_conf(phased, generation)
 
-        if settings.pdb_path.is_file() and settings.chk_convergence:
-            fsc = compute_fsc_conf(phased, fsc)
-            converge = check_convergence_conf(fsc)
+        if settings.chk_convergence and len(fsc) > 0:
+            fsc = compute_fsc_conf_all(phased, fsc)
+            converge = check_convergence_all_conf(fsc)
             if converge:
                 break
 
@@ -313,7 +332,6 @@ def main_spinifel(
     # regions are based on number of images per rank
     for i in range(settings.N_conformations):
         fill_region(orientations_a[i], 0)
-        fill_autocorrelation_regions(solve_ac_dict[i], True)
     fill_region(min_dist, 0.0)
     fill_region(conf, 0)
 
@@ -364,12 +382,7 @@ def main():
     )
 
     # initialize fsc per conformation
-    fsc = []
-    if settings.chk_convergence and settings.pdb_path.is_file():
-        for i in range(settings.N_conformations):
-            fsc_future_entry = init_fsc_task(pixel_distance)
-            fsc.append(fsc_future_entry)
-        logger.log(f"initialized FSC", level=1)
+    fsc = initialize_fsc(pixel_distance)
 
     N_generations = settings.N_generations
     N_gens_stream = settings.N_gens_stream

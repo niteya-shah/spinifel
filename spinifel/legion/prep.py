@@ -620,14 +620,10 @@ def setup_objects_task(pixel_position, pixel_distance, slices, idx):
 # if conformations is set create an array of objects, one for
 # each conformation
 #-------------------------------------------------------------
-def setup_objects(pixel_position, pixel_distance, slices, idx):
+def setup_objects(pixel_position, pixel_distance, slices, idx, N_images_per_rank):
     all_objs = {}
-    N_images_per_rank = slices.ispace.domain.extent[0]
-
     # create a logger object per point
     logger = utils.Logger(True, settings,idx)
-    logger.log(f"entered setup_objects {idx}")
-
     all_objs["logger"] = logger
 
     if settings.use_cuda and not settings.use_pygpu:
@@ -653,7 +649,7 @@ def setup_objects(pixel_position, pixel_distance, slices, idx):
 
     all_objs["snm"] = SNM(
         settings,
-        slices.data,
+        slices,
         pixel_position.reciprocal,
         pixel_distance.reciprocal,
         all_objs["nufft"],
@@ -661,7 +657,7 @@ def setup_objects(pixel_position, pixel_distance, slices, idx):
 
     all_objs["mg"] = Merge(
         settings,
-        slices.data,
+        slices,
         pixel_position.reciprocal,
         pixel_distance.reciprocal,
         all_objs["nufft"],
@@ -677,20 +673,39 @@ def setup_objects(pixel_position, pixel_distance, slices, idx):
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def setup_objects_task_conf(pixel_position, pixel_distance, slices, done_setup_p, idx, num_conformations):
     global multiple_all_objs
+    # reset
+    multiple_all_objs = []
     all_objs = {}
     N_images_per_rank = slices.ispace.domain.extent[0]
     for i in range(num_conformations):
-        all_objs = setup_objects(pixel_position, pixel_distance, slices,idx)
+        all_objs = setup_objects(pixel_position, pixel_distance, slices.data, idx, N_images_per_rank)
         multiple_all_objs.append(all_objs)
     done_setup_p.done[0] = True
 
 # added idx option for conformation number
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def prep_objects_multiple(pixel_position, pixel_distance, slices, done_setup_p, N_procs):
-
-    done_list = []
-    global multiple_all_objs
-    # reset
-    multiple_all_objs = []
     for i in range(N_procs):
         setup_objects_task_conf(pixel_position, pixel_distance, slices[i], done_setup_p[i], i, settings.N_conformations, point=i)
+
+
+#update nufft based on subset of valid diffraction patterns for a particular conformation
+@task(leaf=True, privileges=[RO, RW, RO])
+@lgutils.gpu_task_wrapper
+@nvtx.annotate("legion/prep.py", is_prefix=True)
+def setup_objects_task_select_conf(slices, done_setup_p, conf, idx, num_conformations):
+    N_images_per_rank = slices.ispace.domain.extent[0]
+    global multiple_all_objs
+    for i in range(num_conformations):
+        conf_local = conf.conf_id
+        conf_local = conf_local[i*N_images_per_rank:i*N_images_per_rank+N_images_per_rank]
+        num_images = np.sum(conf_local,dtype=np.int64)
+        assert "nufft" in multiple_all_objs[i]
+        multiple_all_objs[i]["nufft"].update_fields(num_images)
+    done_setup_p.done[0] = True
+
+# update nufft based on subset of images
+@nvtx.annotate("legion/prep.py", is_prefix=True)
+def prep_objects_select_multiple(slices, done_setup_p, conf, N_procs):
+    for i in range(N_procs):
+        setup_objects_task_select_conf(slices[i], done_setup_p[i], conf[i], i, settings.N_conformations, point=i)

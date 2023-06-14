@@ -11,7 +11,7 @@ from spinifel.prep import save_mrc
 from spinifel.sequential.phasing import phase as sequential_phase
 from . import prep as gprep
 from . import utils as lgutils
-from .fsc import check_convergence_task
+from .fsc import check_convergence_single_conf
 
 # multiple conformations, phased region for each one
 @nvtx.annotate("legion/phasing.py", is_prefix=True)
@@ -260,16 +260,17 @@ def new_phase_conf(generation, solved, fsc, phased_regions_dict=None):
     if phased_regions_dict is None:
         create_regions = True
         phased_regions_dict = []
-    logger = gprep.get_gprep(0)["logger"]
+    logger = utils.Logger(True, settings)
     for i in range(settings.N_conformations):
         # check if conformation[i] has converged
         # don't perform phasing for that conformation
-        if len(fsc) > 0 and check_convergence_task(fsc[i]).get():
+        if len(fsc) > 0 and check_convergence_single_conf(fsc[i]):
             assert create_regions is False
             phased_conf.append(phased_regions_dict[i]["phased"])
             logger.log(f"conformation {i} HAS converged in new_phase_conf")
         else:
-            logger.log(f"conformation {i} has NOT converged in new_phase_conf")
+            if len(fsc) > 0:
+                logger.log(f"conformation {i} has NOT converged in new_phase_conf")
             if create_regions is False:
                 phased, phased_regions_dict[i] = new_phase(generation, solved[i], phased_regions_dict[i],i)
                 phased_conf.append(phased)
