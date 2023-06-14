@@ -66,11 +66,11 @@ fi
 
 #DEBUG_FLAG="-Xfaulthandler"
 
+export USE_CUPY=1
 
 # unittest
 pytest -s spinifel/tests/test_main.py
 
-export USE_CUPY=1
 
 # test_mpi_hdf5
 $SPINIFEL_TEST_LAUNCHER python $DEBUG_FLAG -m spinifel --default-settings=test_mpi.toml --mode=mpi $FRONTIER_EXTRAS
