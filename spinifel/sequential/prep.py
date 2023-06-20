@@ -98,3 +98,31 @@ def get_data(N_images, ds):
         pixel_index_map,
         slices_,
     )
+
+
+def show_orientation_matching_results(pred, target, fname=None):
+    import os
+    N, B2 = pred.shape
+    B = int(np.sqrt(B2))
+    pred = pred.reshape(N, B, B)
+    target = target.reshape(N, B, B)
+
+    # initialize a plot grid with 2 columns and N rows
+    fig, axs = plt.subplots(N, 2, figsize=(11, 5*N))
+
+    for i in range(N):
+        # plot arr1 images in the first column
+        axs[i, 0].imshow(pred[i], vmax=pred.max()*0.005)
+        axs[i, 0].axis('off')  # hide the axis
+
+        # plot arr2 images in the second column
+        axs[i, 1].imshow(target[i], vmax=target.max()*0.005)
+        axs[i, 1].axis('off')  # hide the axis
+
+    # show the plot
+    plt.tight_layout()
+    plt.show()
+    if fname is None:
+        fig.savefig(os.path.join(settings.out_dir, f'orientation_matching_results_{np.random.rand():.3f}.png'))
+    else:
+        fig.savefig(os.path.join(settings.out_dir, f'orientation_matching_results_{fname}.png'))

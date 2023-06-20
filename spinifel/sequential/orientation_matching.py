@@ -7,7 +7,7 @@ import logging
 from spinifel import settings, utils, autocorrelation
 import spinifel.sequential.nearest_neighbor as nn
 from spinifel import utils, autocorrelation, SpinifelSettings, Logger
-from spinifel.mpi_network.prep import show_orientation_matching_results
+from spinifel.sequential.prep import show_orientation_matching_results
 
 settings = SpinifelSettings()
 logger = Logger(True, settings)
@@ -80,6 +80,7 @@ class SNM:
         
         self.slices_std = self.slices_.std()
         if settings.typ_intensity_clip == 'abs':
+            logger.log(f"clip / max = {settings.max_intensity_clip / self.slices_.max():.5f}")
             self.clip = settings.max_intensity_clip
         elif settings.typ_intensity_clip == 'rel':
             self.clip = settings.max_intensity_clip * self.slices_.max()
@@ -226,11 +227,11 @@ class SNM:
             f"Match tot:{en_match-st_init:.2f}s. slice={slices_time:.2f}s. match={match_time:.2f}s. slice_oh={slice_init-st_init:.2f}s. match_oh={match_oth_time:.2f}s.",
             level=1
         )
-        print("shape of slices_: ", self.slices_.shape)
-        print("shape of data_images: ", data_images[index].shape)
-        rdn_fname = np.random.rand()
-        show_orientation_matching_results(data_images[index][:5].get(), self.slices_[:5].get(), fname=f'{rdn_fname:.3f}')
-        show_orientation_matching_results(data_images_before_clip[index][:5].get(), self.slices_before_clip[:5].get(), fname=f'beforeClip_{rdn_fname:.3f}')
+        # print("shape of slices_: ", self.slices_.shape)
+        # print("shape of data_images: ", data_images[index].shape)
+        # rdn_fname = np.random.rand()
+        # show_orientation_matching_results(data_images[index][:5].get(), self.slices_[:5].get(), fname=f'{rdn_fname:.3f}')
+        # show_orientation_matching_results(data_images_before_clip[index][:5].get(), self.slices_before_clip[:5].get(), fname=f'beforeClip_{rdn_fname:.3f}')
         return self.nufft.ref_orientations[index]
 
 
