@@ -37,7 +37,7 @@ def init_fsc_task(pixel_distance, filename):
 @task(leaf=True,privileges=[RO("rho_")])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/fsc.py", is_prefix=True)
-def compute_fsc_task(phased, fsc):
+def compute_fsc_task(phased, fsc, conf_id, idx):
     logger = utils.Logger(True,settings)
     if settings.verbosity > 0:
         timer = utils.Timer()
@@ -72,7 +72,7 @@ def compute_fsc_task(phased, fsc):
     fsc_dict["res"] = resolution
     fsc_dict["final"] = final_cc
     logger.log(
-        f"FSC: Check convergence resolution: {resolution:.2f} with cc: {final_cc:.3f} delta_cc:{delta_cc:.5f}.", level=1
+        f"FSC[conf_idx:{conf_id}, fsc_idx:{idx}]: Check convergence resolution: {resolution:.2f} with cc: {final_cc:.3f} delta_cc:{delta_cc:.5f}.", level=1
     )
     # no change in vals
     if math.isclose(final_cc, min_cc) and math.isclose(delta_cc, min_change_cc):
@@ -93,7 +93,7 @@ def compute_fsc_conf(phased_conf, fsc):
         # each task returns a future
         # create an array of futures
         if check_convergence_task(fsc[i]).get() is False:
-            fsc_dict_val = compute_fsc_task(phased_conf[i], fsc[i], point=0)
+            fsc_dict_val = compute_fsc_task(phased_conf[i], fsc[i], i, i, point=0)
         else:
             fsc_dict_val = fsc[i]
         fsc_dict_array.append(fsc_dict_val)
@@ -195,7 +195,7 @@ def check_convergence_all_conf(fsc_conv):
 def compute_fsc_single_conf(phased_conf, fsc, conf_id):
     fsc_dict_array = []
     for i in range(settings.N_conformations):
-        fsc_dict_val = compute_fsc_task(phased_conf, fsc[i], point=0)
+        fsc_dict_val = compute_fsc_task(phased_conf, fsc[i], conf_id, i, point=0)
         fsc_dict_array.append(fsc_dict_val.get())
     return fsc_dict_array
 
