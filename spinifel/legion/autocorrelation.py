@@ -211,7 +211,7 @@ def solve_simple(
     ):
     mg = gprep.get_gprep(group_idx)["mg"]
     logger = gprep.get_gprep(group_idx)["logger"]
-
+    logger.log(f"started solve:[n_conf,conf_index]: [{n_conf},{group_idx}],  conf_shape: {conf.conf_id.shape}, conf_dtype: {conf.conf_id.dtype}", level=2)
     N_images_per_rank = slices.ispace.domain.extent[0]
     conf_local = conf.conf_id
     conf_local = conf_local[group_idx*N_images_per_rank:group_idx*N_images_per_rank+N_images_per_rank]
