@@ -45,6 +45,7 @@ class NUFFT:
         pixel_position_reciprocal,
         pixel_distance_reciprocal,
         images_per_rank=None,
+        orientations=None,
     ) -> None:
         self.N_orientations = settings.N_orientations
 
@@ -59,7 +60,10 @@ class NUFFT:
             self.N_images = images_per_rank
 
         self.pixel_position_reciprocal = pixel_position_reciprocal
-        self.ref_orientations = skp.get_uniform_quat(self.N_orientations, True)
+        if orientations is None:
+            self.ref_orientations = skp.get_uniform_quat(self.N_orientations, True)
+        else:
+            self.ref_orientations = orientations
 
         # Save reference rotation matrix so that we dont re-create it every
         # time

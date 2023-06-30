@@ -272,7 +272,7 @@ def main_spinifel(
             phased.append(phased_regions_dict[i]["phased"])
 
             # setup new regions based on n_images_per_rank
-            orientations, orientations_p = get_random_orientations(n_images_per_rank)
+            orientations, orientations_p = get_random_orientations(n_images_per_rank, True)
             orientations_a.append(orientations)
             orientations_a_p.append(orientations_p)
             solve_ac_dict[i]["orientations"] = orientations
