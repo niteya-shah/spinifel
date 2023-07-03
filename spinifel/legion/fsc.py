@@ -2,7 +2,7 @@ import numpy as np
 import PyNVTX as nvtx
 import pygion
 import math
-from pygion import task, RO, Tunable
+from pygion import task, RO, WD, Tunable, Region, execution_fence
 from spinifel import settings
 from spinifel import utils
 from . import utils as lgutils
@@ -13,10 +13,20 @@ if settings.use_cupy:
     import cupy
 
 @nvtx.annotate("legion/fsc.py", is_prefix=True)
+def create_fsc_regions_multiple():
+    fsc_regions = []
+    for i in range(settings.N_conformations):
+        M = settings.M
+        reference = Region((M,M,M), {"ref":pygion.float64},)
+        fsc_regions.append(reference)
+    return fsc_regions
+
+
+@nvtx.annotate("legion/fsc.py", is_prefix=True)
 def init_fsc(pixel_distance, filename):
     fsc = {}
     dist_recip_max = np.max(pixel_distance.reciprocal)
-    fsc["reference"] = compute_reference(filename, settings.M, dist_recip_max)
+    reference = compute_reference(filename, settings.M, dist_recip_max)
     fsc["final"] = 0.0
     fsc["delta"] = 1.0
     fsc["res"] = 0.0
@@ -24,20 +34,20 @@ def init_fsc(pixel_distance, filename):
     fsc["min_change_cc"] = settings.fsc_min_change_cc
     fsc["dist_recip_max"] = dist_recip_max
     fsc["converge"] = False
-    return fsc
+    return fsc, reference
 
-@task(leaf=True, privileges=[RO])
+@task(leaf=True, privileges=[RO, WD])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/fsc.py", is_prefix=True)
-def init_fsc_task(pixel_distance, filename):
-    fsc = init_fsc(pixel_distance,filename)
+def init_fsc_task(pixel_distance, reference, filename):
+    fsc, ref = init_fsc(pixel_distance, filename)
+    reference.ref[:] = ref
     return fsc
 
-
-@task(leaf=True,privileges=[RO("rho_")])
+@task(leaf=True,privileges=[RO("rho_"), RO])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/fsc.py", is_prefix=True)
-def compute_fsc_task(phased, fsc):
+def compute_fsc_task(phased, reference, fsc):
     logger = utils.Logger(True,settings)
     if settings.verbosity > 0:
         timer = utils.Timer()
@@ -47,7 +57,8 @@ def compute_fsc_task(phased, fsc):
     rho = np.fft.ifftshift(phased.rho_)
     ali_volume, ali_reference, final_cc = align_volumes(
         rho,
-        fsc_dict["reference"],
+        #fsc_dict["reference"],
+        reference.ref,
         zoom=settings.fsc_zoom,
         sigma=settings.fsc_sigma,
         n_iterations=settings.fsc_niter,
@@ -86,14 +97,13 @@ def compute_fsc_task(phased, fsc):
     return fsc_dict
 
 @nvtx.annotate("legion/fsc.py", is_prefix=True)
-def compute_fsc_conf(phased_conf, fsc):
+def compute_fsc_conf(phased_conf, reference, fsc):
     fsc_dict_array = []
-    total_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
     for i in range(settings.N_conformations):
         # each task returns a future
         # create an array of futures
         if check_convergence_task(fsc[i]).get() is False:
-            fsc_dict_val = compute_fsc_task(phased_conf[i], fsc[i], point=0)
+            fsc_dict_val = compute_fsc_task(phased_conf[i], reference[i], fsc[i], point=0)
         else:
             fsc_dict_val = fsc[i]
         fsc_dict_array.append(fsc_dict_val)
@@ -129,12 +139,15 @@ def check_convergence_conf(fsc):
 @nvtx.annotate("legion/fsc.py", is_prefix=True)
 def initialize_fsc(pixel_distance):
     fsc = []
+    reference = create_fsc_regions_multiple()
+    # make sure phased regions are valid
+    execution_fence(block=True)
     logger = utils.Logger(True,settings)
     if settings.N_conformations == 1:
         if settings.pdb_path.is_file() and settings.chk_convergence:
             filename = settings.pdb_path
             logger.log(f"fsc filename: {filename}", level=2)
-            fsc_future_entry = init_fsc_task(pixel_distance,filename, point=0)
+            fsc_future_entry = init_fsc_task(pixel_distance,reference[0],filename, point=0)
             fsc.append(fsc_future_entry)
     else: # multiple conformations
         if settings.pdb_path.is_dir() and settings.chk_convergence:
@@ -142,7 +155,7 @@ def initialize_fsc(pixel_distance):
             for filename in settings.pdb_path.iterdir():
                 logger.log(f"fsc filename: {filename}", level=2)
                 # an array of futures
-                fsc_future_entry = init_fsc_task(pixel_distance,filename, point=0)
+                fsc_future_entry = init_fsc_task(pixel_distance,reference[num_entries],filename, point=0)
                 fsc.append(fsc_future_entry)
                 num_entries = num_entries+ 1
             assert num_entries == settings.N_conformations
@@ -150,7 +163,7 @@ def initialize_fsc(pixel_distance):
         if settings.pdb_path.is_file() and settings.chk_convergence:
             filename = settings.pdb_path
             for i in range(settings.N_conformations):
-                fsc_future_entry = init_fsc_task(pixel_distance,filename, point=0)
+                fsc_future_entry = init_fsc_task(pixel_distance,reference[i],filename, point=0)
                 fsc.append(fsc_future_entry)
 
     # return a 2 dimension array of fscs
@@ -163,7 +176,7 @@ def initialize_fsc(pixel_distance):
     if len(fsc) > 0:
         for i in range(settings.N_conformations):
             fsc_all.append(fsc_all_vals.copy())
-    return fsc_all
+    return fsc_all, reference
 
 @nvtx.annotate("legion/fsc.py", is_prefix=True)
 def check_convergence_single_conf(fsc):
@@ -192,20 +205,20 @@ def check_convergence_all_conf(fsc_conv):
     return converge
 
 @nvtx.annotate("legion/fsc.py", is_prefix=True)
-def compute_fsc_single_conf(phased_conf, fsc, conf_id):
+def compute_fsc_single_conf(phased_conf, reference, fsc, conf_id):
     fsc_dict_array = []
     for i in range(settings.N_conformations):
-        fsc_dict_val = compute_fsc_task(phased_conf, fsc[i], point=0)
+        fsc_dict_val = compute_fsc_task(phased_conf, reference, fsc[i], point=0)
         fsc_dict_array.append(fsc_dict_val.get())
     return fsc_dict_array
 
 # check all conformations
 @nvtx.annotate("legion/fsc.py", is_prefix=True)
-def compute_fsc_conf_all(phased_conf, fsc):
+def compute_fsc_conf_all(phased_conf, reference, fsc):
     fsc_dict_array = []
     for i in range(settings.N_conformations):
         if check_convergence_single_conf(fsc[i]) is False:
-            fsc_dict_val = compute_fsc_single_conf(phased_conf[i], fsc[i], i)
+            fsc_dict_val = compute_fsc_single_conf(phased_conf[i], reference[i], fsc[i], i)
         else:
             fsc_dict_val = fsc[i]
         fsc_dict_array.append(fsc_dict_val)

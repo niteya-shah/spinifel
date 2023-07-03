@@ -244,6 +244,7 @@ def solve_simple(
         summary.v2[0] = 1000.0
         summary.image_set[0] = False
         result.ac[:] = 1.0
+        logger.log(f"default summary solve:[n_conf,conf_index]: [{n_conf},{group_idx}], rlambda:{rlambda}, v1:1000, v2:1000, rank:{rank}, image_set:{summary.image_set[0]}", level=2)
     else:
         ret,W,d = mg.solve_ac_common(slices.data, orientations.quaternions, ac.estimate,
                                  ac.support, conf_local, rlambda, flambda)
@@ -269,8 +270,7 @@ def solve_simple(
         summary.v1[0] = v1
         summary.v2[0] = v2
         summary.image_set[0] = True
-
-    logger.log(f"summary solve:[n_conf,conf_index]: [{n_conf},{group_idx}], rlambda:{rlambda}, v1:{v1}, v2:{v2}, rank:{rank}, image_set:{summary.image_set[0]}", level=2)
+        logger.log(f"summary solve:[n_conf,conf_index]: [{n_conf},{group_idx}], rlambda:{rlambda}, v1:{v1}, v2:{v2}, rank:{rank}, image_set:{summary.image_set[0]}", level=2)
 
 
 @task(leaf=True, privileges=[None, RO])

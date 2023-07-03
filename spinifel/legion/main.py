@@ -58,7 +58,8 @@ def load_psana():
     (pixel_position, pixel_distance, pixel_index, slices, slices_p) = get_data(ds)
     return pixel_position, pixel_distance, pixel_index, slices, slices_p
 
-@task(inner=True, privileges=[RO, RO, RO, RO])
+#@task(inner=True, privileges=[RO, RO, RO, RO])
+@task(privileges=[RO, RO, RO, RO])
 @lgutils.gpu_task_wrapper
 def main_task_conf(pixel_position, pixel_distance, pixel_index, slices, slices_p):
     logger = utils.Logger(True, settings)
@@ -104,7 +105,7 @@ def main_task_conf(pixel_position, pixel_distance, pixel_index, slices, slices_p
     if settings.N_conformations > 1:
         prep_objects_select_multiple(slices_p, ready_objs_p, conf_p, total_procs)
 
-    fsc = initialize_fsc(pixel_distance)
+    fsc, fsc_regions = initialize_fsc(pixel_distance)
 
     solved, solve_ac_dict = solve_ac_conf(
         None, 0, pixel_position, pixel_distance, slices_p, ready_objs_p, conf_p, fsc)
@@ -151,7 +152,7 @@ def main_task_conf(pixel_position, pixel_distance, pixel_index, slices, slices_p
         # check for convergence
         if settings.chk_convergence and len(fsc) > 0:
             logger.log(f"checking convergence: FSC calculation")
-            fsc = compute_fsc_conf_all(phased, fsc)
+            fsc = compute_fsc_conf_all(phased, fsc_regions, fsc)
             converge = check_convergence_all_conf(fsc)
             if converge:
                 break

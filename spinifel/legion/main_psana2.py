@@ -180,6 +180,7 @@ def main_spinifel(
     pixel_index,
     slices,
     slices_p,
+    fsc_regions,
     n_images_per_rank,
     solve_ac_dict,
     start_gen,
@@ -323,7 +324,7 @@ def main_spinifel(
         phased_output_conf(phased, generation)
 
         if settings.chk_convergence and len(fsc) > 0:
-            fsc = compute_fsc_conf_all(phased, fsc)
+            fsc = compute_fsc_conf_all(phased, fsc_regions, fsc)
             converge = check_convergence_all_conf(fsc)
             if converge:
                 break
@@ -382,7 +383,7 @@ def main():
     )
 
     # initialize fsc per conformation
-    fsc = initialize_fsc(pixel_distance)
+    fsc, fsc_regions = initialize_fsc(pixel_distance)
 
     N_generations = settings.N_generations
     N_gens_stream = settings.N_gens_stream
@@ -411,6 +412,7 @@ def main():
             pixel_index,
             slices,
             slices_p,
+            fsc_regions,
             cur_batch_size,
             solve_ac_dict,
             start_gen,
