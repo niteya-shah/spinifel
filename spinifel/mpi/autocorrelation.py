@@ -15,6 +15,8 @@ from spinifel.sequential.autocorrelation import Merge
 
 
 from spinifel import SpinifelSettings, Logger
+import time
+# import omnitrace
 
 settings = SpinifelSettings()
 logger = Logger(True, settings)
@@ -73,11 +75,17 @@ class MergeMPI(Merge):
         self.ref_rank = -1
         self.mult = np.pi / (self.reciprocal_extent)
 
-        lu = np.linspace(-np.pi, np.pi, self.M)
-        Hu_, Ku_, Lu_ = np.meshgrid(lu, lu, lu, indexing="ij")
+        # lu = np.linspace(-np.pi, np.pi, self.M)
+        # Use integers instead of reals in order to avoid roundoff peculiarities.
+        Mhalf = (self.M-1)//2
+        iu = range(-Mhalf, Mhalf+1)
+        # Hu_, Ku_, Lu_ = np.meshgrid(lu, lu, lu, indexing="ij")
+        Hi_, Ki_, Li_ = np.meshgrid(iu, iu, iu, indexing="ij")
 
-        Qu_ = np.around(np.sqrt(Hu_**2 + Ku_**2 + Lu_**2), 4)
-        F_antisupport = Qu_ > np.pi
+        # Qu_ = np.around(np.sqrt(Hu_**2 + Ku_**2 + Lu_**2), 4)
+        Qi2_ = Hi_**2 + Ki_**2 + Li_**2
+        # F_antisupport = Qu_ > np.pi
+        F_antisupport = (Qi2_ > Mhalf**2)
 
         # Generate an antisupport in Fourier space, which has zeros in the central
         # sphere and ones in the high-resolution corners.
@@ -90,16 +98,29 @@ class MergeMPI(Merge):
 
     @nvtx.annotate("mpi/autocorrelation.py::modified", is_prefix=True)
     def setup_linops(self, H, K, L, ac_support, x0):
+        setup_linops_start_time = time.time()
         H_ = H.reshape(-1) * self.mult
         K_ = K.reshape(-1) * self.mult
         L_ = L.reshape(-1) * self.mult
+        end_time = time.time()
+        reshape_time = end_time - setup_linops_start_time
+        print(f"- In setup_linops reshape time {reshape_time} at {time.time() - setup_linops_start_time}")
 
+        start_time = time.time()
         ugrid_conv = self.nufft.adjoint(
             self.nuvect, H_, K_, L_, 1, self.use_reciprocal_symmetry, self.M_ups
         )
+        end_time = time.time()
+        ugrid_conv_time = end_time - start_time
+        print(f"- In setup_linops adjoint ugrid_conv time {ugrid_conv_time} at {time.time() - setup_linops_start_time}")
 
+        start_time = time.time()
         F_ugrid_conv_ = xp.fft.fftn(xp.fft.ifftshift(ugrid_conv))
+        end_time = time.time()
+        fftn_time = end_time - start_time
+        print(f"- In setup_linops adjoint fftn time {fftn_time} at {time.time() - setup_linops_start_time}")
 
+        start_time = time.time()
         def W_matvec(uvect):
             """Define W part of the W @ x = d problem."""
             uvect_ADA = self.core_problem_convolution(uvect, F_ugrid_conv_, ac_support)
@@ -111,23 +132,47 @@ class MergeMPI(Merge):
             )
 
             return uvect
+        end_time = time.time()
+        def_time = end_time - start_time
+        print(f"- In setup_linops def W_matvec time {def_time} at {time.time() - setup_linops_start_time}")
 
         # double precision is used for convergence with Conjugated Gradient
+        start_time = time.time()
         W = LinearOperator(dtype=c_type, shape=(self.Mtot, self.Mtot), matvec=W_matvec)
+        end_time = time.time()
+        W_time = end_time - start_time
+        print(f"- In setup_linops LinearOperator W time {W_time} at {time.time() - setup_linops_start_time}")
 
+        start_time = time.time()
         uvect_ADb = self.nufft.adjoint(
             self.nuvect_Db, H_, K_, L_, ac_support, self.use_reciprocal_symmetry, self.M
         ).reshape(-1)
-        if xp.sum(xp.isnan(uvect_ADb)) > 0:
+        end_time = time.time()
+        uvect_ADb_time = end_time - start_time
+        print(f"- In setup_linops adjoint uvect_ADb time {uvect_ADb_time} at {time.time() - setup_linops_start_time}")
+        start_time = time.time()
+        if xp.any(xp.isnan(uvect_ADb)) > 0:
             logger.log(
                 "Warning: nans in the adjoint calculation; intensities may be too large",
                 level=1,
             )
+        else:
+            print(f"- In setup_linops no nans in adjoint")
+        end_time = time.time()
+        check_nan_time = end_time - start_time
+        print(f"- In setup_linops check nan shape {uvect_ADb.shape} time {check_nan_time} at {time.time() - setup_linops_start_time}")
+        start_time = time.time()
         d = self.alambda * uvect_ADb + self.rlambda * x0
+        setup_linops_end_time = time.time()
+        d_time = setup_linops_end_time - start_time
+        print(f"- In setup_linops final result time {d_time} at {time.time() - setup_linops_start_time}")
+        setup_linops_time = setup_linops_end_time - setup_linops_start_time
+        print(f"- In setup_linops TOTAL time {setup_linops_time}")
 
         return W, d
 
     @nvtx.annotate("mpi/autocorrelation.py::modified", is_prefix=True)
+    # @omnitrace.profile()
     def solve_ac(self, generation, orientations=None, ac_estimate=None):
         # ac_estimate is modified in place and hence its value changes for each
         # run
@@ -157,8 +202,16 @@ class MergeMPI(Merge):
         ac_support = xp.array(ac_support)
         x0 = ac_estimate.reshape(-1)
 
+        start_time = time.time()
         W, d = self.setup_linops(H, K, L, ac_support, x0)
+        end_time = time.time()
+        setup_linops_time = end_time - start_time
+        print(f"TIME FOR mpi solve_ac:  setup_linops {setup_linops_time}")
+        start_time = time.time()
         ret, info = cg(W, d, x0=x0, maxiter=self.maxiter, callback=self.callback)
+        end_time = time.time()
+        cg_time = end_time - start_time
+        print(f"TIME FOR mpi solve_ac:  cg {cg_time}")
 
         if info != 0:
             logger.log(f"WARNING: CG did not converge at rlambda = {self.rlambda}", level=1)

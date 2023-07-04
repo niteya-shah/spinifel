@@ -8,7 +8,9 @@ from mpi4py import MPI
 from spinifel import settings, contexts, utils
 from spinifel.sequential.phasing import phase as sequential_phase
 
+# import omnitrace
 
+# @omnitrace.profile()
 def phase(generation, ac, support_=None, rho_=None):
     """Phase retrieval by Rank0 and broadcast to all ranks."""
 

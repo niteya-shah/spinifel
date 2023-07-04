@@ -6,6 +6,7 @@ from spinifel import SpinifelSettings, SpinifelContexts, Profiler
 
 import skopi as skp
 from spinifel.extern import cufinufft_ext
+import time
 
 settings = SpinifelSettings()
 context = SpinifelContexts()
@@ -160,16 +161,15 @@ class NUFFT:
 
     @nvtx.annotate("extern/util.py", is_prefix=True)
     def update_fields(self, n_images_per_rank):
+        print(f"In update_fields DEBUG in nufft_ext")
         if self.N_images == n_images_per_rank:  # nothing to update
             return
-        n_images_old = self.N_images
         self.N_images = n_images_per_rank
         if settings.use_cufinufft:
-            # force deletion of H_a, K_a, L_a if they haven't already been deleted
-            if not n_images_old == 0:
-                self.H_a.gpudata.free()
-                self.K_a.gpudata.free()
-                self.L_a.gpudata.free()
+            # force deletion of H_a, K_a, L_a
+            self.H_a.gpudata.free()
+            self.K_a.gpudata.free()
+            self.L_a.gpudata.free()
             # Store reused datastructures in memory so that we don't
             # constantly deallocate and realloate them
             self.H_a = gpuarray.GPUArray(
@@ -265,6 +265,8 @@ class NUFFT:
 
         @nvtx.annotate("NUFFT/cufinufft/forward", is_prefix=True)
         def forward(self, ugrid, st, en, support, use_recip_sym, N):
+            print(f"- - In forward DEBUG in nufft_ext for cufinufft1.2")
+            forward_start_time = time.time()
             # Use reshapes instead of flattens because flatten creates copies
             H_ = self.HKL_mat[0, st:en, :].reshape(-1)
             K_ = self.HKL_mat[1, st:en, :].reshape(-1)
@@ -295,6 +297,7 @@ class NUFFT:
 
             nuvect = gpuarray.GPUArray(shape=(N,), dtype=c_type)
             if not hasattr(self, "plan_f"):
+                start_time = time.time()
                 self.plan_f = cufinufft(
                     2,
                     ugrid.shape,
@@ -305,27 +308,68 @@ class NUFFT:
                     gpu_method=1,
                     gpu_device_id=dev_id,
                 )
+                end_time = time.time()
+                diff_time = end_time - start_time
+                print(f"- - In forward plan_f define time {diff_time}")
 
+            start_time = time.time()
             self.plan_f.set_pts(self.H_f, self.K_f, self.L_f)
+            end_time = time.time()
+            diff_time = end_time - start_time
+            print(f"- - In forward plan_f.set_pts time {diff_time}")
+            start_time = time.time()
             self.plan_f.execute(nuvect, ugrid)
-            return self.gpuarray_to_cupy(nuvect)
+            end_time = time.time()
+            diff_time = end_time - start_time
+            print(f"- - In forward plan_f.execute time {diff_time}")
+            nuvect_cupy = self.gpuarray_to_cupy(nuvect)
+            forward_end_time = time.time()
+            forward_time = forward_end_time - forward_start_time
+            print(f"- - In forward TOTAL forward time {forward_time}")
+            return nuvect_cupy
 
         @nvtx.annotate("NUFFT/cufinufft/adjoint", is_prefix=True)
         def adjoint(self, nuvect, H_, K_, L_, support, use_reciprocal_symmetry, M):
+            print(f"- - In adjoint DEBUG in nufft_ext cufinufft1.2")
+            adjoint_start_time = time.time()
             assert H_.shape == K_.shape == L_.shape
+            end_time = time.time()
+            diff_time = end_time - adjoint_start_time
+            print(f"- - In adjoint assert time {diff_time} at {time.time()-adjoint_start_time}")
+            start_time = time.time()
             dev_id = cp.cuda.device.Device().id
+            end_time = time.time()
+            diff_time = end_time - start_time
+            print(f"- - In adjoint Device time {diff_time} at {time.time()-adjoint_start_time}")
 
+            start_time = time.time()
             H_, K_, L_ = self.transpose(H_, K_, L_, dtype=f_type)
+            end_time = time.time()
+            diff_time = end_time - start_time
+            print(f"- - In adjoint transpose time {diff_time} at {time.time()-adjoint_start_time}")
             shape = (M, M, M)
             # TODO convert to GPUarray
+            start_time = time.time()
             nuvect_ga = self.gpuarray_from_cupy(nuvect)
+            end_time = time.time()
+            diff_time = end_time - start_time
+            print(f"- - In adjoint gpuarray_from_cupy time {diff_time} at {time.time()-adjoint_start_time}")
+            start_time = time.time()
             ugrid = gpuarray.GPUArray(shape=shape, dtype=c_type, order="F")
+            end_time = time.time()
+            diff_time = end_time - start_time
+            print(f"- - In adjoint GPUArray time {diff_time} at {time.time()-adjoint_start_time}")
+            start_time = time.time()
             self.H_a.set(H_)
             self.K_a.set(K_)
             self.L_a.set(L_)
+            end_time = time.time()
+            diff_time = end_time - start_time
+            print(f"- - In adjoint set H and K and L shapes {self.H_a.shape} {self.K_a.shape} {self.L_a.shape} time {diff_time} at {time.time()-adjoint_start_time}")
             if not hasattr(self, "plan_a"):
                 self.plan_a = {}
             if shape not in self.plan_a:
+                start_time = time.time()
                 self.plan_a[shape] = cufinufft(
                     1,
                     shape,
@@ -336,18 +380,49 @@ class NUFFT:
                     gpu_method=1,
                     gpu_device_id=dev_id,
                 )
+                end_time = time.time()
+                diff_time = end_time - start_time
+                print(f"- - In adjoint plan_a define time {diff_time} at {time.time()-adjoint_start_time}")
+            start_time = time.time()
             self.plan_a[shape].set_pts(self.H_a, self.K_a, self.L_a)
+            end_time = time.time()
+            diff_time = end_time - start_time
+            print(f"- - In adjoint plan_a.set_pts time {diff_time} at {time.time()-adjoint_start_time}")
+            start_time = time.time()
             self.plan_a[shape].execute(nuvect_ga, ugrid)
+            end_time = time.time()
+            diff_time = end_time - start_time
+            print(f"- - In adjoint plan_a.execute time {diff_time} at {time.time()-adjoint_start_time}")
+            # start_time = time.time()
+            # check_nan = cp.sum(cp.isnan(ugrid)) > 0
+            # end_time = time.time()
+            # check_nan_time = end_time - start_time
+            # print(f"- plan_a check nan {check_nan} time {check_nan_time}")
+            
+            start_time = time.time()
             ugrid_gpu = self.gpuarray_to_cupy(ugrid)
             ugrid_gpu *= support
             if use_reciprocal_symmetry:
                 ugrid_gpu = ugrid_gpu.real
             ugrid_gpu /= M**3
+            end_time = time.time()
+            diff_time = end_time - start_time
+            print(f"- - In adjoint final GPU array time {diff_time} at {time.time()-adjoint_start_time}")
+###            start_time = time.time()
+###            check_nan = cp.any(cp.isnan(ugrid_gpu)) > 0
+###            print(f"- - In adjoint plan_a check nan {check_nan}")
+###            end_time = time.time()
+###            check_nan_time = end_time - start_time
+###            print(f"- - In adjoint plan_a check nan shape {ugrid_gpu.shape} time {check_nan_time} at {time.time()-adjoint_start_time}")
+            adjoint_end_time = time.time()
+            adjoint_time = adjoint_end_time - adjoint_start_time
+            print(f"- - In adjoint TOTAL adjoint time {adjoint_time} at {time.time()-adjoint_start_time}")
             return ugrid_gpu
 
     elif mode == "cufinufft1.1":
 
         def forward(self, ugrid, st, en, support, use_recip_sym, N):
+            print(f"- - In forward DEBUG in nufft_ext for cufinufft1.1")
             H_ = self.HKL_mat[0, st:en, :].reshape(-1)
             K_ = self.HKL_mat[1, st:en, :].reshape(-1)
             L_ = self.HKL_mat[2, st:en, :].reshape(-1)
@@ -392,6 +467,7 @@ class NUFFT:
         @nvtx.annotate("NUFFT/cufinufft/adjoint", is_prefix=True)
         def adjoint(self, nuvect, H_, K_, L_, support, use_reciprocal_symmetry, M):
 
+            print(f"- - In adjoint DEBUG in nufft_ext cufinufft1.1")
             dim = 3
             assert H_.shape == K_.shape == L_.shape
             dev_id = cp.cuda.device.Device().id
@@ -433,6 +509,7 @@ class NUFFT:
             Version 1 of fiNUFFT 3D type 2
             """
 
+            print(f"- - In forward DEBUG in nufft_ext for finufft2.1.0")
             H_ = self.HKL_mat[0, st:en, :].reshape(-1)
             K_ = self.HKL_mat[1, st:en, :].reshape(-1)
             L_ = self.HKL_mat[2, st:en, :].reshape(-1)
@@ -460,6 +537,7 @@ class NUFFT:
             Version 1 of fiNUFFT 3D type 1
             """
 
+            print(f"- - In adjoint DEBUG in nufft_ext finufft2.1.0")
             # Ensure that H, K, and L have the same shape
             assert H_.shape == K_.shape == L_.shape
 
@@ -501,6 +579,7 @@ class NUFFT:
             """
             Version 1 of fiNUFFT 3D type 2
             """
+            print(f"- - In forward DEBUG in nufft_ext for finufft1.1.2")
             H_ = self.HKL_mat[0, st:en, :].reshape(-1)
             K_ = self.HKL_mat[1, st:en, :].reshape(-1)
             L_ = self.HKL_mat[2, st:en, :].reshape(-1)
@@ -523,6 +602,7 @@ class NUFFT:
             Version 1 of fiNUFFT 3D type 1
             """
 
+            print(f"- - In adjoint DEBUG in nufft_ext finufft1.1.2")
             # Ensure that H, K, and L have the same shape
             assert H_.shape == K_.shape == L_.shape
 

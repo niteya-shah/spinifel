@@ -4,9 +4,8 @@
 
 """Spinifel -- SPI FEL analysis tool"""
 
-
 import logging
-
+# import omnitrace
 
 from .settings import SpinifelSettings
 

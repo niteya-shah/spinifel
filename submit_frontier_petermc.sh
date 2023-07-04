@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH -A CSC304
-#SBATCH -t 0:29:59
+#SBATCH -t 0:19:59
 #SBATCH -N 1
 #SBATCH -c 32
 #SBATCH -J RunSpinifel

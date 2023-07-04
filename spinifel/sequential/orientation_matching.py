@@ -26,12 +26,11 @@ if settings.use_cupy:
     import cupy as xp
 
     from cupy.cublas import gemm
-    from cupyx.scipy.special import softmax
 else:
     from scipy.linalg import norm
     from scipy.sparse.linalg import LinearOperator, cg
     from scipy.linalg.blas import dgemm as gemm
-    from scipy.special import softmax
+
     xp = np
 
 if settings.use_cufinufft:
@@ -83,25 +82,10 @@ class SNM:
         self.slices_ = xp.array(
             slices_.reshape((self.N_slices, self.N_pixels)), dtype=f_type
         )
-        
-        self.slices_std = self.slices_.std()
-        self.clip = settings.max_intensity_clip
-        self.slices_ = self.intensity_clip(self.slices_, self.clip)
-        
         self.slices_2 = xp.square(self.slices_).sum(axis=1)
-        
+        self.slices_std = self.slices_.std()
         self.nufft = nufft
 
-    @nvtx.annotate("sequential/orientation_matching.py::modified", is_prefix=True)
-    def intensity_clip(self, data, thresh):
-        """
-        clip pixel intensities above threshold, i.e. pix_val = min(pix_val, thresh)
-        """
-        if thresh > 0:
-            ind = xp.where(data >= thresh)
-            data[ind] = thresh
-        return data
-        
     @nvtx.annotate("sequential/orientation_matching.py::modified", is_prefix=True)
     def euclidean_gemm(self, x, y, out):
         """
@@ -144,24 +128,8 @@ class SNM:
     # this is a place holder for conformation result based on
     # min distance values from each diffraction pattern
     # it needs to be updated
-    def conformation_result(self, min_dist, mode):
-        logger.log(f"conformation_result:mode = {mode}", level=2)
-        if mode == "max_likelihood":
-            min_d = xp.array(min_dist)
-            min_v = xp.min(min_d,axis=0).reshape(1,-1)
-            result = xp.where(min_d == min_v, 1.0, 0.0)
-            if not isinstance(result, np.ndarray):
-                result = result.get()
-        elif mode == "softmax":
-            result = softmax(xp.array(-min_dist), axis=0)
-            if not isinstance(result, np.ndarray):
-                result = result.get()
-        # testing mode
-        else:
-            assert mode == "test_debug"
-            result = np.ones(min_dist.shape)
-        logger.log(f"conformation_result: result={result.shape}", level=2)
-        return result
+    def conformation_result(self, min_dist):
+        return min_dist/min_dist.sum(axis=0)*100
 
     @nvtx.annotate("sequential/orientation_matching.py::modified", is_prefix=True)
     def slicing_and_match(self, ac):
@@ -181,6 +149,7 @@ class SNM:
         :return ref_orientations: array of quaternions matched to slices_
         """
 
+        print(f"DEBUG in slicing_and_match")
         st_init = time.monotonic()
         if not self.N_slices:
             return xp.zeros((0, 4))
@@ -206,6 +175,7 @@ class SNM:
             st_m = i * self.N_batch_size
             en_m = st_m + self.N_batch_size
 
+            print(f"DEBUG in slicing_and_match i={i}, calling forward")
             forward_result = self.nufft.forward(
                 ugrid, st, en, 1, self.reciprocal_extent, N_batch
             )
@@ -216,17 +186,12 @@ class SNM:
                 data_images = xp.array(data_images)
             if not settings.use_cupy and settings.use_cufinufft:
                 data_images = data_images.get()
-                
             data_images *= self.slices_std / data_images.std()
-            
-            data_images = self.intensity_clip(data_images, self.clip)
-            
             match_middle = time.monotonic()
             match_oth_time += match_middle - match_start
             self.euclidean_dist(
                 data_images, self.slices_, self.slices_2, self.dist, st_m, en_m
             )
-            
             match_time += time.monotonic() - match_middle
 
         match_start = time.monotonic()

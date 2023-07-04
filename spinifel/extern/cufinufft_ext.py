@@ -107,6 +107,7 @@ def nufft_3d_t1_cufinufft_v1(H_, K_, L_, nuvect, sign, eps, nx, ny, nz):
     complex_dtype = np.complex128
     dtype = np.float64
 
+    print(f"DEBUG in cufinufft_ext nufft_3d_t1_cufinufft_v1 on shape {shape}, dtype {dtype}, complex_dtype {complex_dtype}")
     if settings.verbosity > 0:
         logger.log(f"Using v1 CUDA to solve the NUFFT 3D T1 on device {dev_id}", level=1)
 
@@ -163,6 +164,7 @@ def nufft_3d_t2_cufinufft_v1(H_, K_, L_, ugrid, sign, eps, N):
     complex_dtype = np.complex128
     dtype = np.float64
 
+    print(f"DEBUG in cufinufft_ext nufft_3d_t2_cufinufft_v1 on N={N}, dtype {dtype}, complex_dtype {complex_dtype}")
     logger.log(f"Using v1 CUDA to solve the NUFFT 3D T2 on device {dev_id}", level=1)
 
     gpu_free, gpu_total = context.cuda_mem_info()
@@ -231,6 +233,7 @@ def nufft_3d_t1_cufinufft_v2(H_, K_, L_, nuvect, sign, eps, nx, ny, nz):
     complex_dtype = np.complex128
     dtype = np.float64
 
+    print(f"DEBUG in cufinufft_ext nufft_3d_t1_cufinufft_v2 on shape {shape}, dtype {dtype}, complex_dtype {complex_dtype}")
     logger.log(f"Using v2 CUDA to solve the NUFFT 3D T1 on device {dev_id}", level=1)
 
     # Ensure that H_, K_, and L_ have the same shape
@@ -280,6 +283,7 @@ def nufft_3d_t2_cufinufft_v2(H_, K_, L_, ugrid, sign, eps, N):
     complex_dtype = np.complex128
     dtype = np.float64
 
+    print(f"DEBUG in cufinufft_ext nufft_3d_t2_cufinufft_v2 on N={N}, dtype {dtype}, complex_dtype {complex_dtype}")
     logger.log(f"Using v2 CUDA to solve the NUFFT 3D T2 on device {dev_id}", level=1)
 
     gpu_free, gpu_total = context.cuda_mem_info()

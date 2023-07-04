@@ -55,6 +55,7 @@ def forward(ugrid, H_, K_, L_, support, use_recip_sym, N):
     # Allocate space in memory and solve NUFFT
     # nuvect = np.zeros(H_.shape, dtype=np.complex64)
     # nfft.nufft3d2(H_, K_, L_, ugrid, out=nuvect, eps=1.0e-12, isign=-1)
+    print(f"calling nufft_3d_t2 in forward")
     nuvect = nufft_3d_t2(H_, K_, L_, ugrid, -1, 1e-12, N)
 
     return nuvect
@@ -78,6 +79,7 @@ def forward_spinifel(ugrid, H_, K_, L_, support, M, N, recip_extent, use_recip_s
         ).real
 
     # Solve NUFFT2-
+    print(f"calling nufft_3d_t2 in forward_spinifel")
     nuvect = nufft_3d_t2(H_, K_, L_, ugrid, -1, 1e-12, N)
 
     return nuvect / M**3
@@ -104,6 +106,7 @@ def adjoint(nuvect, H_, K_, L_, M, use_recip_sym=True, support=None):
     # Allocating space in memory and sovling NUFFT
     # ugrid = np.zeros((M,)*3, dtype=np.complex64)
     # nfft.nufft3d1(H_, K_, L_, nuvect, out=ugrid, eps=1.0e-15, isign=1)
+    print(f"calling nufft_3d_t1 in adjoint")
     ugrid = nufft_3d_t1(H_, K_, L_, nuvect, 1, 1e-12, M, M, M)
 
     # Apply support if given
@@ -126,6 +129,7 @@ def adjoint_spinifel(nuvect, H_, K_, L_, support, M, recip_extent, use_recip_sym
     assert H_.shape == K_.shape == L_.shape
 
     # Solve the NUFFT
+    print(f"calling nufft_3d_t1 in adjoint_spinifel")
     ugrid = nufft_3d_t1(H_, K_, L_, nuvect, 1, 1e-12, M, M, M)
 
     # Apply support
