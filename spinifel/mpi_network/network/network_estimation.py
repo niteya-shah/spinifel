@@ -47,6 +47,8 @@ def evaluate_slices_realvolume(model, slices, batch_size, align_vols=False, devi
     for batch in batches:
         batch = model.encoder_normalize_input_max * \
             batch / torch.amax(batch, dim=(-2,-1), keepdim=True)
+        batch[batch < 0] = 0
+        batch = torch.log(batch + 1.)
         with torch.no_grad():
             rho_tmp = model(batch.float())[0].detach().cpu()
         rho_pred_list.append(rho_tmp)

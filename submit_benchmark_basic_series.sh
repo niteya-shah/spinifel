@@ -30,7 +30,8 @@ for i in {1..20}
 do
     export out_dir="/pscratch/sd/z/zhantao/dgp3d_spi/benchmark/results/${pdb}/basic/run_${i}"
     mkdir -p $out_dir
-    srun -n1 -G1 python -m spinifel --default-settings=perlmutter_network_benchmark.toml --mode=mpi_network algorithm.max_intensity_clip=0.005 algorithm.typ_intensity_clip="rel"
+    srun -n1 -G1 python -m spinifel --default-settings=perlmutter_network_benchmark.toml --mode=mpi_network \ 
+        algorithm.max_intensity_clip=0.005 algorithm.typ_intensity_clip="rel"
     wait
 done
 
