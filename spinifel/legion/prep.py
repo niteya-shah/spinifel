@@ -204,7 +204,7 @@ def load_conformations_prior(conf_prior, num_conf, rank, N_images_per_rank):
     x = conf_prior.conf_id.reshape(num_conf, N_images_per_rank)
     for i in range(num_conf):
         x[i] = np.where(arg_index==i, 1.0, 0.0)
-        if settings.verbosity > 2:
+        if settings.verbosity > 1:
             total_sum = np.sum(x[i])
             logger.log(f"load_conformations_prior: rank:[{rank}], num_conf:conf_idx [{num_conf}][{i}] = {total_sum}",level=2)
     conf_prior.conf_id[:] = x.reshape(num_conf*N_images_per_rank)
