@@ -21,4 +21,4 @@
 	url = https://github.com/chuckie82/skopi.git
 [submodule "setup/PybindGPU"]
 	path = setup/PybindGPU
-	url = https://github.com/monarin/PybindGPU.git
+	url = https://github.com/JBlaschke/PybindGPU.git
