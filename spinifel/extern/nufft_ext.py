@@ -170,7 +170,7 @@ class NUFFT:
         self.N_images = n_images_per_rank
         if settings.use_cufinufft:
             # force deletion of H_a, K_a, L_a if they haven't already been deleted
-            if not n_images_old == 0:
+            if not n_images_old == 0 and not settings.use_pygpu:
                 self.H_a.gpudata.free()
                 self.K_a.gpudata.free()
                 self.L_a.gpudata.free()
