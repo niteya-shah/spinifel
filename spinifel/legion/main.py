@@ -58,8 +58,7 @@ def load_psana():
     (pixel_position, pixel_distance, pixel_index, slices, slices_p) = get_data(ds)
     return pixel_position, pixel_distance, pixel_index, slices, slices_p
 
-#@task(inner=True, privileges=[RO, RO, RO, RO])
-@task(privileges=[RO, RO, RO, RO])
+@task(inner=True, privileges=[RO, RO, RO, RO])
 @lgutils.gpu_task_wrapper
 def main_task_conf(pixel_position, pixel_distance, pixel_index, slices, slices_p):
     logger = utils.Logger(True, settings)
