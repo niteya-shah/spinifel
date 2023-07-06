@@ -49,7 +49,7 @@ else:
     f_type = xp.float64
     c_type = xp.complex128
 
-#TODO support streaming + multiple conformations
+#TODO support streaming
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def get_known_orientations(orientations, N_orientations, N_images_per_rank, rank, str_mode):
     if settings.fsc_fraction_known_orientations > 0:
@@ -69,7 +69,7 @@ def get_known_orientations(orientations, N_orientations, N_images_per_rank, rank
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
 def gen_random_orientations(orientations, N_images_per_rank, rank, str_mode):
-    if settings.fsc_fraction_known_orientations > 0 and settings.N_conformations == 1 and str_mode is None:
+    if settings.fsc_fraction_known_orientations > 0 and str_mode is None:
         N_orientations = orientations.ispace.domain.extent[0]
         get_known_orientations(orientations.quaternions, N_orientations, N_images_per_rank, rank, str_mode)
     else:

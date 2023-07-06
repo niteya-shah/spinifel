@@ -194,6 +194,25 @@ def get_slices(ds):
 
 @task(leaf=True, privileges=[WD])
 @lgutils.gpu_task_wrapper
+def load_conformations_prior(conf_prior, num_conf, rank, N_images_per_rank):
+    logger = utils.Logger(True, settings)
+    logger.log(f"{socket.gethostname()} loading conformations.",level=1)
+    i_start = rank * N_images_per_rank
+    i_end = i_start + N_images_per_rank
+    arg_index = np.empty((N_images_per_rank), dtype=np.int)
+    prep.load_conformations(arg_index, i_start, i_end)
+    x = conf_prior.conf_id.reshape(num_conf, N_images_per_rank)
+    for i in range(num_conf):
+        x[i] = np.where(arg_index==i, 1.0, 0.0)
+        if settings.verbosity > 2:
+            total_sum = np.sum(x[i])
+            logger.log(f"load_conformations_prior: rank:[{rank}], num_conf:conf_idx [{num_conf}][{i}] = {total_sum}",level=2)
+    conf_prior.conf_id[:] = x.reshape(num_conf*N_images_per_rank)
+    logger.log(f"{socket.gethostname()} loaded conformations.",level=1)
+
+
+@task(leaf=True, privileges=[WD])
+@lgutils.gpu_task_wrapper
 def load_orientations_prior(orientations_prior, rank, N_images_per_rank):
     logger = utils.Logger(True, settings)
     logger.log(f"{socket.gethostname()} loading orientations.",level=1)
