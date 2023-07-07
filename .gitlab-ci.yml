@@ -11,7 +11,7 @@ variables:
   # launcher for tests
   SPINIFEL_TEST_LAUNCHER: "jsrun -n1 -a1 -g1"
   SPINIFEL_TEST_LAUNCHER_MULTI: "jsrun -n2 -a1 -g1"
-  SPINIFEL_PSANA2_LAUNCHER: "jsrun -n4 -g1"
+  SPINIFEL_PSANA2_LAUNCHER: "jsrun -n3 -g1"
 
   # spinifel legion
   SPINIFEL_LEGION: "legion_python -ll:py 1  -ll:pyomp 2 -ll:csize 32768 legion_main.py  --default-settings=test_mpi.toml"
@@ -46,7 +46,7 @@ variables:
   # launcher for tests
   SPINIFEL_TEST_LAUNCHER: "srun -n1 --gpus-per-task 1"
   SPINIFEL_TEST_LAUNCHER_MULTI: "srun -n2 --gpus-per-task 1"
-  SPINIFEL_PSANA2_LAUNCHER: "srun -n4 --gpus-per-task 1"
+  SPINIFEL_PSANA2_LAUNCHER: "srun -n3 --gpus-per-task 1"
 
   # for mpi-xtc2 tests
   SPINIFEL_TEST_FLAG: 1
