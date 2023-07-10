@@ -124,13 +124,7 @@ pip install --no-cache-dir gdown
 if [[ $LEGION_USE_GASNET -eq 1 && $GASNET_ROOT == ${root_dir}/gasnet/release ]]
 then
     pushd gasnet
-    # workaround for build with GASNET_CONDUIT=ofi, force slingshot11 (frontier/crusher)
-    if [[ $LEGION_GASNET_CONDUIT == ofi ]]
-    then
-	LEGION_GASNET_SYSTEM=slingshot11 CONDUIT=$GASNET_CONDUIT make -j${THREADS:-8}
-    else
-	CONDUIT=$GASNET_CONDUIT make -j${THREADS:-8}
-    fi
+    make -j${THREADS:-8}
     popd
 fi
 

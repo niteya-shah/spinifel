@@ -54,44 +54,10 @@ EOF
 target=${SPINIFEL_TARGET:-${NERSC_HOST:-$(hostname --fqdn)}}
 
 # Setup environment.
-if [[ ${target} = "cori"* ]]; then
-    cat >> env.sh <<EOF
-if _module_loaded PrgEnv-intel; then
-    module swap PrgEnv-intel PrgEnv-gnu
-fi
-module load cray-fftw
-
-export CC=cc
-export CXX=CC
-export CRAYPE_LINK_TYPE=dynamic # allow dynamic linking
-
-# disable Cori-specific Python environment
-unset PYTHONSTARTUP
-
-export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
-export GASNET_CONDUIT=aries
-EOF
-elif [[ ${target} = "cgpu"* ]]; then
-    cat >> env.sh <<EOF
-module purge
-module load cgpu
-module load gcc
-module load cuda
-module load openmpi
-module load fftw
-
-export CC=gcc
-export CXX=g++
-
-export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
-# NOTE: not sure if this is the best choice -- investigate further if this
-# becomes a problem elsewhere
-export GASNET_CONDUIT=ibv
-export CROSS_CONFIGURE=
-EOF
-elif [[ ${target} = "perlmutter" ]]; then
+if [[ ${target} = "perlmutter" ]]; then
     cat >> env.sh <<EOF
 module load PrgEnv-gnu
+module load gcc/11.2.0
 module load cray-pmi # for GASNet
 module load evp-patch # workaround for recent Perlmutter issue
 
@@ -100,8 +66,8 @@ export CXX=CC
 export CRAYPE_LINK_TYPE=dynamic # allow dynamic linking
 
 export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
-export GASNET_CONDUIT=${GASNET_CONDUIT:-ofi-slingshot11}
-export LEGION_GASNET_CONDUIT=${LEGION_GASNET_CONDUIT:-ofi}
+export LEGION_GASNET_CONDUIT=ofi
+export LEGION_GASNET_SYSTEM=slingshot11
 
 export SPACK_BUILD_CACHE=/global/cfs/cdirs/m2859/spack_build_cache
 export SPACK_TARGET_MACHINE=perlmutter
@@ -114,7 +80,7 @@ export CC=gcc
 export CXX=g++
 
 export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
-export GASNET_CONDUIT=ibv
+export LEGION_GASNET_CONDUIT=ibv
 
 # for Numba
 export CUDA_HOME=\$OLCF_CUDA_ROOT
@@ -130,19 +96,7 @@ export CC=icx
 export CXX=icpx
 
 export LEGION_USE_GASNET=${LEGION_USE_GASNET:-0} # FIXME: GASNet on iris is currently broken
-export GASNET_CONDUIT=ibv
-EOF
-elif [[ ${target} = *"tulip"* ]]; then
-    cat >> env.sh <<EOF
-# load a ROCm-compatible MPI
-module use /home/groups/coegroup/share/coe/modulefiles
-module load ompi/4.1.0/llvm/rocm/4.1.0
-
-export CC=gcc
-export CXX=g++
-
-export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
-export GASNET_CONDUIT=ibv
+export LEGION_GASNET_CONDUIT=ibv
 EOF
 elif [[ ${target} = "g0"*".stanford.edu" ]]; then # sapling
     cat >> env.sh <<EOF
@@ -152,7 +106,7 @@ export CC=gcc
 export CXX=g++
 
 export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
-export GASNET_CONDUIT=ibv
+export LEGION_GASNET_CONDUIT=ibv
 EOF
 elif [[ ${target} = "psbuild"* ]]; then # psana machines
     cat >> env.sh <<EOF
@@ -171,50 +125,39 @@ export CC=cc
 export CXX=CC
 export CRAYPE_LINK_TYPE=dynamic # allow dynamic linking
 
-# compilers for mpi4py
-export MPI4PY_CC="\$(which cc)"
-export MPI4PY_MPICC="\$(which cc) --shared"
-
-# Make sure Cray-FFTW get loaded first to avoid Conda's MKL
-export LD_PRELOAD="\${FFTW_DIR}/libfftw3.so"
-
 export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
-export GASNET_CONDUIT=${GASNET_CONDUIT:-ofi-slingshot11}
-export LEGION_GASNET_CONDUIT=${LEGION_GASNET_CONDUIT:-ofi}
+export LEGION_GASNET_CONDUIT=ofi
+export LEGION_GASNET_SYSTEM=slingshot11
 EOF
 elif [[ $(hostname --fqdn) = *".frontier."* ]]; then
     cat >> env.sh <<EOF
 module load PrgEnv-gnu
 module load rocm/5.4.3
-module load cray-fftw
 
 export CC=cc
 export CXX=CC
 export CRAYPE_LINK_TYPE=dynamic # allow dynamic linking
 
 export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
-export GASNET_CONDUIT=${GASNET_CONDUIT:-ofi-slingshot11}
-export LEGION_GASNET_CONDUIT=${LEGION_GASNET_CONDUIT:-ofi}
+export LEGION_GASNET_CONDUIT=ofi
+export LEGION_GASNET_SYSTEM=slingshot11
 EOF
 elif [[ $(hostname --fqdn) = *".spock."* ]]; then
     cat >> env.sh <<EOF
-module load wget
 module load PrgEnv-gnu
 module load rocm
-module load cray-fftw
 
 export CC=cc
 export CXX=CC
 export CRAYPE_LINK_TYPE=dynamic # allow dynamic linking
 
 export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
-export GASNET_CONDUIT=${GASNET_CONDUIT:-ofi-slingshot10}
-export LEGION_GASNET_CONDUIT=${LEGION_GASNET_CONDUIT:-ofi}
+export LEGION_GASNET_CONDUIT=ofi
+export LEGION_GASNET_SYSTEM=slingshot10
 EOF
 elif [[ $(hostname --fqdn) = *"darwin"* ]]; then
     cat >> env.sh <<EOF
 module load gcc
-module load cuda
 module load openmpi
 
 export CC=gcc
@@ -232,7 +175,6 @@ export LG_RT_DIR="${LG_RT_DIR:-${root_dir}/legion/runtime}"
 export LEGION_DEBUG=0
 
 export PYVER=3.8
-export PYVER_FULL=3.8.13
 
 export SPACK_ROOT="${root_dir}/spack"
 
