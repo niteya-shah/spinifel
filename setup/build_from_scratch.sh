@@ -82,7 +82,6 @@ if [[ -z $SPACK_TARGET_MACHINE ]]; then
     exit 1
 fi
 ln -sf ./machines/$SPACK_TARGET_MACHINE.yaml ./spack_machine_config.yaml
-ln -sf ./machines/$SPACK_TARGET_MACHINE.lock ./spack.lock
 
 # Set up local build cache
 if [[ -z $SPACK_BUILD_CACHE ]]; then
@@ -102,7 +101,10 @@ spack buildcache keys -it # FIXME (Elliott): do we still need this?
 # install directory so that we avoid issues in the future.
 spack config add config:install_tree:padded_length:512
 
+cp -f ./machines/$SPACK_TARGET_MACHINE.lock ./spack.lock
 spack -e . concretize ${SPACK_FORCE_CONCRETIZE:+-f -U}
+cp ./spack.lock ./machines/$SPACK_TARGET_MACHINE.lock
+
 spack -e . env depfile -o Makefile
 # Note: --no-check-signature is required for unsigned build cache.
 make SPACK_INSTALL_FLAGS=--no-check-signature -j${THREADS:-8}
