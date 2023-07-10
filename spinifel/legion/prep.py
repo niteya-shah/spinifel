@@ -4,6 +4,7 @@ import PyNVTX as nvtx
 import os
 import pygion
 import socket
+import skopi as skp
 from pygion import task, Tunable, Partition, Region, WD, RO, RW, Reduce, IndexLaunch
 
 from spinifel import settings, prep, image, utils
@@ -15,7 +16,10 @@ from spinifel.sequential.autocorrelation import Merge
 
 if settings.use_cupy:
     import cupy
-    import pycuda.driver as cuda
+if settings.use_cuda:
+    if not settings.use_pygpu:
+        import pycuda.driver as cuda
+    import cupy
 
 all_objs = {}
 multiple_all_objs = []
@@ -186,6 +190,25 @@ def get_slices(ds):
         for i, slices_subr in enumerate(slices_p):
             load_slices_hdf5(slices_subr, i, N_images_per_rank, point=i)
     return slices, slices_p, pixel_position, pixel_index
+
+
+@task(leaf=True, privileges=[WD])
+@lgutils.gpu_task_wrapper
+def load_conformations_prior(conf_prior, num_conf, rank, N_images_per_rank):
+    logger = utils.Logger(True, settings)
+    logger.log(f"{socket.gethostname()} loading conformations.",level=1)
+    i_start = rank * N_images_per_rank
+    i_end = i_start + N_images_per_rank
+    arg_index = np.empty((N_images_per_rank), dtype=np.int)
+    prep.load_conformations(arg_index, i_start, i_end)
+    x = conf_prior.conf_id.reshape(num_conf, N_images_per_rank)
+    for i in range(num_conf):
+        x[i] = np.where(arg_index==i, 1.0, 0.0)
+        if settings.verbosity > 1:
+            total_sum = np.sum(x[i])
+            logger.log(f"load_conformations_prior: rank:[{rank}], num_conf:conf_idx [{num_conf}][{i}] = {total_sum}",level=2)
+    conf_prior.conf_id[:] = x.reshape(num_conf*N_images_per_rank)
+    logger.log(f"{socket.gethostname()} loaded conformations.",level=1)
 
 
 @task(leaf=True, privileges=[WD])
@@ -550,68 +573,21 @@ def load_image_batch(run, gen_run, gen_smd, slices_p):
 
 
 @nvtx.annotate("legion/prep.py", is_prefix=True)
+def get_ref_orientations(N_orientations, idx):
+    orientations = skp.get_random_quat(N_orientations)
+    if settings.fsc_fraction_known_orientations > 0:
+        logger = utils.Logger(True, settings,idx)
+        n_supply = int(settings.fsc_fraction_known_orientations * N_orientations)
+        i_start = 0
+        i_end = i_start + n_supply
+        logger.log(f'num_ref_orientations:{N_orientations}, n_supply:{n_supply}, i_start:{i_start}, i_end: {i_end}', level=2)
+        prep.load_orientations_prior(orientations, i_start, N_orientations)
+    return orientations
+
+@nvtx.annotate("legion/prep.py", is_prefix=True)
 def get_gprep(conf_idx):
     global multiple_all_objs
     return multiple_all_objs[conf_idx]
-
-@task(leaf=True, privileges=[RO, RO, RO])
-@lgutils.gpu_task_wrapper
-@nvtx.annotate("legion/prep.py", is_prefix=True)
-def setup_objects_task(pixel_position, pixel_distance, slices, idx):
-    global all_objs
-    N_images_per_rank = slices.ispace.domain.extent[0]
-    # create a logger object per point
-    if "logger" in all_objs:
-        logger = all_objs["logger"]
-    else:
-        logger = utils.Logger(True, settings,idx)
-        all_objs["logger"] = logger
-    if settings.use_cupy:
-        mem0 = cuda.mem_get_info()
-        logger.log(
-            f"{socket.gethostname()}: gpu memory: in setup_objects_task = {(mem0[1]-mem0[0])/1e9:.2f}GB ,gpu_total={mem0[1]/1e9:.2f}GB",level=1)
-
-    # release all memory used by cupy aggressively
-    if settings.use_cupy:
-        if settings.cupy_mempool_clear:
-            mempool = cupy.get_default_memory_pool()
-            mempool.free_all_blocks()
-            mem0 = cuda.mem_get_info()
-            logger.log(
-                f"{socket.gethostname()}: gpu memory: after free cupy mempool in setup_objects_task = {(mem0[1]-mem0[0])/1e9:.2f}GB ,gpu_total={mem0[1]/1e9:.2f}GB", level=1)
-    # update nufft
-    if "nufft" in all_objs:
-        all_objs["nufft"].update_fields(N_images_per_rank)
-    else:
-        all_objs["nufft"] = NUFFT(
-            settings,
-            pixel_position.reciprocal,
-            pixel_distance.reciprocal,
-            N_images_per_rank,
-        )
-
-    all_objs["snm"] = SNM(
-        settings,
-        slices.data,
-        pixel_position.reciprocal,
-        pixel_distance.reciprocal,
-        all_objs["nufft"],
-    )
-
-    all_objs["mg"] = Merge(
-        settings,
-        slices.data,
-        pixel_position.reciprocal,
-        pixel_distance.reciprocal,
-        all_objs["nufft"],
-    )
-    done = True
-
-    if settings.use_cupy:
-        mem0 = cuda.mem_get_info()
-        logger.log(f"{socket.gethostname()}: gpu memory: after allocation in setup_objects_task = {(mem0[1]-mem0[0])/1e9:.2f}GB ,gpu_total={mem0[1]/1e9:.2f}GB", level=1)
-    return done
-
 
 #-------------------------------------------------------------
 # if conformations is set create an array of objects, one for
@@ -622,27 +598,32 @@ def setup_objects(pixel_position, pixel_distance, slices, idx, N_images_per_rank
     # create a logger object per point
     logger = utils.Logger(True, settings,idx)
     all_objs["logger"] = logger
-    if settings.use_cupy:
+
+    if settings.use_cuda and not settings.use_pygpu:
         mem0 = cuda.mem_get_info()
         logger.log(
-            f"{socket.gethostname()}: gpu memory: in setup_objects_task = {(mem0[1]-mem0[0])/1e9:.2f}GB ,gpu_total={mem0[1]/1e9:.2f}GB",level=1)
+            f"{socket.gethostname()}: gpu memory: in setup_objects = {(mem0[1]-mem0[0])/1e9:.2f}GB ,gpu_total={mem0[1]/1e9:.2f}GB",level=1)
 
     # release all memory used by cupy aggressively
-    if settings.use_cupy:
+    if settings.use_cuda and not settings.use_pygpu:
         if settings.cupy_mempool_clear:
             mempool = cupy.get_default_memory_pool()
             mempool.free_all_blocks()
             mem0 = cuda.mem_get_info()
             logger.log(
-                f"{socket.gethostname()}: gpu memory: after free cupy mempool in setup_objects_task = {(mem0[1]-mem0[0])/1e9:.2f}GB ,gpu_total={mem0[1]/1e9:.2f}GB", level=1)
+                f"{socket.gethostname()}: gpu memory: after free cupy mempool in setup_objects = {(mem0[1]-mem0[0])/1e9:.2f}GB ,gpu_total={mem0[1]/1e9:.2f}GB", level=1)
 
+    # update nufft
+    ref_orientations = get_ref_orientations(settings.N_orientations, idx)
+    # update with known reference orientations
     all_objs["nufft"] = NUFFT(
         settings,
         pixel_position.reciprocal,
         pixel_distance.reciprocal,
         N_images_per_rank,
+        ref_orientations,
     )
-
+    logger.log(f'ref_orientations {ref_orientations}', level=3)
     all_objs["snm"] = SNM(
         settings,
         slices,
@@ -658,9 +639,10 @@ def setup_objects(pixel_position, pixel_distance, slices, idx, N_images_per_rank
         pixel_distance.reciprocal,
         all_objs["nufft"],
     )
-    if settings.use_cupy:
+
+    if settings.use_cuda and not settings.use_pygpu:
         mem0 = cuda.mem_get_info()
-        logger.log(f"{socket.gethostname()}: gpu memory: after allocation in setup_objects_task = {(mem0[1]-mem0[0])/1e9:.2f}GB ,gpu_total={mem0[1]/1e9:.2f}GB", level=1)
+        logger.log(f"{socket.gethostname()}: gpu memory: after allocation in setup_objects = {(mem0[1]-mem0[0])/1e9:.2f}GB ,gpu_total={mem0[1]/1e9:.2f}GB", level=1)
     return all_objs
 
 @task(leaf=True, privileges=[RO, RO, RO, WD])

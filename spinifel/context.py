@@ -41,7 +41,7 @@ class SpinifelContexts(metaclass=Singleton):
     """
     Singleton Class SpinifelContexts.
 
-    Singleton: Will be initialized once -- repeted calls to constructor will
+    Singleton: Will be initialized once -- repeated calls to constructor will
     return singleton instance
 
     Manages global contexts for MPI and CUDA
@@ -214,7 +214,7 @@ class Profiler(metaclass=Singleton):
     """
     Singleton Class Profiler
 
-    Singleton: Will be initialized once -- repeted calls to constructor will
+    Singleton: Will be initialized once -- repeated calls to constructor will
     return singleton instance
 
     Switchable profiling dectorators

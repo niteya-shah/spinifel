@@ -20,7 +20,7 @@ from pygion import (
 )
 
 
-from spinifel import settings, utils, image
+from spinifel import settings, utils, image, prep
 from . import utils as lgutils
 from . import prep as gprep
 from scipy.ndimage import gaussian_filter
@@ -31,7 +31,6 @@ if settings.use_cupy:
     import os
 
     os.environ["CUPY_ACCELERATORS"] = "cub"
-    from pycuda import gpuarray
     from cupyx.scipy.sparse.linalg import LinearOperator, cg
 
     # from cupyx.scipy.ndimage import gaussian_filter
@@ -50,16 +49,35 @@ else:
     f_type = xp.float64
     c_type = xp.complex128
 
+#TODO support streaming
+@nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
+def get_known_orientations(orientations, N_orientations, N_images_per_rank, rank, str_mode):
+    if settings.fsc_fraction_known_orientations > 0:
+        logger = gprep.get_gprep(0)["logger"]
+        n_supply = int(settings.fsc_fraction_known_orientations * N_images_per_rank)
+        i_start = int(N_images_per_rank*rank)
+        i_end = i_start + n_supply
+        logger.log(f'rank:{rank}, num_orientations:{N_orientations}, n_supply:{n_supply}, i_start:{i_start}, i_end: {i_end}', level=2)
+        prep.load_orientations_prior(orientations, i_start, i_start+N_images_per_rank)
+        logger.log(f'orientations = {orientations}', level=2)
+        if n_supply < N_orientations:
+            orientations[n_supply:,:] = skp.get_random_quat(N_images_per_rank-n_supply)
+    else:
+        orientations[:] = skp.get_random_quat(N_images_per_rank)
 
 @task(leaf=True, privileges=[WD])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
-def gen_random_orientations(orientations, N_images_per_rank):
-    orientations.quaternions[:] = skp.get_random_quat(N_images_per_rank)
+def gen_random_orientations(orientations, N_images_per_rank, rank, str_mode):
+    if settings.fsc_fraction_known_orientations > 0 and str_mode is None:
+        N_orientations = orientations.ispace.domain.extent[0]
+        get_known_orientations(orientations.quaternions, N_orientations, N_images_per_rank, rank, str_mode)
+    else:
+        orientations.quaternions[:] = skp.get_random_quat(N_images_per_rank)
 
 
 @nvtx.annotate("legion/autocorrelation.py", is_prefix=True)
-def get_random_orientations(N_images_per_rank):
+def get_random_orientations(N_images_per_rank, str_mode=None):
     # quaternions are always double precision
     fields_dict = {"quaternions": pygion.float64}
     sec_shape = (4,)
@@ -69,7 +87,7 @@ def get_random_orientations(N_images_per_rank):
     execution_fence(block=True)
     N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
     for i in range(N_procs):
-        gen_random_orientations(orientations_p[i], N_images_per_rank, point=i)
+        gen_random_orientations(orientations_p[i], N_images_per_rank,i, str_mode, point=i)
     return orientations, orientations_p
 
 
@@ -226,6 +244,7 @@ def solve_simple(
         summary.v2[0] = 1000.0
         summary.image_set[0] = False
         result.ac[:] = 1.0
+        logger.log(f"default summary solve:[n_conf,conf_index]: [{n_conf},{group_idx}], rlambda:{rlambda}, v1:1000, v2:1000, rank:{rank}, image_set:{summary.image_set[0]}", level=2)
     else:
         ret,W,d = mg.solve_ac_common(slices.data, orientations.quaternions, ac.estimate,
                                  ac.support, conf_local, rlambda, flambda)
@@ -251,6 +270,8 @@ def solve_simple(
         summary.v1[0] = v1
         summary.v2[0] = v2
         summary.image_set[0] = True
+        logger.log(f"summary solve:[n_conf,conf_index]: [{n_conf},{group_idx}], rlambda:{rlambda}, v1:{v1}, v2:{v2}, rank:{rank}, image_set:{summary.image_set[0]}", level=2)
+
 
 @task(leaf=True, privileges=[None, RO])
 @lgutils.gpu_task_wrapper
@@ -365,7 +386,7 @@ def solve_ac_merge(
         solve_ac_dict["slices_p"] = slices_p
         solve_ac_dict["ready_objs"] = ready_objs
         if orientations is None:
-            orientations, orientations_p = get_random_orientations(N_images_per_rank)
+            orientations, orientations_p = get_random_orientations(N_images_per_rank, str_mode)
         solve_ac_dict["orientations"] = orientations
         solve_ac_dict["orientations_p"] = orientations_p
     elif orientations is None:
@@ -395,8 +416,8 @@ def solve_ac_merge(
     results_r = solve_ac_dict["results_r"]
 
     alambda = 1
-    rlambdas = Mtot / N * 2 ** (np.arange(N_procs) - N_procs / 2).astype(np.float)
-    flambdas = 1e5 * 10 ** (np.arange(N_procs) - N_procs // 2).astype(np.float)
+    rlambdas = Mtot / N * 2 ** (np.arange(N_procs) - N_procs / 2).astype(np.float64)
+    flambdas = 1e5 * 10 ** (np.arange(N_procs) - N_procs // 2).astype(np.float64)
     summary_p = solve_ac_dict["summary_p"]
     summary = solve_ac_dict["summary"]
     reciprocal_extent = solve_ac_dict["reciprocal_extent"]

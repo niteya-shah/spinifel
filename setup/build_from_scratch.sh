@@ -83,7 +83,6 @@ PACKAGE_LIST=(
 
     cffi=1.15.1  # Legion
     pybind11=2.9.2  # FINUFFT
-    numba=0.56.3  # skopi
     scikit-learn=1.1.3  # skopi
     tqdm=4.64.1  # convenience
 
@@ -120,7 +119,7 @@ conda install -y bitstruct krtc -c conda-forge
 
 # Important: install CuPy first, it is now a dependency for mpi4py (at least in some cases)
 (
-    if [[ $(hostname --fqdn) = *".crusher."* ]]; then
+    if [[ $(hostname --fqdn) = *".crusher."* || $(hostname --fqdn) = *".frontier."* ]]; then
         export CUPY_INSTALL_USE_HIP=1
         export ROCM_HOME=$ROCM_PATH
         export HCC_AMDGPU_TARGET=gfx90a
@@ -157,10 +156,18 @@ fi
 # Install pip packages
 pip install --no-cache-dir callmonitor
 pip install --no-cache-dir PyNVTX
+pip install --no-cache-dir gdown
 
 # Pin sckit-learn to 1.0.2 w/o breaking psana (see issue #51)
 conda remove --force -y scikit-learn
 conda install --freeze-installed -y scikit-learn=1.0.2
+
+# Extra for frontier/crusher new unsolved issue
+if [[ ${target} = *".crusher."* || ${target} = *".frontier."* ]]
+then
+    conda install -y -c conda-forge libssh
+    conda install -y -c conda-forge libssh=0.10.4
+fi
 
 #-------------------------------------------------------------------------------
 
@@ -171,7 +178,13 @@ conda install --freeze-installed -y scikit-learn=1.0.2
 if [[ $LEGION_USE_GASNET -eq 1 && $GASNET_ROOT == ${root_dir}/gasnet/release ]]
 then
     pushd gasnet
-    CONDUIT=$GASNET_CONDUIT make -j${THREADS:-8}
+    # workaround for build with GASNET_CONDUIT=ofi, force slingshot11 (frontier/crusher)
+    if [[ $LEGION_GASNET_CONDUIT == ofi ]]
+    then
+	LEGION_GASNET_SYSTEM=slingshot11 CONDUIT=$GASNET_CONDUIT make -j${THREADS:-8}
+    else
+	CONDUIT=$GASNET_CONDUIT make -j${THREADS:-8}
+    fi
     popd
 fi
 
@@ -187,14 +200,6 @@ then
     ./rebuild_legion.sh
     ./mapper_clean_build.sh
 fi
-
-#-------------------------------------------------------------------------------
-
-
-#_______________________________________________________________________________
-# Install LCLS2 (aka PSANA2)
-
-./psana_clean_build.sh
 
 #-------------------------------------------------------------------------------
 
@@ -235,6 +240,15 @@ fi
 
 #-------------------------------------------------------------------------------
 
+#_______________________________________________________________________________
+# Install PybindGPU
+
+if [[ ${cuda_build} == true ]]
+then
+    ./rebuild_pybindgpu.sh
+fi
+
+#-------------------------------------------------------------------------------
 
 #_______________________________________________________________________________
 # Install CUDA KNN implmentation
@@ -243,6 +257,14 @@ if [[ ${cuda_build} == true ]]
 then
     ./rebuild_knn.sh
 fi
+
+#-------------------------------------------------------------------------------
+
+
+#_______________________________________________________________________________
+# Install LCLS2 (aka PSANA2)
+
+./psana_clean_build.sh
 
 #-------------------------------------------------------------------------------
 
