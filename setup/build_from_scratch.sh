@@ -105,7 +105,7 @@ spack config add config:install_tree:padded_length:512
 spack -e . concretize ${SPACK_FORCE_CONCRETIZE:+-f -U}
 spack -e . env depfile -o Makefile
 # Note: --no-check-signature is required for unsigned build cache.
-make SPACK_INSTALL_ARGS=--no-check-signature -j${THREADS:-8}
+make SPACK_INSTALL_FLAGS=--no-check-signature -j${THREADS:-8}
 
 spack -e . buildcache push --unsigned --allow-root --update-index $SPACK_BUILD_CACHE $(spack find --format /{hash})
 
