@@ -7,19 +7,18 @@ from matplotlib.colors import LogNorm, SymLogNorm
 
 import numpy as np
 from scipy.ndimage import gaussian_filter
-from spinifel import settings, utils, image, autocorrelation
+from spinifel import settings, utils, image
 
 from spinifel import SpinifelSettings
 
 settings = SpinifelSettings()
 logger = utils.Logger(True, settings)
+import time
 
 if settings.use_cupy:
     import os
 
     os.environ["CUPY_ACCELERATORS"] = "cub"
-
-    from pycuda import gpuarray
 
     from cupyx.scipy.sparse.linalg import LinearOperator, cg
     from cupy.linalg import norm
@@ -36,6 +35,13 @@ if settings.use_single_prec:
 else:
     f_type = xp.float64
     c_type = xp.complex128
+
+if settings.use_fftx:
+    if settings.verbosity > 0:
+        print(f"Using FFTX for FFTs.", flush=True)
+    import fftx as fftxp
+    # fftx_options_cuda = {'cuda' : True}
+    # fftx_options_nocuda = {'cuda' : False}
 
 
 class Merge:
@@ -127,15 +133,41 @@ class Merge:
         # shape->[N_images] x det_shape
         return H, K, L
 
+    def _fftn(self, ugrid):
+        # Calculate fft of the shifted ugrid. 
+        start_time = time.time()
+        ugrid_shifted = xp.fft.ifftshift(ugrid)
+        if settings.use_fftx:
+            # fftxp.utils.print_array_info(xp, ugrid_shifted, "DATA shifted ugrid")
+            F_ugrid = fftxp.fft.fftn(ugrid_shifted)
+            #FIXME Mona finds better way to compare fftx and numpy
+            #fftxp.utils.print_diff(xp, F_ugrid_np, F_ugrid, "F_ugrid")
+        else:
+            F_ugrid = xp.fft.fftn(ugrid_shifted)  # / M**3
+        # logger.log(f"[fftn] ORDER ugrid_shifted is {ugrid_shifted.flags.c_contiguous} TIME: {time.time()-start_time:.5f}s.", level=2)
+        return F_ugrid
+
+    def _ifftn(self, F_reg):
+        start_time = time.time()
+        if settings.use_fftx:
+            # fftxp.utils.print_array_info(xp, F_reg, "DATA F_reg")
+            reg = xp.fft.fftshift(fftxp.fft.ifftn(F_reg))
+            #FIXME Mona finds better way to compare fftx and numpy
+            #fftxp.utils.print_diff(np, reg_inversed, reg_inversed_fftx, "reg_inversed")
+        else:
+            reg = xp.fft.fftshift(xp.fft.ifftn(F_reg))
+        # logger.log(f"[ifftn] ORDER F_reg is {F_reg.flags.c_contiguous} TIME: {time.time()-start_time:.5f}s.", level=2)
+        return reg
+
+
     @nvtx.annotate("sequential/autocorrelation.py::modified", is_prefix=True)
     def fourier_reg(self, uvect, support):
         ugrid = uvect.reshape((self.M,) * 3) * support
         if self.use_reciprocal_symmetry:
             assert xp.all(xp.isreal(ugrid))
-
-        F_ugrid = xp.fft.fftn(xp.fft.ifftshift(ugrid))  # / M**3
+        F_ugrid = self._fftn(ugrid)
         F_reg = F_ugrid * xp.fft.ifftshift(self.F_antisupport)
-        reg = xp.fft.fftshift(xp.fft.ifftn(F_reg))
+        reg = self._ifftn(F_reg)
         uvect = (reg * support).reshape(-1)
         if self.use_reciprocal_symmetry:
             uvect = uvect.real
@@ -145,15 +177,53 @@ class Merge:
     def core_problem_convolution(self, uvect, F_ugrid_conv_, ac_support):
         if self.use_reciprocal_symmetry:
             assert xp.all(xp.isreal(uvect))
-        ugrid = uvect.reshape((self.M,) * 3) * ac_support
-        ugrid_ups = xp.zeros((self.M_ups,) * 3, dtype=uvect.dtype)
+            ugrid = uvect.real.reshape((self.M,) * 3) * ac_support
+        else:
+            ugrid = uvect.reshape((self.M,) * 3) * ac_support
+        start_time = time.time()
+        # changed uvect.dtype to ugrid.dtype
+        ugrid_ups = xp.zeros((self.M_ups,) * 3, dtype=ugrid.dtype)
         ugrid_ups[: self.M, : self.M, : self.M] = ugrid
         # Convolution = Fourier multiplication
-        F_ugrid_ups = xp.fft.fftn(xp.fft.ifftshift(ugrid_ups))
+        F_ugrid_ups = self._fftn(ugrid_ups)
         F_ugrid_conv_out_ups = F_ugrid_ups * F_ugrid_conv_
-        ugrid_conv_out_ups = xp.fft.fftshift(xp.fft.ifftn(F_ugrid_conv_out_ups))
+        ugrid_conv_out_ups = self._ifftn(F_ugrid_conv_out_ups)
         # Downsample
         ugrid_conv_out = ugrid_conv_out_ups[: self.M, : self.M, : self.M]
+        end_time = time.time()
+        np_time = end_time - start_time
+        if settings.use_fftx:
+            # CuPy version of the above.  (np_time is for FFTX version)
+            start_time = time.time()
+            cp_ugrid_ups = xp.zeros((self.M_ups,) * 3, dtype=ugrid.dtype)
+            cp_ugrid_ups[: self.M, : self.M, : self.M] = ugrid
+            # Convolution = Fourier multiplication
+            # WAS: F_ugrid_ups = self._fftn(ugrid_ups), which called FFTX.
+            cp_F_ugrid_ups = xp.fft.fftn(xp.fft.ifftshift(cp_ugrid_ups))
+            cp_F_ugrid_conv_out_ups = cp_F_ugrid_ups * F_ugrid_conv_
+            # WAS: ugrid_conv_out_ups = self._ifftn(F_ugrid_conv_out_ups)
+            cp_ugrid_conv_out_ups = xp.fft.fftshift(xp.fft.ifftn(cp_F_ugrid_conv_out_ups))
+            # Downsample
+            cp_ugrid_conv_out = cp_ugrid_conv_out_ups[: self.M, : self.M, : self.M]
+            end_time = time.time()
+            cp_time = end_time - start_time
+            fftxp.utils.print_diff(xp, cp_ugrid_conv_out, ugrid_conv_out,
+                                   "core_problem_convolution cupy_fftx_tfm_ugrid_conv_out")
+
+            ugrid_conv_out_fftx = None
+            start_time = time.time()
+            # ugrid_conv_out_fftx = fftxp.kernels.core_problem_convolution_kernel(np, ugrid, M,  F_ugrid_conv_, M_ups)
+            ugrid_conv_out_fftx = fftxp.convo.mdrfsconv(ugrid, F_ugrid_conv_, ugrid_conv_out_fftx)
+            end_time = time.time()
+            fftxp_time = end_time - start_time
+
+            fftxp.utils.print_diff(xp, ugrid_conv_out, ugrid_conv_out_fftx,
+                                   "core_problem_convolution fftx_tfm_all_ugrid_conv_out")
+            fftxp.utils.print_diff(xp, cp_ugrid_conv_out, ugrid_conv_out_fftx,
+                                   "core_problem_convolution cupy_fftx_all_ugrid_conv_out")
+
+            print(f"FULL TIME core_problem_convolution: CuPy-FFT {cp_time} FFTX-FFT {np_time} FFTX-all {fftxp_time}")
+
         ugrid_conv_out *= ac_support
         if self.use_reciprocal_symmetry:
             # Both ugrid_conv and ugrid are real, so their convolution
@@ -174,8 +244,7 @@ class Merge:
                 self.nuvect, H_, K_, L_, 1, self.use_reciprocal_symmetry, self.M_ups
             )
         )
-
-        F_ugrid_conv_ = xp.fft.fftn(xp.fft.ifftshift(ugrid_conv))
+        F_ugrid_conv_ = self._fftn(ugrid_conv)
 
         def W_matvec(uvect):
             """Define W part of the W @ x = d problem."""

@@ -6,7 +6,7 @@ from matplotlib.colors import LogNorm, SymLogNorm
 from scipy.ndimage import gaussian_filter
 
 
-from spinifel import settings, utils, image, autocorrelation, contexts
+from spinifel import settings, utils, image, contexts
 import skopi as skp
 import PyNVTX as nvtx
 
@@ -23,8 +23,6 @@ if settings.use_cupy:
     import os
 
     os.environ["CUPY_ACCELERATORS"] = "cub"
-
-    from pycuda import gpuarray
 
     from cupyx.scipy.sparse.linalg import LinearOperator, cg
     from cupy.linalg import norm
@@ -209,3 +207,4 @@ class MergeMPI(Merge):
         self.comm.Bcast(ac, root=self.ref_rank)
 
         return ac
+

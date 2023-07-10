@@ -24,7 +24,7 @@ def test_quat():
         [[-1.0, 0.0, 0.0], [0.0, -1.0, 0.0], [0.0, 0.0, 1.0]], dtype=np.float64
     )
     print(f"rotmat={rotmat}")
-    o_quat = skp.rotmat_to_quaternion(rotmat)
+    o_quat = skp.rotmat_to_quaternion(rotmat).get()
     print(f"quat={o_quat}")
     print()
 

@@ -4,9 +4,9 @@ import skopi as skp
 import PyNVTX as nvtx
 import logging
 
-from spinifel import settings, utils, autocorrelation
+from spinifel import settings, utils
 import spinifel.sequential.nearest_neighbor as nn
-from spinifel import utils, autocorrelation, SpinifelSettings, Logger
+from spinifel import utils, SpinifelSettings, Logger
 
 settings = SpinifelSettings()
 logger = Logger(True, settings)
@@ -16,7 +16,10 @@ if settings.use_cupy:
 
     os.environ["CUPY_ACCELERATORS"] = "cub"
 
-    from pycuda import gpuarray
+    if settings.use_pygpu:
+        from PybindGPU import to_gpu
+    else:
+        from pycuda.gpuarray import to_gpu
 
     from cupyx.scipy.sparse.linalg import LinearOperator, cg
     from cupy.linalg import norm
@@ -32,7 +35,10 @@ else:
     xp = np
 
 if settings.use_cufinufft:
-    from pycuda import gpuarray
+    if settings.use_pygpu:
+        from PybindGPU import to_gpu
+    else:
+        from pycuda.gpuarray import to_gpu
 
 if settings.use_single_prec:
     f_type = xp.float32
@@ -182,7 +188,7 @@ class SNM:
         if not hasattr(self, "dist"):
             self.dist = xp.empty((self.N_orientations, self.N_slices), dtype=f_type)
         if settings.use_cufinufft:
-            ugrid = gpuarray.to_gpu(ac.astype(c_type))
+            ugrid = to_gpu(ac.astype(c_type))
         else:
             ugrid = ac.astype(c_type)
         slices_time = 0
@@ -238,89 +244,3 @@ class SNM:
         return self.nufft.ref_orientations[index]
 
 
-@nvtx.annotate("sequential/orientation_matching.py", is_prefix=True)
-def slicing_and_match(
-    ac,
-    slices_,
-    pixel_position_reciprocal,
-    pixel_distance_reciprocal,
-    ref_orientations=None,
-):
-    """
-    Determine orientations of the data images by minimizing the euclidean
-    distance with the reference images computed by randomly slicing through
-    the autocorrelation.
-
-    :param ac: autocorrelation of the current electron density estimate
-    :param slices_: data images
-    :param pixel_position_reciprocal: pixel positions in reciprocal space
-    :param pixel_distance_reciprocal: pixel distance in reciprocal space
-    :param ref_orientations: optional parameter for unit tests
-    :return ref_orientations: array of quaternions matched to slices_
-    """
-    st_init = time.monotonic()
-    Mquat = settings.Mquat
-    M = 4 * Mquat + 1
-    N_orientations = settings.N_orientations
-    N_batch_size = settings.N_batch_size
-    N_pixels = utils.prod(settings.reduced_det_shape)
-    N_slices = slices_.shape[0]
-    assert slices_.shape == (N_slices,) + settings.reduced_det_shape
-    N = N_pixels * N_orientations
-
-    if not N_slices:
-        return np.zeros((0, 4))
-
-    if ref_orientations is None:
-        ref_orientations = skp.get_uniform_quat(N_orientations, True)
-    else:
-        logger.log(
-            f"Warning: {ref_orientations.shape[0]} referenced orientations were given (unit test)."
-        )
-    ref_rotmat = np.array(
-        [np.linalg.inv(skp.quaternion2rot3d(quat)) for quat in ref_orientations]
-    )
-    reciprocal_extent = pixel_distance_reciprocal.max()
-
-    # Calulate Model Slices in batch
-    assert (
-        N_orientations % N_batch_size == 0
-    ), "N_orientations must be divisible by N_batch_size"
-    slices_ = slices_.reshape((N_slices, N_pixels))
-    model_slices_new = np.zeros((N,))
-
-    st_slice = time.monotonic()
-
-    for i in range(N_orientations // N_batch_size):
-        st = i * N_batch_size
-        en = st + N_batch_size
-        H, K, L = np.einsum(
-            "ijk,klmn->jilmn", ref_rotmat[st:en], pixel_position_reciprocal
-        )
-        H_ = H.flatten() / reciprocal_extent * np.pi / settings.oversampling
-        K_ = K.flatten() / reciprocal_extent * np.pi / settings.oversampling
-        L_ = L.flatten() / reciprocal_extent * np.pi / settings.oversampling
-        N_batch = N_pixels * N_batch_size
-        st_m = i * N_batch_size * N_pixels
-        en_m = st_m + (N_batch_size * N_pixels)
-        model_slices_new[st_m:en_m] = autocorrelation.forward(
-            ac, H_, K_, L_, 1, reciprocal_extent, N_batch
-        ).real
-    en_slice = time.monotonic()
-
-    # Imaginary part ~ numerical error
-    model_slices_new = model_slices_new.reshape((N_orientations, N_pixels))
-    data_model_scaling_ratio = slices_.std() / model_slices_new.std()
-    logger.log(f"Data/Model std ratio: {data_model_scaling_ratio}.", level=1)
-    model_slices_new *= data_model_scaling_ratio
-
-    # Calculate Euclidean distance in batch to avoid running out of GPU Memory
-    st_match = time.monotonic()
-    index = nn.nearest_neighbor(model_slices_new, slices_, N_batch_size)
-    en_match = time.monotonic()
-
-    logger.log(
-        f"Match tot:{en_match-st_init:.2f}s. slice={en_slice-st_slice:.2f}s. match={en_match-st_match:.2f}s. slice_oh={st_slice-st_init:.2f}s. match_oh={st_match-en_slice:.2f}s.",
-        level=1
-    )
-    return ref_orientations[index]
