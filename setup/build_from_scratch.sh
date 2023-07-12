@@ -74,6 +74,7 @@ unset LD_PRELOAD
 # Install spack and set up local environment
 
 git clone -c feature.manyFiles=true -b develop https://github.com/spack/spack.git $SPACK_ROOT
+git -C $SPACK_ROOT checkout c2bafd7b7fc74d5672beaf79fd808c62900151f6 # develop from 2023-07-12
 source $SPACK_ROOT/share/spack/setup-env.sh
 
 # Link the desired machine config
