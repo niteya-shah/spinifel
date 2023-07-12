@@ -8,11 +8,11 @@ source "$root_dir"/env.sh
 pushd "$root_dir"/finufft
 
 cat > make.inc <<EOF
-CFLAGS+=$FINUFFT_CFLAGS
-LIBS+=$FINUFFT_LDFLAGS
+CFLAGS+=$(pkg-config --cflags fftw3)
+LIBS+=$(pkg-config --libs-only-L fftw3)
 EOF
 
 make -j${THREADS:-8} lib
-LDFLAGS="$FINUFFT_LDFLAGS" CFLAGS="$FINUFFT_CFLAGS" pip install --no-deps .
+CFLAGS="$(pkg-config --cflags fftw3)" LDFLAGS="$(pkg-config --libs-only-L fftw3)" pip install --no-deps .
 
 popd

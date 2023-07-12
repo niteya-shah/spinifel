@@ -190,18 +190,6 @@ pythonpathappend \${LOCAL_INSTALL_DIR}/lib/python\${PYVER}/site-packages
 
 export LCLS2_DIR="${root_dir}/lcls2"
 
-# settings for finufft
-if [[ -z \${FFTW_INC+x} ]]; then
-    export FINUFFT_CFLAGS="-I\${LOCAL_INSTALL_DIR}/include"
-else
-    export FINUFFT_CFLAGS="-I\$FFTW_INC -I\${LOCAL_INSTALL_DIR}/include"
-fi
-if [[ -z \${FFTW_DIR+x} ]]; then
-    export FINUFFT_LDFLAGS="-L\${LOCAL_INSTALL_DIR}/lib"
-else
-    export FINUFFT_LDFLAGS="-L\$FFTW_DIR -L\${LOCAL_INSTALL_DIR}/lib"
-fi
-
 #cufinufft library dir
 export CUFINUFFT_DIR="${root_dir}/cufinufft/lib"
 ldpathappend \$CUFINUFFT_DIR
