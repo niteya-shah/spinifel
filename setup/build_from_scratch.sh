@@ -105,9 +105,7 @@ cp -f ./machines/$SPACK_TARGET_MACHINE.lock ./spack.lock
 spack -e . concretize ${SPACK_FORCE_CONCRETIZE:+-f -U}
 cp ./spack.lock ./machines/$SPACK_TARGET_MACHINE.lock
 
-spack -e . env depfile -o Makefile
-# Note: --no-check-signature is required for unsigned build cache.
-make SPACK_INSTALL_FLAGS=--no-check-signature -j${THREADS:-8}
+spack -e . install --no-check-signature -j${THREADS:-8}
 
 spack -e . buildcache push --unsigned --allow-root --update-index $SPACK_BUILD_CACHE $(spack find --format /{hash})
 
