@@ -208,7 +208,7 @@ def check_convergence_all_conf(fsc_conv):
 def compute_fsc_single_conf(phased_conf, reference, fsc, conf_id):
     fsc_dict_array = []
     for i in range(settings.N_conformations):
-        fsc_dict_val = compute_fsc_task(phased_conf, reference, fsc[i], point=0)
+        fsc_dict_val = compute_fsc_task(phased_conf, reference[i], fsc[i], point=0)
         fsc_dict_array.append(fsc_dict_val.get())
     return fsc_dict_array
 
@@ -218,7 +218,7 @@ def compute_fsc_conf_all(phased_conf, reference, fsc):
     fsc_dict_array = []
     for i in range(settings.N_conformations):
         if check_convergence_single_conf(fsc[i]) is False:
-            fsc_dict_val = compute_fsc_single_conf(phased_conf[i], reference[i], fsc[i], i)
+            fsc_dict_val = compute_fsc_single_conf(phased_conf[i], reference, fsc[i], i)
         else:
             fsc_dict_val = fsc[i]
         fsc_dict_array.append(fsc_dict_val)
