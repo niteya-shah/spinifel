@@ -34,13 +34,9 @@ fi
 
 echo CUFINUFFT_DIR is $CUFINUFFT_DIR
 
-if [[ ${target} = "psbuild"* ]]; then
-    conda install -y -c conda-forge pycuda=2022.1
-    LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CUFINUFFT_DIR:/opt/nvidia/usr/lib64 pip install --no-cache-dir .
-elif [[ ${target} = *"crusher"* || ${target} = *"frontier"* ]]; then
+if [[ ${target} = *"crusher"* || ${target} = *"frontier"* ]]; then
     LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CUFINUFFT_DIR pip install --no-cache-dir .
 else
-    pip install --no-cache-dir pycuda==2022.1
     LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CUFINUFFT_DIR pip install --no-cache-dir .
 fi
 
