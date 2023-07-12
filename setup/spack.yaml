@@ -17,9 +17,10 @@ spack:
   - fftw ~mpi +openmp
 
   - py-cffi    # Legion
-  - py-pybind11    # FINUFFT
+  - py-pybind11    # FINUFFT / PybindGPU
   - py-scikit-learn    # skopi
   - py-tqdm    # convenience
+  - py-six  # cufinufft
   - py-pycuda  # for use with cufinufft
 
   # lcls2

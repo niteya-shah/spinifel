@@ -35,9 +35,9 @@ fi
 echo CUFINUFFT_DIR is $CUFINUFFT_DIR
 
 if [[ ${target} = *"crusher"* || ${target} = *"frontier"* ]]; then
-    LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CUFINUFFT_DIR pip install --no-cache-dir .
+    LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CUFINUFFT_DIR pip install --no-deps --no-cache-dir .
 else
-    LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CUFINUFFT_DIR pip install --no-cache-dir .
+    LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CUFINUFFT_DIR pip install --no-deps --no-cache-dir .
 fi
 
 popd
