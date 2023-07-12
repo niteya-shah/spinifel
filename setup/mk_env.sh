@@ -200,6 +200,7 @@ pythonpathappend \${LCLS2_DIR}/install/lib/python\${PYVER}/site-packages
 
 if [[ -d \$SPACK_ROOT ]]; then
   source "\${SPACK_ROOT}/share/spack/setup-env.sh"
+  spack env activate "${root_dir}"
 fi
 EOF
 
