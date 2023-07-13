@@ -27,8 +27,11 @@ from .test_util import get_known_orientations
 # For making sure that gpu memory is released.
 import gc
 
+import datetime
+
 if settings.use_cuda:
-    import pycuda.driver as cuda
+    if not settings.use_pygpu:
+        import pycuda.driver as cuda
     import cupy
 
     mempool = cupy.get_default_memory_pool()
@@ -37,11 +40,12 @@ if settings.use_cuda:
 
 def log_cuda_mem_info(logger):
     if settings.use_cuda:
-        (free, total) = cuda.mem_get_info()
-        logger.log(
-            f"Global memory occupancy: {free*100/total:.2f}% free ({free/1e9:.2f}/{total/1e9:.2f} GB)", 
-            level=1
-        )
+        if not settings.use_pygpu:
+            (free, total) = cuda.mem_get_info()
+            logger.log(
+                f"Global memory occupancy: {free*100/total:.2f}% free ({free/1e9:.2f}/{total/1e9:.2f} GB)", 
+                level=1
+            )
         mempool_used = mempool.used_bytes() * 1e-9
         mempool_total = mempool.total_bytes() * 1e-9
         logger.log(
@@ -134,7 +138,7 @@ def main():
 
     # Skip this data saving and ac calculation in test mode
     generation = 0
-    reference_dict = {"reference": None, "dist_recip_max": None}
+    reference_dict = {}
     if settings.load_gen > 0:  # Load input from previous generation
         generation = settings.load_gen
         logger.log(
@@ -245,6 +249,7 @@ def main():
             and cn_processed_events % N_images_per_rank == 0
             and generation < N_generations
         ):
+            logger.log(f"datetime.datetime.now() = {str(datetime.datetime.now())}")
             logger.log(f"#" * 45)
             logger.log(
                 f"##### Generation {generation}/{N_generations} Slices:{cn_processed_events}/{N_images_max} #####"
@@ -351,6 +356,7 @@ def main():
                 logger.log(f"AC recovered in {timer.lap():.2f}s.")
 
                 # If the pdb file is given, the writer rank will calculate this
+                reference, dist_recip_max = (None, None)
                 if (
                     settings.pdb_path.is_file()
                     and settings.chk_convergence
@@ -361,8 +367,8 @@ def main():
                         settings.pdb_path, settings.M, dist_recip_max
                     )
                     logger.log(f"Reference created in {timer.lap():.2f}s.")
-                    reference_dict["reference"] = reference
-                    reference_dict["dist_recip_max"] = dist_recip_max
+                reference_dict["reference"] = reference
+                reference_dict["dist_recip_max"] = dist_recip_max
 
                 # If the checkpoint is set, the writer rank will calculate this
                 if settings.checkpoint and comm.rank == writer_rank:

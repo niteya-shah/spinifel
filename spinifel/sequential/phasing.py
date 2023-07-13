@@ -4,6 +4,8 @@ import PyNVTX as nvtx
 
 from spinifel import SpinifelSettings, settings, image, utils
 
+# only for timing
+import time
 # settings = SpinifelSettings()
 logger = utils.Logger(True, settings)
 
@@ -16,6 +18,13 @@ else:
     logger.log(f"Using NumPy for FFTs.", level=1)
 
     from scipy.ndimage import gaussian_filter
+
+if settings.use_fftx:
+    if settings.verbosity > 0:
+        print(f"Using FFTX for FFTs.")
+        import fftx as fftxp
+        # fftx_options_cuda = {'cuda' : True}
+        # fftx_options_nocuda = {'cuda' : False}
 
 if settings.use_single_prec:
     f_type = xp.float32
@@ -173,11 +182,43 @@ def step_phase(rho_, amplitudes_, amp_mask_, support_):
     :return rho_mod_: updated density estimate
     :return support_star_: updated support
     """
+    start_time = time.time()
     rho_hat_ = xp.fft.fftn(rho_)
     phases_ = xp.angle(rho_hat_)
     rho_hat_mod_ = xp.where(amp_mask_, amplitudes_ * xp.exp(1j * phases_), rho_hat_)
     rho_mod_ = xp.fft.ifftn(rho_hat_mod_).real
-    support_star_ = xp.logical_and(support_, rho_mod_ > 0)
+    end_time = time.time()
+    xp_time = end_time - start_time
+    if settings.use_fftx:
+        # Repeat, using FFTX instead of CuPy for FFTs only.
+        start_time = time.time()
+        fp_rho_hat_ = fftxp.fft.fftn(rho_)
+        fp_phases_ = xp.angle(fp_rho_hat_)
+        fp_rho_hat_mod_ = xp.where(amp_mask_, amplitudes_ * xp.exp(1j * fp_phases_), fp_rho_hat_)
+        fp_rho_mod_ = fftxp.fft.ifftn(fp_rho_hat_mod_).real
+        end_time = time.time()
+        fp_time = end_time - start_time
+        
+        start_time = time.time()
+        # rho_complex = rho_.astype(dtype=xp.complex128, order='C')
+        # rho_mod_fftx = fftxp.kernels.step_phase_kernel(xp, rho_complex, amp_mask_, amplitudes_)
+        # REUSE phases_ to store rho_mod_fftx.
+        # Need an array of shape=(M, M, M) dtype=float64 C=True CuPy=True.
+        # rho_mod_fftx = fftxp.convo.stepphase(rho_, amplitudes_)
+        phases_ = fftxp.convo.stepphase(rho_, amplitudes_, phases_) # REUSE phases_ for rho_mod_fftx
+        end_time = time.time()
+        fftxp_time = end_time - start_time
+        # fftxp.utils.print_diff(xp, rho_mod_, rho_mod_fftx, "step_phase rho_mod_")
+        fftxp.utils.print_diff(xp, fp_rho_mod_, rho_mod_, "step_phase cupy_fftx_tfm__rho_mod_")
+        fftxp.utils.print_diff(xp, rho_mod_, phases_, "step_phase fftx_tfm_all_rho_mod_") # REUSE phases_ for rho_mod_fftx
+        fftxp.utils.print_diff(xp, fp_rho_mod_, phases_, "step_phase cupy_fftx_all_rho_mod_") # REUSE phases_ for rho_mod_fftx
+        print(f"FULL TIME step_phase: CuPy-FFT {xp_time} FFTX-FFT {fp_time} FFTX-all {fftxp_time}")
+        fftxp.utils.print_array_info(xp, rho_, "DATA rho_")
+        fftxp.utils.print_array_info(xp, rho_mod_, "DATA rho_mod_")
+        # fftxp.utils.print_array_info(xp, rho_mod_fftx, "DATA rho_mod_fftx")
+        fftxp.utils.print_array_info(xp, phases_, "DATA rho_mod_fftx") # REUSE phases_ for rho_mod_fftx
+
+    support_star_ = xp.logical_and(support_, rho_mod_>0)
     return rho_mod_, support_star_
 
 
@@ -240,8 +281,22 @@ def phase(
     )
     ac_filt_ = xp.fft.ifftshift(ac_filt)
 
+    start_time = time.time()
     intensities_ = xp.abs(xp.fft.fftn(ac_filt_))
+    end_time = time.time()
+    xp_time = end_time - start_time
+    if settings.use_fftx:
+        print(f"ORDER fftn ac_filt_ is {ac_filt_.flags.c_contiguous}")
+        start_time = time.time()
+        ac_filt_complex = ac_filt_.astype(xp.complex128, order='C')
+        intensities_fftx = xp.abs(fftxp.fft.fftn(ac_filt_complex))
+        end_time = time.time()
+        fftxp_time = end_time - start_time
+        fftxp.utils.print_diff(xp, intensities_, intensities_fftx, "intensities_")
+        print(f"FULL TIME intensities_: xp {xp_time} fftxp {fftxp_time}")
+        fftxp.utils.print_array_info(xp, ac_filt_, "DATA ac_filt_")
 
+    #image.show_volume(xp.fft.fftshift(intensities_), Mquat, f"intensities_{generation}.png")
     amplitudes_ = xp.sqrt(intensities_)
 
     amp_mask_ = xp.ones((M, M, M), dtype=xp.bool_)
@@ -282,14 +337,44 @@ def phase(
         np.fft.fftshift(rho_), Mquat, f"rho_phased_{generation}_{group_idx}.png"
     )
 
-    intensities_phased_ = np.abs(np.fft.fftn(rho_)) ** 2
+    start_time = time.time()
+    intensities_phased_ = np.abs(np.fft.fftn(rho_))**2
+    end_time = time.time()
+    np_time = end_time - start_time
+    if settings.use_fftx:
+        print(f"ORDER fftn rho_ is {rho_.flags.c_contiguous}")
+        start_time = time.time()
+        rho_complex = rho_.astype(np.complex128, order='C')
+        intensities_phased_fftx = np.abs(fftxp.fft.fftn(rho_complex))**2
+        end_time = time.time()
+        fftxp_time = end_time - start_time
+        fftxp.utils.print_diff(np, intensities_phased_, intensities_phased_fftx,
+                               "intensities_phased_")
+        print(f"FULL TIME intensities_phased_: np {np_time} fftxp {fftxp_time}")
+        fftxp.utils.print_array_info(np, rho_, "DATA for intensities rho_")
+
     image.show_volume(
         np.fft.fftshift(intensities_phased_),
         Mquat,
         f"intensities_phased_{generation}_{group_idx}.png",
     )
-
+    start_time = time.time()
     ac_phased_ = np.abs(np.fft.ifftn(intensities_phased_))
+    end_time = time.time()
+    np_time = end_time - start_time
+    if settings.use_fftx:
+        print(f"ORDER ifftn intensities_phased_ is {intensities_phased_.flags.c_contiguous}")
+        start_time = time.time()
+        intensities_phased_complex = intensities_phased_.astype(np.complex128,
+                                                                order='C')
+        ac_phased_fftx = np.abs(fftxp.fft.ifftn(intensities_phased_complex))
+        end_time = time.time()
+        fftxp_time = end_time - start_time
+        print(f"ac_phased_ norms original {np.max(np.absolute(ac_phased_))} FFTX {np.max(np.absolute(ac_phased_fftx))}")
+        fftxp.utils.print_diff(np, ac_phased_, ac_phased_fftx, "ac_phased_")
+        print(f"FULL TIME ac_phased_: np {np_time} fftxp {fftxp_time}")
+        fftxp.utils.print_array_info(np, intensities_phased_, "DATA intensities_phased_")
+
     ac_phased = np.fft.fftshift(ac_phased_)
     # image.show_volume(ac_phased, Mquat, f"autocorrelation_phased_{generation}.png")
 

@@ -56,6 +56,12 @@ def init_conf_task(conf, num_images, num_conf, mode):
         x[i] = np.where(arg_index==i, 1.0, 0.0)
     conf.conf_id[:] = x.reshape(num_conf*num_images)
 
+# initialize conf with pre-determined values
+@nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
+def init_conf_known(conf, num_images, num_conf, mode, n_procs):
+    for i in range (n_procs):
+        gprep.load_conformations_prior(conf[i], num_conf, i, settings.N_images_per_rank, point=i)
+
 # initialize conf with random values
 @nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
 def init_conf(conf_p, num_images):
@@ -67,6 +73,12 @@ def init_conf(conf_p, num_images):
     if num_conf == 1 or mode == "test_debug":
         for i in range (N_procs):
             pygion.fill(conf_p[i], "conf_id", 1.0)
+            # support fsc_fraction_known_orientations = 1.0 only
+            # only way to get deterministic results
+            #    elif num_conf > 1 and settings.fsc_fraction_known_orientations == 1.0:
+            #        init_conf_known(conf_p, num_images, num_conf, mode, N_procs)
+            #    elif num_conf > 1:
+            #        assert settings.fsc_fraction_known_orientations != 0.0:
     else:
         for i in range (N_procs):
             init_conf_task(conf_p[i], num_images, num_conf, mode, point=i)

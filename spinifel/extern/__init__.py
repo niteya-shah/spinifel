@@ -5,7 +5,6 @@
 """Manages external libraries"""
 
 
-from cufinufft import cufinufft
 from importlib.metadata import version
 
 from spinifel import SpinifelSettings, SpinifelContexts, Profiler, Logger
@@ -29,12 +28,18 @@ logger = Logger(True, settings)
 # ______________________________________________________________________________
 # Load cufiNUFFT or fiNUFFTpy depending on settings: use_cuda, use_cufinufft
 #
+if settings.use_cufinufft:
+    from cufinufft import cufinufft
+
 if settings.use_cuda and settings.use_cufinufft:
     # TODO: only manage MPI via contexts! But let's leave this here for now
     if settings.mode == "mpi":
         context.init_mpi()  # Ensures that MPI has been initalized
-    context.init_cuda()  # this must be called _after_ init_mpi
-    from pycuda.gpuarray import GPUArray, to_gpu
+    context.init_cuda() # this must be called _after_ init_mpi
+    if settings.use_pygpu:
+        from PybindGPU import GPUArray, to_gpu
+    else:
+        from pycuda.gpuarray import GPUArray, to_gpu
 
     if context.cufinufft_available:
         from cufinufft import cufinufft

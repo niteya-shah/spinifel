@@ -1,19 +1,20 @@
 # global configuration, applies to all machines
 variables:
   THREADS: 4 # reduce parallelism to avoid OOM in Legion build
+  USE_CUPY: 1 # force skopi to use gpu for reference model calculation
 
 # this configuration is intended for use at Ascent / https://code.ornl.gov
 .ascent_variables: &ascent_variables
-  SCHEDULER_PARAMETERS: "-P CHM137 -W 1:30 -nnodes 1 -alloc_flags gpumps"
+  SCHEDULER_PARAMETERS: "-P CHM137 -W 2:00 -nnodes 1 -alloc_flags gpumps"
   EXTERNAL_WORKDIR: /gpfs/wolf/chm137/proj-shared/ci/${CI_PIPELINE_ID}
 
   # launcher for tests
   SPINIFEL_TEST_LAUNCHER: "jsrun -n1 -a1 -g1"
   SPINIFEL_TEST_LAUNCHER_MULTI: "jsrun -n2 -a1 -g1"
-  SPINIFEL_PSANA2_LAUNCHER: "jsrun -n4 -g1"
+  SPINIFEL_PSANA2_LAUNCHER: "jsrun -n3 -g1"
 
   # spinifel legion
-  SPINIFEL_LEGION: "legion_python -ll:py 1  -ll:pyomp 2 -ll:csize 32768 legion_main.py  --default-settings=test_mpi.toml"
+  SPINIFEL_LEGION: "legion_python -ll:py 1  -ll:pyomp 2 -ll:csize 32768 legion_main.py  --default-settings=test_mpi.toml fsc.fsc_fraction_known_orientations=1.0"
 
   # for mpi-xtc2 tests
   SPINIFEL_TEST_FLAG: 1
@@ -39,23 +40,42 @@ variables:
 
 # this configuration is intended for use at Crusher / https://code.olcf.ornl.gov
 .crusher_variables: &crusher_variables
-  SCHEDULER_PARAMETERS: "-A CHM137_crusher -t 1:30:00 -N 1 -p batch"
-  EXTERNAL_WORKDIR: /gpfs/alpine/chm137/proj-shared/ci/${CI_PIPELINE_ID}
+  SCHEDULER_PARAMETERS: "-A CHM137_crusher -t 2:00:00 -N 1 -p batch"
+  EXTERNAL_WORKDIR: /lustre/orion/proj-shared/chm137/ci/${CI_PIPELINE_ID}
 
   # launcher for tests
-  SPINIFEL_TEST_LAUNCHER: "srun -n1"
+  SPINIFEL_TEST_LAUNCHER: "srun -n1 --gpus-per-task 1"
+  SPINIFEL_TEST_LAUNCHER_MULTI: "srun -n2 --gpus-per-task 1"
+  SPINIFEL_PSANA2_LAUNCHER: "srun -n3 --gpus-per-task 1"
+
+  # for mpi-xtc2 tests
+  SPINIFEL_TEST_FLAG: 1
+  all_proxy: "socks://proxy.ccs.ornl.gov:3128/"
+  ftp_proxy: "ftp://proxy.ccs.ornl.gov:3128/"
+  http_proxy: "http://proxy.ccs.ornl.gov:3128/"
+  https_proxy: "http://proxy.ccs.ornl.gov:3128/"
+  no_proxy: "localhost,127.0.0.0/8,*.ccs.ornl.gov"
 
   # for script test
-  DATA_DIR: /gpfs/alpine/chm137/proj-shared/spinifel_data
-  DATA_FILENAME: 2CEX-10k-2.h5
-  out_dir: /gpfs/alpine/chm137/proj-shared/ci/${CI_PIPELINE_ID}/spinifel_output
-  CUPY_CACHE_DIR: /gpfs/alpine/chm137/proj-shared/ci/${CI_PIPELINE_ID}/cupy_cache
-  PYCUDA_CACHE_DIR: /gpfs/wolf/chm137/proj-shared/ci/${CI_PIPELINE_ID}
+  out_dir: /lustre/orion/proj-shared/chm137/ci/${CI_PIPELINE_ID}/spinifel_output
+  CUPY_CACHE_DIR: /lustre/orion/proj-shared/chm137/ci/${CI_PIPELINE_ID}/cupy_cache
+  PYCUDA_CACHE_DIR: /lustre/orion/proj-shared/chm137/ci/${CI_PIPELINE_ID}
 
   # for pytest
-  test_data_dir: /gpfs/alpine/chm137/proj-shared/spinifel_data/testdata
+  test_data_dir: /lustre/orion/proj-shared/chm137/spinifel_data/testdata
+
+  # replace pycuda with PybindGPU
+  FRONTIER_EXTRAS: "runtime.use_pygpu=true"
+
+  # spinifel legion
+  SPINIFEL_LEGION: "legion_python -ll:py 1  -ll:pyomp 2 -ll:csize 32768 legion_main.py  --default-settings=test_mpi.toml fsc.fsc_fraction_known_orientations=1.0 ${FRONTIER_EXTRAS}"
 
   IS_CRUSHER_JOB: 1
+
+# FIXME: due to an underlying network bug, Legion must run on 2+ nodes
+.crusher_variables_legion: &crusher_variables_legion
+  <<: [*crusher_variables]
+  SCHEDULER_PARAMETERS: "-A CHM137_crusher -t 2:00:00 -N 2 -p batch"
 
 
 # scripts for the various test stages
@@ -81,15 +101,15 @@ variables:
 
 .mpi_hdf5_test_script: &mpi_hdf5_test_script
   script:
-    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi
+    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi $FRONTIER_EXTRAS
 
 .mpi_xtc2_test_script: &mpi_xtc2_test_script
   script:
-    - $SPINIFEL_PSANA2_LAUNCHER python -u -m spinifel --default-settings=test_mpi.toml --mode=mpi psana.enable=true
+    - $SPINIFEL_PSANA2_LAUNCHER python -u -m spinifel --default-settings=test_mpi.toml --mode=mpi psana.enable=true $FRONTIER_EXTRAS
 
 .legion_test_script: &legion_test_script
   script:
-    - PYTHONPATH="$PYTHONPATH:$EXTERNAL_WORKDIR:$PWD/mpi4py_poison_wrapper" $SPINIFEL_TEST_LAUNCHER legion_python -ll:py 1 -ll:pyomp 2  -ll:csize 8192 legion_main.py --default-settings=summit_ci.toml --mode=legion
+    - PYTHONPATH="$PYTHONPATH:$EXTERNAL_WORKDIR:$PWD/mpi4py_poison_wrapper" $SPINIFEL_TEST_LAUNCHER legion_python -ll:py 1 -ll:pyomp 2  -ll:csize 8192 legion_main.py --default-settings=summit_ci.toml --mode=legion $FRONTIER_EXTRAS
 
 .legion_hdf5_test_script: &legion_hdf5_test_script
   script:
@@ -123,22 +143,21 @@ variables:
   script:
     - PYTHONPATH="$PYTHONPATH:$EXTERNAL_WORKDIR:$PWD/mpi4py_poison_wrapper" $SPINIFEL_TEST_LAUNCHER_MULTI $SPINIFEL_LEGION --mode=legion algorithm.N_conformations=2 algorithm.conformation_mode="max_likelihood"
 
-
 .sequential_test_script: &sequential_test_script
   script:
-    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=sequential
+    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=sequential $FRONTIER_EXTRAS
 
 .large_test_script: &large_test_script
   script:
-    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi runtime.small_problem=false
+    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi runtime.small_problem=false $FRONTIER_EXTRAS
 
 .finufft_test_script: &finufft_test_script
   script:
-    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi runtime.use_cuda=false runtime.use_cufinufft=false fsc.fsc_min_cc=0.6 fsc.fsc_min_change_cc=0.1 runtime.use_single_prec=false
+    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi runtime.use_cuda=false runtime.use_cufinufft=false fsc.fsc_min_cc=0.6 fsc.fsc_min_change_cc=0.1 runtime.use_single_prec=false $FRONTIER_EXTRAS
 
 .nocuda_test_script: &nocuda_test_script
   script:
-    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi runtime.use_cufinufft=false runtime.use_cuda=false runtime.use_cupy=false fsc.fsc_min_cc=0.6 fsc.fsc_min_change_cc=0.1 runtime.use_single_prec=false
+    - $SPINIFEL_TEST_LAUNCHER python -m spinifel --default-settings=test_mpi.toml --mode=mpi runtime.use_cufinufft=false runtime.use_cuda=false runtime.use_cupy=false fsc.fsc_min_cc=0.6 fsc.fsc_min_change_cc=0.1 runtime.use_single_prec=false $FRONTIER_EXTRAS
 
 .cleanup_script: &cleanup_script
   script:
@@ -199,7 +218,6 @@ test_mpi_xtc2_ascent:
     - batch
   variables:
     <<: [*ascent_variables]
-
 
 test_legion_hdf5_ascent:
   <<: [*test_rules, *test_before_script, *legion_hdf5_test_script]
@@ -338,7 +356,7 @@ unit_test_crusher:
   variables:
     <<: [*crusher_variables]
 
-test_mpi_crusher:
+test_mpi_hdf5_crusher:
   <<: [*test_rules, *test_before_script, *mpi_hdf5_test_script]
   stage: test
   tags:
@@ -347,14 +365,88 @@ test_mpi_crusher:
   variables:
     <<: [*crusher_variables]
 
-test_legion_crusher:
- <<: [*test_rules, *test_before_script, *legion_test_script]
- stage: test
- tags:
-   - slurm
-   - crusher
- variables:
-   <<: [*crusher_variables]
+test_mpi_xtc2_crusher:
+  <<: [*test_rules, *test_before_script, *mpi_xtc2_test_script]
+  stage: test
+  tags:
+    - slurm
+    - crusher
+  variables:
+    <<: [*crusher_variables]
+
+# disable single rank tests for legion/crusher until gasnet issue is resolved
+#test_legion_hdf5_crusher:
+#  <<: [*test_rules, *test_before_script, *legion_hdf5_test_script]
+#  stage: test
+#  tags:
+#    - slurm
+#    - crusher
+#  variables:
+#    <<: [*crusher_variables_legion]
+
+test_legion_hdf5_multirank_crusher:
+  <<: [*test_rules, *test_before_script, *legion_hdf5_multirank_test_script]
+  stage: test
+  tags:
+    - slurm
+    - crusher
+  variables:
+    <<: [*crusher_variables_legion]
+
+test_legion_xtc2_multirank_crusher:
+  <<: [*test_rules, *test_before_script, *legion_xtc2_multirank_test_script]
+  stage: test
+  tags:
+    - slurm
+    - crusher
+  variables:
+    <<: [*crusher_variables_legion, *legion_psana2_variables]
+
+test_legion_xtc2_stream_multirank_crusher:
+  <<: [*test_rules, *test_before_script, *legion_xtc2_stream_multirank_test_script]
+  stage: test
+  tags:
+    - slurm
+    - crusher
+  variables:
+    <<: [*crusher_variables_legion, *legion_psana2_variables]
+
+test_legion_xtc2_stream_multiconf_multirank_crusher:
+  <<: [*test_rules, *test_before_script, *legion_xtc2_stream_multiconf_multirank_test_script]
+  stage: test
+  tags:
+    - slurm
+    - crusher
+  variables:
+    <<: [*crusher_variables_legion, *legion_psana2_variables]
+
+test_legion_xtc2_multiconf_multirank_crusher:
+  <<: [*test_rules, *test_before_script, *legion_xtc2_multiconf_multirank_test_script]
+  stage: test
+  tags:
+    - slurm
+    - crusher
+  variables:
+    <<: [*crusher_variables_legion, *legion_psana2_variables]
+
+test_legion_multiconf_multirank_crusher:
+  <<: [*test_rules, *test_before_script, *legion_multiconf_multirank_test_script]
+  stage: test
+  tags:
+    - slurm
+    - crusher
+  variables:
+    <<: [*crusher_variables_legion]
+
+# disable single rank tests for legion/crusher until gasnet issue is resolved
+#test_legion_crusher:
+# <<: [*test_rules, *test_before_script, *legion_test_script]
+# stage: test
+# tags:
+#   - slurm
+#   - crusher
+# variables:
+#   <<: [*crusher_variables_legion]
 
 # TODO: suggest deprecating
 #test_sequential_crusher:

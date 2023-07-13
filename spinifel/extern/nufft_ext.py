@@ -12,9 +12,11 @@ context = SpinifelContexts()
 profiler = Profiler()
 
 if settings.use_cufinufft:
-    import pycuda.gpuarray as gpuarray
-    import pycuda.driver as cuda
-    import pycuda
+    if settings.use_pygpu:
+        import PybindGPU  as gpuarray
+    else:
+        import pycuda.gpuarray as gpuarray
+        import pycuda
 
     import cupy as cp
     from cufinufft import cufinufft
@@ -43,6 +45,7 @@ class NUFFT:
         pixel_position_reciprocal,
         pixel_distance_reciprocal,
         images_per_rank=None,
+        orientations=None,
     ) -> None:
         self.N_orientations = settings.N_orientations
 
@@ -57,7 +60,10 @@ class NUFFT:
             self.N_images = images_per_rank
 
         self.pixel_position_reciprocal = pixel_position_reciprocal
-        self.ref_orientations = skp.get_uniform_quat(self.N_orientations, True)
+        if orientations is None:
+            self.ref_orientations = skp.get_uniform_quat(self.N_orientations, True)
+        else:
+            self.ref_orientations = orientations
 
         # Save reference rotation matrix so that we dont re-create it every
         # time
@@ -79,36 +85,53 @@ class NUFFT:
         if settings.use_cufinufft:
             # Store resused datastructures in memory so that we don't
             # constantly deallocate and realloate them
-            self.H_f = gpuarray.empty(
+            self.H_f = gpuarray.GPUArray(
                 shape=(self.N_pixels * self.N_batch_size,), dtype=f_type
             )
-            self.K_f = gpuarray.empty(
+            self.K_f = gpuarray.GPUArray(
                 shape=(self.N_pixels * self.N_batch_size,), dtype=f_type
             )
-            self.L_f = gpuarray.empty(
+            self.L_f = gpuarray.GPUArray(
                 shape=(self.N_pixels * self.N_batch_size,), dtype=f_type
             )
 
-            self.H_a = gpuarray.empty(
+            self.H_a = gpuarray.GPUArray(
                 shape=(self.N_pixels * self.N_images,), dtype=f_type
             )
-            self.K_a = gpuarray.empty(
+            self.K_a = gpuarray.GPUArray(
                 shape=(self.N_pixels * self.N_images,), dtype=f_type
             )
-            self.L_a = gpuarray.empty(
+            self.L_a = gpuarray.GPUArray(
                 shape=(self.N_pixels * self.N_images,), dtype=f_type
             )
 
             # Store memory that we have to send to the gpu constantly in pinned
             # memory.
-            self.HKL_mat = pycuda.driver.pagelocked_empty(
-                (
-                    self.ref_rotmat.shape[1],
-                    self.ref_rotmat.shape[0],
-                    *pixel_position_reciprocal.shape[1:],
-                ),
-                f_type,
-            )
+            if settings.use_pygpu:
+                # For PybindGPU, we need to keep the allocator alive by 
+                # assigning it to the class. Failing to do this will 
+                # result in segfault when trying to access self.HKL_mat.
+                self.HKL_mat_alloc = gpuarray.Allocator(
+                    gpuarray.gpuarray.PagelockedAllocator(
+                        (
+                            self.ref_rotmat.shape[1],
+                            self.ref_rotmat.shape[0],
+                            *pixel_position_reciprocal.shape[1:],
+                        ),
+                        f_type,
+                    )
+                )
+
+                self.HKL_mat = gpuarray.GPUArray(allocator=self.HKL_mat_alloc).get()
+            else:
+                self.HKL_mat = pycuda.driver.pagelocked_empty(
+                    (
+                        self.ref_rotmat.shape[1],
+                        self.ref_rotmat.shape[0],
+                        *pixel_position_reciprocal.shape[1:],
+                    ),
+                    f_type,
+                )
         elif context.finufftpy_available:
             self.H_f = np.empty((self.N_pixels * self.N_batch_size,), dtype=f_type)
             self.K_f = np.empty((self.N_pixels * self.N_batch_size,), dtype=f_type)
@@ -147,19 +170,19 @@ class NUFFT:
         self.N_images = n_images_per_rank
         if settings.use_cufinufft:
             # force deletion of H_a, K_a, L_a if they haven't already been deleted
-            if not n_images_old == 0:
+            if not n_images_old == 0 and not settings.use_pygpu:
                 self.H_a.gpudata.free()
                 self.K_a.gpudata.free()
                 self.L_a.gpudata.free()
             # Store reused datastructures in memory so that we don't
             # constantly deallocate and realloate them
-            self.H_a = gpuarray.empty(
+            self.H_a = gpuarray.GPUArray(
                 shape=(self.N_pixels * self.N_images,), dtype=f_type
             )
-            self.K_a = gpuarray.empty(
+            self.K_a = gpuarray.GPUArray(
                 shape=(self.N_pixels * self.N_images,), dtype=f_type
             )
-            self.L_a = gpuarray.empty(
+            self.L_a = gpuarray.GPUArray(
                 shape=(self.N_pixels * self.N_images,), dtype=f_type
             )
         elif context.finufftpy_available:
@@ -181,12 +204,22 @@ class NUFFT:
         @nvtx.annotate("sequential/orientation_matching.py::modified", is_prefix=True)
         def gpuarray_to_cupy(arr):
             """
-            Convert from cupy to GPUarray(pycuda). The conversion is zero-cost.
+            Convert GPUarray(pycuda or PybindGPU) to cupy. The conversion is zero-cost.
             :param arr
             :return arr
             """
             assert isinstance(arr, gpuarray.GPUArray)
-            return cp.asarray(arr)
+            if settings.use_pygpu:
+                # Create a memory chunk from raw pointer and its size.
+                mem = cp.cuda.UnownedMemory(arr.ptr, arr.nbytes, owner=arr)
+
+                # Wrap it as a MemoryPointer.
+                memptr = cp.cuda.MemoryPointer(mem, offset=0)
+
+                # Create an ndarray view backed by the memory pointer.
+                return cp.ndarray(arr.shape, dtype=arr.dtype, memptr=memptr, strides=arr.strides)
+            else:
+                return cp.asarray(arr)
 
         @staticmethod
         @nvtx.annotate("sequential/autocorrelation.py::modified", is_prefix=True)
@@ -210,17 +243,21 @@ class NUFFT:
             else:
                 raise ValueError("arr order cannot be determined")
 
-            return gpuarray.GPUArray(
-                shape=shape, dtype=arr_dtype, allocator=alloc, order=order
-            )
+            if settings.use_pygpu:
+                return gpuarray.GPUArray(allocator=gpuarray.Allocator(arr), order=order) 
+            else:
+                return gpuarray.GPUArray(
+                    shape=shape, dtype=arr_dtype, allocator=alloc, order=order
+                )
 
         def free_gpuarrays_and_cufinufft_plans(self):
-            self.H_f.gpudata.free()
-            self.K_f.gpudata.free()
-            self.L_f.gpudata.free()
-            self.H_a.gpudata.free()
-            self.K_a.gpudata.free()
-            self.L_a.gpudata.free()
+            if not settings.use_pygpu:
+                self.H_f.gpudata.free()
+                self.K_f.gpudata.free()
+                self.L_f.gpudata.free()
+                self.H_a.gpudata.free()
+                self.K_a.gpudata.free()
+                self.L_a.gpudata.free()
             if hasattr(self, "plan_f"):
                 del self.plan_f
             if hasattr(self, "plan_a"):
@@ -240,10 +277,17 @@ class NUFFT:
             assert H_.shape == K_.shape == L_.shape
 
             if use_recip_sym:
-                assert (ugrid.real == ugrid).get().all()
+                # TODO: We need to fix this when .real is availble in PybindGPU
+                if not settings.use_pygpu:
+                    assert (ugrid.real == ugrid).get().all()
 
             if support is not None:
-                ugrid *= support
+                if settings.use_pygpu:
+                    ugrid_cpu_arr = ugrid.get()
+                    ugrid_cpu_arr *= support
+                    ugrid.set(ugrid_cpu_arr)
+                else:
+                    ugrid *= support
 
             dev_id = cp.cuda.device.Device().id
 
@@ -298,12 +342,12 @@ class NUFFT:
                 )
             self.plan_a[shape].set_pts(self.H_a, self.K_a, self.L_a)
             self.plan_a[shape].execute(nuvect_ga, ugrid)
-            ugrid_gpu = self.gpuarray_to_cupy(ugrid)
-            ugrid_gpu *= support
+            ugrid_cp = self.gpuarray_to_cupy(ugrid)
+            ugrid_cp *= support
             if use_reciprocal_symmetry:
-                ugrid_gpu = ugrid_gpu.real
-            ugrid_gpu /= M**3
-            return ugrid_gpu
+                ugrid_cp = ugrid_cp.real
+            ugrid_cp /= M**3
+            return ugrid_cp
 
     elif mode == "cufinufft1.1":
 
