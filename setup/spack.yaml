@@ -6,7 +6,7 @@ spack:
   specs:
   - python@3.8
   - py-matplotlib
-  - py-numpy
+  - py-numpy@1.23
   - py-scipy
   - py-cupy
   - py-mpi4py
@@ -18,7 +18,7 @@ spack:
   - fftw ~mpi +openmp
 
   - py-cffi    # Legion
-  - py-pybind11    # FINUFFT / PybindGPU
+  - py-pybind11@2.10    # FINUFFT / PybindGPU
   - py-scikit-learn    # skopi
   - py-tqdm    # convenience
   - py-six  # cufinufft
@@ -41,7 +41,7 @@ spack:
   - py-lcls-krtc
 
   # For now, still install pip so that we can bootstrap remaining dependencies.
-  - py-pip
+  - py-pip@23
 
   # make sure we install exactly one copy of each dependency (i.e., no multiple copies of Python)
   concretizer:
