@@ -6,7 +6,7 @@ spack:
   specs:
   - python@3.8
   - py-matplotlib
-  - py-numpy@1.23
+  - py-numpy@1.22
   - py-scipy
   - py-cupy@12.1
   - py-mpi4py
