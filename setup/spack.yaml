@@ -8,13 +8,14 @@ spack:
   - py-matplotlib
   - py-numpy@1.23
   - py-scipy
-  - py-cupy
+  - py-cupy@12.1
   - py-mpi4py
   - py-pytest
   - py-toml
   - py-h5py
   - py-mrcfile
   - py-pynvtx
+  - py-callmonitor
   - fftw ~mpi +openmp
 
   - py-cffi    # Legion
