@@ -83,7 +83,7 @@ def compute_fsc_task(phased, reference, fsc):
     fsc_dict["res"] = resolution
     fsc_dict["final"] = final_cc
     logger.log(
-        f"FSC[conf_idx:{conf_id}, fsc_idx:{idx}]: Check convergence resolution: {resolution:.2f} with cc: {final_cc:.3f} delta_cc:{delta_cc:.5f}.", level=1
+        f"FSC: Check convergence resolution: {resolution:.2f} with cc: {final_cc:.3f} delta_cc:{delta_cc:.5f}.", level=1
     )
     # no change in vals
     if math.isclose(final_cc, min_cc) and math.isclose(delta_cc, min_change_cc):
