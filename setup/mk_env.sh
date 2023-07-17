@@ -118,6 +118,8 @@ EOF
 elif [[ $(hostname --fqdn) = *".frontier."* || $(hostname --fqdn) = *".crusher."* ]]; then
     cat >> env.sh <<EOF
 module load PrgEnv-gnu
+module load gcc/12.2.0
+module load cray-pmi # for GASNet
 module load rocm/5.4.3
 
 export CC=cc

@@ -1,6 +1,6 @@
 compilers:
 - compiler:
-    spec: gcc@11.2.0
+    spec: gcc@12.2.0
     paths:
       cc: gcc
       cxx: g++
@@ -11,14 +11,14 @@ compilers:
     target: any
     modules:
     - PrgEnv-gnu
-    - gcc/11.2.0
+    - gcc/12.2.0
     - craype-x86-trento
     - libfabric
 
 packages:
   all:
-    require: "%gcc@11.2.0"
-    compiler: [gcc@11.2.0]
+    require: "%gcc@12.2.0"
+    compiler: [gcc@12.2.0]
     variants: "+rocm amdgpu_target=gfx90a"
     providers:
       # FIXME (Elliott): prevents py-scipy from building
