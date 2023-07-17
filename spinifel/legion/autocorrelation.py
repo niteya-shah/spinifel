@@ -235,6 +235,7 @@ def solve_simple(
     conf_local = conf_local[group_idx*N_images_per_rank:group_idx*N_images_per_rank+N_images_per_rank]
 
     num_images = np.sum(conf_local, dtype=np.int64)
+    logger.log(f"started solve:[n_conf,conf_index]: [{n_conf},{group_idx}],  conf_shape: {conf.conf_id.shape}, conf_dtype: {conf.conf_id.dtype}, num_images={num_images}", level=2)
     # initialize image_set field to False and update summary to
     # default values and return
     if num_images == 0:
@@ -247,7 +248,7 @@ def solve_simple(
         logger.log(f"default summary solve:[n_conf,conf_index]: [{n_conf},{group_idx}], rlambda:{rlambda}, v1:1000, v2:1000, rank:{rank}, image_set:{summary.image_set[0]}", level=2)
     else:
         ret,W,d = mg.solve_ac_common(slices.data, orientations.quaternions, ac.estimate,
-                                 ac.support, conf_local, rlambda, flambda)
+                                     ac.support, conf_local, rlambda, flambda)
         if not isinstance(ret, np.ndarray):
             ac_res = ret.get()
         else:
