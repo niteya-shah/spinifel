@@ -1,3 +1,4 @@
+import sys
 import pygion
 import numpy as np
 import socket
@@ -83,6 +84,8 @@ def init_conf(conf_p, num_images):
             init_conf_task(conf_p[i], num_images, num_conf, mode, point=i)
 
 # this needs to be updated with the right value
+# if the conformation has converged then fill the image idx
+# that belong to it with min float value
 @nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
 def fill_min_dist(min_dist_p, conf_idx, num_conf):
     N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
@@ -90,7 +93,31 @@ def fill_min_dist(min_dist_p, conf_idx, num_conf):
         dist_idx = i*num_conf + conf_idx
         pygion.fill(min_dist_p[dist_idx], "min_dist", 1000000000.0)
 
-# The reference orientations don't have to match exactly between ranks.
+
+# initialize conf with random values
+# min_dist[images we own] = min val
+# min_dist[images we don't own] = max val
+@nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
+@lgutils.gpu_task_wrapper
+@task(leaf=True, privileges=[RO, WD])
+def update_min_dist_task(conf, min_dist_p, n_images_per_rank, group_idx, rank):
+    conf_local = conf.conf_id
+    conf_local = conf_local[group_idx*n_images_per_rank:group_idx*n_images_per_rank+n_images_per_rank]
+    if settings.verbosity >= 2:
+        num_images = np.sum(conf_local, dtype=np.int64)
+        logger = gprep.multiple_all_objs[group_idx]["logger"]
+        logger.log(f"update_min_dist:[rank, conf_index]: [{rank}, {group_idx}],  conf_shape: {conf_local.shape}, conf_dtype: {conf_local.dtype}, num_images={num_images}", level=2)
+    min_dist_p.min_dist[:] = np.where(conf_local==1, -1, sys.float_info.max)
+
+@nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
+def update_min_dist(conf, min_dist_p, conf_idx, num_conf, n_images_per_rank):
+    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
+    for i in range (N_procs):
+        dist_idx = i*num_conf + conf_idx
+        update_min_dist_task(conf[i], min_dist_p[dist_idx], n_images_per_rank, conf_idx, i,  point=i)
+
+# The reference orientations don't have to match exactly
+# between ranks.
 # Each rank aligns its own slices.
 # We can call the sequential function on each rank, provided that the
 # cost of generating the model_slices isn't prohibitive.
@@ -193,7 +220,8 @@ def match_conf(phased, orientations_p, slices_p, min_dist_p, min_dist_proc, conf
             # check fsc future values -> if convergence has failed then continue with match
             if len(fsc) > 0 and check_convergence_single_conf(fsc[i]):
                 logger.log(f"conformation {i} HAS converged in orientation_matching check")
-                fill_min_dist(min_dist_p, i, settings.N_conformations)
+                update_min_dist(conf_p, min_dist_p, i, settings.N_conformations, n_images_per_rank)
+                #fill_min_dist(min_dist_p, i, settings.N_conformations)
             else:
                 if len(fsc) > 0:
                     logger.log(f"conformation {i} has NOT converged in orientation_matching check")
