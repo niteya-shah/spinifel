@@ -115,21 +115,7 @@ elif [[ ${target} = "psbuild"* ]]; then # psana machines
 
 export LEGION_USE_GASNET=${LEGION_USE_GASNET:-0}
 EOF
-elif [[ $(hostname --fqdn) = *".crusher."* ]]; then
-    cat >> env.sh <<EOF
-module load PrgEnv-gnu
-module load rocm/5.4.3
-module load cray-fftw
-
-export CC=cc
-export CXX=CC
-export CRAYPE_LINK_TYPE=dynamic # allow dynamic linking
-
-export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
-export LEGION_GASNET_CONDUIT=ofi
-export LEGION_GASNET_SYSTEM=slingshot11
-EOF
-elif [[ $(hostname --fqdn) = *".frontier."* ]]; then
+elif [[ $(hostname --fqdn) = *".frontier."* || $(hostname --fqdn) = *".crusher."* ]]; then
     cat >> env.sh <<EOF
 module load PrgEnv-gnu
 module load rocm/5.4.3
@@ -141,19 +127,9 @@ export CRAYPE_LINK_TYPE=dynamic # allow dynamic linking
 export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
 export LEGION_GASNET_CONDUIT=ofi
 export LEGION_GASNET_SYSTEM=slingshot11
-EOF
-elif [[ $(hostname --fqdn) = *".spock."* ]]; then
-    cat >> env.sh <<EOF
-module load PrgEnv-gnu
-module load rocm
 
-export CC=cc
-export CXX=CC
-export CRAYPE_LINK_TYPE=dynamic # allow dynamic linking
-
-export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
-export LEGION_GASNET_CONDUIT=ofi
-export LEGION_GASNET_SYSTEM=slingshot10
+export SPACK_BUILD_CACHE=/lustre/orion/proj-shared/chm137/spack_build_cache
+export SPACK_TARGET_MACHINE=frontier
 EOF
 elif [[ $(hostname --fqdn) = *"darwin"* ]]; then
     cat >> env.sh <<EOF
