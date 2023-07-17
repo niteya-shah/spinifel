@@ -11,12 +11,7 @@ source "$root_dir"/legion_build_dir.sh
 
 pushd "$legion_build"
 
-if [[ ${target} = "psbuild"* ]]; then
-    ${CONDA_PREFIX}/bin/make -j${THREADS:-8}
-    ${CONDA_PREFIX}/bin/make install
-else
-    make -j${THREADS:-8}
-    make install
-fi
+make -j${THREADS:-8}
+make install
 
 popd

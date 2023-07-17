@@ -26,18 +26,12 @@ elif [[ ${target} = "g0"*".stanford.edu" ]]; then # sapling
     make -j${THREADS:-8}
 elif [[ ${target} = "darwin"* ]]; then
     export NVCCFLAGS="-std=c++17 -ccbin=${CXX} -O3 ${NVARCH} -Wno-deprecated-gpu-targets --compiler-options=-fPIC --default-stream per-thread -Xcompiler "\"${CXXFLAGS}\"
-    make -j
+    make -j${THREADS:-8}
 else
     echo "Cannot build cuFINUFFT for this architecture"
     exit
 fi
 
-echo CUFINUFFT_DIR is $CUFINUFFT_DIR
-
-if [[ ${target} = *"crusher"* || ${target} = *"frontier"* ]]; then
-    LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CUFINUFFT_DIR pip install --no-deps --no-cache-dir .
-else
-    LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CUFINUFFT_DIR pip install --no-deps --no-cache-dir .
-fi
+LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$CUFINUFFT_DIR" pip install --no-deps --no-cache-dir .
 
 popd
