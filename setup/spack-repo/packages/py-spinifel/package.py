@@ -4,6 +4,8 @@ from spack.package import *
 class PySpinifel(BundlePackage):
     """This package contains **dependencies** for Spinifel. There is no actual code here."""
 
+    version("0.1")
+
     depends_on("python@3.8")
 
     # Direct dependencies
