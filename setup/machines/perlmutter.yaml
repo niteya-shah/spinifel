@@ -86,23 +86,3 @@ modules:
   prefix_inspections:
     lib: [LD_LIBRARY_PATH]
     lib64: [LD_LIBRARY_PATH]
-  default:
-    'enable:': [lmod]
-    lmod:
-      defaults: [cray-mpich@8.1.25]
-      core_compilers: [gcc@=11.2.0]
-      verbose: true
-      hash_length: 4
-      hierarchy: [mpi]
-      projections: {}
-      core_specs: []
-      exclude_implicits: false
-      include: [cray-mpich]
-      all:
-        autoload: direct
-        environment:
-          set:
-            ${PACKAGE}_ROOT: ${PREFIX}
-        suffixes:
-          +cuda cuda_arch=80: cuda80
-          +openmp: openmp
