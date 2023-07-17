@@ -77,8 +77,6 @@ git clone -c feature.manyFiles=true -b cupy-rocm https://github.com/eugeneswalke
 # git -C $SPACK_ROOT checkout 829b4fe8feeed7baa1a41127f08a15a7eabc8e20 # develop from 2023-07-14
 source $SPACK_ROOT/share/spack/setup-env.sh
 
-spack repo add ./spack-repo
-
 # Link the desired machine config
 if [[ -z $SPACK_TARGET_MACHINE ]]; then
     echo "Please modify mk_env.sh to set SPACK_TARGET_MACHINE for this machine"

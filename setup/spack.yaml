@@ -3,6 +3,9 @@ spack:
   include:
   - spack_machine_config.yaml
 
+  repos:
+  - $spack/../spack-repo
+
   specs:
   # IMPORTANT: see spack-repo/packages/py-spinifel for actual dependencies.
   - py-spinifel
