@@ -4,45 +4,8 @@ spack:
   - spack_machine_config.yaml
 
   specs:
-  - python@3.8
-  - py-matplotlib
-  - py-numpy@1.22
-  - py-scipy
-  - py-cupy@12.1
-  - py-mpi4py
-  - py-pytest
-  - py-toml
-  - py-h5py
-  - py-mrcfile
-  - py-pynvtx
-  - py-callmonitor
-  - fftw ~mpi +openmp
-
-  - py-cffi    # Legion
-  - py-pybind11@2.10    # FINUFFT / PybindGPU
-  - py-scikit-learn    # skopi
-  - py-tqdm    # convenience
-  - py-six  # cufinufft
-  - py-pycuda  # for use with cufinufft
-
-  # lcls2
-  - cmake
-  - py-cython
-  - mongo-c-driver   # FIXME: not sure what Spack's name for Conda's mongodb is
-  - mongo-cxx-driver   # FIXME: not sure what Spack's name for Conda's mongodb is
-  - py-pymongo
-  - curl
-  - rapidjson
-  - py-ipython
-  - py-requests
-  - py-mypy
-  - py-prometheus-client
-  - py-amityping
-  - py-bitstruct
-  - py-lcls-krtc
-
-  # For now, still install pip so that we can bootstrap remaining dependencies.
-  - py-pip@23
+  # IMPORTANT: see spack-repo/packages/py-spinifel for actual dependencies.
+  - py-spinifel
 
   # make sure we install exactly one copy of each dependency (i.e., no multiple copies of Python)
   concretizer:
