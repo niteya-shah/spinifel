@@ -17,7 +17,7 @@ def get_saxs(pixel_distance_reciprocal, mean_image):
     qs = pixel_distance_reciprocal.flatten()
     N = 100
     q_max = qs.max()
-    idx = (N * qs / q_max).astype(np.int)
+    idx = (N * qs / q_max).astype(np.int64)
     saxs_acc = np.bincount(idx, mean_image.flatten(), N)
     saxs_wgt = np.bincount(idx, None, N)
     saxs = saxs_acc / saxs_wgt

@@ -200,7 +200,7 @@ class NUFFT:
         @nvtx.annotate("sequential/orientation_matching.py::modified", is_prefix=True)
         def gpuarray_to_cupy(arr):
             """
-            Convert from cupy to GPUarray(pycuda). The conversion is zero-cost.
+            Convert GPUarray(pycuda or PybindGPU) to cupy. The conversion is zero-cost.
             :param arr
             :return arr
             """
@@ -213,7 +213,7 @@ class NUFFT:
                 memptr = cp.cuda.MemoryPointer(mem, offset=0)
 
                 # Create an ndarray view backed by the memory pointer.
-                return cp.ndarray(arr.shape, dtype=arr.dtype, memptr=memptr)
+                return cp.ndarray(arr.shape, dtype=arr.dtype, memptr=memptr, strides=arr.strides)
             else:
                 return cp.asarray(arr)
 
@@ -240,7 +240,7 @@ class NUFFT:
                 raise ValueError("arr order cannot be determined")
 
             if settings.use_pygpu:
-                return gpuarray.GPUArray(allocator=gpuarray.Allocator(arr)) 
+                return gpuarray.GPUArray(allocator=gpuarray.Allocator(arr), order=order) 
             else:
                 return gpuarray.GPUArray(
                     shape=shape, dtype=arr_dtype, allocator=alloc, order=order
@@ -400,24 +400,24 @@ class NUFFT:
             # print(f"- plan_a check nan {check_nan} time {check_nan_time}")
             
             start_time = time.time()
-            ugrid_gpu = self.gpuarray_to_cupy(ugrid)
-            ugrid_gpu *= support
+            ugrid_cp = self.gpuarray_to_cupy(ugrid)
+            ugrid_cp *= support
             if use_reciprocal_symmetry:
-                ugrid_gpu = ugrid_gpu.real
-            ugrid_gpu /= M**3
+                ugrid_cp = ugrid_cp.real
+            ugrid_cp /= M**3
             end_time = time.time()
             diff_time = end_time - start_time
             print(f"- - In adjoint final GPU array time {diff_time} at {time.time()-adjoint_start_time}")
 ###            start_time = time.time()
-###            check_nan = cp.any(cp.isnan(ugrid_gpu)) > 0
+###            check_nan = cp.any(cp.isnan(ugrid_cp)) > 0
 ###            print(f"- - In adjoint plan_a check nan {check_nan}")
 ###            end_time = time.time()
 ###            check_nan_time = end_time - start_time
-###            print(f"- - In adjoint plan_a check nan shape {ugrid_gpu.shape} time {check_nan_time} at {time.time()-adjoint_start_time}")
+###            print(f"- - In adjoint plan_a check nan shape {ugrid_cp.shape} time {check_nan_time} at {time.time()-adjoint_start_time}")
             adjoint_end_time = time.time()
             adjoint_time = adjoint_end_time - adjoint_start_time
             print(f"- - In adjoint TOTAL adjoint time {adjoint_time} at {time.time()-adjoint_start_time}")
-            return ugrid_gpu
+            return ugrid_cp
 
     elif mode == "cufinufft1.1":
 

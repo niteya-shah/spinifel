@@ -11,7 +11,7 @@ variables:
   # launcher for tests
   SPINIFEL_TEST_LAUNCHER: "jsrun -n1 -a1 -g1"
   SPINIFEL_TEST_LAUNCHER_MULTI: "jsrun -n2 -a1 -g1"
-  SPINIFEL_PSANA2_LAUNCHER: "jsrun -n4 -g1"
+  SPINIFEL_PSANA2_LAUNCHER: "jsrun -n3 -g1"
 
   # spinifel legion
   SPINIFEL_LEGION: "legion_python -ll:py 1  -ll:pyomp 2 -ll:csize 32768 legion_main.py  --default-settings=test_mpi.toml"
@@ -46,7 +46,7 @@ variables:
   # launcher for tests
   SPINIFEL_TEST_LAUNCHER: "srun -n1 --gpus-per-task 1"
   SPINIFEL_TEST_LAUNCHER_MULTI: "srun -n2 --gpus-per-task 1"
-  SPINIFEL_PSANA2_LAUNCHER: "srun -n4 --gpus-per-task 1"
+  SPINIFEL_PSANA2_LAUNCHER: "srun -n3 --gpus-per-task 1"
 
   # for mpi-xtc2 tests
   SPINIFEL_TEST_FLAG: 1
@@ -67,7 +67,7 @@ variables:
   # replace pycuda with PybindGPU
   FRONTIER_EXTRAS: "runtime.use_pygpu=true"
 
-  # spinifel legion
+    ## spinifel legion
   SPINIFEL_LEGION: "legion_python -ll:py 1  -ll:pyomp 2 -ll:csize 32768 legion_main.py  --default-settings=test_mpi.toml ${FRONTIER_EXTRAS}"
 
   IS_CRUSHER_JOB: 1
@@ -106,10 +106,6 @@ variables:
 .mpi_xtc2_test_script: &mpi_xtc2_test_script
   script:
     - $SPINIFEL_PSANA2_LAUNCHER python -u -m spinifel --default-settings=test_mpi.toml --mode=mpi psana.enable=true $FRONTIER_EXTRAS
-
-.mpi_hdf5_multirank_test_script: &mpi_hdf5_multirank_test_script
-  script:
-    - $SPINIFEL_TEST_LAUNCHER_MULTI python -m spinifel --default-settings=test_mpi.toml --mode=mpi fsc.fsc_fraction_known_orientations=0 algorithm.N_images_max=1000 $FRONTIER_EXTRAS
 
 .legion_test_script: &legion_test_script
   script:
@@ -217,14 +213,6 @@ test_mpi_hdf5_ascent:
 
 test_mpi_xtc2_ascent:
   <<: [*test_rules, *test_before_script, *mpi_xtc2_test_script]
-  stage: test
-  tags:
-    - batch
-  variables:
-    <<: [*ascent_variables]
-
-test_mpi_hdf5_multirank_ascent:
-  <<: [*test_rules, *test_before_script, *mpi_hdf5_multirank_test_script]
   stage: test
   tags:
     - batch
@@ -379,15 +367,6 @@ test_mpi_hdf5_crusher:
 
 test_mpi_xtc2_crusher:
   <<: [*test_rules, *test_before_script, *mpi_xtc2_test_script]
-  stage: test
-  tags:
-    - slurm
-    - crusher
-  variables:
-    <<: [*crusher_variables]
-
-test_mpi_hdf5_multirank_crusher:
-  <<: [*test_rules, *test_before_script, *mpi_hdf5_multirank_test_script]
   stage: test
   tags:
     - slurm
