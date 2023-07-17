@@ -104,7 +104,7 @@ spack buildcache keys -it # FIXME (Elliott): do we still need this?
 # install directory so that we avoid issues in the future.
 spack config add config:install_tree:padded_length:512
 
-cp -f ./machines/$SPACK_TARGET_MACHINE.lock ./spack.lock
+cp ./machines/$SPACK_TARGET_MACHINE.lock ./spack.lock || true
 spack -e . concretize ${SPACK_FORCE_CONCRETIZE:+-f -U}
 cp ./spack.lock ./machines/$SPACK_TARGET_MACHINE.lock
 
