@@ -75,7 +75,6 @@ export SPINIFEL_LEGION="legion_python -ll:py 1  -ll:pyomp 2 -ll:csize 32768 legi
 
 #DEBUG_FLAG="-Xfaulthandler"
 
-export USE_CUPY=1
 
 export USE_CUPY=1
 
