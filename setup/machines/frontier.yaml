@@ -46,7 +46,7 @@ packages:
     buildable: false
     externals:
     - spec: cray-mpich@8.1.23 %gcc
-      prefix: /opt/cray/pe/mpich/8.1.23/ofi/crayclang/10.0
+      prefix: /opt/cray/pe/mpich/8.1.23/ofi/gnu/9.1
       modules:
       - cray-mpich/8.1.23
   libfabric:
