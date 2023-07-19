@@ -2,7 +2,6 @@
 
 set -e
 
-# Ensure that the local conda environment has been loaded
 root_dir="$(dirname "${BASH_SOURCE[0]}")"
 source "$root_dir"/env.sh
 

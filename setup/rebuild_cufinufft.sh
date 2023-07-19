@@ -7,7 +7,7 @@ source "$root_dir"/env.sh
 
 # Enable host overwrite
 target=${SPINIFEL_TARGET:-${NERSC_HOST:-$(hostname --fqdn)}}
-echo $target
+
 pushd "$root_dir"/cufinufft
 
 if [[ ${target} = "cgpu"* ]]; then
