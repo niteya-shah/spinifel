@@ -73,7 +73,7 @@ unset LD_PRELOAD
 #_______________________________________________________________________________
 # Install spack and set up local environment
 
-git clone -c feature.manyFiles=true -b cupy-rocm https://github.com/eugeneswalker/spack.git $SPACK_ROOT
+git clone -c feature.manyFiles=true -b eds/cupy-rocm https://github.com/elliottslaughter/spack.git $SPACK_ROOT
 # git -C $SPACK_ROOT checkout 829b4fe8feeed7baa1a41127f08a15a7eabc8e20 # develop from 2023-07-14
 source $SPACK_ROOT/share/spack/setup-env.sh
 
