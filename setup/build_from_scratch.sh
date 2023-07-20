@@ -119,27 +119,9 @@ pip install --no-cache-dir gdown
 
 
 #_______________________________________________________________________________
-# Install GASNET
+# Install Legion Mapper
 
-if [[ $LEGION_USE_GASNET -eq 1 && $GASNET_ROOT == ${root_dir}/gasnet/release ]]
-then
-    pushd gasnet
-    make -j${THREADS:-8}
-    popd
-fi
-
-#-------------------------------------------------------------------------------
-
-
-#_______________________________________________________________________________
-# Install Legion
-
-if [[ $LG_RT_DIR == ${root_dir}/legion/runtime ]]
-then
-    ./reconfigure_legion.sh
-    ./rebuild_legion.sh
-    ./mapper_clean_build.sh
-fi
+./mapper_clean_build.sh
 
 #-------------------------------------------------------------------------------
 
