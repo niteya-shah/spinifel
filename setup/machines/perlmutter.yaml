@@ -32,6 +32,8 @@ packages:
     variants: +bzip2 ~nls +xz
   libunwind:
     variants: +pic +xz
+  legion:
+    variants: conduit=ofi-slingshot11
   ncurses:
     require: "@6.3 +termlib"
   openblas:
