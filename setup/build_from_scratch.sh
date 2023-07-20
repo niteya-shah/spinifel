@@ -270,14 +270,6 @@ fi
 
 
 #_______________________________________________________________________________
-# Install LCLS2 (aka PSANA2)
-
-./psana_clean_build.sh
-
-#-------------------------------------------------------------------------------
-
-
-#_______________________________________________________________________________
 # Overwrite the conda libraries with system libraries => don't let anaconda
 # provide libraries (like openmp) that are already provided by the system
 
