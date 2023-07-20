@@ -21,7 +21,7 @@ class PySpinifel(BundlePackage):
     depends_on("py-pynvtx")
     depends_on("py-callmonitor")
     depends_on("py-tqdm")
-    depends_on("legion@79ef214c877b9856f0961ea68b446c0d08ef35ef=cr ~cuda ~rocm +python +bindings +shared +openmp +hdf5 max_dims=4 max_nodes=4096 network=gasnet")
+    depends_on("legion@79ef214c877b9856f0961ea68b446c0d08ef35ef=cr ~cuda ~rocm +python +bindings +shared +openmp +hdf5 max_dims=4 max_num_nodes=4096 network=gasnet")
     depends_on("fftw ~mpi +openmp")
 
     # Transitive dependencies
