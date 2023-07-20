@@ -10,7 +10,7 @@ from inspect import getmembers
 from pathlib import Path
 from os.path import join, abspath, dirname, expandvars
 from toml import load
-from argparse import ArgumentParser
+from argparse import ArgumentParser, Namespace
 
 from .utils import Singleton
 
@@ -526,25 +526,22 @@ class SpinifelSettings(metaclass=Singleton):
             "CHK_CONVERGENCE": ("_chk_convergence", get_bool),
         }
 
-        p = ArgumentParser()
-        p.add_argument("--settings", type=str, nargs=1, default=None)
-        p.add_argument("--default-settings", type=str, nargs=1, default=None)
-        p.add_argument("--mode", type=str, nargs=1, required=True)
-        p.add_argument("-t", "--tag-generation", type=str, default=None)
-        p.add_argument("-g", "--load-generation", type=int, default=-1)
+        self.__args = Namespace(settings=None, default_settings=None)
+        self.__params = []
 
-        self.__args, self.__params = p.parse_known_args()
+    def set_args(self, **kwargs):
+        kwargs.setdefault("settings", None)
+        kwargs.setdefault("default_settings", None)
+        self.__args = Namespace(**kwargs)
 
-        self.mode = self.__args.mode[0]
-        self.tag_gen = self.__args.tag_generation
-        self.load_gen = self.__args.load_generation
+    def set_params(self, *params):
+        self.__params = list(*params)
 
+    def apply_settings(self):
         if (self.__args.settings is None) and (self.__args.default_settings is None):
             raise CannotProcessSettingsFile
 
-        if (self.__args.settings is not None) and (
-            self.__args.default_settings is not None
-        ):
+        if (self.__args.settings is not None) and (self.__args.default_settings is not None):
             raise CannotProcessSettingsFile
 
         if self.__args.default_settings is not None:
@@ -558,6 +555,22 @@ class SpinifelSettings(metaclass=Singleton):
             self.__toml = self.__args.settings[0]
 
         self.refresh()
+
+    def from_cli(self):
+        p = ArgumentParser()
+        p.add_argument("--settings", type=str, nargs=1, default=None)
+        p.add_argument("--default-settings", type=str, nargs=1, default=None)
+        p.add_argument("--mode", type=str, nargs=1, required=True)
+        p.add_argument("-t", "--tag-generation", type=str, default=None)
+        p.add_argument("-g", "--load-generation", type=int, default=-1)
+
+        self.__args, self.__params = p.parse_known_args()
+
+        self.mode = self.__args.mode[0]
+        self.tag_gen = self.__args.tag_generation
+        self.load_gen = self.__args.load_generation
+
+        self.apply_settings()
 
     def __fget(self, attr):
         """Creates closure for fget lambda"""

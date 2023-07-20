@@ -14,7 +14,7 @@ variables:
   SPINIFEL_PSANA2_LAUNCHER: "jsrun -n3 -g1"
 
   # spinifel legion
-  SPINIFEL_LEGION: "legion_python -ll:py 1  -ll:pyomp 2 -ll:csize 32768 legion_main.py  --default-settings=test_mpi.toml"
+  SPINIFEL_LEGION: "legion_python -ll:py 1  -ll:pyomp 2 -ll:csize 32768 legion_main.py  --default-settings=test_mpi.toml fsc.fsc_fraction_known_orientations=1.0"
 
   # for mpi-xtc2 tests
   SPINIFEL_TEST_FLAG: 1
@@ -67,8 +67,8 @@ variables:
   # replace pycuda with PybindGPU
   FRONTIER_EXTRAS: "runtime.use_pygpu=true"
 
-    ## spinifel legion
-  SPINIFEL_LEGION: "legion_python -ll:py 1  -ll:pyomp 2 -ll:csize 32768 legion_main.py  --default-settings=test_mpi.toml ${FRONTIER_EXTRAS}"
+  # spinifel legion
+  SPINIFEL_LEGION: "legion_python -ll:py 1  -ll:pyomp 2 -ll:csize 32768 legion_main.py  --default-settings=test_mpi.toml fsc.fsc_fraction_known_orientations=1.0 ${FRONTIER_EXTRAS}"
 
   IS_CRUSHER_JOB: 1
 

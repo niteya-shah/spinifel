@@ -91,6 +91,7 @@ $SPINIFEL_TEST_LAUNCHER python $DEBUG_FLAG -m spinifel --default-settings=test_m
 PYTHONPATH="$PYTHONPATH:$EXTERNAL_WORKDIR:$PWD/mpi4py_poison_wrapper" $SPINIFEL_TEST_LAUNCHER_MULTI $SPINIFEL_LEGION --mode=legion
 
 
+
 # test_mpi_xtc2
 $SPINIFEL_PSANA2_LAUNCHER python -u -m spinifel --default-settings=test_mpi.toml --mode=mpi psana.enable=true $FRONTIER_EXTRAS
 

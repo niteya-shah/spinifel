@@ -170,6 +170,10 @@ def load_orientations(orientations, i_start, i_end):
     with h5py.File(settings.data_path, "r") as h5f:
         orientations[:] = h5f["orientations"][i_start:i_end]
 
+@nvtx.annotate("prep.py", is_prefix=True)
+def load_conformations(conf, i_start, i_end):
+    with h5py.File(settings.data_path, "r") as h5f:
+        conf[:] = h5f["conformation"][i_start:i_end]
 
 @nvtx.annotate("prep.py", is_prefix=True)
 def load_volume(volume):

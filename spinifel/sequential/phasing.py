@@ -6,9 +6,6 @@ from spinifel import SpinifelSettings, settings, image, utils
 
 # only for timing
 import time
-
-# import omnitrace
-
 # settings = SpinifelSettings()
 logger = utils.Logger(True, settings)
 
@@ -212,7 +209,6 @@ def step_phase(rho_, amplitudes_, amp_mask_, support_):
         end_time = time.time()
         fftxp_time = end_time - start_time
         # fftxp.utils.print_diff(xp, rho_mod_, rho_mod_fftx, "step_phase rho_mod_")
-        print(f"SHAPES rho_ {rho_.shape}, amplitudes_ {amplitudes_.shape}, phases_ {phases_.shape}")
         fftxp.utils.print_diff(xp, fp_rho_mod_, rho_mod_, "step_phase cupy_fftx_tfm__rho_mod_")
         fftxp.utils.print_diff(xp, rho_mod_, phases_, "step_phase fftx_tfm_all_rho_mod_") # REUSE phases_ for rho_mod_fftx
         fftxp.utils.print_diff(xp, fp_rho_mod_, phases_, "step_phase cupy_fftx_all_rho_mod_") # REUSE phases_ for rho_mod_fftx
@@ -254,7 +250,6 @@ def shrink_wrap(sigma, rho_, support_, method=None, weight=1.0, cutoff=0.05):
 
 
 @nvtx.annotate("sequential/phasing.py", is_prefix=True)
-# @omnitrace.profile()
 def phase(
     generation, ac, support_=None, rho_=None, method=None, weight=1.0, group_idx=0
 ):

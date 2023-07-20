@@ -57,6 +57,7 @@ class Merge:
         # every time
         self.M = settings.M
         self.N_images = slices_.shape[0]
+
         self.N = np.prod(slices_.shape)
         self.reciprocal_extent = pixel_distance_reciprocal.max()
         self.use_reciprocal_symmetry = True
@@ -88,16 +89,10 @@ class Merge:
         reduced_det_shape = settings.reduced_det_shape
         self.N_pixels = np.prod(reduced_det_shape)
 
-        # lu = np.linspace(-np.pi, np.pi, self.M)
-        # Use integers instead of reals in order to avoid roundoff peculiarities.
-        Mhalf = (self.M-1)//2
-        iu = range(-Mhalf, Mhalf+1)
-        # Hu_, Ku_, Lu_ = np.meshgrid(lu, lu, lu, indexing="ij")
-        Hi_, Ki_, Li_ = np.meshgrid(iu, iu, iu, indexing="ij")
-        # Qu_ = np.sqrt(Hu_**2 + Ku_**2 + Lu_**2)
-        Qi2_ = Hi_**2 + Ki_**2 + Li_**2
-        # F_antisupport = Qu_ > np.pi / settings.oversampling
-        F_antisupport = (Qi2_ * settings.oversampling**2 > Mhalf**2)
+        lu = np.linspace(-np.pi, np.pi, self.M)
+        Hu_, Ku_, Lu_ = np.meshgrid(lu, lu, lu, indexing="ij")
+        Qu_ = np.sqrt(Hu_**2 + Ku_**2 + Lu_**2)
+        F_antisupport = Qu_ > np.pi / settings.oversampling
         assert np.all(F_antisupport == F_antisupport[::-1, :, :])
         assert np.all(F_antisupport == F_antisupport[:, ::-1, :])
         assert np.all(F_antisupport == F_antisupport[:, :, ::-1])
@@ -129,14 +124,12 @@ class Merge:
                 self.pixel_position_reciprocal,
                 optimize="optimal",
             )[0]
-        print(f"einsum input shapes rotmat {rotmat.shape}, self.pixel_position_reciprocal {self.pixel_position_reciprocal.shape}")
         H, K, L = np.einsum(
             "ijk,klmn->jilmn",
             rotmat,
             self.pixel_position_reciprocal,
             optimize=self.einsum_path,
         )
-        print(f"einsum output types/shapes H {H.dtype} {H.shape}, K {K.dtype} {K.shape}, L {L.dtype} {L.shape}")
         # shape->[N_images] x det_shape
         return H, K, L
 
@@ -224,7 +217,6 @@ class Merge:
             end_time = time.time()
             fftxp_time = end_time - start_time
 
-            print(f"SHAPES ugrid {ugrid.shape}, F_ugrid_conv_ {F_ugrid_conv_.shape}, ugrid_conv_out_fftx {ugrid_conv_out_fftx.shape}")
             fftxp.utils.print_diff(xp, ugrid_conv_out, ugrid_conv_out_fftx,
                                    "core_problem_convolution fftx_tfm_all_ugrid_conv_out")
             fftxp.utils.print_diff(xp, cp_ugrid_conv_out, ugrid_conv_out_fftx,
@@ -247,13 +239,12 @@ class Merge:
         K_ = K.reshape(-1) * self.mult
         L_ = L.reshape(-1) * self.mult
 
-        print(f"DEBUG in setup_linops calling self.nufft.adjoint")
         ugrid_conv = xp.array(
             self.nufft.adjoint(
                 self.nuvect, H_, K_, L_, 1, self.use_reciprocal_symmetry, self.M_ups
             )
         )
-        F_ugrid_conv_ = self._fftn(ugrid_conv) / self.M**3
+        F_ugrid_conv_ = self._fftn(ugrid_conv)
 
         def W_matvec(uvect):
             """Define W part of the W @ x = d problem."""
@@ -266,7 +257,6 @@ class Merge:
             dtype=c_type, shape=(self.M**3, self.M**3), matvec=W_matvec
         )
 
-        print(f"DEBUG in W_matvec calling self.nufft.adjoint")
         uvect_ADb = xp.array(
             self.nufft.adjoint(
                 self.nuvect_Db,
@@ -301,15 +291,8 @@ class Merge:
         ac_support = xp.array(ac_support)
         x0 = ac_estimate.reshape(-1)
 
-        start_time = time.time()
         W, d = self.setup_linops(H, K, L, ac_support, x0)
-        end_time = time.time()
-        setup_linops_time = end_time - start_time
-        start_time = time.time()
         ret, info = cg(W, d, x0=x0, maxiter=self.maxiter, callback=self.callback)
-        end_time = time.time()
-        cg_time = end_time - start_time
-        print(f"TIME FOR sequential solve_ac:  setup_linops {setup_linops_time}, cg {cg_time}")
         ac = ret.reshape((self.M,) * 3).get()
         if self.use_reciprocal_symmetry:
             assert np.all(np.isreal(ac))
@@ -317,3 +300,56 @@ class Merge:
         it_number = self.callback.counter
 
         return ac
+
+    # this is a place holder method for multiple conformations and
+    # needs to be UPDATED
+    # the weight argument is the conformation weight/value for each
+    # image. The algorithm used to compute weight is either
+    # softmax or max_likelihood and can be set
+    # via the algorithm.conf_mode options
+    # extract relevant slices and orientations based on weights we got back
+    # from orientation matching
+    # current support is for max_likelihood mode
+    @nvtx.annotate("sequential/autocorrelation.py::modified", is_prefix=True)
+    def solve_ac_common(self, slices, orients, ac_estimate, ac_support, weights, rlambda, flambda):
+        self.rlambda = rlambda
+        self.flambda = flambda
+        wall = (weights==1).all()
+        num_images = np.sum(weights,dtype=np.int64)
+        logger.log(f"solve_ac_common:[wall]:{wall}, num_images:{num_images}",level=2)
+
+        # if algorithm.conf_mode == max_likelihood/test_debug, extract relevant slices and orientations
+        if not wall:
+            orientations =  np.array(orients[np.where(weights == 1)])
+            data = np.array(slices[np.where(weights == 1)])
+        else:
+            orientations = orients
+            data = slices
+
+        if settings.N_conformations > 1:
+            data = np.array(data.reshape(-1), dtype=f_type)
+            self.nuvect_Db = xp.array((data).astype(c_type))
+            self.nuvect = xp.ones_like(data, dtype=c_type)
+            logger.log(f"solve_ac_common:[data]:{data.shape}, {data.dtype}",level=2)
+            logger.log(f"solve_ac_common:[orientations]:{orientations.shape}, {orientations.dtype}", level=2)
+
+        H, K, L = self.get_non_uniform_positions(orientations)
+        ac_estimate = xp.array(ac_estimate)
+        ac_support = xp.array(ac_support)
+        x0 = ac_estimate.reshape(-1)
+        W, d = self.setup_linops(H, K, L, ac_support, x0)
+
+        ret, info = cg(W, d, x0=x0, maxiter=self.maxiter, callback=self.callback)
+        if info != 0:
+            print(f"WARNING: CG did not converge at rlambda = {self.rlambda}")
+        ac = ret.reshape((self.M,) * 3).get()
+        if self.use_reciprocal_symmetry:
+            assert np.all(np.isreal(ac))
+        it_number = self.callback.counter
+        return ret,W,d
+
+@nvtx.annotate("sequential/autocorrelation.py::modified", is_prefix=True)
+def ac_with_noise(ac):
+    mu,sigma = 0.0, 0.001 # mean and standard deviation
+    noise = np.random.normal(mu,sigma, ac.shape)
+    return ac + noise

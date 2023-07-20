@@ -6,6 +6,9 @@ from . import settings, utils
 
 if __name__ == "__main__":
 
+    # Get settings from CLI
+    settings.from_cli()
+
     logger = utils.Logger(True, settings)
     logger.log(settings, level=1)
 

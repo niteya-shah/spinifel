@@ -1,3 +1,4 @@
+import sys
 import pygion
 import numpy as np
 import socket
@@ -55,6 +56,12 @@ def init_conf_task(conf, num_images, num_conf, mode):
         x[i] = np.where(arg_index==i, 1.0, 0.0)
     conf.conf_id[:] = x.reshape(num_conf*num_images)
 
+# initialize conf with pre-determined values
+@nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
+def init_conf_known(conf, num_images, num_conf, mode, n_procs):
+    for i in range (n_procs):
+        gprep.load_conformations_prior(conf[i], num_conf, i, settings.N_images_per_rank, point=i)
+
 # initialize conf with random values
 @nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
 def init_conf(conf_p, num_images):
@@ -66,11 +73,19 @@ def init_conf(conf_p, num_images):
     if num_conf == 1 or mode == "test_debug":
         for i in range (N_procs):
             pygion.fill(conf_p[i], "conf_id", 1.0)
+            # support fsc_fraction_known_orientations = 1.0 only
+            # only way to get deterministic results
+            #    elif num_conf > 1 and settings.fsc_fraction_known_orientations == 1.0:
+            #        init_conf_known(conf_p, num_images, num_conf, mode, N_procs)
+            #    elif num_conf > 1:
+            #        assert settings.fsc_fraction_known_orientations != 0.0:
     else:
         for i in range (N_procs):
             init_conf_task(conf_p[i], num_images, num_conf, mode, point=i)
 
 # this needs to be updated with the right value
+# if the conformation has converged then fill the image idx
+# that belong to it with min float value
 @nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
 def fill_min_dist(min_dist_p, conf_idx, num_conf):
     N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
@@ -78,7 +93,31 @@ def fill_min_dist(min_dist_p, conf_idx, num_conf):
         dist_idx = i*num_conf + conf_idx
         pygion.fill(min_dist_p[dist_idx], "min_dist", 1000000000.0)
 
-# The reference orientations don't have to match exactly between ranks.
+
+# initialize conf with random values
+# min_dist[images we own] = min val
+# min_dist[images we don't own] = max val
+@nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
+@lgutils.gpu_task_wrapper
+@task(leaf=True, privileges=[RO, WD])
+def update_min_dist_task(conf, min_dist_p, n_images_per_rank, group_idx, rank):
+    conf_local = conf.conf_id
+    conf_local = conf_local[group_idx*n_images_per_rank:group_idx*n_images_per_rank+n_images_per_rank]
+    if settings.verbosity >= 2:
+        num_images = np.sum(conf_local, dtype=np.int64)
+        logger = gprep.multiple_all_objs[group_idx]["logger"]
+        logger.log(f"update_min_dist:[rank, conf_index]: [{rank}, {group_idx}],  conf_shape: {conf_local.shape}, conf_dtype: {conf_local.dtype}, num_images={num_images}", level=2)
+    min_dist_p.min_dist[:] = np.where(conf_local==1, -1, sys.float_info.max)
+
+@nvtx.annotate("legion/orientation_matching.py", is_prefix=True)
+def update_min_dist(conf, min_dist_p, conf_idx, num_conf, n_images_per_rank):
+    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
+    for i in range (N_procs):
+        dist_idx = i*num_conf + conf_idx
+        update_min_dist_task(conf[i], min_dist_p[dist_idx], n_images_per_rank, conf_idx, i,  point=i)
+
+# The reference orientations don't have to match exactly
+# between ranks.
 # Each rank aligns its own slices.
 # We can call the sequential function on each rank, provided that the
 # cost of generating the model_slices isn't prohibitive.
@@ -181,7 +220,8 @@ def match_conf(phased, orientations_p, slices_p, min_dist_p, min_dist_proc, conf
             # check fsc future values -> if convergence has failed then continue with match
             if len(fsc) > 0 and check_convergence_single_conf(fsc[i]):
                 logger.log(f"conformation {i} HAS converged in orientation_matching check")
-                fill_min_dist(min_dist_p, i, settings.N_conformations)
+                update_min_dist(conf_p, min_dist_p, i, settings.N_conformations, n_images_per_rank)
+                #fill_min_dist(min_dist_p, i, settings.N_conformations)
             else:
                 if len(fsc) > 0:
                     logger.log(f"conformation {i} has NOT converged in orientation_matching check")
