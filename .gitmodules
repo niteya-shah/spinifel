@@ -1,9 +1,3 @@
-[submodule "setup/gasnet"]
-	path = setup/gasnet
-	url = https://github.com/StanfordLegion/gasnet.git
-[submodule "setup/legion"]
-	path = setup/legion
-	url = https://gitlab.com/StanfordLegion/legion.git
 [submodule "setup/lcls2"]
 	path = setup/lcls2
 	url = https://github.com/slac-lcls/lcls2.git
