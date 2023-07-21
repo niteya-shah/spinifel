@@ -20,7 +20,7 @@ packages:
     providers:
       mpi: [spectrum-mpi]
   boost:
-    require: "@1.68"
+    require: "@1.69"
   mpi:
     require: spectrum-mpi
   cuda:

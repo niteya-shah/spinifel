@@ -11,12 +11,12 @@
   },
   "roots": [
     {
-      "hash": "xyjqznxcng6zq6hcxqbeuxyi2fw2u7hh",
+      "hash": "5jhqjb7sb5tjvh4stx2g7p4ncfeg4t6y",
       "spec": "py-spinifel"
     }
   ],
   "concrete_specs": {
-    "xyjqznxcng6zq6hcxqbeuxyi2fw2u7hh": {
+    "5jhqjb7sb5tjvh4stx2g7p4ncfeg4t6y": {
       "name": "py-spinifel",
       "version": "0.1",
       "arch": {
@@ -282,7 +282,7 @@
         },
         {
           "name": "py-pycuda",
-          "hash": "gfinz5ze6adkzrl2e6wdgljwxw6pjise",
+          "hash": "hhpd2vpk2yaanzaltd75rjvlb57onfo5",
           "parameters": {
             "deptypes": [
               "build",
@@ -413,7 +413,7 @@
           }
         }
       ],
-      "hash": "xyjqznxcng6zq6hcxqbeuxyi2fw2u7hh"
+      "hash": "5jhqjb7sb5tjvh4stx2g7p4ncfeg4t6y"
     },
     "yzgjxz7zla2hxz4tarix6446vsjpfnck": {
       "name": "cmake",
@@ -10979,7 +10979,7 @@
       ],
       "hash": "774t3yku45loymfkhz4pfsnzvqifgtf7"
     },
-    "gfinz5ze6adkzrl2e6wdgljwxw6pjise": {
+    "hhpd2vpk2yaanzaltd75rjvlb57onfo5": {
       "name": "py-pycuda",
       "version": "2021.1",
       "arch": {
@@ -11013,7 +11013,7 @@
       "dependencies": [
         {
           "name": "boost",
-          "hash": "scpfmsgtjwpbplb57fuefuddxulm2mcv",
+          "hash": "fv6ghb2jufenvbbcugwx2aou6tprbqwg",
           "parameters": {
             "deptypes": [
               "build",
@@ -11119,11 +11119,11 @@
           }
         }
       ],
-      "hash": "gfinz5ze6adkzrl2e6wdgljwxw6pjise"
+      "hash": "hhpd2vpk2yaanzaltd75rjvlb57onfo5"
     },
-    "scpfmsgtjwpbplb57fuefuddxulm2mcv": {
+    "fv6ghb2jufenvbbcugwx2aou6tprbqwg": {
       "name": "boost",
-      "version": "1.68.0",
+      "version": "1.69.0",
       "arch": {
         "platform": "linux",
         "platform_os": "rhel8",
@@ -11170,7 +11170,10 @@
         "nowide": false,
         "numpy": false,
         "patches": [
-          "2ab6c72d03dec6a4ae20220a9dfd5c8c572c5294252155b85c6874d97c323199"
+          "2ab6c72d03dec6a4ae20220a9dfd5c8c572c5294252155b85c6874d97c323199",
+          "3a83d907043708218325c35ffc318fd6d6cfd78ba89a78f2c70013c72603e5b8",
+          "5da7ad24de07adc1e99b2bab8b5aeefa0059d0f0ace932788c7746f9117d9917",
+          "607b0772dec1287c9084ae3b36ee32bff945a2fe5e608823ed47a1ea765c84cd"
         ],
         "pic": false,
         "program_options": true,
@@ -11199,9 +11202,12 @@
         "ldlibs": []
       },
       "patches": [
-        "2ab6c72d03dec6a4ae20220a9dfd5c8c572c5294252155b85c6874d97c323199"
+        "2ab6c72d03dec6a4ae20220a9dfd5c8c572c5294252155b85c6874d97c323199",
+        "3a83d907043708218325c35ffc318fd6d6cfd78ba89a78f2c70013c72603e5b8",
+        "607b0772dec1287c9084ae3b36ee32bff945a2fe5e608823ed47a1ea765c84cd",
+        "5da7ad24de07adc1e99b2bab8b5aeefa0059d0f0ace932788c7746f9117d9917"
       ],
-      "package_hash": "l2g6nhrgwts74zwk44ds5bepxf23f4t7m6tyr2z7w7xsocnzfvha====",
+      "package_hash": "havpgai5bcnt7kzcncv7t5o7cs4ckago3efmvrv7unalopml3bba====",
       "dependencies": [
         {
           "name": "bzip2",
@@ -11259,7 +11265,7 @@
           }
         }
       ],
-      "hash": "scpfmsgtjwpbplb57fuefuddxulm2mcv"
+      "hash": "fv6ghb2jufenvbbcugwx2aou6tprbqwg"
     },
     "seva34ng2nadu72ycfrdbbq2mpgqxftb": {
       "name": "py-appdirs",
