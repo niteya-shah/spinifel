@@ -145,16 +145,6 @@ fi
 
 
 #_______________________________________________________________________________
-# Rebuild FFTW (only needed on some systems -- that don't supply their own)
-
-if [[ ${target} = *"tulip"* || ${target} = *"jlse"* || ${target} = "g0"*".stanford.edu" || ${target} = "psbuild"* ]]; then
-    ./rebuild_fftw.sh
-fi
-
-#-------------------------------------------------------------------------------
-
-
-#_______________________________________________________________________________
 # Install finufft
 
 ./rebuild_finufft.sh
