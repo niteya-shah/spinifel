@@ -74,16 +74,14 @@ export SPACK_TARGET_MACHINE=perlmutter
 EOF
 elif [[ ${target} = *"summit"* || ${target} = *"ascent"* ]]; then
     cat >> env.sh <<EOF
-module load gcc/11.1.0
+module load gcc/9.1.0
+module load cuda/11.0.3
 
 export CC=gcc
 export CXX=g++
 
 export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
 export LEGION_GASNET_CONDUIT=ibv
-
-# for Numba
-export CUDA_HOME=\$OLCF_CUDA_ROOT
 
 export SPACK_BUILD_CACHE=/gpfs/wolf/chm137/proj-shared/spack_build_cache
 export SPACK_TARGET_MACHINE=ascent

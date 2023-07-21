@@ -42,7 +42,6 @@ class PySpinifel(BundlePackage):
     depends_on("py-cython")
     # FIXME: not sure what Spack's name for Conda's mongodb is
     depends_on("mongo-c-driver")
-    depends_on("mongo-cxx-driver")
     depends_on("py-pymongo")
     depends_on("curl")
     depends_on("rapidjson")

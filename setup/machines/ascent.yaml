@@ -1,6 +1,6 @@
 compilers:
 - compiler:
-    spec: gcc@=11.1.0
+    spec: gcc@=9.1.0
     paths:
       cc: gcc
       cxx: g++
@@ -10,21 +10,38 @@ compilers:
     operating_system: rhel8
     target: any
     modules:
-    - gcc/11.1.0
+    - gcc/9.1.0
 
 packages:
   all:
-    require: "%gcc@11.1.0"
-    compiler: [gcc@11.1.0]
+    require: "%gcc@9.1.0"
+    compiler: [gcc@9.1.0]
     variants: "+cuda cuda_arch=70"
     providers:
       mpi: [spectrum-mpi]
+  boost:
+    require: "@1.68"
   mpi:
     require: spectrum-mpi
+  cuda:
+    buildable: false
+    externals:
+    - spec: cuda@11.0.3
+      prefix: /sw/ascent/cuda/11.0.3
+      modules:
+      - cuda/11.0.3
+  nccl:
+    buildable: false
+    externals:
+    - spec: nccl@2.11.4
+      prefix: /sw/ascent/nvhpc_sdk/rhel8/Linux_ppc64le/21.11/comm_libs/nccl
+      # Hack: trying to patch together this library with the system CUDA
+      # modules:
+      # - nvhpc/21.11-libs
   spectrum-mpi:
     buildable: false
     externals:
     - spec: spectrum-mpi@10.4.0.3-20210112
-      prefix: /sw/ascent/spack-envs/base/opt/linux-rhel8-ppc64le/gcc-11.1.0/spectrum-mpi-10.4.0.3-20210112-6kg6anupjriji6pnvijebfn7ha5vsqp2
+      prefix: /sw/ascent/spack-envs/base/opt/linux-rhel8-ppc64le/gcc-9.1.0/spectrum-mpi-10.4.0.3-20210112-6jbupg3thjwhsabgevk6xmwhd2bbyxdc
       modules:
       - spectrum-mpi/10.4.0.3-20210112
