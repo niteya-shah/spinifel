@@ -98,13 +98,16 @@ export LEGION_GASNET_CONDUIT=ibv
 EOF
 elif [[ ${target} = "g0"*".stanford.edu" ]]; then # sapling
     cat >> env.sh <<EOF
-module load cuda mpi slurm
+module load mpi slurm
 
 export CC=gcc
 export CXX=g++
 
 export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
 export LEGION_GASNET_CONDUIT=ibv
+
+export SPACK_BUILD_CACHE=/scratch/spinifel/spack_build_cache
+export SPACK_TARGET_MACHINE=ascent
 EOF
 elif [[ ${target} = "psbuild"* ]]; then # psana machines
     cat >> env.sh <<EOF

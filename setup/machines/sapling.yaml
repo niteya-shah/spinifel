@@ -1,0 +1,30 @@
+compilers:
+- compiler:
+    spec: gcc@=9.4.0
+    paths:
+      cc: gcc
+      cxx: g++
+      f77: gfortran
+      fc: gfortran
+    flags: {}
+    operating_system: ubuntu20.04
+    target: any
+
+packages:
+  all:
+    require: "%gcc@9.4.0"
+    compiler: [gcc@9.4.0]
+    variants: "+cuda cuda_arch=60"
+    providers:
+      mpi: [openmpi]
+  mpi:
+    require: openmpi
+  cuda:
+    require: "@:11.7.1"
+  openmpi:
+    buildable: false
+    externals:
+    - spec: openmpi@4.1.5
+      prefix: /usr/local/openmpi-4.1.5
+      modules:
+      - mpi/openmpi/4.1.5
