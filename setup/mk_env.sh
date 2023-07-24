@@ -107,7 +107,7 @@ export LEGION_USE_GASNET=${LEGION_USE_GASNET:-1}
 export LEGION_GASNET_CONDUIT=ibv
 
 export SPACK_BUILD_CACHE=/scratch/spinifel/spack_build_cache
-export SPACK_TARGET_MACHINE=ascent
+export SPACK_TARGET_MACHINE=sapling
 EOF
 elif [[ ${target} = "psbuild"* ]]; then # psana machines
     cat >> env.sh <<EOF
