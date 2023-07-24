@@ -9,6 +9,7 @@ compilers:
     flags: {}
     operating_system: ubuntu20.04
     target: any
+    modules: []
 
 packages:
   all:
