@@ -33,6 +33,7 @@ cmake -DCMAKE_PREFIX_PATH="$CONDA_ENV_DIR" \
     -DLegion_USE_GASNet=$([ $LEGION_USE_GASNET -eq 1 ] && echo ON || echo OFF) \
     -DGASNet_ROOT_DIR="$GASNET_ROOT" \
     -DGASNet_CONDUITS=${LEGION_GASNET_CONDUIT:-$GASNET_CONDUIT} \
+    -DLegion_NETWORKS=gasnetex \
     -DLegion_USE_HDF5=ON \
     -DLegion_MAX_DIM=4 \
     -DCMAKE_INSTALL_PREFIX="$LEGION_INSTALL_DIR" \
