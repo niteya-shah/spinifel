@@ -428,18 +428,22 @@ def get_data(ds):
         pixel_index = get_pixel_index()
 
     mean_image = compute_mean_image(slices, slices_p)
-    show_image(pixel_index, slices_p[0], 0, "image_0.png")
-    show_image(pixel_index, mean_image, ..., "mean_image_0.png")
+    if settings.show_image:
+        show_image(pixel_index, slices_p[0], 0, "image_0.png")
+        show_image(pixel_index, mean_image, ..., "mean_image_0.png")
     pixel_distance = compute_pixel_distance(pixel_position)
-    export_saxs(pixel_distance, mean_image, "saxs_0.png")
+    if settings.show_image:
+        export_saxs(pixel_distance, mean_image, "saxs_0.png")
     pixel_position = bin_pixel_position(pixel_position)
     pixel_index = bin_pixel_index(pixel_index)
     slices, slices_p = bin_slices(slices, slices_p)
     mean_image = compute_mean_image(slices, slices_p)
-    show_image(pixel_index, slices_p[0], 0, "image_binned_0.png")
-    show_image(pixel_index, mean_image, ..., "mean_image_binned_0.png")
+    if settings.show_image:
+        show_image(pixel_index, slices_p[0], 0, "image_binned_0.png")
+        show_image(pixel_index, mean_image, ..., "mean_image_binned_0.png")
     pixel_distance = compute_pixel_distance(pixel_position)
-    export_saxs(pixel_distance, mean_image, "saxs_binned_0.png")
+    if settings.show_image:
+        export_saxs(pixel_distance, mean_image, "saxs_binned_0.png")
     if settings.fluctuation_analysis:
         for i, sl in enumerate(slices_p):
             fluctuation_task(pixel_distance, mean_image, sl, point=i)
@@ -506,10 +510,10 @@ def process_data(
 ):
     # returns a region that contains the mean of images
     mean_image = compute_mean_image(slices, slices_p)
-
-    show_image(pixel_index, slices_p[0], 0, f"image_{iteration}.png")
-    show_image(pixel_index, mean_image, ..., f"mean_image_{iteration}.png")
-    export_saxs(pixel_distance, mean_image, f"saxs_{iteration}.png")
+    if settings.show_image:
+        show_image(pixel_index, slices_p[0], 0, f"image_{iteration}.png")
+        show_image(pixel_index, mean_image, ..., f"mean_image_{iteration}.png")
+        export_saxs(pixel_distance, mean_image, f"saxs_{iteration}.png")
 
     # bin pixel position and pixel index
     # return a region that contains the binned pixel_position + pixel_index
@@ -523,15 +527,16 @@ def process_data(
     bin_slices_new(slices_p, slices_bin_p)
     # get the mean of the binned slices
     mean_image = compute_mean_image(slices_bin, slices_bin_p)
-    show_image(pixel_index, slices_bin_p[0], 0, f"image_binned_{iteration}.png")
-    show_image(pixel_index, mean_image, ..., f"mean_image_binned_{iteration}.png")
+    if settings.show_image:
+        show_image(pixel_index, slices_bin_p[0], 0, f"image_binned_{iteration}.png")
+        show_image(pixel_index, mean_image, ..., f"mean_image_binned_{iteration}.png")
 
     # return a region pixel_distance based on the binned pixel_position
     # done only on iteraton 1
     if iteration == 0:
         pixel_distance = compute_pixel_distance(pixel_position)
-
-    export_saxs(pixel_distance, mean_image, f"saxs_binned_{iteration}.png")
+    if settings.show_image:
+        export_saxs(pixel_distance, mean_image, f"saxs_binned_{iteration}.png")
     if settings.fluctuation_analysis:
         for i, sl in enumerate(slices_bin_p):
             fluctuation_task(pixel_distance, mean_image, sl, point=i)

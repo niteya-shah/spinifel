@@ -258,8 +258,9 @@ def solve_simple(
             assert np.all(np.isreal(ac_res))
         ac_res = ac_res.real
         result.ac[:] = np.ascontiguousarray(ac_res)
-        image.show_volume(
-            ac_res, settings.Mquat, f"autocorrelation_conf_{group_idx}_{generation}_{rank}.png"
+        if settings.show_image:
+            image.show_volume(
+                ac_res, settings.Mquat, f"autocorrelation_conf_{group_idx}_{generation}_{rank}.png"
         )
         v1 = norm(ret)
         v2 = norm(W * ret - d)
