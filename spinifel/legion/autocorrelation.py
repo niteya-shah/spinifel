@@ -418,10 +418,9 @@ def solve_ac_merge(
     results_r = solve_ac_dict["results_r"]
 
     alambda = 1
-    # temp fix for rlambdas/flambas
-    #rlambdas = Mtot / N * 2 ** (np.arange(N_procs) - N_procs / 2).astype(np.float64)
+    rlambdas = Mtot / N * 2 ** (np.arange(N_procs) - N_procs / 2).astype(np.float64)
+    # temp fix for flambdas
     #flambdas = 1e5 * 10 ** (np.arange(N_procs) - N_procs // 2).astype(np.float64)
-    rlambdas = Mtot / N * 2 ** ((np.arange(N_procs) - N_procs / 2) % 32).astype(np.float64)
     flambdas = 1e5 * 10 ** ((np.arange(N_procs) - N_procs // 2) % 32 ).astype(np.float64)
 
     summary_p = solve_ac_dict["summary_p"]
