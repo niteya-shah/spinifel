@@ -421,9 +421,9 @@ def solve_ac_merge(
     # temp fix for flambdas/rlambdas, for single precision - maxval=8, for double precision - maxval=32
     max_val = 32
     if settings.use_single_prec:
-        max_val = 8
-    flambdas = 1e5 * 10 ** ((np.arange(N_procs) - N_procs // 2) % max_val).astype(np.float64)
-    rlambdas = Mtot / N * 2 ** ((np.arange(N_procs) - N_procs / 2) % max_val).astype(np.float64)
+        max_val =  8
+    flambdas = 1e5 * 10 ** np.fmod((np.arange(N_procs) - N_procs // 2), max_val).astype(np.float64)
+    rlambdas = Mtot / N * 2 ** np.fmod((np.arange(N_procs) - N_procs / 2), max_val).astype(np.float64)
     summary_p = solve_ac_dict["summary_p"]
     summary = solve_ac_dict["summary"]
     reciprocal_extent = solve_ac_dict["reciprocal_extent"]
