@@ -40,7 +40,6 @@ if settings.use_psana:
 def load_pixel_position(pixel_position):
     prep.load_pixel_position_reciprocal(pixel_position.reciprocal)
 
-
 @task(privileges=[WD])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/prep.py", is_prefix=True)
@@ -62,12 +61,29 @@ def get_pixel_position(run=None):
     return pixel_position
 
 
+@nvtx.annotate("legion/prep.py", is_prefix=True)
+def get_pixel_position_distributed(nprocs, run=None):
+    pixel_position_type = getattr(pygion, settings.pixel_position_type_str)
+    pixel_position, pixel_position_p = lgutils.create_distributed_region_procs(
+        {"reciprocal": pixel_position_type},
+        settings.pixel_position_shape
+    )
+
+    if run == None:
+        for i in range(nprocs):
+            load_pixel_position(pixel_position_p[i], point=i)
+    else:
+        for i in range(nprocs):
+            load_pixel_position_psana(pixel_position_p[i], run)
+
+    return pixel_position, pixel_position_p
+
+
 @task(leaf=True, privileges=[WD])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def load_pixel_index(pixel_index):
     prep.load_pixel_index_map(pixel_index.map)
-
 
 @task(leaf=True, privileges=[WD])
 @lgutils.gpu_task_wrapper
@@ -89,6 +105,23 @@ def get_pixel_index(run=None):
         load_pixel_index(pixel_index)
     return pixel_index
 
+
+@nvtx.annotate("legion/prep.py", is_prefix=True)
+def get_pixel_index_distributed(nprocs, run=None):
+    pixel_index_type = getattr(pygion, settings.pixel_index_type_str)
+    pixel_index, pixel_index_p = lgutils.create_distributed_region_procs(
+        {"map": pixel_index_type},
+        settings.pixel_index_shape
+    )
+    # psana
+    if run:
+        for i in range(nprocs):
+            load_pixel_index_psana(pixel_index_p[i], run, point=i)
+    else:
+        for i in range(nprocs):
+            load_pixel_index(pixel_index_p[i], point=i)
+
+    return pixel_index, pixel_index_p
 
 # this is the equivalent of big data (the loop around batch_events)
 @task(leaf=True, privileges=[WD])
@@ -159,16 +192,18 @@ def get_slices(ds):
     )
     pixel_position = None
     pixel_index = None
+    pixel_index_p = None
+    pixel_position_p = None
     if ds is not None:
-        n_nodes = Tunable.select(Tunable.NODE_COUNT).get()
+        n_nodes = Tunable.select(Tunable.GLOBAL_PYS).get()
         chunk_i = 0
         val = 0
         for run in ds.runs():
             # load pixel index map and pixel position reciprocal only once
             if val == 0:
                 # pixel index map
-                pixel_index = get_pixel_index(run)
-                pixel_position = get_pixel_position(run)
+                pixel_index, pixel_index_p = get_pixel_index_distributed(n_nodes, run)
+                pixel_position, pixel_position_p = get_pixel_position_distributed(n_nodes, run)
             val = val + 1
             gen_smd = smd_chunks_steps(run)
             while chunk_i < n_nodes:
@@ -189,7 +224,7 @@ def get_slices(ds):
     else:
         for i, slices_subr in enumerate(slices_p):
             load_slices_hdf5(slices_subr, i, N_images_per_rank, point=i)
-    return slices, slices_p, pixel_position, pixel_index
+    return slices, slices_p, pixel_position, pixel_index, pixel_position_p, pixel_index_p
 
 
 @task(leaf=True, privileges=[WD])
@@ -249,9 +284,10 @@ def compute_mean_image(slices, slices_p):
     nprocs = Tunable.select(Tunable.GLOBAL_PYS).get()
 
     logger = utils.Logger(True, settings)
-    for i, sl in enumerate(slices_p):
-        logger.log(f"{socket.gethostname()} rank:{i} compute_mean_image", level=1)
-        reduce_mean_image(sl, mean_image, nprocs, point=i)
+    # do an index launch
+    #for i, sl in enumerate(slices_p):
+    for i in IndexLaunch(nprocs):
+        reduce_mean_image(slices_p[i], mean_image, nprocs)
     return mean_image
 
 
@@ -263,7 +299,6 @@ def calculate_pixel_distance(pixel_position, pixel_distance):
         pixel_position.reciprocal
     )
 
-
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def compute_pixel_distance(pixel_position):
     pixel_position_type = getattr(pygion, settings.pixel_position_type_str)
@@ -273,6 +308,19 @@ def compute_pixel_distance(pixel_position):
     )
     calculate_pixel_distance(pixel_position, pixel_distance)
     return pixel_distance
+
+@nvtx.annotate("legion/prep.py", is_prefix=True)
+def compute_pixel_distance_distributed(pixel_position, pixel_position_p, nprocs):
+    pixel_position_type = getattr(pygion, settings.pixel_position_type_str)
+    pixel_distance, pixel_distance_p = lgutils.create_distributed_region_procs(
+        {"reciprocal": pixel_position_type},
+        lgutils.get_region_shape(pixel_position)[1:]
+    )
+
+    for i in range(nprocs):
+        calculate_pixel_distance(pixel_position_p[i], pixel_distance_p[i], point=i)
+
+    return pixel_distance, pixel_distance_p
 
 
 @task(leaf=True, privileges=[RO, WD])
@@ -292,6 +340,18 @@ def bin_pixel_position(old_pixel_position):
     return new_pixel_position
 
 
+@nvtx.annotate("legion/prep.py", is_prefix=True)
+def bin_pixel_position_distributed(old_pixel_position_p, nprocs):
+    pixel_position_type = getattr(pygion, settings.pixel_position_type_str)
+    new_pixel_position, new_pixel_position_p = lgutils.create_distributed_region_procs(
+        {"reciprocal": pixel_position_type},
+        settings.reduced_pixel_position_shape)
+
+    for i in range(nprocs):
+        apply_pixel_position_binning(old_pixel_position_p[i], new_pixel_position_p[i], point=i)
+    return new_pixel_position, new_pixel_position_p
+
+
 @task(leaf=True, privileges=[RO, WD])
 @lgutils.gpu_task_wrapper
 @nvtx.annotate("legion/prep.py", is_prefix=True)
@@ -307,6 +367,19 @@ def bin_pixel_index(old_pixel_index):
     )
     apply_pixel_index_binning(old_pixel_index, new_pixel_index)
     return new_pixel_index
+
+
+@nvtx.annotate("legion/prep.py", is_prefix=True)
+def bin_pixel_index_distributed(old_pixel_index_p, n_procs):
+    pixel_index_type = getattr(pygion, settings.pixel_index_type_str)
+    new_pixel_index, new_pixel_index_p = lgutils.create_distributed_region_procs(
+        {"map": pixel_index_type},
+        settings.reduced_pixel_index_shape)
+
+    for i in range(n_procs):
+        apply_pixel_index_binning(old_pixel_index_p[i], new_pixel_index_p[i], point=i)
+    return new_pixel_index, new_pixel_index_p
+
 
 
 @task(leaf=True, privileges=[RO, WD])
@@ -410,7 +483,7 @@ def init_partitions_regions_psana2():
         cur_batch_size,
         sec_shape,
     )
-    pygion.execution_fence(block=True)
+    #pygion.execution_fence(block=True)
     return slices, p, slices_images, slices_images_p
 
 
@@ -420,36 +493,45 @@ def get_data(ds):
     logger.log(f"{socket.gethostname()} loading slices.", level=1)
 
     # if psana load pixel_position/pixel_index using first 'run'
-    slices, slices_p, pixel_position, pixel_index = get_slices(ds)
-
+    slices, slices_p, pixel_position, pixel_index, pixel_position_p, pixel_index_p = get_slices(ds)
+    nprocs = Tunable.select(Tunable.GLOBAL_PYS).get()
     # if not psana - load pixel_postion/pixel_index from hdf5 file
     if ds == None:
-        pixel_position = get_pixel_position(ds)
-        pixel_index = get_pixel_index()
+        pixel_position, pixel_position_p = get_pixel_position_distributed(nprocs)
+        pixel_index, pixel_index_p = get_pixel_index_distributed(nprocs)
 
-    mean_image = compute_mean_image(slices, slices_p)
     if settings.show_image:
-        show_image(pixel_index, slices_p[0], 0, "image_0.png")
-        show_image(pixel_index, mean_image, ..., "mean_image_0.png")
-    pixel_distance = compute_pixel_distance(pixel_position)
+        mean_image = compute_mean_image(slices, slices_p)
+        show_image(pixel_index_p[0], slices_p[0], 0, "image_0.png")
+        show_image(pixel_index_p[0], mean_image, ..., "mean_image_0.png")
+
+    pixel_distance, pixel_distance_p = compute_pixel_distance_distributed(pixel_position, pixel_position_p, nprocs)
     if settings.show_image:
-        export_saxs(pixel_distance, mean_image, "saxs_0.png")
-    pixel_position = bin_pixel_position(pixel_position)
-    pixel_index = bin_pixel_index(pixel_index)
+        export_saxs(pixel_distance_p[0], mean_image, "saxs_0.png")
+
+    pixel_position_bin, pixel_position_bin_p = bin_pixel_position_distributed(pixel_position_p, nprocs)
+
+    pixel_index, pixel_index_p = bin_pixel_index_distributed(pixel_index_p, nprocs)
+
     slices, slices_p = bin_slices(slices, slices_p)
-    mean_image = compute_mean_image(slices, slices_p)
+
     if settings.show_image:
-        show_image(pixel_index, slices_p[0], 0, "image_binned_0.png")
-        show_image(pixel_index, mean_image, ..., "mean_image_binned_0.png")
-    pixel_distance = compute_pixel_distance(pixel_position)
+        mean_image = compute_mean_image(slices, slices_p)
+        show_image(pixel_index_p[0], slices_p[0], 0, "image_binned_0.png")
+        show_image(pixel_index_p[0], mean_image, ..., "mean_image_binned_0.png")
+
+    pixel_distance, pixel_distance_p = compute_pixel_distance_distributed(pixel_position, pixel_position_p, nprocs)
+
     if settings.show_image:
-        export_saxs(pixel_distance, mean_image, "saxs_binned_0.png")
+        export_saxs(pixel_distance_p[0], mean_image, "saxs_binned_0.png")
+
     if settings.fluctuation_analysis:
+        if setttings.show_image is False:
+            mean_image = compute_mean_image(slices, slices_p)
         for i, sl in enumerate(slices_p):
-            fluctuation_task(pixel_distance, mean_image, sl, point=i)
+            fluctuation_task(pixel_distance_p[i], mean_image, sl, point=i)
 
-    return (pixel_position, pixel_distance, pixel_index, slices, slices_p)
-
+    return (pixel_position, pixel_distance, pixel_index, slices, slices_p, pixel_position_p, pixel_distance_p, pixel_index_p)
 
 # Fluctuation
 @task(leaf=True, privileges=[RO, RO, RW])
@@ -476,16 +558,16 @@ def load_pixel_data(ds):
     pixel_position = None
     pixel_index = None
     assert ds is not None
-    n_nodes = Tunable.select(Tunable.NODE_COUNT).get()
+    nprocs = Tunable.select(Tunable.GLOBAL_PYS).get()
     gen_run = ds.runs()
     for run in gen_run:
         # load pixel index map and pixel position reciprocal only once
-        pixel_index = get_pixel_index(run)
-        pixel_position = get_pixel_position(run)
+        pixel_index, pixel_index_p = get_pixel_index_distributed(nprocs,run)
+        pixel_position, pixel_position_p = get_pixel_position_distributed(nprocs,run)
         break
 
-    pixel_distance = compute_pixel_distance(pixel_position)
-    return pixel_position, pixel_distance, pixel_index, run
+    pixel_distance, pixel_distance_p = compute_pixel_distance_distributed(pixel_position, pixel_position_p, nprocs)
+    return pixel_position, pixel_distance, pixel_index, pixel_position_p, pixel_distance_p, pixel_index_p, run
 
 
 # process pixel data after first set of slices are loaded
@@ -506,46 +588,57 @@ def process_data(
     pixel_distance,
     pixel_index,
     pixel_position,
+    pixel_distance_p,
+    pixel_index_p,
+    pixel_position_p,
     iteration,
 ):
     # returns a region that contains the mean of images
-    mean_image = compute_mean_image(slices, slices_p)
     if settings.show_image:
-        show_image(pixel_index, slices_p[0], 0, f"image_{iteration}.png")
-        show_image(pixel_index, mean_image, ..., f"mean_image_{iteration}.png")
-        export_saxs(pixel_distance, mean_image, f"saxs_{iteration}.png")
+        mean_image = compute_mean_image(slices, slices_p)
+    if settings.show_image:
+        show_image(pixel_index_p[0], slices_p[0], 0, f"image_{iteration}.png")
+        show_image(pixel_index_p[0], mean_image, ..., f"mean_image_{iteration}.png")
+        export_saxs(pixel_distance_p[0], mean_image, f"saxs_{iteration}.png")
 
+    nprocs = Tunable.select(Tunable.GLOBAL_PYS).get()
     # bin pixel position and pixel index
     # return a region that contains the binned pixel_position + pixel_index
     if iteration == 0:
-        pixel_position = bin_pixel_position(pixel_position)
-        pixel_index = bin_pixel_index(pixel_index)
+        pixel_position, pixel_position_p = bin_pixel_position_distributed(pixel_position_p, nprocs)
+        pixel_index, pixel_index_p = bin_pixel_index_distributed(pixel_index_p, nprocs)
 
     # bin slices new is passed the current set of images,
     # and the slices_bin partition to copy the binned
     # slices into
     bin_slices_new(slices_p, slices_bin_p)
     # get the mean of the binned slices
-    mean_image = compute_mean_image(slices_bin, slices_bin_p)
     if settings.show_image:
-        show_image(pixel_index, slices_bin_p[0], 0, f"image_binned_{iteration}.png")
-        show_image(pixel_index, mean_image, ..., f"mean_image_binned_{iteration}.png")
+        mean_image = compute_mean_image(slices_bin, slices_bin_p)
+
+    if settings.show_image:
+        show_image(pixel_index_p[0], slices_bin_p[0], 0, f"image_binned_{iteration}.png")
+        show_image(pixel_index_p[0], mean_image, ..., f"mean_image_binned_{iteration}.png")
 
     # return a region pixel_distance based on the binned pixel_position
     # done only on iteraton 1
     if iteration == 0:
-        pixel_distance = compute_pixel_distance(pixel_position)
+        #pixel_distance = compute_pixel_distance(pixel_position)
+        pixel_distance, pixel_distance_p = compute_pixel_distance_distributed(pixel_position, pixel_position_p, nprocs)
+
     if settings.show_image:
-        export_saxs(pixel_distance, mean_image, f"saxs_binned_{iteration}.png")
+        export_saxs(pixel_distance_p[0], mean_image, f"saxs_binned_{iteration}.png")
+
     if settings.fluctuation_analysis:
         for i, sl in enumerate(slices_bin_p):
-            fluctuation_task(pixel_distance, mean_image, sl, point=i)
+            fluctuation_task(pixel_distance_p[0], mean_image, sl, point=i)
 
     # mean_image region is no longer needed
-    pygion.fill(mean_image, "data", 0)
+    if settings.show_image:
+        pygion.fill(mean_image, "data", 0)
 
     # return regions containing binned pixel_position, pixel_distance, pixel_index
-    return (pixel_position, pixel_distance, pixel_index)
+    return (pixel_position, pixel_distance, pixel_index, pixel_position_p, pixel_distance_p, pixel_index_p)
 
 
 # load image batch from psana2
@@ -668,7 +761,8 @@ def setup_objects_task_conf(pixel_position, pixel_distance, slices, done_setup_p
 @nvtx.annotate("legion/prep.py", is_prefix=True)
 def prep_objects_multiple(pixel_position, pixel_distance, slices, done_setup_p, N_procs):
     for i in range(N_procs):
-        setup_objects_task_conf(pixel_position, pixel_distance, slices[i], done_setup_p[i], i, settings.N_conformations, point=i)
+        setup_objects_task_conf(pixel_position[i], pixel_distance[i], slices[i], done_setup_p[i], i, settings.N_conformations, point=i)
+        #setup_objects_task_conf(pixel_position[i], pixel_distance[i], slices[i], done_setup_p[i], i, settings.N_conformations, point=i)
 
 
 #update nufft based on subset of valid diffraction patterns for a particular conformation
