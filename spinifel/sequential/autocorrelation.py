@@ -110,7 +110,7 @@ class Merge:
         else:
             rotmat = np.zeros((0, 3, 3))
             logger.log(
-                "WARNING: gen_nonuniform_positions got empty orientation - returning h,k,l for Null rotation"
+                "WARNING: gen_nonuniform_positions got empty orientation - returning h,k,l for Null rotation", level=1
             )
 
         # TODO : How to ensure we support all formats of pixel_position reciprocal
@@ -341,7 +341,7 @@ class Merge:
 
         ret, info = cg(W, d, x0=x0, maxiter=self.maxiter, callback=self.callback)
         if info != 0:
-            print(f"WARNING: CG did not converge at rlambda = {self.rlambda}")
+            logger.log(f"WARNING: CG did not converge at rlambda = {self.rlambda}",level=1)
         ac = ret.reshape((self.M,) * 3).get()
         if self.use_reciprocal_symmetry:
             assert np.all(np.isreal(ac))

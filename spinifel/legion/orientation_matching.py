@@ -219,12 +219,12 @@ def match_conf(phased, orientations_p, slices_p, min_dist_p, min_dist_proc, conf
         for i in range(settings.N_conformations):
             # check fsc future values -> if convergence has failed then continue with match
             if len(fsc) > 0 and check_convergence_single_conf(fsc[i]):
-                logger.log(f"conformation {i} HAS converged in orientation_matching check")
+                logger.log(f"conformation {i} HAS converged in orientation_matching check",level=1)
                 update_min_dist(conf_p, min_dist_p, i, settings.N_conformations, n_images_per_rank)
                 #fill_min_dist(min_dist_p, i, settings.N_conformations)
             else:
                 if len(fsc) > 0:
-                    logger.log(f"conformation {i} has NOT converged in orientation_matching check")
+                    logger.log(f"conformation {i} has NOT converged in orientation_matching check",level=1)
                 match_single_conf(phased[i], orientations_p[i], slices_p, min_dist_p, n_images_per_rank, i, settings.N_conformations, ready_objs)
         N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
         # TODO initialize min_dist_proc to zero for those conformations that are completed
