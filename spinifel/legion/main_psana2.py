@@ -106,11 +106,11 @@ def load_psana():
     ) = init_partitions_regions_psana2()
 
     # load pixel_position, pixel_distance, pixel_index
-    pixel_position, pixel_distance, pixel_index, run = load_pixel_data(ds)
+    pixel_position, pixel_distance, pixel_index, pixel_position_p, pixel_distance_p, pixel_index_p, run = load_pixel_data(ds)
     gen_run = ds.runs()
     gen_run, gen_smd, run = load_image_batch(run, gen_run, None, slices_images_p[0])
 
-    pixel_position, pixel_distance, pixel_index = process_data(
+    pixel_position, pixel_distance, pixel_index, pixel_position_p, pixel_distance_p, pixel_index_p = process_data(
         slices_images,
         slices_images_p[0],
         slices,
@@ -118,6 +118,9 @@ def load_psana():
         pixel_distance,
         pixel_index,
         pixel_position,
+        pixel_distance_p,
+        pixel_index_p,
+        pixel_position_p,
         0,
     )
 
@@ -125,6 +128,9 @@ def load_psana():
         pixel_position,
         pixel_distance,
         pixel_index,
+        pixel_position_p,
+        pixel_distance_p,
+        pixel_index_p,
         slices,
         all_partitions[0],
         all_partitions,
@@ -150,6 +156,9 @@ def load_psana_subset(
     pixel_position,
     pixel_distance,
     pixel_index,
+    pixel_position_p,
+    pixel_distance_p,
+    pixel_index_p,
 ):
 
     # cur_batch_size  must be a multiple of batch_size
@@ -160,7 +169,7 @@ def load_psana_subset(
     gen_run, gen_smd, run = load_image_batch(run, gen_run, gen_smd, slices_images_p)
 
     # bin data
-    pixel_position, pixel_distance, pixel_index = process_data(
+    pixel_position, pixel_distance, pixel_index, pixel_position_p, pixel_distance_p, pixel_index_p = process_data(
         slices_images,
         slices_images_p,
         slices,
@@ -168,16 +177,22 @@ def load_psana_subset(
         pixel_distance,
         pixel_index,
         pixel_position,
+        pixel_distance_p,
+        pixel_index_p,
+        pixel_position_p,
         idx,
     )
 
-    return slices_p, gen_run, gen_smd, run, pixel_distance, pixel_index, pixel_position
+    return slices_p, gen_run, gen_smd, run, pixel_distance, pixel_index, pixel_position, pixel_distance_p, pixel_index_p, pixel_position_p
 
 
 def main_spinifel(
     pixel_position,
     pixel_distance,
     pixel_index,
+    pixel_position_p,
+    pixel_distance_p,
+    pixel_index_p,
     slices,
     slices_p,
     fsc_regions,
@@ -195,7 +210,7 @@ def main_spinifel(
     curr_gen = 0
     total_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
 
-    prep_objects_multiple(pixel_position, pixel_distance, slices_p, ready_objs_p, total_procs)
+    prep_objects_multiple(pixel_position_p, pixel_distance_p, slices_p, ready_objs_p, total_procs)
 
     # regions specific to to multiple conformations
     min_dist = None
@@ -241,8 +256,6 @@ def main_spinifel(
         solved, solve_ac_dict = solve_ac_conf(
             solve_ac_dict,
             0,
-            pixel_position,
-            pixel_distance,
             slices_p,
             ready_objs_p,
             conf_p,
@@ -308,8 +321,6 @@ def main_spinifel(
         solved, solve_ac_dict = solve_ac_conf(
             solve_ac_dict,
             generation,
-            pixel_position,
-            pixel_distance,
             slices_p,
             ready_objs_p,
             conf_p,
@@ -351,6 +362,9 @@ def main():
         pixel_position,
         pixel_distance,
         pixel_index,
+        pixel_position_p,
+        pixel_distance_p,
+        pixel_index_p,
         slices,
         slices_p,
         all_partitions,
@@ -375,7 +389,7 @@ def main():
     solve_ac_dict = create_solve_regions_multiple()
 
     # reuse dictionary items across streams
-    init_ac_persistent_regions(solve_ac_dict, pixel_position, pixel_distance)
+    init_ac_persistent_regions(solve_ac_dict, pixel_distance, pixel_distance_p)
 
     # reuse ready_objs_p across streams
     ready_objs, ready_objs_p = lgutils.create_distributed_region(
@@ -410,6 +424,9 @@ def main():
             pixel_position,
             pixel_distance,
             pixel_index,
+            pixel_position_p,
+            pixel_distance_p,
+            pixel_index_p,
             slices,
             slices_p,
             fsc_regions,
@@ -437,6 +454,9 @@ def main():
                     pixel_distance,
                     pixel_index,
                     pixel_position,
+                    pixel_distance_p,
+                    pixel_index_p,
+                    pixel_position_p,
                 ) = load_psana_subset(
                     gen_run,
                     gen_smd,
@@ -451,6 +471,9 @@ def main():
                     pixel_position,
                     pixel_distance,
                     pixel_index,
+                    pixel_position_p,
+                    pixel_distance_p,
+                    pixel_index_p,
                 )
                 cur_batch_size = cur_batch_size + batch_size
                 if cur_batch_size == max_batch_size:

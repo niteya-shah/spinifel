@@ -1,7 +1,7 @@
 from functools import wraps
 import numpy as np
 import PyNVTX as nvtx
-from pygion import task, Region, Partition, Tunable, R, Ipartition, WD, Ispace, fill
+from pygion import task, Region, Partition, Tunable, R, Ipartition, WD, Ispace, fill, execution_fence
 
 from spinifel import SpinifelContexts, settings
 from . import utils as lgutils
@@ -146,7 +146,7 @@ def create_max_region(maxImagesPerRank, fieldsDict, secShape, nPoints):
     shape_total = (N_images,) + secShape
     region = Region(shape_total, fieldsDict)
 
-    if settings.verbosity > 0:
+    if settings.verbosity > 2:
         print(
             f" region = {region.ispace.bounds}, max_images_per_rank = {maxImagesPerRank}, n_points={nPoints}",
             flush=True,
@@ -165,7 +165,7 @@ def union_partitions_with_stride(
         region, [nPoints], stride * np.eye(len(shape_total), 1), shape_local
     )
 
-    if settings.verbosity > 0:
+    if settings.verbosity > 3:
         for i in range(nPoints):
             print(
                 f"Union: region_p[{i}] = {region_p[i].ispace.domain.extent}, {region_p[i].ispace.bounds}",
@@ -173,3 +173,22 @@ def union_partitions_with_stride(
             )
 
     return region_p
+
+
+@nvtx.annotate("legion/utils.py", is_prefix=True)
+def create_distributed_region_procs(fields_dict, sec_shape):
+    N_procs = Tunable.select(Tunable.GLOBAL_PYS).get()
+    #shape_total = (N_procs,) + sec_shape # 2,...
+    shape_total = (N_procs*sec_shape[0],) + sec_shape[1:] # 2,...
+    region = Region(shape_total, fields_dict)
+    region_p = Partition.restrict(
+        region, [N_procs], sec_shape[0]*np.eye(len(shape_total), 1), sec_shape
+    )
+    if settings.verbosity > 3:
+        for i in range(N_procs):
+            print(
+                f"distributed_region_procs: region_p[{i}] = {region_p[i].ispace.domain.extent}, {region_p[i].ispace.bounds}",
+                flush=True,
+            )
+    return region, region_p
+

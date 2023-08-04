@@ -55,12 +55,17 @@ def load_psana():
     )
 
     # Load unique set of intensity slices for python process
-    (pixel_position, pixel_distance, pixel_index, slices, slices_p) = get_data(ds)
-    return pixel_position, pixel_distance, pixel_index, slices, slices_p
+    (pixel_position, pixel_distance, pixel_index, slices, slices_p, pixel_position_p, pixel_distance_p, pixel_index_p) = get_data(ds)
+    return pixel_position, pixel_distance, pixel_index, slices, slices_p, pixel_position_p, pixel_distance_p, pixel_index_p
 
 @task(inner=True, privileges=[RO, RO, RO, RO])
 @lgutils.gpu_task_wrapper
-def main_task_conf(pixel_position, pixel_distance, pixel_index, slices, slices_p):
+def main_task_conf(pixel_position, pixel_distance, pixel_index, slices,
+                   pixel_position_p,
+                   pixel_distance_p,
+                   pixel_index_p,
+                   slices_p):
+
     logger = utils.Logger(True, settings)
     timer = utils.Timer()
     curr_gen = 0
@@ -94,9 +99,9 @@ def main_task_conf(pixel_position, pixel_distance, pixel_index, slices, slices_p
     conf_p = conf_regions_dict["conf_p"]
 
     # all partitions/regions need to be ready/available
-    execution_fence(block=True)
+    #execution_fence(block=True)
 
-    prep_objects_multiple(pixel_position, pixel_distance, slices_p, ready_objs_p, total_procs)
+    prep_objects_multiple(pixel_position_p, pixel_distance_p, slices_p, ready_objs_p, total_procs)
 
     # initialize conf/conf_p with random 0/1 values
     init_conf(conf_p, settings.N_images_per_rank)
@@ -104,10 +109,10 @@ def main_task_conf(pixel_position, pixel_distance, pixel_index, slices, slices_p
     if settings.N_conformations > 1:
         prep_objects_select_multiple(slices_p, ready_objs_p, conf_p, total_procs)
 
-    fsc, fsc_regions = initialize_fsc(pixel_distance)
+    fsc, fsc_regions = initialize_fsc(pixel_distance_p[0])
 
     solved, solve_ac_dict = solve_ac_conf(
-        None, 0, pixel_position, pixel_distance, slices_p, ready_objs_p, conf_p, fsc)
+        None, 0, slices_p, ready_objs_p, conf_p, fsc)
     phased, phased_regions_dict = new_phase_conf(0, solved, fsc)
     phased_output_conf(phased, 0)
     curr_gen += 1
@@ -131,8 +136,6 @@ def main_task_conf(pixel_position, pixel_distance, pixel_index, slices, slices_p
         solved, solve_ac_dict = solve_ac_conf(
             solve_ac_dict,
             generation,
-            pixel_position,
-            pixel_distance,
             slices_p,
             ready_objs_p,
             conf_p,
@@ -150,7 +153,7 @@ def main_task_conf(pixel_position, pixel_distance, pixel_index, slices, slices_p
 
         # check for convergence
         if settings.chk_convergence and len(fsc) > 0:
-            logger.log(f"checking convergence: FSC calculation")
+            logger.log(f"checking convergence: FSC calculation", level=1)
             fsc = compute_fsc_conf_all(phased, fsc_regions, fsc)
             converge = check_convergence_all_conf(fsc)
             if converge:
@@ -174,16 +177,20 @@ def main():
     timer = utils.Timer()
     # Reading input images using psana2
     if settings.use_psana:
-        (pixel_position, pixel_distance, pixel_index, slices, slices_p) = load_psana()
+        (pixel_position, pixel_distance, pixel_index, slices, slices_p, pixel_position_p, pixel_distance_p, pixel_index_p) = load_psana()
     # Reading input images from hdf5
     else:
         # Load unique set of intensity slices for python process
-        (pixel_position, pixel_distance, pixel_index, slices, slices_p) = get_data(ds)
+        (pixel_position, pixel_distance, pixel_index, slices, slices_p, pixel_position_p, pixel_distance_p, pixel_index_p) = get_data(ds)
+
     logger.log(f"Loaded in {timer.lap():.2f}s.")
     main_task_conf(pixel_position,
                    pixel_distance,
                    pixel_index,
                    slices,
+                   pixel_position_p,
+                   pixel_distance_p,
+                   pixel_index_p,
                    slices_p)
 
 
