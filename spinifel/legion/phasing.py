@@ -267,10 +267,10 @@ def new_phase_conf(generation, solved, fsc, phased_regions_dict=None):
         if len(fsc) > 0 and check_convergence_single_conf(fsc[i]):
             assert create_regions is False
             phased_conf.append(phased_regions_dict[i]["phased"])
-            logger.log(f"conformation {i} HAS converged in new_phase_conf")
+            logger.log(f"conformation {i} HAS converged in new_phase_conf", level=1)
         else:
             if len(fsc) > 0:
-                logger.log(f"conformation {i} has NOT converged in new_phase_conf")
+                logger.log(f"conformation {i} has NOT converged in new_phase_conf",level=1)
             if create_regions is False:
                 phased, phased_regions_dict[i] = new_phase(generation, solved[i], phased_regions_dict[i],i)
                 phased_conf.append(phased)
