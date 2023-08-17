@@ -99,7 +99,7 @@ if settings.use_cuda and settings.use_cufinufft:
         context.init_mpi()  # Ensures that MPI has been initalized
     context.init_cuda()  # this must be called _after_ init_mpi
     if context.cufinufft_available:
-        if version("cufinufft") not in ["1.1", "1.2"]:
+        if version("cufinufft") not in ["1.1", "1.2", "1.3"]:
             raise CUFINUFFTVersionUnsupported
     else:
         raise CUFINUFFTRequiredButNotFound
