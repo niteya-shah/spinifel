@@ -18,7 +18,7 @@
 	url = https://github.com/elliottslaughter/cufinufft.git
 [submodule "setup/skopi"]
 	path = setup/skopi
-	url = https://github.com/chuckie82/skopi.git
+	url = https://github.com/lcls-psana/skopi.git 
 [submodule "setup/PybindGPU"]
 	path = setup/PybindGPU
 	url = https://github.com/JBlaschke/PybindGPU.git
