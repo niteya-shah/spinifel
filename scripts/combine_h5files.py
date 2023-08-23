@@ -46,24 +46,41 @@ for i, h5file in enumerate(h5files):
     st += n_images_per_file[i]
 
 
-out_file = '/lustre/orion/proj-shared/chm137/demo23/data/3iyf_3j03_128x128pixels_4m.h5'
+out_file = 'out.h5'
 unique_keys = ['beam_offsets', 'fluences', 'pixel_index_map', 'pixel_position_reciprocal', 'polarization', 'solid_angle']
 print(f'Start writing output file', flush=True)
 t0 = time.monotonic()
 with h5py.File(out_file, 'w') as hf:
     # These are the same for all conformations
+    print(f'  Writing unique keys and their values', flush=True)
     for unique_key in unique_keys:
         hf.create_dataset(unique_key, data=h5files[0][unique_key][:])
 
     # Copy all volumes with new key and combine all command_lines
+    print(f'  Collecting command lines', flush=True)
     command_line = ''
     for i, h5file in enumerate(h5files):
-        hf.create_dataset(f'volume_{Path(fnames[i]).stem}', data=h5file['volume'][:])
+        #hf.create_dataset(f'volume_{Path(fnames[i]).stem}', data=h5file['volume'][:])
         command_line += h5file.attrs['command_line'] + ';'
 
-    # Combine intensities and orientations in random orders
-    hf.create_dataset('intensities', data=intensities[rand_ids])
-    hf.create_dataset('orientations', data=orientations[rand_ids])
+    # Combine intensities and orientations in random orders by batches
+    # to avoid memory problem
+    print(f'  Writing intensities', flush=True)
+    intensities_ds = hf.create_dataset('intensities', intensities.shape)
+    st = 0
+    for i in range(n_files):
+        intensities_ds[st:st+n_images_per_file[i],:,:,:] = intensities[rand_ids[st:st+n_images_per_file[i]]]
+        st += n_images_per_file[i]
+        print(f'    done with batch {i}')
+
+
+    print(f'  Writing orientations', flush=True)
+    orientations_ds = hf.create_dataset('orientations', orientations.shape)
+    st = 0
+    for i in range(n_files):
+        orientations_ds[st:st+n_images_per_file[i],:,:] = orientations[rand_ids[st:st+n_images_per_file[i]]]
+        st += n_images_per_file[i]
+        print(f'    done with batch {i}')
 
     hf.attrs['command_line'] = command_line
 t1 = time.monotonic()
