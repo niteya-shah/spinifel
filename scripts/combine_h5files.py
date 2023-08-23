@@ -3,40 +3,53 @@ import sys
 import numpy as np
 import random
 from pathlib import Path
+import time
 
 
+t0 = time.monotonic()
 fnames = sys.argv[1:]
+print(f'Start opening {len(sys.argv)-1} files', flush=True)
 h5files = [h5py.File(fname, 'r') for fname in fnames]
 n_files = len(h5files)
+t1 = time.monotonic()
+print(f'Opening files done in {t1-t0:.2f}s.', flush=True)
 
 
+t0 = time.monotonic()
+print(f'Retreiving no. of images per file', flush=True)
 n_images_per_file = [h5file['intensities'].shape[0] for h5file in h5files]
 n_total_images = np.sum(n_images_per_file)
+t1 = time.monotonic()
+print(f'done in {t1-t0:.2f}s.', flush=True)
 
 
 # Create a random no. identifier for each image in all datasets
-ids = list(range(n_total_images))
-rand_ids = []
-while ids:
-    my_id = random.sample(ids, 1)[0]
-    rand_ids += [my_id]
-    ids.remove(my_id)
+t0 = time.monotonic()
+print(f'Generating random indices', flush=True)
+rand_ids = random.sample(range(n_total_images), n_total_images)
 assert len(rand_ids) == np.unique(rand_ids).shape[0]
+t1 = time.monotonic()
+print(f'Create random indices for {n_total_images} done in {t1-t0:.2f}s.', flush=True)
 
 
 # Combine intensities and orientations
+print(f'Start copying input files', flush=True)
 intensities = np.empty([n_total_images]+list(h5files[0]['intensities'].shape[1:]), dtype=h5files[0]['intensities'].dtype)
 orientations = np.empty([n_total_images]+list(h5files[0]['orientations'].shape[1:]), dtype=h5files[0]['orientations'].dtype)
 st = 0
 for i, h5file in enumerate(h5files):
-    print(f'copying st:{st} en:{st+n_images_per_file[i]}')
+    t0 = time.monotonic()
     intensities[st:st+n_images_per_file[i]] = h5file['intensities'][:]
     orientations[st:st+n_images_per_file[i]] = h5file['orientations'][:]
-    st = n_images_per_file[i]
+    t1 = time.monotonic()
+    print(f'copied st:{st} en:{st+n_images_per_file[i]} done in {t1-t0:.2f}s.', flush=True)
+    st += n_images_per_file[i]
 
 
-out_file = 'out.h5'
+out_file = '/lustre/orion/proj-shared/chm137/demo23/data/3iyf_3j03_128x128pixels_4m.h5'
 unique_keys = ['beam_offsets', 'fluences', 'pixel_index_map', 'pixel_position_reciprocal', 'polarization', 'solid_angle']
+print(f'Start writing output file', flush=True)
+t0 = time.monotonic()
 with h5py.File(out_file, 'w') as hf:
     # These are the same for all conformations
     for unique_key in unique_keys:
@@ -53,7 +66,8 @@ with h5py.File(out_file, 'w') as hf:
     hf.create_dataset('orientations', data=orientations[rand_ids])
 
     hf.attrs['command_line'] = command_line
-
+t1 = time.monotonic()
+print(f'Writing {out_file} done in {t1-t0:.2f}s.', flush=True)
 
 # Check the output files
 with h5py.File(out_file, 'r') as hf:
