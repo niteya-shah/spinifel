@@ -1,14 +1,13 @@
 # Include some libraries that should be there for sure
+# NUFFT with the different orientations distributed over the nodes
 from importlib.metadata import version
 import numpy as np
 import PyNVTX as nvtx
-from spinifel import SpinifelSettings, SpinifelContexts, Profiler
+from spinifel import settings, contexts, Profiler
 
 import skopi as skp
 from spinifel.extern import cufinufft_ext
 
-settings = SpinifelSettings()
-context = SpinifelContexts()
 profiler = Profiler()
 
 if settings.use_cufinufft:
@@ -22,13 +21,14 @@ if settings.use_cufinufft:
     from cufinufft import cufinufft
 
     mode = "cufinufft" + version("cufinufft")
+    from orientation_ext import TransferBuffer, SharedMemory, WindowManager
 
-elif context.finufftpy_available:
-    from . import nfft as finufft
+# elif context.finufftpy_available:
+#     from . import nfft as finufft
 
-    mode = "finufft" + version("finufftpy")
-    if settings.use_cupy:
-        import cupy as cp
+#     mode = "finufft" + version("finufftpy")
+#     if settings.use_cupy:
+#         import cupy as cp
 
 if settings.use_single_prec:
     f_type = np.float32
@@ -38,7 +38,7 @@ else:
     c_type = np.complex128
 
 
-class NUFFT:
+class NUFFT_MPI:
     def __init__(
         self,
         settings,
@@ -53,6 +53,7 @@ class NUFFT:
         self.reduced_det_shape = settings.reduced_det_shape
         self.oversampling = settings.oversampling
         self.N_pixels = np.prod(self.reduced_det_shape)
+
         # For psana2 streaming, no. of images can grow over no. of generations
         if images_per_rank is None:
             self.N_images = settings.N_images_per_rank
@@ -67,13 +68,9 @@ class NUFFT:
 
         # Save reference rotation matrix so that we dont re-create it every
         # time
-        self.ref_rotmat = np.array(
-            [
-                np.linalg.inv(skp.quaternion2rot3d(quat))
-                for quat in self.ref_orientations
-            ],
-            dtype=f_type,
-        )
+        self.ref_rotmat = SharedMemory((self.N_orientations, 4), f_type, split=False)
+        for quat in self.ref_orientations:
+            self.ref_rotmat[quat] = np.linalg.inv(skp.quaternion2rot3d(quat))
 
         self.eps = 1e-12
         self.isign = -1
@@ -81,7 +78,7 @@ class NUFFT:
         self.reciprocal_extent = pixel_distance_reciprocal.max()
         self.pixel_position_reciprocal = np.array(pixel_position_reciprocal)
         self.mult = np.pi / (self.oversampling * self.reciprocal_extent)
-
+        
         if settings.use_cufinufft:
             # Store resused datastructures in memory so that we don't
             # constantly deallocate and realloate them
@@ -313,7 +310,6 @@ class NUFFT:
             self.plan_f.set_pts(self.H_f, self.K_f, self.L_f)
             self.plan_f.execute(nuvect, ugrid)
             return self.gpuarray_to_cupy(nuvect)
-        
 
         @nvtx.annotate("NUFFT/cufinufft/adjoint", is_prefix=True)
         def adjoint(self, nuvect, H_, K_, L_, support, use_reciprocal_symmetry, M):
