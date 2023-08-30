@@ -408,6 +408,13 @@ class SpinifelSettings(metaclass=Singleton):
                 1000,
                 "N_batch_size parameter for slicing in batches",
             ),
+            "_N_streams": (
+                "algorithm",
+                "N_streams",
+                int,
+                1,
+                "Number of parallel streams to use when using MPI NUFFT",
+            ),
             "_load_generation": (
                 "algorithm",
                 "load_generation",

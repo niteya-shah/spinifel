@@ -1,15 +1,12 @@
 from importlib.metadata import version
 import numpy as np
 import PyNVTX as nvtx
-from utils import CUFINUFFTRequiredButNotFound
 
 from spinifel import settings, contexts, Profiler
 
-if not settings.use_cufinufft:
-    raise CUFINUFFTRequiredButNotFound 
-    
-import cupy as cp
-import cupyx as cpx
+if settings.use_cupy:
+    import cupy as cp
+    import cupyx as cpx
 
 from mpi4py.util import dtlib
 from mpi4py import MPI
@@ -18,7 +15,7 @@ from threading import Thread
 from itertools import chain
 
 class TransferBufferGPU:
-    def __init__(self, shape, ctx, dtype):
+    def __init__(self, shape, dtype):
         """
         Initialise our Transfer Buffer class for the GPU. This class wraps the CPU host and GPU for the CPU target->CPU host->GPU transfer
         Uses the context from spinifel context
@@ -37,18 +34,32 @@ class TransferBufferGPU:
     def set_data(self):
         """
         Require the correct context ctx to be pushed
+        
+        Sends the entire cpu_buf to the gpu_buf and assumes that H, K, L are set correctly
         """
         self.gpu_buf.set(self.cpu_buf, self.stream)
         
     def set_data_local(self, arr, gpu_index):
         """
-        Require the correct context ctx to be pushed
+        Require the correct context ctx to be pushed. Since the memory is local, H, K, L can
+        be set independently.
         """
         self.gpu_buf[gpu_index].set(arr, self.stream)
 
+class TransferBufferCPU:
+    def __init__(self, shape, dtype):
+        """
+        Initialise our Transfer Buffer class for the CPU. We can directly load 
+        either from local shared memory or just use the cpu_buf for MPI loads
+
+        :param shape -- shape of the buffer
+        :param dtype -- dtype of the buffers
+        """
+        self.cpu_buf = np.empty(shape, dtype)
+
 class SharedMemory:
     
-    def __init__(self, shape, dtype, split=True):
+    def __init__(self, shape, dtype, split=True, pinned=True):
         """
         Initialise our Shared Memory class. This class wraps a MPI shared Window
         :param shape -- shape of the buffer
@@ -70,7 +81,7 @@ class SharedMemory:
         buf, itemsize = self.win_shared.Shared_query(contexts.rank_shared if split else 0)
         self.local_buf = np.ndarray(buf=buf, dtype=self.np_dtype, shape=self.shape)
 
-        if split or contexts.rank_shared == 0:
+        if split or (contexts.rank_shared == 0) and pinned:
             cp.cuda.runtime.hostRegister(self.local_buf.ctypes.data, self.local_buf.nbytes, 0x2)
         contexts.comm_compute_shared.Barrier()
 
@@ -82,26 +93,24 @@ class SharedMemory:
 
 class WindowManager:
 
-    def __init__(self, shape, batch_shape, dtype):
+    def __init__(self, shape, dtype, pinned=True):
         """
         Initialise our Window Manager class. This class wraps the global MPI Windows
-        :param shape -- shape of all data
-        :param batch_shape -- shape of 
+        :param shape -- shape of all data 
         :param dtype(optional) -- dtype of the buffer
         :param split(optional) -- if split is true, every rank in the node creates its own buffer. Else, only rank 0 creates a buffer
         """
-        self.batch_shape = batch_shape
         self.rank_shape = self.get_rank_shape(shape)
         self.dtype = dtype
                 
-        self.shared_memory = SharedMemory(self.rank_shape, dtype)
+        self.shared_memory = SharedMemory(self.rank_shape, dtype, pinned=pinned)
         self.win = MPI.Win.Create(self.shared_memory.local_buf, comm=contexts.comm_compute)
 
     def lock(self, target_rank):
         self.win.Lock(rank=target_rank, lock_type=MPI.LOCK_SHARED)
 
     def unlock(self, target_rank):
-        self.win.Unlock(rank=target_rank)      
+        self.win.Unlock(rank=target_rank)
 
     def get_rank_shape(self, shape):
         """

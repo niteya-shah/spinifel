@@ -10,6 +10,7 @@ from spinifel.extern import cufinufft_ext
 
 profiler = Profiler()
 
+
 if settings.use_cufinufft:
     if settings.use_pygpu:
         import PybindGPU  as gpuarray
@@ -21,14 +22,17 @@ if settings.use_cufinufft:
     from cufinufft import cufinufft
 
     mode = "cufinufft" + version("cufinufft")
-    from orientation_ext import TransferBuffer, SharedMemory, WindowManager
+    from orientation_ext import TransferBufferGPU
 
-# elif context.finufftpy_available:
-#     from . import nfft as finufft
+elif context.finufftpy_available:
+    from . import nfft as finufft
 
-#     mode = "finufft" + version("finufftpy")
-#     if settings.use_cupy:
-#         import cupy as cp
+    mode = "finufft" + version("finufftpy")
+    if settings.use_cupy:
+        import cupy as cp
+    from orientation_ext import TransferBufferCPU
+
+from orientation_ext import SharedMemory, WindowManager, halo_generator
 
 if settings.use_single_prec:
     f_type = np.float32
@@ -66,11 +70,14 @@ class NUFFT_MPI:
         else:
             self.ref_orientations = orientations
 
+        self.work_unit_shared = self.N_orientations//contexts.size_compute_shared
+        self.work_unit = self.N_orientations//contexts.size_compute
         # Save reference rotation matrix so that we dont re-create it every
         # time
-        self.ref_rotmat = SharedMemory((self.N_orientations, 4), f_type, split=False)
-        for quat in self.ref_orientations:
-            self.ref_rotmat[quat] = np.linalg.inv(skp.quaternion2rot3d(quat))
+        self.ref_rotmat = SharedMemory((self.N_orientations, 3, 3), f_type, split=False, pinned=False)
+
+        for quat in self.N_orientations[self.work_unit_shared * contexts.rank_shared:self.work_unit_shared * (contexts.rank_shared + 1)]:
+            self.ref_rotmat[quat] = np.linalg.inv(skp.quaternion2rot3d(self.ref_orientations[quat]))
 
         self.eps = 1e-12
         self.isign = -1
@@ -82,15 +89,14 @@ class NUFFT_MPI:
         if settings.use_cufinufft:
             # Store resused datastructures in memory so that we don't
             # constantly deallocate and realloate them
-            self.H_f = gpuarray.GPUArray(
-                shape=(self.N_pixels * self.N_batch_size,), dtype=f_type
-            )
-            self.K_f = gpuarray.GPUArray(
-                shape=(self.N_pixels * self.N_batch_size,), dtype=f_type
-            )
-            self.L_f = gpuarray.GPUArray(
-                shape=(self.N_pixels * self.N_batch_size,), dtype=f_type
-            )
+            # Transfer Buffer stores pinned memory for transfer and GPU memory in one 
+            # boxed class
+            # We use H K L in contiguous memory
+            self.transfer_buffer = list()
+            for i in range(settings.N_streams):
+                self.transfer_buffer[i] = TransferBufferGPU(
+                    (3, self.N_batch_size, self.N_pixels), f_type
+                    )
 
             self.H_a = gpuarray.GPUArray(
                 shape=(self.N_pixels * self.N_images,), dtype=f_type
@@ -104,31 +110,15 @@ class NUFFT_MPI:
 
             # Store memory that we have to send to the gpu constantly in pinned
             # memory.
-            if settings.use_pygpu:
-                # For PybindGPU, we need to keep the allocator alive by 
-                # assigning it to the class. Failing to do this will 
-                # result in segfault when trying to access self.HKL_mat.
-                self.HKL_mat_alloc = gpuarray.Allocator(
-                    gpuarray.gpuarray.PagelockedAllocator(
-                        (
-                            self.ref_rotmat.shape[1],
-                            self.ref_rotmat.shape[0],
-                            *pixel_position_reciprocal.shape[1:],
-                        ),
-                        f_type,
-                    )
-                )
-
-                self.HKL_mat = gpuarray.GPUArray(allocator=self.HKL_mat_alloc).get()
-            else:
-                self.HKL_mat = pycuda.driver.pagelocked_empty(
-                    (
-                        self.ref_rotmat.shape[1],
-                        self.ref_rotmat.shape[0],
-                        *pixel_position_reciprocal.shape[1:],
-                    ),
-                    f_type,
-                )
+            self.HKL_mat = WindowManager(
+                (              
+                    self.ref_rotmat.shape[1],
+                    self.ref_rotmat.shape[0],
+                    *pixel_position_reciprocal.shape[1:],
+                ), 
+                f_type
+            )
+          
         elif context.finufftpy_available:
             self.H_f = np.empty((self.N_pixels * self.N_batch_size,), dtype=f_type)
             self.K_f = np.empty((self.N_pixels * self.N_batch_size,), dtype=f_type)
@@ -138,26 +128,30 @@ class NUFFT_MPI:
             self.K_a = np.empty((self.N_pixels * self.N_images,), dtype=f_type)
             self.L_a = np.empty((self.N_pixels * self.N_images,), dtype=f_type)
 
-            self.HKL_mat = np.empty(
-                (
+            self.HKL_mat = WindowManager(
+                (              
                     self.ref_rotmat.shape[1],
                     self.ref_rotmat.shape[0],
                     *pixel_position_reciprocal.shape[1:],
-                ),
+                ), 
                 f_type,
+                pinned=False
             )
 
         # Cupy Einsum leaks memory so we dont use it
+        # This version assumes that Orientations are split across all nodes as in Window Manager
+        # TODO: Work out a way to link those two
+        self.local_HKL_mat = self.HKL_mat.get_win_local()
         np.einsum(
             "ijk,klmn->jilmn",
-            self.ref_rotmat,
+            self.ref_rotmat[self.work_unit * contexts.rank:self.work_unit * (contexts.rank + 1)],
             self.pixel_position_reciprocal,
             optimize="greedy",
             dtype=f_type,
-            out=self.HKL_mat,
+            out=self.local_HKL_mat,
         )
-        self.HKL_mat *= self.mult
-        assert np.max(np.abs(self.HKL_mat)) < 3 * np.pi
+        self.local_HKL_mat *= self.mult
+        assert np.max(np.abs(self.local_HKL_mat)) < 3 * np.pi
 
     @nvtx.annotate("extern/util.py", is_prefix=True)
     def update_fields(self, n_images_per_rank):
@@ -249,9 +243,11 @@ class NUFFT_MPI:
 
         def free_gpuarrays_and_cufinufft_plans(self):
             if not settings.use_pygpu:
-                self.H_f.gpudata.free()
-                self.K_f.gpudata.free()
-                self.L_f.gpudata.free()
+
+                # TODO: Fix to remove Transfer Buffers and Plans
+                # self.H_f.gpudata.free()
+                # self.K_f.gpudata.free()
+                # self.L_f.gpudata.free()
                 self.H_a.gpudata.free()
                 self.K_a.gpudata.free()
                 self.L_a.gpudata.free()

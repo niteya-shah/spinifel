@@ -184,11 +184,11 @@ class SpinifelContexts(metaclass=Singleton):
         return self._rank
 
     @property
-    def shared_rank(self):
+    def rank_shared(self):
         """
         Get MPI Node Rank
         """
-        return self._shared_rank
+        return self._rank_shared
 
     @property
     def comm(self):
