@@ -23,13 +23,13 @@ class TransferBufferGPU:
         :param shape -- shape of the buffer
         :param dtype -- dtype of the buffers
         """
-        settings.ctx.push()
+        contexts.ctx.push()
 
         self.stream = cp.cuda.Stream()
         self.cpu_buf = cpx.empty_pinned(shape, dtype)
         self.gpu_buf = cp.empty(shape, dtype=dtype)
 
-        settings.ctx.pop()
+        contexts.ctx.pop()
 
     def set_data(self):
         """
@@ -70,7 +70,8 @@ class SharedMemory:
         self.np_dtype = dtype
         self.mpi_dtype = dtlib.from_numpy_dtype(dtype)
         self.itemsize = self.mpi_dtype.Get_size()
-        
+        self.shape = shape
+
         if split or contexts.rank_shared == 0:
             self.nbytes = np.prod(self.shape) * self.itemsize
         else:
@@ -79,7 +80,7 @@ class SharedMemory:
             size=self.nbytes,disp_unit=self.itemsize, comm=contexts.comm_compute_shared)
 
         buf, itemsize = self.win_shared.Shared_query(contexts.rank_shared if split else 0)
-        self.local_buf = np.ndarray(buf=buf, dtype=self.np_dtype, shape=self.shape)
+        self.local_buf = np.ndarray(buffer=buf, dtype=self.np_dtype, shape=self.shape)
 
         if split or (contexts.rank_shared == 0) and pinned:
             cp.cuda.runtime.hostRegister(self.local_buf.ctypes.data, self.local_buf.nbytes, 0x2)
@@ -128,7 +129,7 @@ class WindowManager:
     
     def get_win_local(self, rank):
         buf, itemsize = self.shared_memory.win_shared.Shared_query(rank)
-        return np.ndarray(buf=buf, dtype=self.dtype, shape=self.rank_shape)
+        return np.ndarray(buffer=buf, dtype=self.dtype, shape=self.rank_shape)
     
     def set_win(self, arr):
         self.shared_memory[:] = arr

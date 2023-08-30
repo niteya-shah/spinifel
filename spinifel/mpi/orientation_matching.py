@@ -4,6 +4,23 @@ from spinifel.sequential.orientation_matching import (
     slicing_and_match as sequential_match,
 )
 
+from spinifel.sequential.orientation_matching import SNM
+
+class SNM_MPI(SNM):
+    def __init__(
+        self,
+        settings,
+        slices_,
+        pixel_position_reciprocal,
+        pixel_distance_reciprocal,
+        nufft,
+    ):
+        super().__init__(settings,
+        slices_, pixel_position_reciprocal,
+        pixel_distance_reciprocal, nufft)
+
+        
+
 
 @nvtx.annotate("mpi/orientation_matching.py", is_prefix=True)
 def match(

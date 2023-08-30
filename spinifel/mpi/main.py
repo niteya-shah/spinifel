@@ -16,7 +16,7 @@ from .phasing import phase
 
 from spinifel.sequential.orientation_matching import SNM
 from .autocorrelation import MergeMPI
-from spinifel.extern.nufft_ext import NUFFT
+from spinifel.extern.nufft_ext_mpi import NUFFT_MPI
 
 from eval.fsc import compute_fsc, compute_reference
 from eval.align import align_volumes
@@ -326,7 +326,7 @@ def main():
 
             # Intitilize merge and orientation matching
             if nufft is None:
-                nufft = NUFFT(
+                nufft = NUFFT_MPI(
                     settings,
                     pixel_position_reciprocal,
                     pixel_distance_reciprocal,

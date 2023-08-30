@@ -22,7 +22,7 @@ if settings.use_cufinufft:
     from cufinufft import cufinufft
 
     mode = "cufinufft" + version("cufinufft")
-    from orientation_ext import TransferBufferGPU
+    from spinifel.extern.orientations_ext import TransferBufferGPU
 
 elif context.finufftpy_available:
     from . import nfft as finufft
@@ -30,9 +30,9 @@ elif context.finufftpy_available:
     mode = "finufft" + version("finufftpy")
     if settings.use_cupy:
         import cupy as cp
-    from orientation_ext import TransferBufferCPU
+    from spinifel.extern.orientations_ext import TransferBufferCPU
 
-from orientation_ext import SharedMemory, WindowManager, halo_generator
+from spinifel.extern.orientations_ext import SharedMemory, WindowManager, halo_generator
 
 if settings.use_single_prec:
     f_type = np.float32
@@ -76,7 +76,7 @@ class NUFFT_MPI:
         # time
         self.ref_rotmat = SharedMemory((self.N_orientations, 3, 3), f_type, split=False, pinned=False)
 
-        for quat in self.N_orientations[self.work_unit_shared * contexts.rank_shared:self.work_unit_shared * (contexts.rank_shared + 1)]:
+        for quat in range(self.work_unit_shared * contexts.rank_shared, self.work_unit_shared * (contexts.rank_shared + 1)):
             self.ref_rotmat[quat] = np.linalg.inv(skp.quaternion2rot3d(self.ref_orientations[quat]))
 
         self.eps = 1e-12
@@ -92,12 +92,7 @@ class NUFFT_MPI:
             # Transfer Buffer stores pinned memory for transfer and GPU memory in one 
             # boxed class
             # We use H K L in contiguous memory
-            self.transfer_buffer = list()
-            for i in range(settings.N_streams):
-                self.transfer_buffer[i] = TransferBufferGPU(
-                    (3, self.N_batch_size, self.N_pixels), f_type
-                    )
-
+            self.transfer_buffer = [TransferBufferGPU((3, self.N_batch_size, self.N_pixels), f_type) for _ in range(settings.N_streams)]
             self.H_a = gpuarray.GPUArray(
                 shape=(self.N_pixels * self.N_images,), dtype=f_type
             )
@@ -119,10 +114,11 @@ class NUFFT_MPI:
                 f_type
             )
           
-        elif context.finufftpy_available:
-            self.H_f = np.empty((self.N_pixels * self.N_batch_size,), dtype=f_type)
-            self.K_f = np.empty((self.N_pixels * self.N_batch_size,), dtype=f_type)
-            self.L_f = np.empty((self.N_pixels * self.N_batch_size,), dtype=f_type)
+        elif contexts.finufftpy_available:
+            # Shift finufft to Shared version
+            # self.H_f = np.empty((self.N_pixels * self.N_batch_size,), dtype=f_type)
+            # self.K_f = np.empty((self.N_pixels * self.N_batch_size,), dtype=f_type)
+            # self.L_f = np.empty((self.N_pixels * self.N_batch_size,), dtype=f_type)
 
             self.H_a = np.empty((self.N_pixels * self.N_images,), dtype=f_type)
             self.K_a = np.empty((self.N_pixels * self.N_images,), dtype=f_type)
@@ -141,7 +137,7 @@ class NUFFT_MPI:
         # Cupy Einsum leaks memory so we dont use it
         # This version assumes that Orientations are split across all nodes as in Window Manager
         # TODO: Work out a way to link those two
-        self.local_HKL_mat = self.HKL_mat.get_win_local()
+        self.local_HKL_mat = self.HKL_mat.get_win_local(contexts.rank_shared)
         np.einsum(
             "ijk,klmn->jilmn",
             self.ref_rotmat[self.work_unit * contexts.rank:self.work_unit * (contexts.rank + 1)],
