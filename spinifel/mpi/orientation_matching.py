@@ -1,13 +1,15 @@
 import PyNVTX as nvtx
 
-from spinifel.sequential.orientation_matching import (
-    slicing_and_match as sequential_match,
-)
+# from spinifel.sequential.orientation_matching import (
+    # slicing_and_match as sequential_match,
+# )
 
 from spinifel.sequential.orientation_matching import SNM
 from spinifel.extern.orientations_ext import halo_generator
 from spinifel import settings, contexts, Profiler
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+import time
 
 if settings.use_cupy:
     import os
@@ -71,19 +73,27 @@ class SNM_MPI(SNM):
     @nvtx.annotate("mpi/orientation_matching.py::modified", is_prefix=True)
     def _slice_and_match_int(self, stream_id, ugrid):
         transfer_buf = TransferBuffer((3, self.N_batch_size, self.N_pixels), f_type)
+        contexts.ctx.push()
+
+        slices_time = 0
+        match_time = 0
+        match_oth_time = 0
+        slice_init = time.monotonic()
+
 
         for target_rank in halo_generator(contexts.size_compute_shared, contexts.size, contexts.rank, stream_id, settings.N_streams):
             shared = target_rank // contexts.size_compute_shared == contexts.rank // contexts.size_compute_shared
 
             self.nufft.HKL_mat.lock(target_rank)
             
-            for offset in range(batches):
+            for offset in range(self.nufft.HKL_mat.rank_shape[1]//self.N_batch_size):
+                slice_start = time.monotonic()
                 if shared:
                     target_arr = self.nufft.HKL_mat.get_win_local(target_rank %  contexts.size_compute_shared)
                     # H, K and L
                     for dim in range(3):
                         arr_offset = (dim, slice(offset * self.N_batch_size, (offset + 1) * self.N_batch_size))
-                        transfer_buf.set_data_local(target_arr[arr_offset], dim)
+                        transfer_buf.set_data_local(target_arr[arr_offset].reshape(self.N_batch_size, self.N_pixels), dim)
                 else:
                     for dim in range(3):
                         arr_offset_begin = self.nufft.HKL_mat.get_strides()[0:2] @ np.array([dim, offset * self.N_batch_size])
@@ -93,9 +103,9 @@ class SNM_MPI(SNM):
                     self.nufft.HKL_mat.flush(target_rank)
                     transfer_buf.set_data()
                 
-                H_, K_, L_ = transfer_buf.get_HKL()
+                H_, K_, L_ = map(self.nufft.gpuarray_from_cupy, transfer_buf.get_HKL())
 
-                forward_result = self.nufft.forward(self.ugrid, H_, K_, L_, stream_id, 1, self.reciprocal_extent, self.N_batch)
+                forward_result = self.nufft.forward(ugrid, H_, K_, L_, stream_id, 1, self.reciprocal_extent, self.N_batch)
                 data_images = forward_result.real.reshape(self.N_batch_size, -1)
 
                 slices_time += time.monotonic() - slice_start
@@ -117,12 +127,13 @@ class SNM_MPI(SNM):
 
                 args_temp = self.dist[stream_id].argmin(axis=0)
                 matching_indexes = args_temp != self.N_batch_size
-                self.args[stream_id, matching_indexes] = target_rank * self.nufft.rank_shape[1] + offset * self.N_batch + args_temp[matching_indexes]
+                self.args[stream_id, matching_indexes] = target_rank * self.nufft.HKL_mat.rank_shape[1] + offset * self.N_batch + args_temp[matching_indexes]
                 min_distance = xp.take_along_axis(self.dist[stream_id], args_temp[None, :], 0).reshape(-1)
                 self.dist[stream_id, -1] = min_distance
                 match_time += time.monotonic() - match_middle
             
             self.nufft.HKL_mat.unlock(target_rank)
+        contexts.ctx.pop()
 
     @nvtx.annotate("sequential/orientation_matching.py::modified", is_prefix=True)
     def slicing_and_match_with_min_dist(self, ac):
@@ -137,22 +148,23 @@ class SNM_MPI(SNM):
             ugrid = to_gpu(ac.astype(c_type))
         else:
             ugrid = ac.astype(c_type)
-        slices_time = 0
-        match_time = 0
-        match_oth_time = 0
-        slice_init = time.monotonic()
 
         with ThreadPoolExecutor(max_workers=settings.N_streams) as executor:
-            futures = executor.map(lambda stream_id: self._slice_and_match_int(stream_id, ugrid), range(settings.N_streams))
+            futures = map(lambda stream_id: self._slice_and_match_int(stream_id, ugrid), range(settings.N_streams))
 
-            for future in as_completed(futures):
-                if future.exception():
-                    logger.log(repr(future.exception()), level=1)
+            # for future in as_completed(futures):
+                # if future.exception():
+                    # logger.log(repr(future.exception()), level=1)
 
-        args_final = xp.take_along_axis(self.args, self.distances[:, self.N_batch_size].argmin(axis=0)[None, :], 0)
-        distances_final = distances[:, self.N_batch_size].min(axis=0)
+        args_final = xp.take_along_axis(self.args, self.dist[:, self.N_batch_size].argmin(axis=0)[None, :], 0).get()
+        distances_final = self.dist[:, self.N_batch_size].min(axis=0).get()
 
-        return self.nufft.ref_orientations[args_final], distances_final
+        return xp.squeeze(self.nufft.ref_orientations[args_final]), distances_final
+
+    @nvtx.annotate("sequential/orientation_matching.py::modified", is_prefix=True)
+    def slicing_and_match(self, ac):
+        orients, dist = self.slicing_and_match_with_min_dist(ac)
+        return orients
 
 @nvtx.annotate("mpi/orientation_matching.py", is_prefix=True)
 def match(

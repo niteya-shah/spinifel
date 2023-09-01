@@ -14,7 +14,7 @@ import os
 from .prep import compute_mean_image, show_image, bin_data, get_pixel_info, get_data
 from .phasing import phase
 
-from spinifel.sequential.orientation_matching import SNM
+from spinifel.mpi.orientation_matching import SNM_MPI
 from .autocorrelation import MergeMPI
 from spinifel.extern.nufft_ext_mpi import NUFFT_MPI
 
@@ -340,7 +340,7 @@ def main():
                     nufft,
                 )
 
-                snm = SNM(
+                snm = SNM_MPI(
                     settings,
                     slices_,
                     pixel_position_reciprocal,

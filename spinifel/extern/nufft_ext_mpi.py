@@ -294,8 +294,8 @@ class NUFFT_MPI:
                     gpu_device_id=dev_id,
                 )
 
-            plan_f[stream_id].set_pts(H_, K_, L_)
-            plan_f[stream_id].execute(nuvect, ugrid)
+            self.plan_f[stream_id].set_pts(H_, K_, L_)
+            self.plan_f[stream_id].execute(nuvect, ugrid)
             return self.gpuarray_to_cupy(nuvect)
 
         @nvtx.annotate("NUFFT/cufinufft/adjoint", is_prefix=True)
