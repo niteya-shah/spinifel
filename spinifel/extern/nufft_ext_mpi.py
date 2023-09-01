@@ -22,7 +22,6 @@ if settings.use_cufinufft:
     from cufinufft import cufinufft
 
     mode = "cufinufft" + version("cufinufft")
-    from spinifel.extern.orientations_ext import TransferBufferGPU
 
 elif context.finufftpy_available:
     from . import nfft as finufft
@@ -30,9 +29,8 @@ elif context.finufftpy_available:
     mode = "finufft" + version("finufftpy")
     if settings.use_cupy:
         import cupy as cp
-    from spinifel.extern.orientations_ext import TransferBufferCPU
 
-from spinifel.extern.orientations_ext import SharedMemory, WindowManager, halo_generator
+from spinifel.extern.orientations_ext import SharedMemory, WindowManager
 
 if settings.use_single_prec:
     f_type = np.float32
@@ -92,7 +90,6 @@ class NUFFT_MPI:
             # Transfer Buffer stores pinned memory for transfer and GPU memory in one 
             # boxed class
             # We use H K L in contiguous memory
-            self.transfer_buffer = [TransferBufferGPU((3, self.N_batch_size, self.N_pixels), f_type) for _ in range(settings.N_streams)]
             self.H_a = gpuarray.GPUArray(
                 shape=(self.N_pixels * self.N_images,), dtype=f_type
             )
@@ -257,12 +254,12 @@ class NUFFT_MPI:
     if mode == "cufinufft1.2":
 
         @nvtx.annotate("NUFFT/cufinufft/forward", is_prefix=True)
-        def forward(self, ugrid, st, en, support, use_recip_sym, N):
+        def forward(self, ugrid, H_, K_, L_, stream_id, support, use_recip_sym, N):
+            """
+            New version of forward now accepts gpuarray/pygpu arrays in H_, K_, L_ directly
+            We also pass stream_id to ensure that every thread has a unique plan
+            """
             # Use reshapes instead of flattens because flatten creates copies
-            H_ = self.HKL_mat[0, st:en, :].reshape(-1)
-            K_ = self.HKL_mat[1, st:en, :].reshape(-1)
-            L_ = self.HKL_mat[2, st:en, :].reshape(-1)
-
             assert H_.shape == K_.shape == L_.shape
 
             if use_recip_sym:
@@ -282,13 +279,11 @@ class NUFFT_MPI:
 
             H_, K_, L_ = self.transpose(H_, K_, L_)
 
-            self.H_f.set(H_)
-            self.K_f.set(K_)
-            self.L_f.set(L_)
-
             nuvect = gpuarray.GPUArray(shape=(N,), dtype=c_type)
             if not hasattr(self, "plan_f"):
-                self.plan_f = cufinufft(
+                self.plan_f = {}
+            if stream_id not in self.plan_f:
+                self.plan_f[stream_id] = cufinufft(
                     2,
                     ugrid.shape,
                     1,
@@ -299,8 +294,8 @@ class NUFFT_MPI:
                     gpu_device_id=dev_id,
                 )
 
-            self.plan_f.set_pts(self.H_f, self.K_f, self.L_f)
-            self.plan_f.execute(nuvect, ugrid)
+            plan_f[stream_id].set_pts(H_, K_, L_)
+            plan_f[stream_id].execute(nuvect, ugrid)
             return self.gpuarray_to_cupy(nuvect)
 
         @nvtx.annotate("NUFFT/cufinufft/adjoint", is_prefix=True)

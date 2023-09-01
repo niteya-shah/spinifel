@@ -38,13 +38,21 @@ class TransferBufferGPU:
         Sends the entire cpu_buf to the gpu_buf and assumes that H, K, L are set correctly
         """
         self.gpu_buf.set(self.cpu_buf, self.stream)
+        self.stream.synchronize()
         
-    def set_data_local(self, arr, gpu_index):
+    def set_data_local(self, arr, index):
         """
         Require the correct context ctx to be pushed. Since the memory is local, H, K, L can
         be set independently.
         """
-        self.gpu_buf[gpu_index].set(arr, self.stream)
+        self.gpu_buf[index].set(arr, self.stream)
+        self.stream.synchronize()
+
+    def get_HKL(self, **kwargs):
+        """
+        Unused keyword argument kwargs to keep API uniform between CPU and GPU mode
+        """
+        return self.gpu_buf[0], self.gpu_buf[1], self.gpu_buf[0]
 
 class TransferBufferCPU:
     def __init__(self, shape, dtype):
@@ -56,6 +64,28 @@ class TransferBufferCPU:
         :param dtype -- dtype of the buffers
         """
         self.cpu_buf = np.empty(shape, dtype)
+        self.local_buf = {}
+
+    def set_data(self):
+        """
+        Data already in buffer so this function is not used
+        """
+        pass
+
+    def set_data_local(self, arr, index):
+        """
+        Store address of local data array for ease of access and unified API
+        """
+        self.local_buf[index] = arr
+
+    def get_HKL(self, shared=True):
+        """
+        if shared use local_buf, else cpu_buf
+        """
+        if shared:
+            return self.local_buf[0], self.local_buf[1], self.local_buf[2]
+        else:
+            return self.cpu_buf[0], self.cpu_buf[1], self.cpu_buf[2]
 
 class SharedMemory:
     
@@ -125,7 +155,7 @@ class WindowManager:
         self.win.Get(
             transfer_buf,
             target_rank=target_rank,
-            target=target)
+            target=(*target, self.shared_memory.mpi_dtype))
     
     def get_win_local(self, rank):
         buf, itemsize = self.shared_memory.win_shared.Shared_query(rank)
@@ -133,16 +163,21 @@ class WindowManager:
     
     def set_win(self, arr):
         self.shared_memory[:] = arr
+    
+    def get_strides(self):
+        return self.shared_memory.local_buf.strides
 
     def flush(self, target_rank):
         self.win.Flush_local(target_rank)
 
-def halo_generator(shared_comm_size, comm_size, rank, num_streams):
+def halo_generator(shared_comm_size, comm_size, rank, stream_id, num_streams):
     num_nodes = comm_size//shared_comm_size
     local_rank = rank % shared_comm_size
     node_id = rank // shared_comm_size
     for idx, i in enumerate(chain(range(local_rank, shared_comm_size), range(local_rank))):
         for jdx, j in enumerate(chain(range(node_id, num_nodes), range(node_id))):
             target_rank = (i + j * shared_comm_size)%(shared_comm_size * num_nodes)
-            stream_id = (idx * num_nodes + jdx)%num_streams
-            yield target_rank, stream_id
+            stream_id_target = (idx * num_nodes + jdx)%num_streams
+            if stream_id == stream_id_target:
+                yield target_rank
+
