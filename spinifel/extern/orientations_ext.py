@@ -52,7 +52,7 @@ class TransferBufferGPU:
         """
         Unused keyword argument kwargs to keep API uniform between CPU and GPU mode
         """
-        return self.gpu_buf[0], self.gpu_buf[1], self.gpu_buf[0]
+        return self.gpu_buf[0], self.gpu_buf[1], self.gpu_buf[2]
 
 class TransferBufferCPU:
     def __init__(self, shape, dtype):

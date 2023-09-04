@@ -10,6 +10,7 @@ from spinifel import settings, contexts, Profiler
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import time
+import numpy as np
 
 if settings.use_cupy:
     import os
@@ -88,7 +89,7 @@ class SNM_MPI(SNM):
             
             for offset in range(self.nufft.HKL_mat.rank_shape[1]//self.N_batch_size):
                 slice_start = time.monotonic()
-                if shared:
+                if shared and False:
                     target_arr = self.nufft.HKL_mat.get_win_local(target_rank %  contexts.size_compute_shared)
                     # H, K and L
                     for dim in range(3):
@@ -98,7 +99,7 @@ class SNM_MPI(SNM):
                     for dim in range(3):
                         arr_offset_begin = self.nufft.HKL_mat.get_strides()[0:2] @ np.array([dim, offset * self.N_batch_size])
                         target = (arr_offset_begin, self.N_batch)
-                        self.nufft.HKL_mat.get_win(target_rank, target, transfer_buf.cpu_buf[i])
+                        self.nufft.HKL_mat.get_win(target_rank, target, transfer_buf.cpu_buf[dim])
 
                     self.nufft.HKL_mat.flush(target_rank)
                     transfer_buf.set_data()
@@ -127,7 +128,7 @@ class SNM_MPI(SNM):
 
                 args_temp = self.dist[stream_id].argmin(axis=0)
                 matching_indexes = args_temp != self.N_batch_size
-                self.args[stream_id, matching_indexes] = target_rank * self.nufft.HKL_mat.rank_shape[1] + offset * self.N_batch + args_temp[matching_indexes]
+                self.args[stream_id, matching_indexes] = target_rank * self.nufft.HKL_mat.rank_shape[1] + offset * self.N_batch_size + args_temp[matching_indexes]
                 min_distance = xp.take_along_axis(self.dist[stream_id], args_temp[None, :], 0).reshape(-1)
                 self.dist[stream_id, -1] = min_distance
                 match_time += time.monotonic() - match_middle
@@ -150,7 +151,7 @@ class SNM_MPI(SNM):
             ugrid = ac.astype(c_type)
 
         with ThreadPoolExecutor(max_workers=settings.N_streams) as executor:
-            futures = map(lambda stream_id: self._slice_and_match_int(stream_id, ugrid), range(settings.N_streams))
+            futures = list(map(lambda stream_id: self._slice_and_match_int(stream_id, ugrid), range(settings.N_streams)))
 
             # for future in as_completed(futures):
                 # if future.exception():
@@ -158,7 +159,6 @@ class SNM_MPI(SNM):
 
         args_final = xp.take_along_axis(self.args, self.dist[:, self.N_batch_size].argmin(axis=0)[None, :], 0).get()
         distances_final = self.dist[:, self.N_batch_size].min(axis=0).get()
-
         return xp.squeeze(self.nufft.ref_orientations[args_final]), distances_final
 
     @nvtx.annotate("sequential/orientation_matching.py::modified", is_prefix=True)
