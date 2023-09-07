@@ -82,7 +82,7 @@ class SNM_MPI(SNM):
         slice_init = time.monotonic()
 
 
-        for target_rank in halo_generator(contexts.size_compute_shared, contexts.size, contexts.rank, stream_id, settings.N_streams):
+        for target_rank in halo_generator(contexts.size_compute_shared, contexts.size, contexts.rank, stream_id, settings.N_streams, self.nufft.HKL_mat.splits):
             shared = target_rank // contexts.size_compute_shared == contexts.rank // contexts.size_compute_shared
 
             self.nufft.HKL_mat.lock(target_rank)
