@@ -68,15 +68,6 @@ class NUFFT_MPI:
         else:
             self.ref_orientations = orientations
 
-        self.work_unit_shared = self.N_orientations//contexts.size_compute_shared
-        self.work_unit = self.N_orientations//contexts.size_compute
-        # Save reference rotation matrix so that we dont re-create it every
-        # time
-        self.ref_rotmat = SharedMemory((self.N_orientations, 3, 3), f_type, split=False, pinned=False)
-
-        for quat in range(self.work_unit_shared * contexts.rank_shared, self.work_unit_shared * (contexts.rank_shared + 1)):
-            self.ref_rotmat[quat] = np.linalg.inv(skp.quaternion2rot3d(self.ref_orientations[quat]))
-
         self.eps = 1e-12
         self.isign = -1
 
@@ -134,10 +125,20 @@ class NUFFT_MPI:
         # Cupy Einsum leaks memory so we dont use it
         # This version assumes that Orientations are split across all nodes as in Window Manager
         # TODO: Work out a way to link those two
+        self.work_unit_shared = self.N_orientations//contexts.size_compute_shared
+        self.work_unit = self.N_orientations//(contexts.size_compute//self.HKL_mat.splits)
+        self.split_rank = contexts.rank % (contexts.size_compute//self.HKL_mat.splits)
+        # Save reference rotation matrix so that we dont re-create it every
+        # time
+        self.ref_rotmat = SharedMemory((self.N_orientations, 3, 3), f_type, split=False, pinned=False)
+
+        for quat in range(self.work_unit_shared * contexts.rank_shared, self.work_unit_shared * (contexts.rank_shared + 1)):
+            self.ref_rotmat[quat] = np.linalg.inv(skp.quaternion2rot3d(self.ref_orientations[quat]))
+
         self.local_HKL_mat = self.HKL_mat.get_win_local(contexts.rank_shared)
         np.einsum(
             "ijk,klmn->jilmn",
-            self.ref_rotmat[self.work_unit * contexts.rank:self.work_unit * (contexts.rank + 1)],
+            self.ref_rotmat[self.work_unit * self.split_rank:self.work_unit * (self.split_rank + 1)],
             self.pixel_position_reciprocal,
             optimize="greedy",
             dtype=f_type,

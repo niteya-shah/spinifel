@@ -13,6 +13,7 @@ from mpi4py import MPI
 
 from threading import Thread
 from itertools import chain
+from math import ceil
 
 class TransferBufferGPU:
     def __init__(self, shape, dtype):
@@ -131,7 +132,13 @@ class WindowManager:
         :param dtype(optional) -- dtype of the buffer
         :param split(optional) -- if split is true, every rank in the node creates its own buffer. Else, only rank 0 creates a buffer
         """
-        self.rank_shape = self.get_rank_shape(shape)
+        if settings.split_type == 'even':
+            self.rank_shape, self.splits = self.get_rank_shape(shape)
+        elif settings.split_type == 'balanced':
+            self.rank_shape, self.splits = get_balanced_rank_shape(shape)
+        else:
+            raise ValueError("Unknown split type")
+
         self.dtype = dtype
                 
         self.shared_memory = SharedMemory(self.rank_shape, dtype, pinned=pinned)
@@ -143,13 +150,43 @@ class WindowManager:
     def unlock(self, target_rank):
         self.win.Unlock(rank=target_rank)
 
-    def get_rank_shape(self, shape):
+    @staticmethod
+    def get_even_rank_shape(shape):
         """
         Heurestic to split the data. Currently, splits so that data is split evenly among the ranks. 
-        TODO: Future plan to maximize local utilization
         """
-        assert shape[1] % (contexts.size_compute) == 0
-        return [shape[0], shape[1]//(contexts.size_compute), *shape[2:]]
+        assert shape[1] % (contexts.size_compute) == 0, "Cannot evenly split orientations between ranks"
+        return [shape[0], shape[1]//(contexts.size_compute), *shape[2:]], 1
+    
+    @staticmethod
+    def get_balanced_rank_shape_and_num_splits(shape):
+        """
+        Heurestic to split the data. Currently, splits so that data is balanced over the ranks to maximize local data.
+        """
+        # Computation is always local
+        if shape[1] <= settings.split_size:
+            return [
+                shape[0],
+                shape[1],
+                *shape[2:],
+            ], contexts.size_compute // contexts.size_compute_shared
+        # We need to distribute over nodes
+        else:
+            num_nodes_in_split = ceil(shape[1] / settings.split_size)
+            assert (
+                shape[1] % num_nodes_in_split == 0
+            ), "Cannot split orientations over ranks in a balanced manner"
+            assert (
+                contexts.size_compute // contexts.size_compute_shared
+            ) >= num_nodes_in_split, "Not enough nodes to split in balanced manner"
+            assert (
+                contexts.size_compute // contexts.size_compute_shared
+            ) % num_nodes_in_split == 0, (
+                "Cannot split orientations over nodes in balanced manner"
+            )
+            return [shape[0], shape[1] // num_nodes_in_split, *shape[2:]], (
+                contexts.size_compute // contexts.size_compute_shared
+            ) // num_nodes_in_split
 
     def get_win(self, target_rank, target, transfer_buf):
         self.win.Get(
@@ -170,14 +207,37 @@ class WindowManager:
     def flush(self, target_rank):
         self.win.Flush_local(target_rank)
 
-def halo_generator(shared_comm_size, comm_size, rank, stream_id, num_streams):
-    num_nodes = comm_size//shared_comm_size
+def halo_generator(shared_comm_size, comm_size, rank, stream_id, num_streams, splits=1):
+    """
+    Yields target rank for a symmetric All-to-All exchange.
+    stream_id : Ranks for the stream
+    splits : Number of times to split the nodes
+    """
+    assert (
+        comm_size % shared_comm_size == 0
+    ), "shared comm size is not divisible comm size"
+    assert rank < comm_size, "rank larger than comm size"
+    assert stream_id < num_streams, "stream id larger than number of streams"
+
+    num_nodes = comm_size // shared_comm_size
     local_rank = rank % shared_comm_size
     node_id = rank // shared_comm_size
-    for idx, i in enumerate(chain(range(local_rank, shared_comm_size), range(local_rank))):
-        for jdx, j in enumerate(chain(range(node_id, num_nodes), range(node_id))):
-            target_rank = (i + j * shared_comm_size)%(shared_comm_size * num_nodes)
-            stream_id_target = (idx * num_nodes + jdx)%num_streams
-            if stream_id == stream_id_target:
-                yield target_rank
 
+    assert num_nodes % splits == 0, "Cannot split data evenly between the nodes"
+
+    num_nodes_in_split = num_nodes // splits
+    offset_node_id = node_id % num_nodes_in_split
+    offset_in_split = node_id // num_nodes_in_split
+
+    for idx, i in enumerate(
+        chain(range(local_rank, shared_comm_size), range(local_rank))
+    ):
+        for jdx, j in enumerate(
+            chain(range(offset_node_id, num_nodes_in_split), range(offset_node_id))
+        ):
+            target_rank = (i + j * shared_comm_size) % (
+                shared_comm_size * num_nodes_in_split
+            )
+            stream_id_target = (idx * num_nodes_in_split + jdx) % num_streams
+            if stream_id == stream_id_target:
+                yield target_rank + offset_in_split * num_nodes_in_split * shared_comm_size
