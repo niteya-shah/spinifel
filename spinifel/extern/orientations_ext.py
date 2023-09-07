@@ -135,7 +135,7 @@ class WindowManager:
         if settings.split_type == 'even':
             self.rank_shape, self.splits = self.get_rank_shape(shape)
         elif settings.split_type == 'balanced':
-            self.rank_shape, self.splits = get_balanced_rank_shape(shape)
+            self.rank_shape, self.splits = self.get_balanced_rank_shape(shape)
         else:
             raise ValueError("Unknown split type")
 
