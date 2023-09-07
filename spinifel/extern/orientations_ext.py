@@ -159,7 +159,7 @@ class WindowManager:
         return [shape[0], shape[1]//(contexts.size_compute), *shape[2:]], 1
     
     @staticmethod
-    def get_balanced_rank_shape_and_num_splits(shape):
+    def get_balanced_rank_shape(shape):
         """
         Heurestic to split the data. Currently, splits so that data is balanced over the ranks to maximize local data.
         """
