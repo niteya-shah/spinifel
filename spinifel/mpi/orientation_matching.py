@@ -82,7 +82,7 @@ class SNM_MPI(SNM):
         slice_init = time.monotonic()
 
 
-        for target_rank in halo_generator(contexts.size_compute_shared, contexts.size, contexts.rank, stream_id, settings.N_streams, self.nufft.HKL_mat.splits):
+        for target_rank in halo_generator(contexts.size_compute_shared, contexts.size_compute, contexts.rank, stream_id, settings.N_streams, self.nufft.HKL_mat.splits):
             shared = target_rank // contexts.size_compute_shared == contexts.rank // contexts.size_compute_shared
 
             self.nufft.HKL_mat.lock(target_rank)
@@ -128,7 +128,7 @@ class SNM_MPI(SNM):
 
                 args_temp = self.dist[stream_id].argmin(axis=0)
                 matching_indexes = args_temp != self.N_batch_size
-                self.args[stream_id, matching_indexes] = target_rank * self.nufft.HKL_mat.rank_shape[1] + offset * self.N_batch_size + args_temp[matching_indexes]
+                self.args[stream_id, matching_indexes] = (target_rank % (contexts.size_compute//self.nufft.HKL_mat.splits)) * self.nufft.HKL_mat.rank_shape[1] + offset * self.N_batch_size + args_temp[matching_indexes]
                 min_distance = xp.take_along_axis(self.dist[stream_id], args_temp[None, :], 0).reshape(-1)
                 self.dist[stream_id, -1] = min_distance
                 match_time += time.monotonic() - match_middle
