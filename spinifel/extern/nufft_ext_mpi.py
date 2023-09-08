@@ -137,14 +137,15 @@ class NUFFT_MPI:
         # Save reference rotation matrix so that we dont re-create it every
         # time
         self.local_HKL_mat = self.HKL_mat.get_win_local(contexts.rank_shared)
-        np.einsum(
-            "ijk,klmn->jilmn",
-            self.ref_rotmat[self.work_unit * self.split_rank:self.work_unit * (self.split_rank + 1)],
-            self.pixel_position_reciprocal,
-            optimize="greedy",
-            dtype=f_type,
-            out=self.local_HKL_mat,
-        )
+        for val in range(0, self.work_unit, self.N_batch_size):
+            st = val + self.work_unit * self.split_rank
+            en = (val + self.N_batch_size) + self.work_unit * self.split_rank
+            self.local_HKL_mat[:, val:val + self.N_batch_size] = cp.einsum(
+                "ijk,klmn->jilmn",
+                self.ref_rotmat[st:en],
+                self.pixel_position_reciprocal,
+                optimize="greedy",
+                dtype=f_type).get()
         self.local_HKL_mat *= self.mult
         assert np.max(np.abs(self.local_HKL_mat)) < 3 * np.pi
 

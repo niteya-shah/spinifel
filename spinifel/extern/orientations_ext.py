@@ -133,7 +133,7 @@ class WindowManager:
         :param split(optional) -- if split is true, every rank in the node creates its own buffer. Else, only rank 0 creates a buffer
         """
         if settings.split_type == 'even':
-            self.rank_shape, self.splits = self.get_rank_shape(shape)
+            self.rank_shape, self.splits = self.get_even_rank_shape(shape)
         elif settings.split_type == 'balanced':
             self.rank_shape, self.splits = self.get_balanced_rank_shape(shape)
         else:
@@ -167,7 +167,7 @@ class WindowManager:
         if shape[1] <= settings.split_size:
             return [
                 shape[0],
-                shape[1],
+                shape[1] // contexts.size_compute_shared,
                 *shape[2:],
             ], contexts.size_compute // contexts.size_compute_shared
         # We need to distribute over nodes
@@ -184,7 +184,7 @@ class WindowManager:
             ) % num_nodes_in_split == 0, (
                 "Cannot split orientations over nodes in balanced manner"
             )
-            return [shape[0], shape[1] // num_nodes_in_split, *shape[2:]], (
+            return [shape[0], shape[1] // (num_nodes_in_split * contexts.size_compute_shared), *shape[2:]], (
                 contexts.size_compute // contexts.size_compute_shared
             ) // num_nodes_in_split
 
