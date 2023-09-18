@@ -14,9 +14,14 @@ import os
 from .prep import compute_mean_image, show_image, bin_data, get_pixel_info, get_data
 from .phasing import phase
 
-from spinifel.mpi.orientation_matching import SNM_MPI
 from .autocorrelation import MergeMPI
-from spinifel.extern.nufft_ext_mpi import NUFFT_MPI
+
+if settings.split_type == "none":
+    from spinifel.extern.nufft_ext import NUFFT
+    from spinifel.sequential.orientation_matching import SNM
+else:
+    from spinifel.extern.nufft_ext_mpi import NUFFT_MPI as NUFFT
+    from spinifel.mpi.orientation_matching import SNM_MPI as SNM
 
 from eval.fsc import compute_fsc, compute_reference
 from eval.align import align_volumes
@@ -326,7 +331,7 @@ def main():
 
             # Intitilize merge and orientation matching
             if nufft is None:
-                nufft = NUFFT_MPI(
+                nufft = NUFFT(
                     settings,
                     pixel_position_reciprocal,
                     pixel_distance_reciprocal,
@@ -340,7 +345,7 @@ def main():
                     nufft,
                 )
 
-                snm = SNM_MPI(
+                snm = SNM(
                     settings,
                     slices_,
                     pixel_position_reciprocal,

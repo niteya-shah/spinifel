@@ -511,7 +511,7 @@ class SpinifelSettings(metaclass=Singleton):
                 "orientation_matching",
                 "split_type",
                 str,
-                "balanced",
+                "none",
                 "Strategy for distributing orientations over nodes",
             ),
                 "_split_size": (
