@@ -313,7 +313,6 @@ class NUFFT:
             self.plan_f.set_pts(self.H_f, self.K_f, self.L_f)
             self.plan_f.execute(nuvect, ugrid)
             return self.gpuarray_to_cupy(nuvect)
-        
 
         @nvtx.annotate("NUFFT/cufinufft/adjoint", is_prefix=True)
         def adjoint(self, nuvect, H_, K_, L_, support, use_reciprocal_symmetry, M):

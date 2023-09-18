@@ -1,8 +1,8 @@
 import PyNVTX as nvtx
 
-# from spinifel.sequential.orientation_matching import (
-    # slicing_and_match as sequential_match,
-# )
+from spinifel.sequential.orientation_matching import (
+    slicing_and_match as sequential_match,
+)
 
 from spinifel.sequential.orientation_matching import SNM
 from spinifel.extern.orientations_ext import halo_generator

@@ -90,19 +90,9 @@ class SpinifelContexts(metaclass=Singleton):
             self._grp_compute = self._comm.group.Excl(self._psana_excl_ranks)
             self._comm_compute = self._comm.Create(self._grp_compute)
             self._rank = self._comm.Get_rank()
-            self._size_compute = self._comm.Get_size()
-
-            self._comm_compute_shared = self._comm_compute.Split_type(MPI.COMM_TYPE_SHARED)
-            self._rank_shared = self._comm_compute_shared.Get_rank()
-            self._size_compute_shared = self._comm_compute_shared.Get_size()
         else:
             self._comm = MPI.COMM_WORLD
             self._rank = self._comm.Get_rank()
-            self._size = self._comm.Get_size()
-
-            self._comm_shared = self._comm.Split_type(MPI.COMM_TYPE_SHARED)
-            self._rank_shared = self._comm_shared.Get_rank()
-            self._size_shared = self._comm_shared.Get_size()
 
         # register(MPI.Finalize)
         register(goodbye)
@@ -143,52 +133,11 @@ class SpinifelContexts(metaclass=Singleton):
         self._cuda_initialized = True
 
     @property
-    def size(self):
-        """
-        Get MPI Size        
-        """
-        return self._size
-
-    @property
-    def size_compute(self):
-        """
-        Get MPI Size        
-        """
-        if self._psana_excl_ranks:
-            return self._size_compute
-        else:
-            return self._size
-
-    @property
-    def size_shared(self):
-        """
-        Get MPI Node Rank
-        """
-        return self._size_shared
-    
-    @property
-    def size_compute_shared(self):
-        """
-        Get MPI Size        
-        """
-        if self._psana_excl_ranks:
-            return self._size_compute_shared
-        else:
-            return self._size_shared
-
-    @property
     def rank(self):
         """
         Get MPI Rank
         """
         return self._rank
-
-    @property
-    def rank_shared(self):
-        """
-        Get MPI Node Rank
-        """
-        return self._rank_shared
 
     @property
     def comm(self):
@@ -213,31 +162,6 @@ class SpinifelContexts(metaclass=Singleton):
             return self._comm_compute
         else:
             return self._comm
-
-
-    @property
-    def comm_shared(self):
-        """
-        Get MPI Communicator
-        """
-        return self._comm_shared
-
-    @property
-    def comm_compute_shared(self):
-        """
-        Get MPI Compute Only Communicator shared within Node
-
-        We use `_psana_excl_ranks` to check if psana2 is used
-        to avoid intializing SpinfielSettings again.
-
-        For MPI-hdf5, this is world communication.
-        For MPI-psana2, this comm exludes all exclusive
-        ranks (smd0, eb and srv) from the communication group.
-        """
-        if self._psana_excl_ranks:
-            return self._comm_compute_shared
-        else:
-            return self._comm_shared
 
     @property
     def is_worker(self):
