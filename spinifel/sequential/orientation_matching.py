@@ -21,11 +21,15 @@ if settings.use_cupy:
     else:
         from pycuda.gpuarray import to_gpu
 
+    from cupyx.scipy.sparse.linalg import LinearOperator, cg
+    from cupy.linalg import norm
     import cupy as xp
 
     from cupy.cublas import gemm
     from cupyx.scipy.special import softmax
 else:
+    from scipy.linalg import norm
+    from scipy.sparse.linalg import LinearOperator, cg
     from scipy.linalg.blas import dgemm as gemm
     from scipy.special import softmax
     xp = np
@@ -88,9 +92,8 @@ class SNM:
         
         self.nufft = nufft
 
-    @staticmethod
     @nvtx.annotate("sequential/orientation_matching.py::modified", is_prefix=True)
-    def intensity_clip(data, thresh):
+    def intensity_clip(self, data, thresh):
         """
         clip pixel intensities above threshold, i.e. pix_val = min(pix_val, thresh)
         """
@@ -99,9 +102,8 @@ class SNM:
             data[ind] = thresh
         return data
         
-    @staticmethod
     @nvtx.annotate("sequential/orientation_matching.py::modified", is_prefix=True)
-    def euclidean_gemm(x, y, out):
+    def euclidean_gemm(self, x, y, out):
         """
         Thin wrapper for the GEMM function to support both scipy blas routines and cublas gemm
         """
@@ -114,9 +116,8 @@ class SNM:
             np.add(out, twoxy, out=out)
             return out
 
-    @staticmethod
     @nvtx.annotate("sequential/orientation_matching.py::modified", is_prefix=True)
-    def euclidean_dist(x, y, y_2, dist):
+    def euclidean_dist(self, x, y, y_2, dist, start, end):
         """
         Computes the pair-wise euclidean distance betwee two image groups. This formulation relies on blas support from CUDA/ROCM.
         The computation relies on the fact that
@@ -126,8 +127,8 @@ class SNM:
         """
         x = xp.array(x)
         x_2 = xp.square(x).sum(axis=1)
-        xp.add(x_2[:, xp.newaxis], y_2[xp.newaxis, :], out=dist)
-        return SNM.euclidean_gemm(x, y, dist)
+        xp.add(x_2[:, xp.newaxis], y_2[xp.newaxis, :], out=dist[start:end])
+        return self.euclidean_gemm(x, y, dist[start:end])
 
     @nvtx.annotate("sequential/orientation_matching.py::modified", is_prefix=True)
     def slicing_and_match_with_min_dist(self, ac):
@@ -222,8 +223,9 @@ class SNM:
             
             match_middle = time.monotonic()
             match_oth_time += match_middle - match_start
-            SNM.euclidean_dist(
-                data_images, self.slices_, self.slices_2, self.dist[st_m:en_m])
+            self.euclidean_dist(
+                data_images, self.slices_, self.slices_2, self.dist, st_m, en_m
+            )
             
             match_time += time.monotonic() - match_middle
 

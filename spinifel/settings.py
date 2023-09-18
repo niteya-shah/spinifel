@@ -408,13 +408,6 @@ class SpinifelSettings(metaclass=Singleton):
                 1000,
                 "N_batch_size parameter for slicing in batches",
             ),
-            "_N_streams": (
-                "algorithm",
-                "N_streams",
-                int,
-                1,
-                "Number of parallel streams to use when using MPI NUFFT",
-            ),
             "_load_generation": (
                 "algorithm",
                 "load_generation",
@@ -507,21 +500,6 @@ class SpinifelSettings(metaclass=Singleton):
                 0.75,
                 "Amount of correct orientations in main and unit tests",
             ),
-                "_split_type": (
-                "orientation_matching",
-                "split_type",
-                str,
-                "balanced",
-                "Strategy for distributing orientations over nodes",
-            ),
-                "_split_size": (
-                "orientation_matching",
-                "split_size",
-                int,
-                256000,
-                "Number of orientations per node for balanced split",
-            ),
-
         }
 
         self.__init_internals()
