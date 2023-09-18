@@ -145,9 +145,15 @@ class WindowManager:
         self.win = MPI.Win.Create(self.shared_memory.local_buf, comm=contexts.comm_compute)
 
     def lock(self, target_rank):
+        """
+        Helper to begin transfers from the window at target rank
+        """
         self.win.Lock(rank=target_rank, lock_type=MPI.LOCK_SHARED)
 
     def unlock(self, target_rank):
+        """
+        Helper to end transfers from the window at target rank
+        """
         self.win.Unlock(rank=target_rank)
 
     @staticmethod
@@ -189,25 +195,43 @@ class WindowManager:
             ) // num_nodes_in_split
 
     def get_win(self, target_rank, target, transfer_buf):
+        """
+        Helper Function to perform the Get MPI operation for the MPI window
+        target_rank : Rank to fetch data from
+        target : MPI Window Get information for offset, dtype and strides
+        transfer_buf : Buffer to put the data into
+        """
         self.win.Get(
             transfer_buf,
             target_rank=target_rank,
             target=(*target, self.shared_memory.mpi_dtype))
     
     def get_win_local(self, rank):
+        """
+        Get the data from a shared memory region as an numpy array
+        """
         buf, itemsize = self.shared_memory.win_shared.Shared_query(rank)
         return np.ndarray(buffer=buf, dtype=self.dtype, shape=self.rank_shape)
     
     def set_win(self, arr):
+        """
+        Set values for the rank's shared memory region
+        """
         self.shared_memory[:] = arr
     
     def get_strides(self):
+        """
+        Return strides for the shared memory region
+        """
         return self.shared_memory.local_buf.strides
 
     def flush(self, target_rank):
+        """
+        Flush all local operations for the Window
+        """
         self.win.Flush_local(target_rank)
 
-def halo_generator(shared_comm_size, comm_size, rank, stream_id, num_streams, splits=1):
+def rank_generator(shared_comm_size, comm_size, rank, stream_id, num_streams, splits=1):
     """
     Yields target rank for a symmetric All-to-All exchange.
     stream_id : Ranks for the stream

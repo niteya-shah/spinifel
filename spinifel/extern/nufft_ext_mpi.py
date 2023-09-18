@@ -3,13 +3,10 @@
 from importlib.metadata import version
 import numpy as np
 import PyNVTX as nvtx
-from spinifel import settings, contexts, Profiler
+from spinifel import settings, contexts
 
 import skopi as skp
 from spinifel.extern import cufinufft_ext
-
-profiler = Profiler()
-
 
 if settings.use_cufinufft:
     if settings.use_pygpu:
@@ -109,11 +106,6 @@ class NUFFT_MPI:
             )
           
         elif contexts.finufftpy_available:
-            # Shift finufft to Shared version
-            # self.H_f = np.empty((self.N_pixels * self.N_batch_size,), dtype=f_type)
-            # self.K_f = np.empty((self.N_pixels * self.N_batch_size,), dtype=f_type)
-            # self.L_f = np.empty((self.N_pixels * self.N_batch_size,), dtype=f_type)
-
             self.H_a = np.empty((self.N_pixels * self.N_images,), dtype=f_type)
             self.K_a = np.empty((self.N_pixels * self.N_images,), dtype=f_type)
             self.L_a = np.empty((self.N_pixels * self.N_images,), dtype=f_type)
@@ -239,11 +231,6 @@ class NUFFT_MPI:
 
         def free_gpuarrays_and_cufinufft_plans(self):
             if not settings.use_pygpu:
-
-                # TODO: Fix to remove Transfer Buffers and Plans
-                # self.H_f.gpudata.free()
-                # self.K_f.gpudata.free()
-                # self.L_f.gpudata.free()
                 self.H_a.gpudata.free()
                 self.K_a.gpudata.free()
                 self.L_a.gpudata.free()
@@ -338,10 +325,12 @@ class NUFFT_MPI:
 
     elif mode == "cufinufft1.1":
 
-        def forward(self, ugrid, st, en, support, use_recip_sym, N):
-            H_ = self.HKL_mat[0, st:en, :].reshape(-1)
-            K_ = self.HKL_mat[1, st:en, :].reshape(-1)
-            L_ = self.HKL_mat[2, st:en, :].reshape(-1)
+        @nvtx.annotate("NUFFT/cufinufft/forward", is_prefix=True)
+        def forward(self, ugrid, H_, K_, L_, stream_id, support, use_recip_sym, N):
+            """
+            New version of forward now accepts gpuarray/pygpu arrays in H_, K_, L_ directly
+            We also pass stream_id to ensure that every thread has a unique plan
+            """
 
             assert H_.shape == K_.shape == L_.shape
 
@@ -355,18 +344,16 @@ class NUFFT_MPI:
             dev_id = cp.cuda.device.Device().id
             H_, K_, L_ = self.transpose(H_, K_, L_)
 
-            self.H_.set(H_)
-            self.K_.set(K_)
-            self.L_.set(L_)
-
             forward_opts = cufinufft.default_opts(nufft_type=2, dim=dim)
             forward_opts.gpu_method = 1  # Override with method 1. The default is 2
             forward_opts.cuda_device_id = dev_id
 
             nuvect = gpuarray.GPUArray(shape=(N,), dtype=c_type)
 
-            if not hasattr(self, "plan"):
-                self.plan = cufinufft(
+            if not hasattr(self, "plan_f"):
+                self.plan_f = {}
+            if stream_id not in self.plan_f:
+                self.plan_f[stream_id] = cufinufft(
                     2,
                     ugrid.shape,
                     1,
@@ -376,8 +363,8 @@ class NUFFT_MPI:
                     opts=forward_opts,
                 )
 
-            self.plan.set_pts(self.H_f.shape[0], self.H_f, self.K_f, self.L_f)
-            self.plan.execute(nuvect, ugrid)
+            self.plan_f[stream_id].set_pts(H_.shape[0], H_, K_, L_)
+            self.plan_f[stream_id].execute(nuvect, ugrid)
             return self.gpuarray_to_cupy(nuvect)
 
         @nvtx.annotate("NUFFT/cufinufft/adjoint", is_prefix=True)
@@ -419,14 +406,11 @@ class NUFFT_MPI:
     elif mode == "finufft2.1.0":
 
         @nvtx.annotate("NUFFT/finufft/forward", is_prefix=True)
-        def forward(self, ugrid, st, en, support, use_recip_sym, N):
+        def forward(self, ugrid, H_, K_, L_, stream_id, support, use_recip_sym, N):
             """
             Version 1 of fiNUFFT 3D type 2
             """
 
-            H_ = self.HKL_mat[0, st:en, :].reshape(-1)
-            K_ = self.HKL_mat[1, st:en, :].reshape(-1)
-            L_ = self.HKL_mat[2, st:en, :].reshape(-1)
             assert H_.shape == K_.shape == L_.shape
 
             if use_recip_sym:
@@ -488,13 +472,10 @@ class NUFFT_MPI:
     elif mode == "finufft1.1.2":
 
         @nvtx.annotate("NUFFT/finufft/forward", is_prefix=True)
-        def forward(self, ugrid, st, en, support, use_recip_sym, N):
+        def forward(self, ugrid, H_, K_, L_, stream_id, support, use_recip_sym, N):
             """
             Version 1 of fiNUFFT 3D type 2
             """
-            H_ = self.HKL_mat[0, st:en, :].reshape(-1)
-            K_ = self.HKL_mat[1, st:en, :].reshape(-1)
-            L_ = self.HKL_mat[2, st:en, :].reshape(-1)
             assert H_.shape == K_.shape == L_.shape
 
             # Allocate space in memory
