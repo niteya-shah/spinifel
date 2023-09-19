@@ -86,11 +86,12 @@ class SNM_MPI(SNM):
             shared = target_rank // contexts.size_compute_shared == contexts.rank // contexts.size_compute_shared
 
             self.nufft.HKL_mat.lock(target_rank)
-            
+            if shared:
+                target_arr = self.nufft.HKL_mat.get_win_local(target_rank %  contexts.size_compute_shared)
+
             for offset in range(self.nufft.HKL_mat.rank_shape[1]//self.N_batch_size):
                 slice_start = time.monotonic()
                 if shared:
-                    target_arr = self.nufft.HKL_mat.get_win_local(target_rank %  contexts.size_compute_shared)
                     # H, K and L
                     for dim in range(3):
                         arr_offset = (dim, slice(offset * self.N_batch_size, (offset + 1) * self.N_batch_size))
