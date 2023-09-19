@@ -2,11 +2,12 @@ import PyNVTX as nvtx
 
 from spinifel.sequential.orientation_matching import SNM
 from spinifel.extern.orientations_ext import rank_generator
-from spinifel import settings, contexts, Profiler
+from spinifel import settings, contexts, Profiler, Logger
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import time
 import numpy as np
+logger = Logger(True, settings)
 
 if settings.use_cupy:
     import os
