@@ -36,10 +36,11 @@ else:
 if settings.use_single_prec:
     f_type = xp.float32
     c_type = xp.complex64
+    max_val = 8
 else:
     f_type = xp.float64
     c_type = xp.complex128
-
+    max_val = 32
 
 class MergeMPI(Merge):
     def __init__(
@@ -68,8 +69,8 @@ class MergeMPI(Merge):
         self.M_ups = self.M * 2
         self.alambda = 1
         self.Mtot = self.M**3
-        self.rlambda = self.Mtot / self.N * 2 ** (self.comm.rank - self.comm.size / 2)
-        self.flambda = 1e5 * pow(10, self.comm.rank - self.comm.size // 2)
+        self.rlambda = self.Mtot / self.N * 2 ** ((self.comm.rank - self.comm.size / 2) % max_val)
+        self.flambda = 1e5 * pow(10, ((self.comm.rank - self.comm.size // 2) % max_val))
         self.ref_rank = -1
         self.mult = np.pi / (self.reciprocal_extent)
 

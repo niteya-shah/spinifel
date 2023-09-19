@@ -151,12 +151,17 @@ class SNM_MPI(SNM):
         else:
             ugrid = ac.astype(c_type)
 
-        with ThreadPoolExecutor(max_workers=settings.N_streams) as executor:
-            futures = list(map(lambda stream_id: self._slice_and_match_int(stream_id, ugrid), range(settings.N_streams)))
+        if settings.N_streams == 1:
+            self._slice_and_match_int(0, ugrid)
+        else:
+            futures = []
+            with ThreadPoolExecutor(max_workers=settings.N_streams) as executor:
+                for i in range(settings.N_streams):
+                    futures.append(executor.submit(self._slice_and_match_int(i, ugrid)))           
 
-            # for future in as_completed(futures):
-                # if future.exception():
-                    # logger.log(repr(future.exception()), level=1)
+            for future in as_completed(futures):
+                if future.exception():
+                    logger.log(repr(future.exception()), level=1)
 
         args_final = xp.take_along_axis(self.args, self.dist[:, self.N_batch_size].argmin(axis=0)[None, :], 0).get()
         distances_final = self.dist[:, self.N_batch_size].min(axis=0).get()
