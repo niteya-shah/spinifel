@@ -92,8 +92,9 @@ class SNM:
         
         self.nufft = nufft
 
+    @staticmethod
     @nvtx.annotate("sequential/orientation_matching.py::modified", is_prefix=True)
-    def intensity_clip(self, data, thresh):
+    def intensity_clip(data, thresh):
         """
         clip pixel intensities above threshold, i.e. pix_val = min(pix_val, thresh)
         """
@@ -101,9 +102,10 @@ class SNM:
             ind = xp.where(data >= thresh)
             data[ind] = thresh
         return data
-        
+    
+    @staticmethod
     @nvtx.annotate("sequential/orientation_matching.py::modified", is_prefix=True)
-    def euclidean_gemm(self, x, y, out):
+    def euclidean_gemm(x, y, out):
         """
         Thin wrapper for the GEMM function to support both scipy blas routines and cublas gemm
         """
@@ -116,8 +118,9 @@ class SNM:
             np.add(out, twoxy, out=out)
             return out
 
+    @staticmethod
     @nvtx.annotate("sequential/orientation_matching.py::modified", is_prefix=True)
-    def euclidean_dist(self, x, y, y_2, dist, start, end):
+    def euclidean_dist(x, y, y_2, dist):
         """
         Computes the pair-wise euclidean distance betwee two image groups. This formulation relies on blas support from CUDA/ROCM.
         The computation relies on the fact that
@@ -127,8 +130,8 @@ class SNM:
         """
         x = xp.array(x)
         x_2 = xp.square(x).sum(axis=1)
-        xp.add(x_2[:, xp.newaxis], y_2[xp.newaxis, :], out=dist[start:end])
-        return self.euclidean_gemm(x, y, dist[start:end])
+        xp.add(x_2[:, xp.newaxis], y_2[xp.newaxis, :], out=dist)
+        return SNM.euclidean_gemm(x, y, dist)
 
     @nvtx.annotate("sequential/orientation_matching.py::modified", is_prefix=True)
     def slicing_and_match_with_min_dist(self, ac):
@@ -223,8 +226,8 @@ class SNM:
             
             match_middle = time.monotonic()
             match_oth_time += match_middle - match_start
-            self.euclidean_dist(
-                data_images, self.slices_, self.slices_2, self.dist, st_m, en_m
+            SNM.euclidean_dist(
+                data_images, self.slices_, self.slices_2, self.dist[st_m:en_m]
             )
             
             match_time += time.monotonic() - match_middle

@@ -514,6 +514,13 @@ class SpinifelSettings(metaclass=Singleton):
                 256000,
                 "Number of orientations per node for balanced split",
             ),
+                "_N_streams" : (
+                    "orientation_matching",
+                    "N_streams",
+                    int,
+                    1,
+                    "Number of parallel streams to use when using MPI Orientation Matching"
+                )
 
         }
 
