@@ -82,10 +82,11 @@ class SNM_MPI(SNM):
         for target_rank in rank_generator(contexts.size_compute_shared, contexts.size_compute, contexts.rank, stream_id, settings.N_streams, self.nufft.HKL_mat.splits):
             shared = target_rank // contexts.size_compute_shared == contexts.rank // contexts.size_compute_shared
 
-            self.nufft.HKL_mat.lock(target_rank)
+
             if shared:
                 target_arr = self.nufft.HKL_mat.get_win_local(target_rank %  contexts.size_compute_shared)
-
+            else:
+                self.nufft.HKL_mat.lock(target_rank)                
             for offset in range(self.nufft.HKL_mat.rank_shape[1]//self.N_batch_size):
                 slice_start = time.monotonic()
                 if shared:
@@ -131,7 +132,8 @@ class SNM_MPI(SNM):
                 self.dist[stream_id, -1] = min_distance
                 match_time += time.monotonic() - match_middle
             
-            self.nufft.HKL_mat.unlock(target_rank)
+            if not shared:
+                self.nufft.HKL_mat.unlock(target_rank)
         contexts.ctx.pop()
 
     @nvtx.annotate("sequential/orientation_matching.py::modified", is_prefix=True)
@@ -154,7 +156,7 @@ class SNM_MPI(SNM):
             futures = []
             with ThreadPoolExecutor(max_workers=settings.N_streams) as executor:
                 for i in range(settings.N_streams):
-                    futures.append(executor.submit(self._slice_and_match_int(i, ugrid)))           
+                    futures.append(executor.submit(self._slice_and_match_int, i, ugrid))           
 
             for future in as_completed(futures):
                 if future.exception():
