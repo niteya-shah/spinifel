@@ -1,7 +1,7 @@
 import PyNVTX as nvtx
 
 from spinifel.sequential.orientation_matching import SNM
-from spinifel.extern.orientations_ext import rank_generator
+from spinifel.extern.orientations_ext import rank_generator, rank_generator_serial
 from spinifel import settings, contexts, Profiler, Logger
 from concurrent.futures import ThreadPoolExecutor, as_completed
 

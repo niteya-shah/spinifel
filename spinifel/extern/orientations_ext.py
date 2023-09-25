@@ -265,3 +265,17 @@ def rank_generator(shared_comm_size, comm_size, rank, stream_id, num_streams, sp
             stream_id_target = (idx * num_nodes_in_split + jdx) % num_streams
             if stream_id == stream_id_target:
                 yield target_rank + offset_in_split * num_nodes_in_split * shared_comm_size
+
+def rank_generator_serial(shared_comm_size, comm_size, rank, stream_id, num_streams, splits=1):
+    num_nodes = comm_size // shared_comm_size
+    num_nodes_in_split = num_nodes // splits
+    node_id = rank // shared_comm_size
+
+    offset_node_id = node_id % num_nodes_in_split
+    offset_in_split = node_id // num_nodes_in_split
+
+    for target_node in range(num_nodes_in_split):
+        for target_shared_comm in range(shared_comm_size):
+            yield (
+                target_node + offset_in_split * num_nodes_in_split
+            ) * shared_comm_size + target_shared_comm
