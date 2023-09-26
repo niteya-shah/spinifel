@@ -144,17 +144,17 @@ class WindowManager:
         self.shared_memory = SharedMemory(self.rank_shape, dtype, pinned=pinned)
         self.win = MPI.Win.Create(self.shared_memory.local_buf, comm=contexts.comm_compute)
 
-    def lock(self, target_rank):
+    def lock(self):
         """
-        Helper to begin transfers from the window at target rank
+        Helper to begin all transfers from the window
         """
-        self.win.Lock(rank=target_rank, lock_type=MPI.LOCK_SHARED)
+        self.win.Lock_all(assertion=MPI.MODE_NOCHECK)
 
-    def unlock(self, target_rank):
+    def unlock(self):
         """
-        Helper to end transfers from the window at target rank
+        Helper to end all transfers from the window
         """
-        self.win.Unlock(rank=target_rank)
+        self.win.Unlock_all()
 
     @staticmethod
     def get_even_rank_shape(shape):

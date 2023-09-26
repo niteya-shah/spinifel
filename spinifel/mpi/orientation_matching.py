@@ -85,8 +85,7 @@ class SNM_MPI(SNM):
 
             if shared:
                 target_arr = self.nufft.HKL_mat.get_win_local(target_rank %  contexts.size_compute_shared)
-            else:
-                self.nufft.HKL_mat.lock(target_rank)                
+              
             for offset in range(self.nufft.HKL_mat.rank_shape[1]//self.N_batch_size):
                 slice_start = time.monotonic()
                 if shared:
@@ -132,8 +131,6 @@ class SNM_MPI(SNM):
                 self.dist[stream_id, -1] = min_distance
                 match_time += time.monotonic() - match_middle
             
-            if not shared:
-                self.nufft.HKL_mat.unlock(target_rank)
         contexts.ctx.pop()
 
     @nvtx.annotate("sequential/orientation_matching.py::modified", is_prefix=True)
@@ -150,6 +147,8 @@ class SNM_MPI(SNM):
         else:
             ugrid = ac.astype(c_type)
 
+        self.nufft.HKL_mat.lock()
+
         if settings.N_streams == 1:
             self._slice_and_match_int(0, ugrid)
         else:
@@ -161,6 +160,8 @@ class SNM_MPI(SNM):
             for future in as_completed(futures):
                 if future.exception():
                     logger.log(repr(future.exception()), level=1)
+
+        self.nufft.HKL_mat.unlock()
 
         args_final = xp.take_along_axis(self.args, self.dist[:, self.N_batch_size].argmin(axis=0)[None, :], 0).get()
         distances_final = self.dist[:, self.N_batch_size].min(axis=0).get()
