@@ -133,7 +133,7 @@ class SNM_MPI(SNM):
             
         contexts.ctx.pop()
 
-    @nvtx.annotate("sequential/orientation_matching.py::modified", is_prefix=True)
+    @nvtx.annotate("mpi/orientation_matching.py::modified", is_prefix=True)
     def slicing_and_match_with_min_dist(self, ac):
         st_init = time.monotonic()
         if not self.N_slices:
@@ -163,11 +163,14 @@ class SNM_MPI(SNM):
 
         self.nufft.HKL_mat.unlock()
 
-        args_final = xp.take_along_axis(self.args, self.dist[:, self.N_batch_size].argmin(axis=0)[None, :], 0).get()
-        distances_final = self.dist[:, self.N_batch_size].min(axis=0).get()
-        return xp.squeeze(self.nufft.ref_orientations[args_final]), distances_final
+        args_final = xp.take_along_axis(self.args, self.dist[:, self.N_batch_size].argmin(axis=0)[None, :], 0)
+        distances_final = self.dist[:, self.N_batch_size].min(axis=0)
+        if settings.use_cupy:
+            args_final = args_final.get()
+            distances_final = distances_final.get()
+        return np.squeeze(self.nufft.ref_orientations[args_final]), distances_final
 
-    @nvtx.annotate("sequential/orientation_matching.py::modified", is_prefix=True)
+    @nvtx.annotate("mpi/orientation_matching.py::modified", is_prefix=True)
     def slicing_and_match(self, ac):
         orients, dist = self.slicing_and_match_with_min_dist(ac)
         return orients
