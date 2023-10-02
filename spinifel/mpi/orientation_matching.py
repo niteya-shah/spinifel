@@ -142,6 +142,10 @@ class SNM_MPI(SNM):
         if not hasattr(self, "dist"):
             self.dist = xp.full((settings.N_streams, self.N_batch_size + 1, self.N_slices), xp.finfo(xp.float64).max)
             self.args = xp.zeros((settings.N_streams, self.N_slices), dtype=int_type)
+        else:
+            self.dist[:, self.N_batch_size].fill(xp.finfo(xp.float64).max)
+            self.args.fill(0)
+
         if settings.use_cufinufft:
             ugrid = to_gpu(ac.astype(c_type))
         else:
